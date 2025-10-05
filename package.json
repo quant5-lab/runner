@@ -1,0 +1,19 @@
+{
+  "name": "pinets-example-app",
+  "version": "1.0.0",
+  "description": "Lightweight Node.js app demonstrating PineTS usage",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "pinets": "file:../PineTS"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
