@@ -116,8 +116,12 @@ dist/
 .pnp.*
 
 # Generated files
-chart-data.json
-chart-config.json
+out/chart-data.json
+out/chart-config.json
+
+# Keep the output directory structure and template
+!out/
+!out/index.html
 
 # OS generated files
 .DS_Store

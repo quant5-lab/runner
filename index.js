@@ -1,5 +1,6 @@
 import { PineTS, Provider } from '../PineTS/dist/pinets.dev.es.js';
-import { writeFileSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { MoexProvider } from './providers/MoexProvider.js';
 import { YahooFinanceProvider } from './providers/YahooFinanceProvider.js';
 
@@ -246,18 +247,28 @@ class ConfigurationBuilder {
 }
 
 class FileExporter {
+    static ensureOutDirectory() {
+        try {
+            mkdirSync('out', { recursive: true });
+        } catch (error) {
+            /* Directory already exists */
+        }
+    }
+
     static exportChartData(candlestickData, plots) {
+        this.ensureOutDirectory();
         const chartData = {
             candlestick: candlestickData,
             plots,
             timestamp: new Date().toISOString()
         };
         
-        writeFileSync('chart-data.json', JSON.stringify(chartData, null, 2));
+        writeFileSync(join('out', 'chart-data.json'), JSON.stringify(chartData, null, 2));
     }
 
     static exportConfiguration(config) {
-        writeFileSync('chart-config.json', JSON.stringify(config, null, 2));
+        this.ensureOutDirectory();
+        writeFileSync(join('out', 'chart-config.json'), JSON.stringify(config, null, 2));
     }
 }
 
