@@ -1,7 +1,7 @@
 import { PineTS, Provider } from '../PineTS/dist/pinets.dev.es.js';
 import { MoexProvider } from './providers/MoexProvider.js';
 import { YahooFinanceProvider } from './providers/YahooFinanceProvider.js';
-import { TradingOrchestrator } from './classes/TradingOrchestrator.js';
+import { createContainer } from './container.js';
 
 const PROVIDER_CHAIN = [
     { name: 'MOEX', instance: new MoexProvider() },
@@ -28,11 +28,16 @@ async function main() {
         const envTimeframe = process.env.TIMEFRAME || timeframe;
         const envBars = parseInt(process.env.BARS) || bars;
         
-        const orchestrator = new TradingOrchestrator(PROVIDER_CHAIN, DEFAULT_CONFIG);
+        const container = createContainer(PROVIDER_CHAIN, DEFAULT_CONFIG);
+        const orchestrator = container.resolve('tradingOrchestrator');
+        const logger = container.resolve('logger');
+        
         await orchestrator.runTradingAnalysis(envSymbol, envTimeframe, envBars);
         
     } catch (error) {
-        console.error('Error:', error);
+        const container = createContainer(PROVIDER_CHAIN, DEFAULT_CONFIG);
+        const logger = container.resolve('logger');
+        logger.error('Error:', error);
         process.exit(1);
     }
 }

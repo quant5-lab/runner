@@ -2,27 +2,10 @@ import { PineTS, Provider } from '../../PineTS/dist/pinets.dev.es.js';
 
 class TechnicalAnalysisEngine {
     async createPineTSAdapter(provider, data, instance, symbol, timeframe, bars) {
-        if (provider === 'Binance') {
-            // Binance: Use PineTS built-in Binance provider - exact pattern from docs
-            const pineTS = new PineTS(Provider.Binance, symbol, timeframe, bars);
-            await pineTS.ready();
-            return pineTS;
-        } else if (provider === 'MOEX') {
-            // MOEX: Use existing MOEX provider instance
-            const pineTS = new PineTS(instance, symbol, timeframe, bars);
-            await pineTS.ready();
-            return pineTS;
-        } else if (provider === 'YahooFinance') {
-            // Yahoo: Use existing Yahoo provider instance
-            const pineTS = new PineTS(instance, symbol, timeframe, bars);
-            await pineTS.ready();
-            return pineTS;
-        } else {
-            // Fallback: Pass data array directly
-            const pineTS = new PineTS(data, symbol, timeframe, bars);
-            await pineTS.ready();
-            return pineTS;
-        }
+        /* All providers now return consistent data arrays - create PineTS from data */
+        const pineTS = new PineTS(data, symbol, timeframe, bars);
+        await pineTS.ready();
+        return pineTS;
     }
 
     async runEMAStrategy(pineTS) {

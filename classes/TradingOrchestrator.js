@@ -5,24 +5,25 @@ import { ConfigurationBuilder } from './ConfigurationBuilder.js';
 import { FileExporter } from './FileExporter.js';
 
 class TradingOrchestrator {
-    constructor(providerChain, defaultConfig) {
-        this.providerManager = new ProviderManager(providerChain);
-        this.technicalAnalysisEngine = new TechnicalAnalysisEngine();
-        this.dataProcessor = new DataProcessor();
-        this.configurationBuilder = new ConfigurationBuilder(defaultConfig);
-        this.fileExporter = new FileExporter();
+    constructor(providerManager, technicalAnalysisEngine, dataProcessor, configurationBuilder, fileExporter, logger) {
+        this.providerManager = providerManager;
+        this.technicalAnalysisEngine = technicalAnalysisEngine;
+        this.dataProcessor = dataProcessor;
+        this.configurationBuilder = configurationBuilder;
+        this.fileExporter = fileExporter;
+        this.logger = logger;
     }
 
     async runTradingAnalysis(symbol, timeframe, bars) {
-        console.log(`📊 Configuration: Symbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
+        this.logger.log(`📊 Configuration: Symbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
         
         const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars);
         
-        console.log(`🎯 Attempting to fetch ${symbol} (${timeframe}) with dynamic provider fallback`);
+        this.logger.log(`🎯 Attempting to fetch ${symbol} (${timeframe}) with dynamic provider fallback`);
         
         const { provider, data, instance } = await this.providerManager.fetchMarketData(symbol, timeframe, bars);
         
-        console.log(`📊 Using ${provider} provider for ${symbol}`);
+        this.logger.log(`📊 Using ${provider} provider for ${symbol}`);
         
         const pineTS = await this.technicalAnalysisEngine.createPineTSAdapter(provider, data, instance, symbol, timeframe, bars);
         
@@ -47,7 +48,7 @@ class TradingOrchestrator {
         const chartConfig = this.configurationBuilder.generateChartConfig(tradingConfig, indicatorMetadata);
         this.fileExporter.exportConfiguration(chartConfig);
         
-        console.log(`Successfully processed ${candlestickData.length} candles for ${tradingConfig.symbol}`);
+        this.logger.log(`Successfully processed ${candlestickData.length} candles for ${tradingConfig.symbol}`);
     }
 
     processIndicatorPlots(result, data) {
