@@ -1,12 +1,41 @@
 import { PineTS, Provider } from '../PineTS/dist/pinets.dev.es.js';
 import { writeFileSync } from 'fs';
+import { MoexProvider } from './providers/MoexProvider.js';
 
-/* Configuration - Single Source of Truth */
-const TRADING_CONFIG = {
-    symbol: 'BTCUSDT',
-    provider: Provider.Binance,
-    timeframe: 'D',
-    bars: 100,
+/* Extended Provider System */
+const PROVIDERS = {
+    Binance: Provider.Binance,
+    MOEX: new MoexProvider()
+};
+
+/* Symbol-to-Provider Auto-Detection */
+const SYMBOL_MAPPING = {
+    // MOEX Stocks
+    'SBER': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'GAZP': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: '60' },
+    'YNDX': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'LKOH': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'ROSN': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'NVTK': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'MGNT': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    'VTBR': { provider: 'MOEX', exchange: 'MOEX', defaultTimeframe: 'D' },
+    
+    // Binance Crypto
+    'BTCUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1m' },
+    'ETHUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '4h' },
+    'ADAUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' },
+    'DOTUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' },
+    'LINKUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' },
+    'UNIUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' },
+    'LTCUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' },
+    'XRPUSDT': { provider: 'Binance', exchange: 'Binance', defaultTimeframe: '1h' }
+};
+
+/* Default Configuration - Auto-detects provider based on symbol */
+const DEFAULT_CONFIG = {
+    symbol: process.env.SYMBOL || 'BTCUSDT',
+    timeframe: process.env.TIMEFRAME || null, // Auto-detect if not specified
+    bars: parseInt(process.env.BARS) || 100,
     strategy: 'EMA Crossover Strategy',
     indicators: {
         ema9: { period: 9, color: '#2196F3' },
@@ -17,34 +46,85 @@ const TRADING_CONFIG = {
 
 /* Alternative configurations for easy switching */
 const PRESET_CONFIGS = {
-    scalping: {
+    binance_scalping: {
         symbol: 'BTCUSDT',
+        provider: PROVIDERS.Binance,
+        exchange: 'Binance',
         timeframe: '1m',
         bars: 200,
-        strategy: 'Scalping EMA',
+        strategy: 'Binance Scalping EMA',
         indicators: {
             ema9: { period: 9, color: '#00BCD4' },
             ema21: { period: 21, color: '#FF5722' }
         }
     },
-    swing: {
+    binance_swing: {
         symbol: 'ETHUSDT', 
+        provider: PROVIDERS.Binance,
+        exchange: 'Binance',
         timeframe: '4h',
         bars: 150,
-        strategy: 'Swing Trading',
+        strategy: 'Binance Swing Trading',
         indicators: {
             ema20: { period: 20, color: '#9C27B0' },
             ema50: { period: 50, color: '#FF9800' }
+        }
+    },
+    moex_daily: {
+        symbol: 'SBER',
+        provider: PROVIDERS.MOEX,
+        exchange: 'MOEX',
+        timeframe: 'D',
+        bars: 100,
+        strategy: 'MOEX Daily EMA',
+        indicators: {
+            ema9: { period: 9, color: '#2196F3' },
+            ema18: { period: 18, color: '#F44336' }
+        }
+    },
+    moex_intraday: {
+        symbol: 'GAZP',
+        provider: PROVIDERS.MOEX,
+        exchange: 'MOEX', 
+        timeframe: '60',
+        bars: 150,
+        strategy: 'MOEX Hourly Trading',
+        indicators: {
+            ema12: { period: 12, color: '#4CAF50' },
+            ema26: { period: 26, color: '#FF5722' }
         }
     }
 };
 
 class ConfigurationManager {
+    static autoDetectProvider(symbol) {
+        const symbolInfo = SYMBOL_MAPPING[symbol.toUpperCase()];
+        if (!symbolInfo) {
+            throw new Error(`Unknown symbol: ${symbol}. Add it to SYMBOL_MAPPING or use supported symbols.`);
+        }
+        return symbolInfo;
+    }
+
+    static createUnifiedConfig(symbol, timeframe = null, bars = 100) {
+        const symbolInfo = this.autoDetectProvider(symbol);
+        
+        return {
+            symbol: symbol.toUpperCase(),
+            provider: PROVIDERS[symbolInfo.provider],
+            exchange: symbolInfo.exchange,
+            timeframe: timeframe || symbolInfo.defaultTimeframe,
+            bars,
+            strategy: `${symbolInfo.exchange} Auto-Detected Strategy`,
+            indicators: DEFAULT_CONFIG.indicators
+        };
+    }
+
     static generateChartConfig(tradingConfig, calculatedIndicators) {
         return {
             ui: {
-                title: `${tradingConfig.strategy} - ${tradingConfig.symbol}`,
+                title: `${tradingConfig.strategy} - ${tradingConfig.symbol} (${tradingConfig.exchange})`,
                 symbol: tradingConfig.symbol,
+                exchange: tradingConfig.exchange,
                 timeframe: this.formatTimeframe(tradingConfig.timeframe),
                 strategy: tradingConfig.strategy
             },
@@ -73,11 +153,13 @@ class ConfigurationManager {
 
     static formatTimeframe(timeframe) {
         const timeframes = {
-            '1m': '1 Minute',
-            '5m': '5 Minutes', 
-            '15m': '15 Minutes',
-            '1h': '1 Hour',
-            '4h': '4 Hours',
+            '1': '1 Minute',
+            '5': '5 Minutes', 
+            '10': '10 Minutes',
+            '15': '15 Minutes',
+            '30': '30 Minutes',
+            '60': '1 Hour',
+            '240': '4 Hours',
             'D': 'Daily',
             'W': 'Weekly',
             'M': 'Monthly'
@@ -218,11 +300,21 @@ class ChartDataExporter {
 
 async function main() {
     try {
+        // Unified configuration - auto-detects provider based on symbol
+        const symbol = process.env.SYMBOL || DEFAULT_CONFIG.symbol;
+        const timeframe = process.env.TIMEFRAME || DEFAULT_CONFIG.timeframe;
+        const bars = parseInt(process.env.BARS) || DEFAULT_CONFIG.bars;
+        
+        // Create unified config with auto-detection
+        const activeConfig = ConfigurationManager.createUnifiedConfig(symbol, timeframe, bars);
+        
+        console.log(`Auto-detected: Trading ${activeConfig.symbol} on ${activeConfig.exchange} (${activeConfig.timeframe})`);
+        
         const pineTS = new PineTS(
-            TRADING_CONFIG.provider, 
-            TRADING_CONFIG.symbol, 
-            TRADING_CONFIG.timeframe, 
-            TRADING_CONFIG.bars
+            activeConfig.provider, 
+            activeConfig.symbol, 
+            activeConfig.timeframe, 
+            activeConfig.bars
         );
         
         const { result, plots } = await TechnicalAnalysisCalculator.runEMAIndicator(pineTS);
@@ -238,8 +330,10 @@ async function main() {
         ChartDataExporter.exportToFile(candlestickData, plots);
         
         /* Generate and export chart configuration */
-        const chartConfig = ConfigurationManager.generateChartConfig(TRADING_CONFIG, indicatorMetadata);
+        const chartConfig = ConfigurationManager.generateChartConfig(activeConfig, indicatorMetadata);
         ConfigurationManager.exportConfiguration(chartConfig);
+        
+        console.log(`Successfully processed ${candlestickData.length} candles for ${activeConfig.symbol}`);
         
     } catch (error) {
         console.error('Error:', error);

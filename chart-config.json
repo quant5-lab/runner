@@ -1,9 +1,10 @@
 {
   "ui": {
-    "title": "EMA Crossover Strategy - BTCUSDT",
-    "symbol": "BTCUSDT",
+    "title": "MOEX Auto-Detected Strategy - SBER (MOEX)",
+    "symbol": "SBER",
+    "exchange": "MOEX",
     "timeframe": "Daily",
-    "strategy": "EMA Crossover Strategy"
+    "strategy": "MOEX Auto-Detected Strategy"
   },
   "dataSource": {
     "url": "chart-data.json",
