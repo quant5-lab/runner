@@ -1,0 +1,3537 @@
+{
+  "candlestick": [
+    {
+      "time": 1759622400,
+      "open": 122390.99,
+      "high": 125708.42,
+      "low": 122136,
+      "close": 122709.48,
+      "volume": 18086.177533
+    },
+    {
+      "time": 1759536000,
+      "open": 122232.21,
+      "high": 122800,
+      "low": 121510,
+      "close": 122391,
+      "volume": 8208.16678
+    },
+    {
+      "time": 1759449600,
+      "open": 120529.35,
+      "high": 123894.99,
+      "low": 119248.3,
+      "close": 122232,
+      "volume": 23936.328
+    },
+    {
+      "time": 1759363200,
+      "open": 118594.99,
+      "high": 121022.07,
+      "low": 118279.31,
+      "close": 120529.35,
+      "volume": 19670.83503
+    },
+    {
+      "time": 1759276800,
+      "open": 114048.94,
+      "high": 118649.1,
+      "low": 113966.67,
+      "close": 118594.99,
+      "volume": 20036.39516
+    },
+    {
+      "time": 1759190400,
+      "open": 114311.97,
+      "high": 114792,
+      "low": 112656.27,
+      "close": 114048.93,
+      "volume": 15044.15633
+    },
+    {
+      "time": 1759104000,
+      "open": 112163.96,
+      "high": 114400,
+      "low": 111560.65,
+      "close": 114311.96,
+      "volume": 15541.12005
+    },
+    {
+      "time": 1759017600,
+      "open": 109635.85,
+      "high": 112350,
+      "low": 109189.99,
+      "close": 112163.95,
+      "volume": 7542.3316
+    },
+    {
+      "time": 1758931200,
+      "open": 109643.46,
+      "high": 109743.91,
+      "low": 109064.4,
+      "close": 109635.85,
+      "volume": 5501.78643
+    },
+    {
+      "time": 1758844800,
+      "open": 108994.49,
+      "high": 110300,
+      "low": 108620.07,
+      "close": 109643.46,
+      "volume": 14243.01591
+    },
+    {
+      "time": 1758758400,
+      "open": 113307.01,
+      "high": 113510.23,
+      "low": 108631.51,
+      "close": 108994.49,
+      "volume": 21231.14957
+    },
+    {
+      "time": 1758672000,
+      "open": 111998.8,
+      "high": 113940,
+      "low": 111042.66,
+      "close": 113307,
+      "volume": 12369.25967
+    },
+    {
+      "time": 1758585600,
+      "open": 112650.99,
+      "high": 113290.5,
+      "low": 111458.73,
+      "close": 111998.8,
+      "volume": 12301.3203
+    },
+    {
+      "time": 1758499200,
+      "open": 115232.29,
+      "high": 115379.25,
+      "low": 111800,
+      "close": 112650.99,
+      "volume": 20781.71356
+    },
+    {
+      "time": 1758412800,
+      "open": 115685.63,
+      "high": 115819.06,
+      "low": 115188,
+      "close": 115232.29,
+      "volume": 4511.52219
+    },
+    {
+      "time": 1758326400,
+      "open": 115632.39,
+      "high": 116121.81,
+      "low": 115408.47,
+      "close": 115685.63,
+      "volume": 4674.92752
+    },
+    {
+      "time": 1758240000,
+      "open": 117073.53,
+      "high": 117459.99,
+      "low": 115100,
+      "close": 115632.38,
+      "volume": 8992.09065
+    },
+    {
+      "time": 1758153600,
+      "open": 116447.6,
+      "high": 117900,
+      "low": 116092.76,
+      "close": 117073.53,
+      "volume": 11657.23365
+    },
+    {
+      "time": 1758067200,
+      "open": 116788.96,
+      "high": 117286.73,
+      "low": 114720.81,
+      "close": 116447.59,
+      "volume": 16754.2454
+    },
+    {
+      "time": 1757980800,
+      "open": 115349.71,
+      "high": 116964.27,
+      "low": 114737.11,
+      "close": 116788.96,
+      "volume": 10926.9094
+    },
+    {
+      "time": 1757894400,
+      "open": 115268.01,
+      "high": 116757.99,
+      "low": 114384,
+      "close": 115349.71,
+      "volume": 13212.51149
+    },
+    {
+      "time": 1757808000,
+      "open": 115918.29,
+      "high": 116165.19,
+      "low": 115135,
+      "close": 115268.01,
+      "volume": 6707.60197
+    },
+    {
+      "time": 1757721600,
+      "open": 116029.41,
+      "high": 116298.78,
+      "low": 115127.27,
+      "close": 115918.29,
+      "volume": 8269.40394
+    },
+    {
+      "time": 1757635200,
+      "open": 115482.69,
+      "high": 116665.63,
+      "low": 114740.99,
+      "close": 116029.42,
+      "volume": 15324.10719
+    },
+    {
+      "time": 1757548800,
+      "open": 113960,
+      "high": 115488.09,
+      "low": 113430,
+      "close": 115482.69,
+      "volume": 13676.73119
+    },
+    {
+      "time": 1757462400,
+      "open": 111546.38,
+      "high": 114313.13,
+      "low": 110917.45,
+      "close": 113960,
+      "volume": 17517.41823
+    },
+    {
+      "time": 1757376000,
+      "open": 112065.23,
+      "high": 113293.29,
+      "low": 110766.66,
+      "close": 111546.39,
+      "volume": 15379.28248
+    },
+    {
+      "time": 1757289600,
+      "open": 111137.35,
+      "high": 112924.37,
+      "low": 110621.78,
+      "close": 112065.23,
+      "volume": 11582.40211
+    },
+    {
+      "time": 1757203200,
+      "open": 110187.98,
+      "high": 111600,
+      "low": 110180,
+      "close": 111137.34,
+      "volume": 5681.29944
+    },
+    {
+      "time": 1757116800,
+      "open": 110660,
+      "high": 111307.7,
+      "low": 109977,
+      "close": 110187.97,
+      "volume": 5000.29897
+    },
+    {
+      "time": 1757030400,
+      "open": 110730.87,
+      "high": 113384.62,
+      "low": 110206.96,
+      "close": 110659.99,
+      "volume": 21587.40888
+    },
+    {
+      "time": 1756944000,
+      "open": 111705.72,
+      "high": 112180,
+      "low": 109329.12,
+      "close": 110730.87,
+      "volume": 12203.13536
+    },
+    {
+      "time": 1756857600,
+      "open": 111240.01,
+      "high": 112575.27,
+      "low": 110528.71,
+      "close": 111705.71,
+      "volume": 11773.72084
+    },
+    {
+      "time": 1756771200,
+      "open": 109237.43,
+      "high": 111771.52,
+      "low": 108393.39,
+      "close": 111240.01,
+      "volume": 18510.28756
+    },
+    {
+      "time": 1756684800,
+      "open": 108246.36,
+      "high": 109912.4,
+      "low": 107255,
+      "close": 109237.42,
+      "volume": 16053.60219
+    },
+    {
+      "time": 1756598400,
+      "open": 108816.33,
+      "high": 109480.02,
+      "low": 108076.93,
+      "close": 108246.35,
+      "volume": 9489.51596
+    },
+    {
+      "time": 1756512000,
+      "open": 108377.4,
+      "high": 108926.15,
+      "low": 107350.1,
+      "close": 108816.33,
+      "volume": 10708.39159
+    },
+    {
+      "time": 1756425600,
+      "open": 112566.9,
+      "high": 112638.64,
+      "low": 107463.9,
+      "close": 108377.4,
+      "volume": 22580.31045
+    },
+    {
+      "time": 1756339200,
+      "open": 111262.01,
+      "high": 113485.9,
+      "low": 110862.42,
+      "close": 112566.9,
+      "volume": 11104.27744
+    },
+    {
+      "time": 1756252800,
+      "open": 111763.22,
+      "high": 112625,
+      "low": 110345.42,
+      "close": 111262.01,
+      "volume": 13392.60875
+    },
+    {
+      "time": 1756166400,
+      "open": 110111.98,
+      "high": 112371,
+      "low": 108666.66,
+      "close": 111763.22,
+      "volume": 18452.43877
+    },
+    {
+      "time": 1756080000,
+      "open": 113493.59,
+      "high": 113667.28,
+      "low": 109274.1,
+      "close": 110111.98,
+      "volume": 25182.79379
+    },
+    {
+      "time": 1755993600,
+      "open": 115438.06,
+      "high": 115666.68,
+      "low": 110680,
+      "close": 113493.59,
+      "volume": 21175.98462
+    },
+    {
+      "time": 1755907200,
+      "open": 116936,
+      "high": 117030,
+      "low": 114560,
+      "close": 115438.05,
+      "volume": 11329.36197
+    },
+    {
+      "time": 1755820800,
+      "open": 112500,
+      "high": 117429.05,
+      "low": 111684.79,
+      "close": 116935.99,
+      "volume": 23128.09037
+    },
+    {
+      "time": 1755734400,
+      "open": 114271.23,
+      "high": 114821.76,
+      "low": 112015.67,
+      "close": 112500,
+      "volume": 10839.69235
+    },
+    {
+      "time": 1755648000,
+      "open": 112872.95,
+      "high": 114615.38,
+      "low": 112380,
+      "close": 114271.24,
+      "volume": 15636.34194
+    },
+    {
+      "time": 1755561600,
+      "open": 116227.05,
+      "high": 116725.69,
+      "low": 112732.58,
+      "close": 112872.94,
+      "volume": 18065.47424
+    },
+    {
+      "time": 1755475200,
+      "open": 117405.01,
+      "high": 117543.75,
+      "low": 114640.14,
+      "close": 116227.05,
+      "volume": 17745.93954
+    },
+    {
+      "time": 1755388800,
+      "open": 117380.66,
+      "high": 118575,
+      "low": 117172.21,
+      "close": 117405.01,
+      "volume": 5898.64192
+    },
+    {
+      "time": 1755302400,
+      "open": 117342.04,
+      "high": 117898.99,
+      "low": 117143.98,
+      "close": 117380.66,
+      "volume": 6393.68117
+    },
+    {
+      "time": 1755216000,
+      "open": 118295.09,
+      "high": 119216.82,
+      "low": 116803.99,
+      "close": 117342.05,
+      "volume": 13623.33874
+    },
+    {
+      "time": 1755129600,
+      "open": 123306.44,
+      "high": 124474,
+      "low": 117180,
+      "close": 118295.09,
+      "volume": 27980.947586
+    },
+    {
+      "time": 1755043200,
+      "open": 120134.09,
+      "high": 123667.79,
+      "low": 118920.92,
+      "close": 123306.43,
+      "volume": 23210.07102
+    },
+    {
+      "time": 1754956800,
+      "open": 118686,
+      "high": 120324.43,
+      "low": 118207.47,
+      "close": 120134.08,
+      "volume": 16720.10893
+    },
+    {
+      "time": 1754870400,
+      "open": 119294.27,
+      "high": 122335.16,
+      "low": 118050.11,
+      "close": 118686,
+      "volume": 26494.33429
+    },
+    {
+      "time": 1754784000,
+      "open": 116462.25,
+      "high": 119311.11,
+      "low": 116460.63,
+      "close": 119294.01,
+      "volume": 14322.77073
+    },
+    {
+      "time": 1754697600,
+      "open": 116674.74,
+      "high": 117944.05,
+      "low": 116299.13,
+      "close": 116462.25,
+      "volume": 9514.13144
+    },
+    {
+      "time": 1754611200,
+      "open": 117472.02,
+      "high": 117630,
+      "low": 115878.71,
+      "close": 116674.74,
+      "volume": 10045.31278
+    },
+    {
+      "time": 1754524800,
+      "open": 114992.27,
+      "high": 117621,
+      "low": 114259,
+      "close": 117472.01,
+      "volume": 13468.56263
+    },
+    {
+      "time": 1754438400,
+      "open": 114129.75,
+      "high": 115716,
+      "low": 113355.13,
+      "close": 114992.27,
+      "volume": 9761.15318
+    },
+    {
+      "time": 1754352000,
+      "open": 115055.03,
+      "high": 115127.81,
+      "low": 112650,
+      "close": 114129.75,
+      "volume": 12042.79078
+    },
+    {
+      "time": 1754265600,
+      "open": 114208.81,
+      "high": 115720,
+      "low": 114107.6,
+      "close": 115055.03,
+      "volume": 9667.67916
+    },
+    {
+      "time": 1754179200,
+      "open": 112546.35,
+      "high": 114799.97,
+      "low": 111920,
+      "close": 114208.8,
+      "volume": 7397.76046
+    },
+    {
+      "time": 1754092800,
+      "open": 113297.92,
+      "high": 114063.49,
+      "low": 112003,
+      "close": 112546.35,
+      "volume": 11507.33428
+    },
+    {
+      "time": 1754006400,
+      "open": 115764.07,
+      "high": 116052,
+      "low": 112722.58,
+      "close": 113297.93,
+      "volume": 24487.10206
+    },
+    {
+      "time": 1753920000,
+      "open": 117840.29,
+      "high": 118922.45,
+      "low": 115500,
+      "close": 115764.08,
+      "volume": 17010.0073
+    },
+    {
+      "time": 1753833600,
+      "open": 117950.75,
+      "high": 118792,
+      "low": 115796.23,
+      "close": 117840.3,
+      "volume": 15586.73631
+    },
+    {
+      "time": 1753747200,
+      "open": 118062.32,
+      "high": 119273.36,
+      "low": 116950.75,
+      "close": 117950.76,
+      "volume": 15137.93445
+    },
+    {
+      "time": 1753660800,
+      "open": 119415.56,
+      "high": 119800,
+      "low": 117427.5,
+      "close": 118062.32,
+      "volume": 13961.74754
+    },
+    {
+      "time": 1753574400,
+      "open": 117919.99,
+      "high": 119766.65,
+      "low": 117825.5,
+      "close": 119415.55,
+      "volume": 9328.30919
+    },
+    {
+      "time": 1753488000,
+      "open": 117614.31,
+      "high": 118297.35,
+      "low": 117138.38,
+      "close": 117919.99,
+      "volume": 6991.67206
+    },
+    {
+      "time": 1753401600,
+      "open": 118340.98,
+      "high": 118451.57,
+      "low": 114723.16,
+      "close": 117614.31,
+      "volume": 38406.34873
+    },
+    {
+      "time": 1753315200,
+      "open": 118756,
+      "high": 119450,
+      "low": 117103.1,
+      "close": 118340.99,
+      "volume": 15806.89043
+    },
+    {
+      "time": 1753228800,
+      "open": 119954.43,
+      "high": 120090,
+      "low": 117301,
+      "close": 118755.99,
+      "volume": 14558.75083
+    },
+    {
+      "time": 1753142400,
+      "open": 117380.36,
+      "high": 120247.8,
+      "low": 116128,
+      "close": 119954.42,
+      "volume": 20959.12973
+    },
+    {
+      "time": 1753056000,
+      "open": 117265.11,
+      "high": 119676.73,
+      "low": 116515,
+      "close": 117380.36,
+      "volume": 17107.33128
+    },
+    {
+      "time": 1752969600,
+      "open": 117840.01,
+      "high": 118856.8,
+      "low": 116467.02,
+      "close": 117265.12,
+      "volume": 12962.92889
+    },
+    {
+      "time": 1752883200,
+      "open": 117924.84,
+      "high": 118499.9,
+      "low": 117277.34,
+      "close": 117840,
+      "volume": 6635.80306
+    },
+    {
+      "time": 1752796800,
+      "open": 119177.56,
+      "high": 120820.71,
+      "low": 116812.76,
+      "close": 117924.84,
+      "volume": 19924.66266
+    },
+    {
+      "time": 1752710400,
+      "open": 118630.44,
+      "high": 120998.71,
+      "low": 117453.57,
+      "close": 119177.56,
+      "volume": 15728.57651
+    },
+    {
+      "time": 1752624000,
+      "open": 117758.08,
+      "high": 120063.84,
+      "low": 117017.29,
+      "close": 118630.43,
+      "volume": 17039.90851
+    },
+    {
+      "time": 1752537600,
+      "open": 119841.17,
+      "high": 119940.83,
+      "low": 115736.92,
+      "close": 117758.09,
+      "volume": 32018.46083
+    },
+    {
+      "time": 1752451200,
+      "open": 119086.65,
+      "high": 123218,
+      "low": 118905.18,
+      "close": 119841.18,
+      "volume": 27269.348877
+    },
+    {
+      "time": 1752364800,
+      "open": 117420,
+      "high": 119488,
+      "low": 117224.79,
+      "close": 119086.64,
+      "volume": 9550.792947
+    },
+    {
+      "time": 1752278400,
+      "open": 117527.66,
+      "high": 118200,
+      "low": 116900.05,
+      "close": 117420,
+      "volume": 8446.60437
+    },
+    {
+      "time": 1752192000,
+      "open": 116010.01,
+      "high": 118869.98,
+      "low": 115222.22,
+      "close": 117527.66,
+      "volume": 25873.521148
+    },
+    {
+      "time": 1752105600,
+      "open": 111234,
+      "high": 116868,
+      "low": 110500,
+      "close": 116010,
+      "volume": 24883.450665
+    },
+    {
+      "time": 1752019200,
+      "open": 108922.99,
+      "high": 111999.79,
+      "low": 108324.53,
+      "close": 111233.99,
+      "volume": 17282.2865
+    },
+    {
+      "time": 1751932800,
+      "open": 108262.94,
+      "high": 109216.56,
+      "low": 107429.57,
+      "close": 108922.98,
+      "volume": 9216.0208
+    },
+    {
+      "time": 1751846400,
+      "open": 109203.85,
+      "high": 109700,
+      "low": 107513.2,
+      "close": 108262.94,
+      "volume": 9405.37601
+    },
+    {
+      "time": 1751760000,
+      "open": 108198.12,
+      "high": 109700,
+      "low": 107800.01,
+      "close": 109203.84,
+      "volume": 6447.607
+    },
+    {
+      "time": 1751673600,
+      "open": 107984.25,
+      "high": 108420.56,
+      "low": 107756.31,
+      "close": 108198.12,
+      "volume": 3736.9757
+    },
+    {
+      "time": 1751587200,
+      "open": 109584.77,
+      "high": 109767.59,
+      "low": 107245,
+      "close": 107984.24,
+      "volume": 11793.86615
+    },
+    {
+      "time": 1751500800,
+      "open": 108849.59,
+      "high": 110529.18,
+      "low": 108530.4,
+      "close": 109584.78,
+      "volume": 13047.08225
+    },
+    {
+      "time": 1751414400,
+      "open": 105681.13,
+      "high": 109730,
+      "low": 105100.19,
+      "close": 108849.6,
+      "volume": 17691.89592
+    },
+    {
+      "time": 1751328000,
+      "open": 107146.51,
+      "high": 107540,
+      "low": 105250.85,
+      "close": 105681.14,
+      "volume": 10505.62437
+    },
+    {
+      "time": 1751241600,
+      "open": 108356.93,
+      "high": 108789.99,
+      "low": 106733.33,
+      "close": 107146.5,
+      "volume": 9754.12491
+    },
+    {
+      "time": 1751155200,
+      "open": 107296.79,
+      "high": 108528.5,
+      "low": 107172.52,
+      "close": 108356.93,
+      "volume": 6831.7364
+    },
+    {
+      "time": 1751068800,
+      "open": 107047.58,
+      "high": 107577.75,
+      "low": 106811.51,
+      "close": 107296.79,
+      "volume": 3282.17352
+    }
+  ],
+  "plots": {
+    "EMA9": {
+      "data": [
+        {
+          "time": 1751068800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751155200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751241600000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751328000000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751414400000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751500800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751587200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751673600000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751760000000,
+          "value": 108033.5488888889,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751846400000,
+          "value": 108079.4271111111,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1751932800000,
+          "value": 108248.1376888889,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752019200000,
+          "value": 108845.3081511111,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752105600000,
+          "value": 110278.2465208889,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752192000000,
+          "value": 111728.1292167111,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752278400000,
+          "value": 112866.5033733689,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752364800000,
+          "value": 114110.5306986951,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752451200000,
+          "value": 115256.6605589561,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752537600000,
+          "value": 115756.9464471649,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752624000000,
+          "value": 116331.6431577319,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752710400000,
+          "value": 116900.8265261856,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752796800000,
+          "value": 117105.6292209484,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752883200000,
+          "value": 117252.5033767588,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1752969600000,
+          "value": 117255.026701407,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753056000000,
+          "value": 117280.0933611256,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753142400000,
+          "value": 117814.9586889005,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753228800000,
+          "value": 118003.1649511204,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753315200000,
+          "value": 118070.7299608963,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753401600000,
+          "value": 117979.4459687171,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753488000000,
+          "value": 117967.5547749737,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753574400000,
+          "value": 118257.153819979,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753660800000,
+          "value": 118218.1870559832,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753747200000,
+          "value": 118164.7016447865,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753833600000,
+          "value": 118099.8213158292,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1753920000000,
+          "value": 117632.6730526634,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754006400000,
+          "value": 116765.7244421307,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754092800000,
+          "value": 115921.8495537046,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754179200000,
+          "value": 115579.2396429637,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754265600000,
+          "value": 115474.3977143709,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754352000000,
+          "value": 115205.4681714968,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754438400000,
+          "value": 115162.8285371974,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754524800000,
+          "value": 115624.6648297579,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754611200000,
+          "value": 115834.6798638064,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754697600000,
+          "value": 115960.1938910451,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754784000000,
+          "value": 116626.9571128361,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754870400000,
+          "value": 117038.7656902689,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1754956800000,
+          "value": 117657.8285522151,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755043200000,
+          "value": 118787.5488417721,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755129600000,
+          "value": 118689.0570734177,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755216000000,
+          "value": 118419.6556587342,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755302400000,
+          "value": 118211.8565269873,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755388800000,
+          "value": 118050.4872215899,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755475200000,
+          "value": 117685.7997772719,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755561600000,
+          "value": 116723.2278218175,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755648000000,
+          "value": 116232.830257454,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755734400000,
+          "value": 115486.2642059632,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755820800000,
+          "value": 115776.2093647706,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755907200000,
+          "value": 115708.5774918165,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1755993600000,
+          "value": 115265.5799934532,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756080000000,
+          "value": 114234.8599947626,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756166400000,
+          "value": 113740.5319958101,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756252800000,
+          "value": 113244.8275966481,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756339200000,
+          "value": 113109.2420773185,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756425600000,
+          "value": 112162.8736618548,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756512000000,
+          "value": 111493.5649294838,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756598400000,
+          "value": 110844.1219435871,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756684800000,
+          "value": 110522.7815548697,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756771200000,
+          "value": 110666.2272438957,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756857600000,
+          "value": 110874.1237951166,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1756944000000,
+          "value": 110845.4730360933,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757030400000,
+          "value": 110808.3764288746,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757116800000,
+          "value": 110684.2951430997,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757203200000,
+          "value": 110774.9041144798,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757289600000,
+          "value": 111032.9692915838,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757376000000,
+          "value": 111135.6534332671,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757462400000,
+          "value": 111700.5227466137,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757548800000,
+          "value": 112456.9561972909,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757635200000,
+          "value": 113171.4489578328,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757721600000,
+          "value": 113720.8171662662,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757808000000,
+          "value": 114030.255733013,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757894400000,
+          "value": 114294.1465864104,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1757980800000,
+          "value": 114793.1092691283,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758067200000,
+          "value": 115124.0054153027,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758153600000,
+          "value": 115513.9103322421,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758240000000,
+          "value": 115537.6042657937,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758326400000,
+          "value": 115567.209412635,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758412800000,
+          "value": 115500.225530108,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758499200000,
+          "value": 114930.3784240864,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758585600000,
+          "value": 114344.0627392691,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758672000000,
+          "value": 114136.6501914153,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758758400000,
+          "value": 113108.2181531323,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758844800000,
+          "value": 112415.2665225058,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1758931200000,
+          "value": 111859.3832180047,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759017600000,
+          "value": 111920.2965744037,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759104000000,
+          "value": 112398.629259523,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759190400000,
+          "value": 112728.6894076184,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759276800000,
+          "value": 113901.9495260947,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759363200000,
+          "value": 115227.4296208758,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759449600000,
+          "value": 116628.3436967006,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759536000000,
+          "value": 117780.8749573605,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        },
+        {
+          "time": 1759622400000,
+          "value": 118766.5959658884,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "blue"
+          }
+        }
+      ],
+      "options": {
+        "style": "line",
+        "linewidth": 2,
+        "color": "blue"
+      },
+      "title": "EMA9"
+    },
+    "EMA18": {
+      "data": [
+        {
+          "time": 1751068800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751155200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751241600000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751328000000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751414400000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751500800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751587200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751673600000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751760000000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751846400000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1751932800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752019200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752105600000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752192000000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752278400000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752364800000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752451200000,
+          "value": null,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752537600000,
+          "value": 111575.8566666666,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752624000000,
+          "value": 112318.4433333333,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752710400000,
+          "value": 113040.4556140351,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752796800000,
+          "value": 113554.6013388735,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752883200000,
+          "value": 114005.6959347815,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1752969600000,
+          "value": 114348.7932048045,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753056000000,
+          "value": 114667.9054990356,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753142400000,
+          "value": 115224.3807096635,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753228800000,
+          "value": 115596.1290560147,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753315200000,
+          "value": 115885.0617869605,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753401600000,
+          "value": 116067.0879146489,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753488000000,
+          "value": 116262.1302394227,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753574400000,
+          "value": 116594.0691615887,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753660800000,
+          "value": 116748.6218814215,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753747200000,
+          "value": 116875.1627360087,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753833600000,
+          "value": 116976.7561322183,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1753920000000,
+          "value": 116849.1060130374,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754006400000,
+          "value": 116475.2980116651,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754092800000,
+          "value": 116061.7245367529,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754179200000,
+          "value": 115866.6798486737,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754265600000,
+          "value": 115781.2430224975,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754352000000,
+          "value": 115607.4016517083,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754438400000,
+          "value": 115542.6509515285,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754524800000,
+          "value": 115745.7413776834,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754611200000,
+          "value": 115843.5307063483,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754697600000,
+          "value": 115908.6590530485,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754784000000,
+          "value": 116265.0117843065,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754870400000,
+          "value": 116519.8526491164,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1754956800000,
+          "value": 116900.2976334199,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755043200000,
+          "value": 117574.6273562178,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755129600000,
+          "value": 117650.4655292475,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755216000000,
+          "value": 117618.0007366951,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755302400000,
+          "value": 117593.0175012535,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755388800000,
+          "value": 117573.2272379637,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755475200000,
+          "value": 117431.5243708096,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755561600000,
+          "value": 116951.6733844086,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755648000000,
+          "value": 116669.5225018393,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755734400000,
+          "value": 116230.6253963825,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755820800000,
+          "value": 116304.8743020265,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755907200000,
+          "value": 116213.6296386553,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1755993600000,
+          "value": 115927.3096766916,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756080000000,
+          "value": 115315.169710724,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756166400000,
+          "value": 114941.2802674899,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756252800000,
+          "value": 114553.9886603857,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756339200000,
+          "value": 114344.8214329767,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756425600000,
+          "value": 113716.6718084528,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756512000000,
+          "value": 113200.8463549315,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756598400000,
+          "value": 112679.3204228334,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756684800000,
+          "value": 112317.0151151668,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756771200000,
+          "value": 112203.6461556755,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756857600000,
+          "value": 112151.2318234992,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1756944000000,
+          "value": 112001.7200526045,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757030400000,
+          "value": 111860.4853102251,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757116800000,
+          "value": 111684.4310670435,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757203200000,
+          "value": 111626.8425336705,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757289600000,
+          "value": 111672.9885827578,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757376000000,
+          "value": 111659.6624161517,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757462400000,
+          "value": 111901.8032144515,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757548800000,
+          "value": 112278.7386655619,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757635200000,
+          "value": 112673.5472270817,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757721600000,
+          "value": 113015.0990979152,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757808000000,
+          "value": 113252.2476139241,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757894400000,
+          "value": 113473.0331282479,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1757980800000,
+          "value": 113822.0780621165,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758067200000,
+          "value": 114098.4477397885,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758153600000,
+          "value": 114411.614293495,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758240000000,
+          "value": 114540.1159468113,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758326400000,
+          "value": 114660.6963734627,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758412800000,
+          "value": 114720.8641236245,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758499200000,
+          "value": 114502.9826369272,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758585600000,
+          "value": 114239.3844646191,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758672000000,
+          "value": 114141.2387315013,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758758400000,
+          "value": 113599.4757071327,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758844800000,
+          "value": 113183.0530011188,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1758931200000,
+          "value": 112809.6632115273,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759017600000,
+          "value": 112741.6933997876,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759104000000,
+          "value": 112906.9846208626,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759190400000,
+          "value": 113027.1893976139,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759276800000,
+          "value": 113613.2736715493,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759363200000,
+          "value": 114341.281706123,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759449600000,
+          "value": 115171.8836317943,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759536000000,
+          "value": 115931.7906179212,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        },
+        {
+          "time": 1759622400000,
+          "value": 116645.2316055084,
+          "options": {
+            "style": "line",
+            "linewidth": 2,
+            "color": "red"
+          }
+        }
+      ],
+      "options": {
+        "style": "line",
+        "linewidth": 2,
+        "color": "red"
+      },
+      "title": "EMA18"
+    },
+    "BullSignal": {
+      "data": [
+        {
+          "time": 1751068800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751155200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751241600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751328000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751414400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751500800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751587200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751673600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751760000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751846400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1751932800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752019200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752105600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752192000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752278400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752364800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752451200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752537600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752624000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752710400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752796800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752883200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1752969600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753056000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753142400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753228800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753315200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753401600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753488000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753574400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753660800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753747200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753833600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1753920000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754006400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754092800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754179200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754265600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754352000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754438400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754524800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754611200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754697600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754784000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754870400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1754956800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755043200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755129600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755216000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755302400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755388800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755475200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755561600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755648000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755734400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755820800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755907200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1755993600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756080000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756166400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756252800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756339200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756425600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756512000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756598400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756684800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756771200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756857600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1756944000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757030400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757116800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757203200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757289600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757376000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757462400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757548800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757635200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757721600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757808000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757894400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1757980800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758067200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758153600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758240000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758326400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758412800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758499200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758585600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758672000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758758400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758844800000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1758931200000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759017600000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759104000000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759190400000,
+          "value": 0,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759276800000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759363200000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759449600000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759536000000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        },
+        {
+          "time": 1759622400000,
+          "value": 1,
+          "options": {
+            "style": "line",
+            "linewidth": 1,
+            "color": "green"
+          }
+        }
+      ],
+      "options": {
+        "style": "line",
+        "linewidth": 1,
+        "color": "green"
+      },
+      "title": "BullSignal"
+    }
+  },
+  "timestamp": "2025-10-05T15:38:39.619Z"
+}

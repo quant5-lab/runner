@@ -5,15 +5,21 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "concurrently \"node --watch index.js\" \"http-server -p 8080 -c-1\"",
+    "run": "node index.js",
+    "stop": "pkill -f http-server || true"
   },
   "dependencies": {
     "pinets": "file:../PineTS"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "http-server": "^14.1.1"
+  }
 }
