@@ -16,8 +16,8 @@ export class MoexProvider {
         '60': '60',     // 1 hour
         '240': '240',   // 4 hours
         'D': '24',      // Daily
-        'W': 'W',       // Weekly (needs custom handling)
-        'M': 'M'        // Monthly (needs custom handling)
+        'W': '7',       // Weekly (7 days)
+        'M': '31'       // Monthly (31 days)
     };
 
     /* Convert PineTS timeframe to MOEX interval */
@@ -84,9 +84,7 @@ export class MoexProvider {
         
         const params = new URLSearchParams();
         
-        if (interval !== 'W' && interval !== 'M') {
-            params.append('interval', interval);
-        }
+        params.append('interval', interval);
         
         if (sDate) {
             params.append('from', this.formatDate(sDate));
@@ -119,7 +117,7 @@ export class MoexProvider {
             '60': 1/24,     // 1 hour
             '240': 1/6,     // 4 hours
             'D': 1,         // Daily
-            'W': 7,         // Weekly
+            'W': 7,         // Weekly   
             'M': 30         // Monthly
         };
         return days[timeframe] || 1;
