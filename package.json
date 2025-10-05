@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"node --watch index.js\" \"http-server out -p 8080 -c-1\"",
-    "start": "node index.js"
+    "start": "node index.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "inversify": "7.10.2",
@@ -21,6 +25,12 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "http-server": "^14.1.1"
+    "eslint": "8.57.1",
+    "eslint-config-standard": "17.1.0",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-promise": "7.2.1",
+    "http-server": "^14.1.1",
+    "prettier": "3.6.2"
   }
 }

@@ -37,7 +37,7 @@ SYMBOL=SBER pnpm start          # Sberbank (MOEX)
 BARS=50 pnpm start              # Get 50 candles
 BARS=200 pnpm start             # Get 200 candles (default: 100)
 
-# Timeframe configuration  
+# Timeframe configuration
 TIMEFRAME=1h pnpm start         # 1-hour candles
 TIMEFRAME=D pnpm start          # Daily candles (default)
 
@@ -48,18 +48,21 @@ SYMBOL=AAPL BARS=150 TIMEFRAME=D pnpm start
 ### Supported Symbols by Provider
 
 **MOEX (Russian Stocks):**
+
 - `SBER` - Sberbank
 - `GAZP` - Gazprom
 - `LKOH` - Lukoil
 - `YNDX` - Yandex
 
 **Binance (Cryptocurrency):**
+
 - `BTCUSDT` - Bitcoin
 - `ETHUSDT` - Ethereum
 - `ADAUSDT` - Cardano
 - `SOLUSDT` - Solana
 
 **Yahoo Finance (US Stocks):**
+
 - `AAPL` - Apple
 - `GOOGL` - Google
 - `MSFT` - Microsoft
@@ -68,11 +71,13 @@ SYMBOL=AAPL BARS=150 TIMEFRAME=D pnpm start
 ## Available Scripts
 
 ### Core Commands
+
 - `pnpm start` - Generate trading analysis data with current parameters
-- `pnpm run serve` - Start HTTP server for chart visualization  
+- `pnpm run serve` - Start HTTP server for chart visualization
 - `pnpm run visualize` - Build data + start server (recommended)
 
 ### Development
+
 - `pnpm run dev` - Run analysis with file watching
 - `pnpm run dev:watch` - Run analysis + server with file watching
 - `pnpm run build` - Generate chart data and configuration
@@ -81,6 +86,7 @@ SYMBOL=AAPL BARS=150 TIMEFRAME=D pnpm start
 ## Dynamic Provider Fallback
 
 The system automatically tries providers in order:
+
 1. **MOEX** (for Russian stocks)
 2. **Binance** (for crypto pairs)
 3. **Yahoo Finance** (for US stocks)
@@ -90,8 +96,9 @@ If a provider doesn't have data for the requested symbol, it automatically falls
 ## Technical Analysis
 
 The application implements an EMA Crossover Strategy with:
+
 - **EMA9** - 9-period Exponential Moving Average (blue line)
-- **EMA18** - 18-period Exponential Moving Average (red line)  
+- **EMA18** - 18-period Exponential Moving Average (red line)
 - **BullSignal** - Bullish signal when EMA9 > EMA18 (green line)
 
 ## Architecture

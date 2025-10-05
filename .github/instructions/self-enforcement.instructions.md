@@ -7,33 +7,39 @@ applyTo: '**'
 ## ⚡ MANDATORY SELF-DISCIPLINE ⚡
 
 ### 🔴 AFTER EVERY COMMAND EXECUTION:
+
 - **STOP** → Check terminal output immediately
 - **VERIFY** → Command succeeded or failed
 - **CORRECT** → Fix any failures before proceeding
 
 ### 🔴 AFTER EVERY CLAIM:
+
 - **PROVE** → Execute command to verify claim
 - **SHOW** → Display exact evidence
 - **ADMIT** → Acknowledge when wrong
 
 ### 🔴 WHEN CLAIMING COMPLETION:
+
 - **STOP** → Never claim "task complete", "requirements fulfilled", "implementation complete"
 - **DOUBLE-CHECK** → Re-read original requirements vs actual implementation
 - **FOCUS FORWARD** → Current status (1 line), Next step (1 line), Remaining work (1 line)
 - **NO BOASTING** → No paragraphs describing achievements - reinforces delusion
 
 ### 🔴 WHEN PROTOCOLS VIOLATED:
+
 - **HALT** → Stop current action immediately
 - **DECLARE** → "SELF-VIOLATION: [specific breach]"
 - **RESTART** → Begin again with evidence
 
 ### 🔴 WHEN 15-MINUTE TIMEBOX EXCEEDED:
+
 - **STOP** → Cease current debugging approach immediately
 - **ACTIVATE** → Systematic debugging protocol: minimal setup → gradual transition → isolate exact delta
 - **PROVE** → Each step works before adding next component
 - **EVIDENCE-BASED ONLY** → No theories, claims, or assumptions without executable proof
 
 ### � WHEN EVIDENCE GAPS EXIST:
+
 - **STOP** → Cease theorizing immediately
 - **WRITE LOGS** → Add console.log/debug statements everywhere
 - **CAPTURE LOGS** → Run tests/commands to collect actual evidence
