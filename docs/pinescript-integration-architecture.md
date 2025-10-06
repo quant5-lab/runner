@@ -112,6 +112,7 @@ CMD ["sh", "-c", "http-server out -p 8080 -c-1 & tail -f /dev/null"]
 ```
 
 **Changes from Plan**:
+
 - Added `tcpdump` for network monitoring in tests
 - Used `--break-system-packages` flag for pip3 (Alpine Linux requirement)
 - Python 3.12.11 instead of 3.10+ (latest Alpine stable)
@@ -136,7 +137,7 @@ services:
       - ./out:/app/out:rw
       - ../PineTS:/PineTS:ro
     ports:
-      - "8080:8080"
+      - '8080:8080'
     command: sh -c "http-server out -p 8080 -c-1 & tail -f /dev/null"
     networks:
       - runner-net
@@ -147,6 +148,7 @@ networks:
 ```
 
 **Features**:
+
 - Read-only mounts for source code (src, tests, services)
 - Read-write mounts for strategies and output directories
 - http-server runs permanently on port 8080
@@ -160,6 +162,7 @@ pynescript>=0.2.0
 ```
 
 **Installed Packages**:
+
 - pynescript 0.2.0
 - antlr4-python3-runtime 4.13.2 (dependency)
 - click 8.3.0 (dependency)
@@ -446,6 +449,7 @@ docker-compose down
 ```
 
 **Verified Setup**:
+
 - Container stays alive with http-server on port 8080
 - Volume mounts provide fresh source code on every execution
 - No rebuild needed for code changes
@@ -537,6 +541,7 @@ docker-compose exec runner pnpm start BTCUSDT 1h 100 strategies/ema_cross.pine
 ### ✅ COMPLETED: Phase 1 - Docker Environment Setup
 
 **Achievements**:
+
 - Dockerfile with Node.js 18-alpine + Python 3.12.11
 - System packages: tcpdump, python3, py3-pip, python3-dev, build-base
 - Python packages: pynescript 0.2.0, antlr4-python3-runtime 4.13.2, click 8.3.0
@@ -545,6 +550,7 @@ docker-compose exec runner pnpm start BTCUSDT 1h 100 strategies/ema_cross.pine
 - Integration test: AAPL symbol processed via YahooFinance (126 candles retrieved, 100 processed)
 
 **Files Created**:
+
 - `services/pine-parser/requirements.txt` - pynescript dependency
 - `services/pine-parser/setup.sh` - pip install script (executable)
 - `docker-compose.yml` - development orchestration
@@ -553,6 +559,7 @@ docker-compose exec runner pnpm start BTCUSDT 1h 100 strategies/ema_cross.pine
 ### 🎯 NEXT: Phase 2 - Python Parser Service
 
 **Immediate Tasks**:
+
 1. Install escodegen: `pnpm add escodegen`
 2. Create `services/pine-parser/parser.py` based on arose26/pinestuff
 3. Implement PyneToJsAstConverter class with visitor pattern

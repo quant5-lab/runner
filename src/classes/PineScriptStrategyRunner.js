@@ -101,6 +101,7 @@ class PineScriptStrategyRunner {
     try {
       const paramNames = Object.keys(globalScope);
       const paramValues = Object.values(globalScope);
+      // eslint-disable-next-line no-new-func
       const strategyFunc = new Function(...paramNames, jsCode + '\nreturn plots;');
       const result = strategyFunc(...paramValues);
       return { plots: result || plots };

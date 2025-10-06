@@ -158,6 +158,7 @@ The application transpiles and executes Pine Script strategies:
 ### Pine Script Strategies
 
 Custom strategies with full Pine Script v4/v5 support including:
+
 - Built-in functions: `indicator()`, `strategy()`, `plot()`
 - Built-in variables: `close`, `open`, `high`, `low`, `volume`
 - Technical indicators: Bollinger Bands, ADX, SMA, RSI

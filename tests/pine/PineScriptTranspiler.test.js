@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PineScriptTranspiler, PineScriptTranspilationError } from '../../src/pine/PineScriptTranspiler.js';
+import { PineScriptTranspiler } from '../../src/pine/PineScriptTranspiler.js';
 
 describe('PineScriptTranspiler', () => {
   let transpiler;

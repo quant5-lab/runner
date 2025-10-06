@@ -104,7 +104,7 @@ describe('TradingAnalysisRunner', () => {
       mockConfigurationBuilder.generateChartConfig.mockReturnValue(mockChartConfig);
     });
 
-    it('should execute full trading analysis workflow', async() => {
+    it('should execute full trading analysis workflow', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('TradingAnalysisRunner', () => {
       expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalled();
     });
 
-    it('should log configuration at start', async() => {
+    it('should log configuration at start', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
@@ -124,19 +124,19 @@ describe('TradingAnalysisRunner', () => {
       );
     });
 
-    it('should create trading config with correct parameters', async() => {
+    it('should create trading config with correct parameters', async () => {
       await runner.run('AAPL', 'W', 200);
 
       expect(mockConfigurationBuilder.createTradingConfig).toHaveBeenCalledWith('AAPL', 'W', 200);
     });
 
-    it('should fetch market data from provider manager', async() => {
+    it('should fetch market data from provider manager', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
     });
 
-    it('should log provider used', async() => {
+    it('should log provider used', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
@@ -144,7 +144,7 @@ describe('TradingAnalysisRunner', () => {
       );
     });
 
-    it('should create PineTS adapter with market data', async() => {
+    it('should create PineTS adapter with market data', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockPineScriptStrategyRunner.createPineTSAdapter).toHaveBeenCalledWith(
@@ -157,7 +157,7 @@ describe('TradingAnalysisRunner', () => {
       );
     });
 
-    it('should run EMA strategy', async() => {
+    it('should run EMA strategy', async () => {
       const mockPineTS = { ready: vi.fn() };
       mockPineScriptStrategyRunner.createPineTSAdapter.mockResolvedValue(mockPineTS);
 
@@ -166,19 +166,21 @@ describe('TradingAnalysisRunner', () => {
       expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalledWith(mockPineTS);
     });
 
-    it('should process candlestick data', async() => {
+    it('should process candlestick data', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalledWith(mockMarketData);
+      expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalledWith(
+        mockMarketData,
+      );
     });
 
-    it('should export chart data with processed candles and plots', async() => {
+    it('should export chart data with processed candles and plots', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalledWith(mockProcessedData, mockPlots);
     });
 
-    it('should generate and export chart configuration', async() => {
+    it('should generate and export chart configuration', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockConfigurationBuilder.generateChartConfig).toHaveBeenCalledWith(
@@ -188,13 +190,13 @@ describe('TradingAnalysisRunner', () => {
       expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalledWith(mockChartConfig);
     });
 
-    it('should log success message with candle count', async() => {
+    it('should log success message with candle count', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith('Successfully processed 2 candles for BTCUSDT');
     });
 
-    it('should throw error when no market data available', async() => {
+    it('should throw error when no market data available', async () => {
       mockProviderManager.fetchMarketData.mockResolvedValue({
         provider: 'BINANCE',
         data: [],
@@ -206,7 +208,7 @@ describe('TradingAnalysisRunner', () => {
       );
     });
 
-    it('should throw error when market data is null', async() => {
+    it('should throw error when market data is null', async () => {
       mockProviderManager.fetchMarketData.mockResolvedValue({
         provider: 'BINANCE',
         data: null,

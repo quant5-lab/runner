@@ -15,7 +15,7 @@ services:
       - STRATEGY=${STRATEGY:-}
     command: sh -c "npx http-server out -p 8080 -c-1 & tail -f /dev/null"
     ports:
-      - "8080:8080"
+      - '8080:8080'
     networks:
       - runner-net
 

@@ -38,17 +38,22 @@ class TradingAnalysisRunner {
       /* Execute transpiled Pine Script strategy */
       try {
         const marketData = {
-          open: data.map(c => c.open),
-          high: data.map(c => c.high),
-          low: data.map(c => c.low),
-          close: data.map(c => c.close),
-          volume: data.map(c => c.volume || 0),
+          open: data.map((c) => c.open),
+          high: data.map((c) => c.high),
+          low: data.map((c) => c.low),
+          close: data.map((c) => c.close),
+          volume: data.map((c) => c.volume || 0),
         };
 
-        const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(jsCode, marketData);
+        const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(
+          jsCode,
+          marketData,
+        );
         this.logger.log('✅ Strategy execution complete');
         plots = executionResult.plots || {};
-        indicatorMetadata = { TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' } };
+        indicatorMetadata = {
+          TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' },
+        };
       } catch (error) {
         this.logger.error(`❌ Strategy execution failed: ${error.message}`);
         throw error;

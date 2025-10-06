@@ -61,7 +61,7 @@ export class PineScriptTranspiler {
         stderr += data.toString();
       });
 
-      pythonProcess.on('close', async(code) => {
+      pythonProcess.on('close', async (code) => {
         if (code !== 0) {
           reject(new Error(`Python parser exited with code ${code}: ${stderr}`));
           return;
