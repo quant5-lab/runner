@@ -16,6 +16,7 @@
     "format": "eslint . --fix && prettier --write ."
   },
   "dependencies": {
+    "escodegen": "2.1.0",
     "inversify": "7.10.2",
     "pinets": "file:../PineTS",
     "reflect-metadata": "0.2.2"
