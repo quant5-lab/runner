@@ -3,6 +3,7 @@ import { createProviderChain, DEFAULTS } from './config.js';
 import { readFile } from 'fs/promises';
 
 async function main() {
+  const startTime = performance.now();
   try {
     const { symbol, timeframe, bars } = DEFAULTS;
     const envSymbol = process.argv[2] || process.env.SYMBOL || symbol;
@@ -15,20 +16,29 @@ async function main() {
     const runner = container.resolve('tradingAnalysisRunner');
 
     if (envStrategy) {
-      logger.info(`🌲 Pine Script strategy file: ${envStrategy}`);
+      const strategyStartTime = performance.now();
+      logger.info(`Strategy file:\t${envStrategy}`);
       const transpiler = container.resolve('pineScriptTranspiler');
 
+      const loadStartTime = performance.now();
       const pineCode = await readFile(envStrategy, 'utf-8');
-      logger.info('📖 Pine Script code loaded, transpiling...');
+      const loadDuration = ((performance.now() - loadStartTime)).toFixed(2);
+      logger.info(`Loading file:\ttook ${loadDuration}ms`);
 
+      const transpileStartTime = performance.now();
       const jsCode = await transpiler.transpile(pineCode);
-      logger.info('✅ Transpilation complete, generated JavaScript');
-      logger.info(`📝 Transpiled code length: ${jsCode.length} characters`);
+      const transpileDuration = ((performance.now() - transpileStartTime)).toFixed(2);
+      logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
+      const runDuration = ((performance.now() - strategyStartTime)).toFixed(2);
       await runner.run(envSymbol, envTimeframe, envBars, jsCode);
+      logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {
       await runner.run(envSymbol, envTimeframe, envBars);
     }
+    
+    const totalDuration = ((performance.now() - startTime)).toFixed(2);
+    logger.info(`Completed in:\ttook ${totalDuration}ms total`);
   } catch (error) {
     const container = createContainer(createProviderChain, DEFAULTS);
     const logger = container.resolve('logger');

@@ -8,19 +8,21 @@ class ProviderManager {
     for (let i = 0; i < this.providerChain.length; i++) {
       const { name, instance } = this.providerChain[i];
 
-      this.logger.log(`🔍 Trying ${name} provider for ${symbol}`);
+      const providerStartTime = performance.now();
+      this.logger.log(`Attempting:\t${name} > ${symbol}`);
 
       try {
         const marketData = await instance.getMarketData(symbol, timeframe, bars);
 
         if (marketData?.length > 0) {
-          this.logger.log(`✅ ${name} provider succeeded for ${symbol}`);
+          const providerDuration = ((performance.now() - providerStartTime)).toFixed(2);
+          this.logger.log(`Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`);
           return { provider: name, data: marketData, instance };
         }
 
-        this.logger.log(`➡️  Symbol ${symbol} not found in ${name} provider`);
+        this.logger.log(`No data:\t${name} > ${symbol}`);
       } catch (error) {
-        this.logger.log(`➡️  Symbol ${symbol} not found in ${name} provider`);
+        this.logger.log(`Failed:\t\t${name} > ${symbol}`);
         this.logger.debug(`Error from ${name} provider: ${error}`);
         continue;
       }

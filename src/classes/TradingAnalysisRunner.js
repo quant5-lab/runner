@@ -16,27 +16,29 @@ class TradingAnalysisRunner {
   }
 
   async run(symbol, timeframe, bars, jsCode = null) {
-    this.logger.log(`📊 Configuration: Symbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
+    const runStartTime = performance.now();
+    this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
     const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars);
 
-    this.logger.log(
-      `🎯 Attempting to fetch ${symbol} (${timeframe}) with dynamic provider fallback`,
-    );
+    const fetchStartTime = performance.now();
+    this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
 
     const { provider, data, instance } = await this.providerManager.fetchMarketData(
       symbol,
       timeframe,
       bars,
     );
-
-    this.logger.log(`📊 Using ${provider} provider for ${symbol}`);
+    
+    const fetchDuration = ((performance.now() - fetchStartTime)).toFixed(2);
+    this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
 
     let result, plots, indicatorMetadata;
 
     if (jsCode) {
       /* Execute transpiled Pine Script strategy */
       try {
+        const execStartTime = performance.now();
         const marketData = {
           open: data.map((c) => c.open),
           high: data.map((c) => c.high),
@@ -49,13 +51,14 @@ class TradingAnalysisRunner {
           jsCode,
           marketData,
         );
-        this.logger.log('✅ Strategy execution complete');
+        const execDuration = ((performance.now() - execStartTime)).toFixed(2);
+        this.logger.log(`Execution:\ttook ${execDuration}ms`);
         plots = executionResult.plots || {};
         indicatorMetadata = {
           TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' },
         };
       } catch (error) {
-        this.logger.error(`❌ Strategy execution failed: ${error.message}`);
+        this.logger.error(`Execution failed:\t${error.message}`);
         throw error;
       }
     } else {
@@ -96,9 +99,8 @@ class TradingAnalysisRunner {
     );
     this.jsonFileWriter.exportConfiguration(chartConfig);
 
-    this.logger.log(
-      `Successfully processed ${candlestickData.length} candles for ${tradingConfig.symbol}`,
-    );
+    const runDuration = ((performance.now() - runStartTime)).toFixed(2);
+    this.logger.log(`Processing:\t${candlestickData.length} candles (took ${runDuration}ms)`);
   }
 
   processIndicatorPlots(result, data) {

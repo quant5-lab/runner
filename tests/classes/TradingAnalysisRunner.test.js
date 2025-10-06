@@ -120,7 +120,7 @@ describe('TradingAnalysisRunner', () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-        '📊 Configuration: Symbol=BTCUSDT, Timeframe=D, Bars=100',
+        'Configuration:\tSymbol=BTCUSDT, Timeframe=D, Bars=100',
       );
     });
 
@@ -140,7 +140,7 @@ describe('TradingAnalysisRunner', () => {
       await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Using BINANCE provider'),
+        expect.stringContaining('Data source:\tBINANCE'),
       );
     });
 
@@ -193,7 +193,7 @@ describe('TradingAnalysisRunner', () => {
     it('should log success message with candle count', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockLogger.log).toHaveBeenCalledWith('Successfully processed 2 candles for BTCUSDT');
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('Processing:\t2 candles'));
     });
 
     it('should throw error when no market data available', async () => {
