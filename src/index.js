@@ -31,7 +31,7 @@ async function main() {
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
       const runDuration = (performance.now() - strategyStartTime).toFixed(2);
-      await runner.run(envSymbol, envTimeframe, envBars, jsCode);
+      await runner.run(envSymbol, envTimeframe, envBars, jsCode, envStrategy);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {
       await runner.run(envSymbol, envTimeframe, envBars);

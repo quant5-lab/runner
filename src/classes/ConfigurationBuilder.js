@@ -3,12 +3,12 @@ class ConfigurationBuilder {
     this.defaultConfig = defaultConfig;
   }
 
-  createTradingConfig(symbol, timeframe = 'D', bars = 100) {
+  createTradingConfig(symbol, timeframe = 'D', bars = 100, strategyPath = 'Multi-Provider Strategy') {
     return {
       symbol: symbol.toUpperCase(),
       timeframe,
       bars,
-      strategy: 'Multi-Provider Strategy',
+      strategy: strategyPath,
     };
   }
 

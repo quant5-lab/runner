@@ -127,7 +127,7 @@ describe('TradingAnalysisRunner', () => {
     it('should create trading config with correct parameters', async () => {
       await runner.run('AAPL', 'W', 200);
 
-      expect(mockConfigurationBuilder.createTradingConfig).toHaveBeenCalledWith('AAPL', 'W', 200);
+      expect(mockConfigurationBuilder.createTradingConfig).toHaveBeenCalledWith('AAPL', 'W', 200, 'Multi-Provider Strategy');
     });
 
     it('should fetch market data from provider manager', async () => {

@@ -15,11 +15,11 @@ class TradingAnalysisRunner {
     this.logger = logger;
   }
 
-  async run(symbol, timeframe, bars, jsCode = null) {
+  async run(symbol, timeframe, bars, jsCode = null, strategyPath = 'Multi-Provider Strategy') {
     const runStartTime = performance.now();
     this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
-    const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars);
+    const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars, strategyPath);
 
     const fetchStartTime = performance.now();
     this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
