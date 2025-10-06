@@ -462,11 +462,12 @@ class PyneToJsAstConverter:
 
 def main():
     """Main entry point"""
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "Usage: python parser.py <pine_script_file>"}))
+    if len(sys.argv) < 3:
+        print(json.dumps({"error": "Usage: python parser.py <pine_script_file> <output_json_file>"}))
         sys.exit(1)
 
     filename = sys.argv[1]
+    output_file = sys.argv[2]
 
     try:
         with open(filename, "r") as f:
@@ -478,7 +479,8 @@ def main():
         converter = PyneToJsAstConverter()
         js_ast = converter.visit(eval(tree_dump))
         
-        print(json.dumps(js_ast, indent=2))
+        with open(output_file, "w") as f:
+            json.dump(js_ast, f, indent=2)
 
     except FileNotFoundError:
         print(json.dumps({"error": f"File not found: {filename}"}))
