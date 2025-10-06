@@ -26,7 +26,7 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 
 ### Phase 1: Docker Environment Setup
 
-- [ ] Create `Dockerfile` with Node.js 22 + Python 3.10+
+- [ ] Create `Dockerfile` with Node.js 18 + Python 3.10+
 - [ ] Install system dependencies: `python3-dev`, `build-base`
 - [ ] Create `docker-compose.yml` for development workflow
 - [ ] Configure volume mounts for live code reload
@@ -222,13 +222,13 @@ class StrategyExecutor {
 runner/
 ├── src/
 │   ├── classes/
+│   │   ├── CandlestickDataSanitizer.js
 │   │   ├── ConfigurationBuilder.js
-│   │   ├── DataProcessor.js
-│   │   ├── FileExporter.js
+│   │   ├── JsonFileWriter.js
 │   │   ├── Logger.js
+│   │   ├── PineScriptStrategyRunner.js
 │   │   ├── ProviderManager.js
-│   │   ├── TechnicalAnalysisEngine.js
-│   │   └── TradingOrchestrator.js
+│   │   └── TradingAnalysisRunner.js
 │   ├── providers/
 │   │   ├── AlphaVantageProvider.js
 │   │   ├── MoexProvider.js
@@ -413,7 +413,7 @@ docker-compose exec app node -e "
 
 - ✅ Keep existing inline strategy support
 - ✅ Add .pine file loader as alternative input method
-- ✅ Use same ProviderManager, TechnicalAnalysisEngine, TradingOrchestrator
+- ✅ Use same ProviderManager, PineScriptStrategyRunner, TradingAnalysisRunner
 - ✅ Extend IoC container with PineScriptLoader, PineScriptTranspiler
 - ✅ Add Python setup to package.json preinstall script
 
@@ -465,5 +465,5 @@ STRATEGY=strategies/ema_cross.pine SYMBOL=BTCUSDT pnpm start
 1. **Immediate**: Set up Docker environment with Python + Node.js
 2. **Week 1**: Implement Python parser service based on arose26/pinestuff
 3. **Week 2**: Create Node.js transpilation bridge with subprocess IPC
-4. **Week 3**: Integrate with existing TechnicalAnalysisEngine
+4. **Week 3**: Integrate with existing PineScriptStrategyRunner
 5. **Week 4**: Test with real .pine strategies and optimize performance
