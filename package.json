@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "prestart": "vitest run",
+    "prestart": "vitest run --silent > /tmp/test.log 2>&1 || (cat /tmp/test.log && exit 1)",
     "start": "node src/index.js",
     "test": "./scripts/test-with-isolation.sh",
     "test:ui": "vitest --ui",

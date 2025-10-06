@@ -9,7 +9,7 @@ if command -v tcpdump >/dev/null 2>&1; then
   TCPDUMP_PID=$!
   sleep 1
   
-  pnpm vitest run
+  pnpm vitest run --silent
   TEST_EXIT=$?
   
   sleep 1
@@ -17,5 +17,5 @@ if command -v tcpdump >/dev/null 2>&1; then
   ./scripts/validate-network.sh "$LOG_FILE"
   exit $TEST_EXIT
 else
-  pnpm vitest run
+  pnpm vitest run --silent
 fi
