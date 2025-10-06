@@ -7,8 +7,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov', 'json-summary'],
-      include: ['classes/**/*.js', 'providers/**/*.js', 'container.js', 'config.js'],
-      exclude: ['node_modules', 'out', 'tests'],
+      include: ['src/**/*.js'],
+      exclude: ['node_modules', 'out', 'tests', 'scripts', 'coverage'],
       thresholds: {
         lines: 80,
         functions: 80,

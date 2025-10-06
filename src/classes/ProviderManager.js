@@ -1,7 +1,42 @@
+import { TimeframeError } from '../errors/TimeframeError.js';
+
 class ProviderManager {
   constructor(providerChain, logger) {
     this.providerChain = providerChain;
     this.logger = logger;
+  }
+
+  validateDataFreshness(marketData, symbol, timeframe, providerName) {
+    if (!marketData?.length) return;
+
+    const mostRecentCandle = marketData[marketData.length - 1];
+
+    const timeField = mostRecentCandle.time || mostRecentCandle.openTime;
+
+    const candleTime = new Date(timeField * (timeField > 1000000000000 ? 1 : 1000));
+
+    const now = new Date();
+
+    const ageInDays = (now - candleTime) / (24 * 60 * 60 * 1000);
+
+    let maxAgeDays;
+    if (timeframe.includes('m') && !timeframe.includes('mo')) {
+      maxAgeDays = 1;
+    } else if (timeframe.includes('h')) {
+      maxAgeDays = 2;
+    } else if (timeframe.includes('d') || timeframe === 'D') {
+      maxAgeDays = 7;
+    } else {
+      maxAgeDays = 30;
+    }
+
+    if (ageInDays > maxAgeDays) {
+      throw new Error(
+        `${providerName} returned stale data for ${symbol} ${timeframe}: ` +
+        `latest candle is ${Math.floor(ageInDays)} days old (${candleTime.toDateString()}). ` +
+        `Expected data within ${maxAgeDays} days.`,
+      );
+    }
   }
 
   async fetchMarketData(symbol, timeframe, bars) {
@@ -15,6 +50,8 @@ class ProviderManager {
         const marketData = await instance.getMarketData(symbol, timeframe, bars);
 
         if (marketData?.length > 0) {
+          this.validateDataFreshness(marketData, symbol, timeframe, name);
+
           const providerDuration = (performance.now() - providerStartTime).toFixed(2);
           this.logger.log(
             `Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`,
@@ -24,6 +61,12 @@ class ProviderManager {
 
         this.logger.log(`No data:\t${name} > ${symbol}`);
       } catch (error) {
+        if (error.message.includes('returned stale data')) {
+          throw error;
+        }
+        if (error instanceof TimeframeError) {
+          throw new Error(`Timeframe '${timeframe}' not supported for symbol '${symbol}'. ${error.message}`);
+        }
         this.logger.log(`Failed:\t\t${name} > ${symbol}`);
         this.logger.debug(`Error from ${name} provider: ${error}`);
         continue;

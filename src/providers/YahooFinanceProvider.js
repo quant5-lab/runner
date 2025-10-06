@@ -1,4 +1,6 @@
 // Yahoo Finance Provider for PineTS - Real market data for US stocks
+import { TimeframeParser } from '../utils/timeframeParser.js';
+
 export class YahooFinanceProvider {
   constructor(logger) {
     this.baseUrl = 'https://query1.finance.yahoo.com/v8/finance/chart';
@@ -10,22 +12,9 @@ export class YahooFinanceProvider {
     this.logger = logger;
   }
 
-  /* Yahoo Finance interval mapping */
-  static intervalMap = {
-    1: '1m', // 1 minute
-    5: '5m', // 5 minutes
-    15: '15m', // 15 minutes
-    30: '30m', // 30 minutes
-    60: '1h', // 1 hour
-    240: '4h', // 4 hours (not supported by Yahoo, use 1h)
-    D: '1d', // Daily
-    W: '1wk', // Weekly
-    M: '1mo', // Monthly
-  };
-
   /* Convert PineTS timeframe to Yahoo interval */
   convertTimeframe(timeframe) {
-    return YahooFinanceProvider.intervalMap[timeframe] || '1d';
+    return TimeframeParser.toYahooInterval(timeframe);
   }
 
   /* Generate cache key */
@@ -74,20 +63,82 @@ export class YahooFinanceProvider {
 
   /* Get date range string for Yahoo API */
   getDateRange(limit, timeframe) {
-    // Use ranges that provide sufficient data points (targeting ~100 like other providers)
-    const ranges = {
-      1: '1d', // 1 minute - 1 day gives ~390 points
-      5: '5d', // 5 minutes - 5 days gives ~1440 points
-      15: '5d', // 15 minutes - 5 days gives ~480 points
-      30: '5d', // 30 minutes - 5 days gives ~240 points
-      60: '5d', // 1 hour - 5 days gives ~120 points
-      240: '1mo', // 4 hours - 1 month gives ~180 points
-      D: '6mo', // Daily - 6 months gives ~130 trading days
-      W: '2y', // Weekly - 2 years gives ~104 weeks
-      M: '10y', // Monthly - 10 years gives ~120 months
-    };
+    // Convert timeframe to minutes to determine appropriate range
+    const minutes = TimeframeParser.parseToMinutes(timeframe);
 
-    return ranges[timeframe] || '6mo';
+    // Calculate ranges based on actual trading hours and requested limit
+    // Markets trade ~6.5 hours/day, 5 days/week = ~32.5 hours/week
+
+    // Dynamic range selection based on requested limit
+    if (minutes <= 1) {
+      // 1 minute: ~390 points per day
+      if (limit <= 390) return '1d';
+      if (limit <= 1950) return '5d'; // ~1950 points in 5 days
+      if (limit <= 3900) return '10d'; // ~3900 points in 10 days
+      return '1mo'; // For larger requests
+    }
+
+    if (minutes <= 5) {
+      // 5 minutes: ~78 points per day (390/5)
+      if (limit <= 78) return '1d';
+      if (limit <= 390) return '5d';
+      if (limit <= 780) return '10d';
+      return '1mo';
+    }
+
+    if (minutes <= 15) {
+      // 15 minutes: ~26 points per day (390/15)
+      if (limit <= 26) return '1d';
+      if (limit <= 130) return '5d';
+      if (limit <= 260) return '10d';
+      return '1mo';
+    }
+
+    if (minutes <= 30) {
+      // 30 minutes: ~13 points per day (390/30)
+      if (limit <= 65) return '5d';
+      if (limit <= 130) return '10d';
+      if (limit <= 260) return '1mo';
+      return '3mo';
+    }
+
+    if (minutes <= 60) {
+      // 1 hour: ~6.5 points per day
+      if (limit <= 65) return '10d'; // ~65 hours in 10 trading days
+      if (limit <= 130) return '1mo'; // ~130 hours in 20 trading days
+      if (limit <= 195) return '3mo'; // ~195 hours in 30 trading days
+      return '6mo'; // ~390 hours for larger requests
+    }
+
+    if (minutes <= 240) {
+      // 4 hours: ~1.6 points per day
+      if (limit <= 50) return '1mo';
+      if (limit <= 100) return '3mo';
+      if (limit <= 200) return '6mo';
+      return '1y';
+    }
+
+    if (minutes <= 1440) {
+      // Daily: ~1 point per day
+      if (limit <= 30) return '1mo';
+      if (limit <= 90) return '3mo';
+      if (limit <= 180) return '6mo';
+      if (limit <= 250) return '1y';
+      return '2y';
+    }
+
+    if (minutes <= 10080) {
+      // Weekly: ~52 points per year
+      if (limit <= 52) return '1y';
+      if (limit <= 104) return '2y';
+      if (limit <= 260) return '5y';
+      return '10y';
+    }
+
+    // Monthly: ~12 points per year
+    if (limit <= 24) return '2y';
+    if (limit <= 60) return '5y';
+    return '10y';
   }
 
   /* Build Yahoo Finance API URL */
@@ -179,6 +230,9 @@ export class YahooFinanceProvider {
       // Apply limit
       return convertedData.slice(-limit);
     } catch (error) {
+      if (error.name === 'TimeframeError') {
+        throw error; // Re-throw TimeframeError to be handled by ProviderManager
+      }
       this.logger.debug(`Yahoo Finance provider error for ${symbol}: ${error.message}`);
       if (error.stack) {
         this.logger.debug(`Yahoo Finance error stack: ${error.stack}`);

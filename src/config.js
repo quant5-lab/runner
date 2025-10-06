@@ -1,12 +1,12 @@
-import { Provider } from '../../PineTS/dist/pinets.dev.es.js';
 import { MoexProvider } from './providers/MoexProvider.js';
+import { BinanceProvider } from './providers/BinanceProvider.js';
 import { YahooFinanceProvider } from './providers/YahooFinanceProvider.js';
 
 /* Provider chain factory - requires logger injection */
 export function createProviderChain(logger) {
   return [
     { name: 'MOEX', instance: new MoexProvider(logger) },
-    { name: 'Binance', instance: Provider.Binance },
+    { name: 'Binance', instance: new BinanceProvider(logger) },
     { name: 'YahooFinance', instance: new YahooFinanceProvider(logger) },
   ];
 }

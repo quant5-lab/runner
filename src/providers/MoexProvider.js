@@ -1,29 +1,16 @@
-// MOEX (Moscow Exchange) Provider for PineTS
-export class MoexProvider {
+import { TimeframeParser } from '../utils/timeframeParser.js';
+
+class MoexProvider {
   constructor(logger) {
+    this.logger = logger;
     this.baseUrl = 'https://iss.moex.com/iss';
     this.cache = new Map();
-    this.cacheDuration = 5 * 60 * 1000; // 5 minutes
-    this.logger = logger;
+    this.cacheDuration = 5 * 60 * 1000;
   }
-
-  /* MOEX timeframe mapping */
-  static timeframeMap = {
-    1: '1', // 1 minute
-    5: '5', // 5 minutes
-    10: '10', // 10 minutes
-    15: '15', // 15 minutes
-    30: '30', // 30 minutes
-    60: '60', // 1 hour
-    240: '240', // 4 hours
-    D: '24', // Daily
-    W: '7', // Weekly (7 days)
-    M: '31', // Monthly (31 days)
-  };
 
   /* Convert PineTS timeframe to MOEX interval */
   convertTimeframe(timeframe) {
-    return MoexProvider.timeframeMap[timeframe] || '24';
+    return TimeframeParser.toMoexInterval(timeframe);
   }
 
   /* Generate cache key */
@@ -75,7 +62,16 @@ export class MoexProvider {
   /* Format dates for MOEX API */
   formatDate(timestamp) {
     if (!timestamp) return '';
-    return new Date(timestamp).toISOString().split('T')[0];
+    const date = new Date(timestamp);
+    return date.toISOString().split('T')[0];
+  }
+
+  /* Format end date for MOEX API - set to end of day */
+  formatEndDate(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    date.setHours(23, 59, 59, 999);
+    return date.toISOString().replace('T', ' ').replace('Z', '');
   }
 
   /* Build MOEX API URL */
@@ -92,16 +88,43 @@ export class MoexProvider {
     }
 
     if (eDate) {
-      params.append('till', this.formatDate(eDate));
+      params.append('till', this.formatEndDate(eDate));
     }
 
     if (limit && !sDate && !eDate) {
       // Calculate date range based on limit
       const now = new Date();
-      const daysBack = Math.ceil(limit * this.getTimeframeDays(timeframe));
+      const minutes = TimeframeParser.parseToMinutes(timeframe);
+
+      // Calculate proper days back based on limit and timeframe
+      let daysBack = Math.ceil(limit * this.getTimeframeDays(timeframe));
+
+      // Apply multipliers to account for non-trading periods
+      if (minutes >= 1440) {
+        // For daily+ timeframes, account for weekends and holidays
+        // Request ~1.4x more calendar days to ensure we get enough trading days
+        daysBack = Math.ceil(daysBack * 1.4);
+      } else if (minutes >= 60) {
+        // For hourly+ intraday timeframes, account for non-trading hours
+        // MOEX trades ~10 hours/day, so need ~2.4x more calendar days (24/10)
+        daysBack = Math.ceil(daysBack * 2.4);
+      } else if (minutes >= 10) {
+        // For 10m+ timeframes, similar logic but slightly less buffer
+        daysBack = Math.ceil(daysBack * 2.2);
+      } else {
+        // For very short timeframes (1m), use conservative buffer
+        daysBack = Math.ceil(daysBack * 2.0);
+      }
+
       const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+
+      // For intraday timeframes, extend end date to ensure current day data is included
+      const endDate = minutes < 1440
+        ? new Date(now.getTime() + 24 * 60 * 60 * 1000) // Tomorrow for intraday
+        : now; // Today for daily+
+
       params.append('from', this.formatDate(startDate.getTime()));
-      params.append('till', this.formatDate(now.getTime()));
+      params.append('till', this.formatEndDate(endDate.getTime()));
     }
 
     return url + (params.toString() ? '?' + params.toString() : '');
@@ -109,19 +132,33 @@ export class MoexProvider {
 
   /* Get timeframe in days for limit calculation */
   getTimeframeDays(timeframe) {
-    const days = {
-      1: 1 / 1440, // 1 minute
-      5: 1 / 288, // 5 minutes
-      10: 1 / 144, // 10 minutes
-      15: 1 / 96, // 15 minutes
-      30: 1 / 48, // 30 minutes
-      60: 1 / 24, // 1 hour
-      240: 1 / 6, // 4 hours
-      D: 1, // Daily
-      W: 7, // Weekly
-      M: 30, // Monthly
-    };
-    return days[timeframe] || 1;
+    const minutes = TimeframeParser.parseToMinutes(timeframe);
+
+    // MOEX trading hours: ~9 hours per trading day (10:00-18:50 Moscow time)
+    // Need to account for actual trading time, not full calendar days
+    const tradingHoursPerDay = 9;
+    const minutesPerTradingDay = tradingHoursPerDay * 60; // 540 minutes per trading day
+
+    // For timeframes >= 1 day, use calendar days
+    if (minutes >= 1440) {
+      return minutes / 1440; // Calendar days for daily+ timeframes
+    }
+
+    // CRITICAL: 1m and 5m data has processing delays on MOEX
+    // Current day data not immediately available for very short timeframes
+    if (minutes <= 5) {
+      // For 1m and 5m, go back extra days to ensure sufficient data
+      const tradingDays = minutes / minutesPerTradingDay;
+      const calendarDaysWithWeekends = tradingDays * 1.4; // ~40% extra for weekends
+      const delayBuffer = 2; // Extra 2 days for processing delays
+      return calendarDaysWithWeekends + delayBuffer;
+    }
+
+    // For other intraday timeframes, account for trading hours and add buffer for weekends
+    const tradingDays = minutes / minutesPerTradingDay;
+    const calendarDaysWithWeekends = tradingDays * 1.4; // ~40% extra for weekends
+
+    return calendarDaysWithWeekends;
   }
 
   /* Main method - get market data */
@@ -154,7 +191,7 @@ export class MoexProvider {
         .map((candle) => this.convertMoexCandle(candle))
         .sort((a, b) => a.openTime - b.openTime); // Sort by time ascending
 
-      // Apply limit if specified
+      // Apply limit if specified - take the most recent N candles
       const limitedData = limit ? convertedData.slice(-limit) : convertedData;
 
       this.setCache(cacheKey, limitedData);
@@ -162,8 +199,13 @@ export class MoexProvider {
 
       return limitedData;
     } catch (error) {
+      if (error.name === 'TimeframeError') {
+        throw error; // Re-throw TimeframeError to be handled by ProviderManager
+      }
       this.logger.debug(`MOEX Provider error: ${error.message}`);
       return [];
     }
   }
 }
+
+export { MoexProvider };
