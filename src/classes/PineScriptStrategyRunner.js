@@ -1,4 +1,4 @@
-import { PineTS } from '../../PineTS/dist/pinets.dev.es.js';
+import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 
 class PineScriptStrategyRunner {
   async createPineTSAdapter(provider, data, instance, symbol, timeframe, bars) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CandlestickDataSanitizer } from '../classes/CandlestickDataSanitizer.js';
+import { CandlestickDataSanitizer } from '../../src/classes/CandlestickDataSanitizer.js';
 
 describe('CandlestickDataSanitizer', () => {
   let processor;

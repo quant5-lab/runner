@@ -2,11 +2,11 @@
   "name": "pinets-example-app",
   "version": "1.0.0",
   "description": "Lightweight Node.js app demonstrating PineTS usage",
-  "main": "index.js",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
     "prestart": "vitest run",
-    "start": "concurrently \"node --watch index.js\" \"http-server out -p 8080 -c-1\"",
+    "start": "concurrently \"node --watch src/index.js\" \"http-server out -p 8080 -c-1\"",
     "test": "./scripts/test-with-isolation.sh",
     "test:ui": "vitest --ui",
     "docker:test": "docker-compose exec app pnpm test",

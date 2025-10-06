@@ -1,4 +1,4 @@
-import { Provider } from '../PineTS/dist/pinets.dev.es.js';
+import { Provider } from '../../PineTS/dist/pinets.dev.es.js';
 import { MoexProvider } from './providers/MoexProvider.js';
 import { YahooFinanceProvider } from './providers/YahooFinanceProvider.js';
 

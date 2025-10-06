@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { YahooFinanceProvider } from '../providers/YahooFinanceProvider.js';
+import { YahooFinanceProvider } from '../../src/providers/YahooFinanceProvider.js';
 
 global.fetch = vi.fn();
 

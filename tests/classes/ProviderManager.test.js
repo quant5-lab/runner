@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ProviderManager } from '../classes/ProviderManager.js';
+import { ProviderManager } from '../../src/classes/ProviderManager.js';
 
 describe('ProviderManager', () => {
   let manager;

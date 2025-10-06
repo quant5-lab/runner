@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { JsonFileWriter } from '../classes/JsonFileWriter.js';
+import { JsonFileWriter } from '../../src/classes/JsonFileWriter.js';
 import * as fs from 'fs';
 
 vi.mock('fs', () => ({

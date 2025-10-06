@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ConfigurationBuilder } from '../classes/ConfigurationBuilder.js';
+import { ConfigurationBuilder } from '../../src/classes/ConfigurationBuilder.js';
 
 describe('ConfigurationBuilder', () => {
   let builder;

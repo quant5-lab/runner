@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createProviderChain, DEFAULTS } from '../config.js';
+import { createProviderChain, DEFAULTS } from '../../src/config.js';
 
 vi.mock('../PineTS/dist/pinets.dev.es.js', () => ({
   Provider: {

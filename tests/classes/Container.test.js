@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Container, createContainer } from '../container.js';
+import { Container, createContainer } from '../../src/container.js';
 
 describe('Container', () => {
   let container;

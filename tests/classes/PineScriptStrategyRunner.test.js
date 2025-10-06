@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PineScriptStrategyRunner } from '../classes/PineScriptStrategyRunner.js';
+import { PineScriptStrategyRunner } from '../../src/classes/PineScriptStrategyRunner.js';
 
 /* Mock PineTS module */
-vi.mock('../../PineTS/dist/pinets.dev.es.js', () => ({
+vi.mock('../../../PineTS/dist/pinets.dev.es.js', () => ({
   PineTS: vi.fn(),
 }));
 
@@ -20,13 +20,13 @@ describe('PineScriptStrategyRunner', () => {
     };
 
     /* Mock PineTS constructor */
-    const { PineTS } = await import('../../PineTS/dist/pinets.dev.es.js');
+    const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
     PineTS.mockImplementation(() => mockPineTS);
   });
 
   describe('createPineTSAdapter()', () => {
     it('should create PineTS instance with market data', async () => {
-      const { PineTS } = await import('../../PineTS/dist/pinets.dev.es.js');
+      const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
       const data = [{ time: 1, open: 100, high: 105, low: 95, close: 102 }];
 
       const result = await runner.createPineTSAdapter('BINANCE', data, {}, 'BTCUSDT', 'D', 100);
@@ -37,7 +37,7 @@ describe('PineScriptStrategyRunner', () => {
     });
 
     it('should pass correct parameters to PineTS', async () => {
-      const { PineTS } = await import('../../PineTS/dist/pinets.dev.es.js');
+      const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
       const data = [{ time: 1, open: 100 }];
 
       await runner.createPineTSAdapter('YAHOO', data, {}, 'AAPL', 'W', 200);

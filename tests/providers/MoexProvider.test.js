@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MoexProvider } from '../providers/MoexProvider.js';
+import { MoexProvider } from '../../src/providers/MoexProvider.js';
 
 /* Mock global fetch */
 global.fetch = vi.fn();

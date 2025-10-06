@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TradingAnalysisRunner } from '../classes/TradingAnalysisRunner.js';
+import { TradingAnalysisRunner } from '../../src/classes/TradingAnalysisRunner.js';
 
 describe('TradingAnalysisRunner', () => {
   let runner;
