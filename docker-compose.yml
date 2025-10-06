@@ -6,7 +6,14 @@ services:
     image: runner-app
     container_name: runner-dev
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./strategies:/app/strategies
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - ./pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - ./vitest.config.js:/app/vitest.config.js
+      - ./out:/app/out
       - ../PineTS:/PineTS:ro
     environment:
       - SYMBOL=${SYMBOL:-BTCUSDT}
