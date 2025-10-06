@@ -1,5 +1,6 @@
 import { createContainer } from './container.js';
 import { createProviderChain, DEFAULTS } from './config.js';
+import { readFile } from 'fs/promises';
 
 async function main() {
   try {
@@ -10,7 +11,22 @@ async function main() {
     const envStrategy = process.argv[5] || process.env.STRATEGY;
 
     const container = createContainer(createProviderChain, DEFAULTS);
+    const logger = container.resolve('logger');
     const runner = container.resolve('tradingAnalysisRunner');
+
+    if (envStrategy) {
+      logger.info(`🌲 Pine Script strategy file: ${envStrategy}`);
+      const transpiler = container.resolve('pineScriptTranspiler');
+      
+      const pineCode = await readFile(envStrategy, 'utf-8');
+      logger.info('📖 Pine Script code loaded, transpiling...');
+      
+      const jsCode = await transpiler.transpile(pineCode);
+      logger.info('✅ Transpilation complete, generated JavaScript');
+      logger.info(`📝 Transpiled code length: ${jsCode.length} characters`);
+      
+      // TODO: Pass jsCode to runner when strategy execution is implemented
+    }
 
     await runner.run(envSymbol, envTimeframe, envBars);
   } catch (error) {

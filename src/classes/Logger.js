@@ -7,6 +7,14 @@ class Logger {
     console.log(message);
   }
 
+  info(message) {
+    console.log(message);
+  }
+
+  warn(message) {
+    console.warn(message);
+  }
+
   debug(message) {
     if (this.verbose) {
       console.log(message);
