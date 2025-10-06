@@ -4,9 +4,10 @@ import { createProviderChain, DEFAULTS } from './config.js';
 async function main() {
   try {
     const { symbol, timeframe, bars } = DEFAULTS;
-    const envSymbol = process.env.SYMBOL || symbol;
-    const envTimeframe = process.env.TIMEFRAME || timeframe;
-    const envBars = parseInt(process.env.BARS) || bars;
+    const envSymbol = process.argv[2] || process.env.SYMBOL || symbol;
+    const envTimeframe = process.argv[3] || process.env.TIMEFRAME || timeframe;
+    const envBars = parseInt(process.argv[4]) || parseInt(process.env.BARS) || bars;
+    const envStrategy = process.argv[5] || process.env.STRATEGY;
 
     const container = createContainer(createProviderChain, DEFAULTS);
     const runner = container.resolve('tradingAnalysisRunner');
