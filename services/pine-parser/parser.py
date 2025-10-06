@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""Pine Script to JavaScript AST transpiler using pynescript"""
+import sys
+import json
+from pynescript.ast import parse, dump
+
+
+class Node:
+    def __repr__(self):
+        attrs = {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+        return f"{self.__class__.__name__}({', '.join(f'{k}={v!r}' for k, v in attrs.items())})"
+
+
+class Script(Node):
+    def __init__(self, body, annotations):
+        self.body = body
+        self.annotations = annotations
+
+
+class ReAssign(Node):
+    def __init__(self, target, value):
+        self.target = target
+        self.value = value
+
+
+class Assign(Node):
+    def __init__(self, target, value, annotations):
+        self.target = target
+        self.value = value
+        self.annotations = annotations
+
+
+class Name(Node):
+    def __init__(self, id, ctx):
+        self.id = id
+        self.ctx = ctx
+
+
+class Constant(Node):
+    def __init__(self, value):
+        self.value = value
+
+
+class BinOp(Node):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+
+class Add: pass
+class Sub: pass
+class Mult: pass
+class Div: pass
+class Mod: pass
+class Gt: pass
+class Lt: pass
+class Eq: pass
+class GtE: pass
+class LtE: pass
+class NotEq: pass
+class Or: pass
+class And: pass
+class Not: pass
+class Store: pass
+class Load: pass
+
+
+class FunctionDef(Node):
+    def __init__(self, name, args, body, method=None, export=None, annotations=[]):
+        self.name = name
+        self.args = args
+        self.body = body
+        self.method = method
+        self.export = export
+        self.annotations = annotations
+
+
+class While(Node):
+    def __init__(self, test, body=None):
+        self.test = test
+        self.body = body
+
+
+class If(Node):
+    def __init__(self, test, body, orelse):
+        self.test = test
+        self.body = body
+        self.orelse = orelse
+
+
+class ForTo(Node):
+    def __init__(self, target, start, end, body):
+        self.target = target
+        self.start = start
+        self.end = end
+        self.body = body
+
+
+class Param(Node):
+    def __init__(self, name):
+        self.name = name
+
+
+class UnaryOp(Node):
+    def __init__(self, op, operand):
+        self.op = op
+        self.operand = operand
+
+
+class Call(Node):
+    def __init__(self, func, args):
+        self.func = func
+        self.args = args
+
+
+class Attribute(Node):
+    def __init__(self, value, attr, ctx):
+        self.value = value
+        self.attr = attr
+        self.ctx = ctx
+
+
+class Arg(Node):
+    def __init__(self, value, name=None):
+        self.value = value
+        self.name = name
+
+
+class Expr(Node):
+    def __init__(self, value):
+        self.value = value
+
+
+class Conditional(Node):
+    def __init__(self, test, body, orelse):
+        self.test = test
+        self.body = body
+        self.orelse = orelse
+
+
+class BoolOp(Node):
+    def __init__(self, op, values):
+        self.op = op
+        self.values = values
+
+
+class Compare(Node):
+    def __init__(self, left, ops, comparators):
+        assert len(ops) == 1 and len(comparators) == 1
+        self.left = left
+        self.op = ops[0]
+        self.right = comparators[0]
+
+
+class Subscript(Node):
+    def __init__(self, value, slice, ctx):
+        self.value = value
+        self.slice = slice
+        self.ctx = ctx
+
+
+def estree_node(type, **kwargs):
+    """Create ESTree-compliant AST node"""
+    node = {'type': type}
+    node.update(kwargs)
+    return node
+
+
+class PyneToJsAstConverter:
+    """Convert pynescript AST to ESTree JavaScript AST"""
+    
+    def __init__(self):
+        self._declared_vars = set()
+
+    def _map_operator(self, op_node):
+        if isinstance(op_node, Add): return '+'
+        elif isinstance(op_node, Sub): return '-'
+        elif isinstance(op_node, Mult): return '*'
+        elif isinstance(op_node, Div): return '/'
+        elif isinstance(op_node, Mod): return '%'
+        raise NotImplementedError(f"Operator mapping not implemented for {type(op_node)}")
+
+    def _map_comparison_operator(self, op_node):
+        if isinstance(op_node, GtE): return '>='
+        elif isinstance(op_node, Gt): return '>'
+        elif isinstance(op_node, Lt): return '<'
+        elif isinstance(op_node, LtE): return '<='
+        elif isinstance(op_node, Eq): return '==='
+        elif isinstance(op_node, NotEq): return '!=='
+        raise NotImplementedError(f"Comparison operator mapping not implemented for {type(op_node)}")
+
+    def _map_logical_operator(self, op_node):
+        if isinstance(op_node, Or): return '||'
+        elif isinstance(op_node, And): return '&&'
+        raise NotImplementedError(f"Logical operator mapping not implemented for {type(op_node)}")
+
+    def visit(self, node):
+        """Visitor dispatch method"""
+        method_name = 'visit_' + type(node).__name__
+        visitor = getattr(self, method_name, self.generic_visit)
+        return visitor(node)
+
+    def generic_visit(self, node):
+        raise NotImplementedError(f"No visit method implemented for {type(node)}")
+
+    def visit_Script(self, node):
+        body = [self.visit(stmt) for stmt in node.body]
+        body = [stmt for stmt in body if stmt]
+        return estree_node('Program', body=body, sourceType='module')
+
+    def visit_Assign(self, node):
+        var_name = node.target.id
+        js_value = self.visit(node.value)
+
+        if var_name not in self._declared_vars:
+            self._declared_vars.add(var_name)
+            declaration = estree_node('VariableDeclarator',
+                                      id=self.visit(node.target),
+                                      init=js_value)
+            return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+        else:
+            return estree_node('ExpressionStatement',
+                               expression=estree_node('AssignmentExpression',
+                                                    operator='=',
+                                                    left=self.visit(node.target),
+                                                    right=js_value))
+
+    def visit_ReAssign(self, node):
+        var_name = node.target.id
+        js_value = self.visit(node.value)
+
+        if var_name not in self._declared_vars:
+            self._declared_vars.add(var_name)
+            declaration = estree_node('VariableDeclarator',
+                                      id=self.visit(node.target),
+                                      init=js_value)
+            return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
+        else:
+            return estree_node('ExpressionStatement',
+                               expression=estree_node('AssignmentExpression',
+                                                    operator='=',
+                                                    left=self.visit(node.target),
+                                                    right=js_value))
+
+    def visit_Name(self, node):
+        return estree_node('Identifier', name=node.id)
+
+    def visit_Constant(self, node):
+        return estree_node('Literal', value=node.value, raw=repr(node.value))
+
+    def visit_BinOp(self, node):
+        return estree_node('BinaryExpression',
+                           operator=self._map_operator(node.op),
+                           left=self.visit(node.left),
+                           right=self.visit(node.right))
+
+    def visit_Call(self, node):
+        callee = self.visit(node.func)
+        is_input_call = isinstance(node.func, Name) and node.func.id == 'input'
+
+        positional_args_js = []
+        named_args_props = []
+
+        for i, arg in enumerate(node.args):
+            arg_value_js = self.visit(arg.value)
+            if arg.name:
+                prop = estree_node('Property',
+                                   key=estree_node('Identifier', name=arg.name),
+                                   value=arg_value_js,
+                                   kind='init',
+                                   method=False,
+                                   shorthand=False,
+                                   computed=False)
+                named_args_props.append(prop)
+            else:
+                positional_args_js.append(arg_value_js)
+
+                if is_input_call and i == 0 and isinstance(arg.value, Constant):
+                    first_arg_py_value = arg.value.value
+                    input_type_attr = None
+
+                    if isinstance(first_arg_py_value, bool):
+                        input_type_attr = 'bool'
+                    elif isinstance(first_arg_py_value, float):
+                        input_type_attr = 'float'
+                    elif isinstance(first_arg_py_value, int):
+                        input_type_attr = 'int'
+
+                    if input_type_attr:
+                        callee = estree_node('MemberExpression',
+                                             object=estree_node('Identifier', name='input'),
+                                             property=estree_node('Identifier', name=input_type_attr),
+                                             computed=False)
+
+        final_args_js = positional_args_js
+
+        if named_args_props:
+            options_object = estree_node('ObjectExpression', properties=named_args_props)
+            final_args_js.append(options_object)
+
+        return estree_node('CallExpression', callee=callee, arguments=final_args_js)
+
+    def visit_Attribute(self, node):
+        return estree_node('MemberExpression',
+                           object=self.visit(node.value),
+                           property=estree_node('Identifier', name=node.attr),
+                           computed=False)
+
+    def visit_Expr(self, node):
+        if isinstance(node.value, (While, If, ForTo)):
+            return self.visit(node.value)
+        return estree_node('ExpressionStatement', expression=self.visit(node.value))
+
+    def visit_Conditional(self, node):
+        return estree_node('ConditionalExpression',
+                           test=self.visit(node.test),
+                           consequent=self.visit(node.body),
+                           alternate=self.visit(node.orelse))
+
+    def visit_BoolOp(self, node):
+        if len(node.values) < 2:
+            raise ValueError("BoolOp requires at least two values")
+
+        expression = estree_node('LogicalExpression',
+                                 operator=self._map_logical_operator(node.op),
+                                 left=self.visit(node.values[0]),
+                                 right=self.visit(node.values[1]))
+
+        for i in range(2, len(node.values)):
+            expression = estree_node('LogicalExpression',
+                                     operator=self._map_logical_operator(node.op),
+                                     left=expression,
+                                     right=self.visit(node.values[i]))
+        return expression
+
+    def visit_Compare(self, node):
+        return estree_node('BinaryExpression',
+                           operator=self._map_comparison_operator(node.op),
+                           left=self.visit(node.left),
+                           right=self.visit(node.right))
+
+    def visit_Subscript(self, node):
+        obj = self.visit(node.value)
+        prop = self.visit(node.slice)
+        return estree_node('MemberExpression',
+                           object=obj,
+                           property=prop,
+                           computed=True)
+
+    def visit_FunctionDef(self, node):
+        func_name = node.name
+        params = [self.visit(arg) for arg in node.args]
+        body_statements = [self.visit(stmt) for stmt in node.body]
+        body_block = estree_node('BlockStatement', body=body_statements)
+
+        if body_statements and isinstance(node.body[-1], Expr):
+            return_stmt = estree_node('ReturnStatement',
+                                    argument=self.visit(node.body[-1].value))
+            body_block['body'] = body_statements[:-1] + [return_stmt]
+
+        func_declaration = estree_node(
+            'VariableDeclaration',
+            declarations=[
+                estree_node(
+                    'VariableDeclarator',
+                    id=estree_node('Identifier', name=func_name),
+                    init=estree_node(
+                        'ArrowFunctionExpression',
+                        id=None,
+                        params=params,
+                        body=body_block,
+                        expression=False,
+                        generator=False,
+                        **{"async": False}
+                    )
+                )
+            ],
+            kind='const'
+        )
+
+        self._declared_vars.add(func_name)
+        return func_declaration
+
+    def visit_Param(self, node):
+        return estree_node('Identifier', name=node.name)
+
+    def visit_While(self, node):
+        test_js = self.visit(node.test)
+        body_statements = [self.visit(stmt) for stmt in node.body]
+        body_statements = [stmt for stmt in body_statements if stmt]
+        body_block = estree_node('BlockStatement', body=body_statements)
+
+        return {
+            'type': 'WhileStatement',
+            'test': test_js,
+            'body': body_block
+        }
+
+    def visit_ForTo(self, node):
+        var_name = node.target.id
+        var_id = self.visit(node.target)
+        start_js = self.visit(node.start)
+        end_js = self.visit(node.end)
+
+        init = estree_node('VariableDeclaration',
+                          declarations=[
+                              estree_node('VariableDeclarator',
+                                         id=var_id,
+                                         init=start_js)
+                          ],
+                          kind='let')
+
+        self._declared_vars.add(var_name)
+
+        test = estree_node('BinaryExpression',
+                          operator='<=',
+                          left=var_id,
+                          right=end_js)
+
+        update = estree_node('UpdateExpression',
+                            operator='++',
+                            argument=var_id,
+                            prefix=False)
+
+        body_statements = [self.visit(stmt) for stmt in node.body]
+        body_statements = [stmt for stmt in body_statements if stmt]
+        body_block = estree_node('BlockStatement', body=body_statements)
+
+        return {
+            'type': 'ForStatement',
+            'init': init,
+            'test': test,
+            'update': update,
+            'body': body_block
+        }
+
+    def visit_If(self, node):
+        test_js = self.visit(node.test)
+        body_statements = [self.visit(stmt) for stmt in node.body]
+        body_statements = [stmt for stmt in body_statements if stmt]
+        consequent_block = estree_node('BlockStatement', body=body_statements)
+
+        alternate_block = None
+        if node.orelse:
+            if isinstance(node.orelse, list):
+                else_statements = [self.visit(stmt) for stmt in node.orelse]
+                else_statements = [stmt for stmt in else_statements if stmt]
+                alternate_block = estree_node('BlockStatement', body=else_statements)
+            elif isinstance(node.orelse, If):
+                alternate_block = self.visit(node.orelse)
+            else:
+                raise ValueError(f"Unexpected type for else branch: {type(node.orelse)}")
+
+        return {
+            'type': 'IfStatement',
+            'test': test_js,
+            'consequent': consequent_block,
+            'alternate': alternate_block
+        }
+
+
+def main():
+    """Main entry point"""
+    if len(sys.argv) < 2:
+        print(json.dumps({"error": "Usage: python parser.py <pine_script_file>"}))
+        sys.exit(1)
+
+    filename = sys.argv[1]
+
+    try:
+        with open(filename, "r") as f:
+            pine_code = f.read()
+
+        tree = parse(pine_code)
+        tree_dump = dump(tree, indent=2)
+        
+        converter = PyneToJsAstConverter()
+        js_ast = converter.visit(eval(tree_dump))
+        
+        print(json.dumps(js_ast, indent=2))
+
+    except FileNotFoundError:
+        print(json.dumps({"error": f"File not found: {filename}"}))
+        sys.exit(1)
+    except Exception as e:
+        print(json.dumps({"error": str(e), "type": type(e).__name__}))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
