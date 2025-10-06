@@ -1,0 +1,368 @@
+//@version=4
+strategy(title="BB Strategy 9 avg rus", shorttitle="BB Strategy 9 avg rus", overlay=true, default_qty_type=strategy.cash, default_qty_value=300000, initial_capital=2000000, pyramiding = 999, calc_on_every_tick=false, commission_type=strategy.commission.percent, commission_value=0.03, slippage=1, margin_long=95, margin_short=95)
+sl_factor = input(2.5, step=0.1, title='Long SL Calculation Factor', type=input.float)
+sl_factor_short = input(0.2, step=0.01, title='Short SL Calculation Factor', type=input.float)
+lack_of_potential_tolerance = input(0, title='Torelance to a lack of Potential, %', type=input.float)
+min_volatility_sl_factor = input(1, step=0.05, title='Minimum volatility vs SL factor', type=input.float)
+reward_risk_ratio = input(5, title='Reward / Risk ratio', type=input.float)
+show_trades = input(true, title='Show SL/TP', type=input.bool)
+entry_time = input("0950-1050", title="Entry Time", type=input.session)
+trading_session = input("0950-1645", title="Trading Session", type=input.session)
+make_trades = input(true, title='Make Trades', type=input.bool)
+hold_overnight = input(true, title='Hold Overnight', type=input.bool)
+long_trades = input(true, title='Long Trades', type=input.bool)
+long_trades_by_1d_sma = input(true, title='∟ Long Trades limited to SMA 20/50 on 1D', type=input.bool)
+partial_close = input(true, title='∟ Partial Close', type=input.bool)
+partial_close_percent = input(100, step=5, title='Partial Close, %', type=input.float)
+short_trades = input(false, title='Short Trades', type=input.bool)
+short_trades_by_atr_1d = input(false, title='∟ Short Trades limited to ATR on 1D', type=input.bool)
+min_vix = input(0, title='Short: Minimum Volatility RVI', type=input.float)
+max_trades = input(10, title='Max Trades Per Session', type=input.integer)
+trail_stop_enable = input(true, title='Trailing SL', type=input.bool)
+trail_stop_factor = input(2, step=0.1, title='Trailing SL factor', type=input.float)
+smart_take_profit_enable = input(true, title='Smart Take Profit', type=input.bool)
+smart_take_profit_offset = input(0.0, step=0.05, title='Smart TP Offset, %', type=input.float)
+smart_tp_immediate_lock_in = input(true, title='Smart TP Immediate Lock-In', type=input.bool)
+
+// 1D Support & Resistance
+use_1d_sr = input(true, title='Auto detection of S&R', type=input.bool)
+leftBars  = input(15, title = "SR Left Bars ")
+rightBars  = input(15, title = "SR Right Bars")
+// EXAMPLE:
+// open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
+// atr_1d = security(syminfo.tickerid, "1D", atr(14))
+highUsePivot = security(syminfo.tickerid, "1D", fixnan(pivothigh(leftBars, rightBars)[1]))
+lowUsePivot = security(syminfo.tickerid, "1D", fixnan(pivotlow(leftBars, rightBars)[1]))
+// r1 = plot(highUsePivot, color=change(highUsePivot) ? na : #FF0000,  linewidth=3, offset=-(rightBars+1), title="Resistance")
+// s1 = plot(lowUsePivot, color=change(lowUsePivot) ? na : #233dee,  linewidth=3, offset=-(rightBars+1), title="Support")
+closest_level_1 = use_1d_sr ? highUsePivot : na
+closest_level_2 = use_1d_sr ? lowUsePivot : na
+
+// Session
+session_open = na(time(timeframe.period, trading_session)) ? false : true
+
+// Entry Time
+is_entry_time = na(time(timeframe.period, entry_time)) ? false : true
+
+// SMA
+plot(sma(close, 20), linewidth=1, color=color.red, transp=0)
+plot(sma(close, 50), linewidth=1, color=color.black, transp=0)
+plot(sma(close, 200), linewidth=1, color=color.lime, transp=0)
+
+// 1D SMA
+sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
+sma_1d_50 = security(syminfo.tickerid, 'D', sma(close, 50))
+sma_1d_200 = security(syminfo.tickerid, 'D', sma(close, 200))
+//plot(sma_1d_20, color=yellow, style=linebr, title="1D SMA20", linewidth=1)
+//plot(sma_1d_50, color=green, style=linebr, title="1D SMA50", linewidth=1)
+//plot(sma_1d_200, color=red, style=linebr, title="1D SMA200", linewidth=1)
+
+sma200_1d_bullish = sma_1d_20 > sma_1d_50
+sma200_1d_bearish = sma_1d_20 < sma_1d_50
+
+// 1D RVI
+vix_1d = security('RVI', 'D', close)
+
+// BB
+bblenght = input(46, minval=1, title="Bollinger Bars Lenght")
+bbstdev = input(0.35, minval=0.1, step=0.05, title="Bollinger Bars Standard Deviation")
+source = close
+basis = sma(source, bblenght)
+dev = bbstdev * stdev(source, bblenght)
+upperBB = basis + dev
+lowerBB = basis - dev
+midBB = (upperBB + lowerBB) / 2
+isOverBBTop = low > upperBB ? true : false
+isUnderBBBottom = high < lowerBB ? true : false
+newisOverBBTop = isOverBBTop != isOverBBTop[1]
+newisUnderBBBottom = isUnderBBBottom != isUnderBBBottom[1]
+high_range = valuewhen(newisOverBBTop, high, 0)
+low_range = valuewhen(newisUnderBBBottom, low, 0)
+bblow = valuewhen(newisOverBBTop, lowerBB / 0.00005 * 0.00005, 0)
+bbhigh = valuewhen(newisUnderBBBottom, (upperBB * 1000 / 5 + 5) * 5 / 1000, 0)
+bb_buy = isOverBBTop ? high_range == high_range[1] ? high_range + 0.001 : na : na
+bb_sell = isUnderBBBottom ? low_range == low_range[1] ? low_range - 0.001 : na : na
+// plot(upperBB, title="BB Upper Band", style=linebr, linewidth=1, color=highlightHigh)
+// plot(lowerBB, title="BB Bottom Band", style=linebr, linewidth=1, color=highlightLow)
+
+
+// ADX
+LWadxlength = input(16, title="ADX period #1")
+LWdilength = input(18, title="DMI Length #1")
+LWadxlength2 = input(16, title="ADX period #2")
+LWdilength2 = input(18, title="DMI Length #2")
+dirmov(len) =>
+    up = change(high)
+    down = -change(low)
+    truerange = rma(tr, len)
+    plus = fixnan(100 * rma(up > down and up > 0 ? up : 0, len) / truerange)
+    minus = fixnan(100 * rma(down > up and down > 0 ? down : 0, len) / truerange)
+    [plus, minus]
+
+adx(LWdilength, LWadxlength) =>
+    [plus, minus] = dirmov(LWdilength)
+    sum = plus + minus
+    adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), LWadxlength)
+    [adx, plus, minus]
+
+[ADX, up, down] = adx(LWdilength, LWadxlength)
+adx_buy = ADX >= 20 and up > down
+adx_sell = ADX >= 20 and up < down
+
+[ADX2, up2, down2] = adx(LWdilength2, LWadxlength2)
+adx_buy2 = ADX2 >= 20 and up2 > down2
+adx_sell2 = ADX2 >= 20 and up2 < down2
+
+buy_limit_entry = not na(bb_buy) and adx_buy and adx_buy2 ? bb_buy : na
+sell_limit_entry = not na(bb_sell) and adx_sell and adx_sell2 ? bb_sell : na
+
+// Long & Short Strategy
+sma200_bullish = sma(close, 50) > sma(close, 200)
+sma200_bearish = sma(close, 50) < sma(close, 200)
+
+open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
+atr_1d = security(syminfo.tickerid, "1D", atr(14))
+
+// has_active_trade = not na(strategy.position_avg_price)
+has_active_trade = false
+has_active_trade := has_active_trade[1]
+position_avg_price_or_close = has_active_trade ? strategy.position_avg_price : close
+ 
+sma_bullish = long_trades_by_1d_sma ? sma200_1d_bullish : sma200_bullish
+sma_bearish = long_trades_by_1d_sma ? sma200_1d_bearish : sma200_bearish
+
+
+// Stop Loss
+sl_inp = 0.0
+sl_inp := has_active_trade and nz(sl_inp[1]) > 0 ? nz(sl_inp[1]) :  nz((sma_bullish ? sl_factor : sl_factor_short) * atr_1d/close)
+
+fixed_stop_level = sma_bullish ? position_avg_price_or_close * (1 - sl_inp) : position_avg_price_or_close * (1 + sl_inp)
+
+// Trailing Stop Loss
+trailing_stop_level = fixed_stop_level
+trailing_stop_step = position_avg_price_or_close * sl_inp * trail_stop_factor
+trailing_stop_level := has_active_trade ?
+   sma_bullish 
+   ? (low > trailing_stop_level[1] + 2 * trailing_stop_step ? trailing_stop_level[1] + trailing_stop_step : trailing_stop_level[1])
+   : (low < trailing_stop_level[1] - 2 * trailing_stop_step ? trailing_stop_level[1] - trailing_stop_step : trailing_stop_level[1])
+   : fixed_stop_level
+
+stop_level = trail_stop_enable and nz(trailing_stop_level) > 0 ? trailing_stop_level : fixed_stop_level
+
+trailing_stop_lock_in = sma_bullish ? low < stop_level : high > stop_level
+
+// plot(low, color=has_active_trade and show_trades ? color.blue : color.white, style=plot.style_linebr, linewidth=1)
+// plot(high, color=has_active_trade and show_trades ? color.blue : color.white, style=plot.style_linebr, linewidth=1)
+// plot(sma_bullish ? fixed_stop_level + trailing_stop_step : fixed_stop_level - trailing_stop_step, color=has_active_trade and show_trades ? color.purple : color.white, style=plot.style_linebr, linewidth=1)
+// plot(stop_level, color= color.purple, style=plot.style_linebr, linewidth=5)
+
+tp_inp = reward_risk_ratio * sl_inp
+fixed_take_level = sma_bullish ? position_avg_price_or_close * (1 + tp_inp) : position_avg_price_or_close * (1 - tp_inp)
+
+// Persistent Take Profit
+persistent_take_level = fixed_take_level
+persistent_take_step = position_avg_price_or_close * tp_inp * 2
+persistent_take_level := has_active_trade ?
+   sma_bullish 
+   ? (low > persistent_take_level[1] + 2 * persistent_take_step ? persistent_take_level[1] + persistent_take_step : persistent_take_level[1])
+   : (low < persistent_take_level[1] - 2 * persistent_take_step ? persistent_take_level[1] - persistent_take_step : persistent_take_level[1])
+   : fixed_take_level
+
+take_level = nz(persistent_take_level) > 0 ? persistent_take_level : fixed_take_level
+
+// Smart Take Profit
+//  Support/Resistance:
+//   RSI
+sr_src1 = close
+sr_len = 9
+sr_up1 = rma(max(change(sr_src1), 0), sr_len)
+sr_down1 = rma(-min(change(sr_src1), 0), sr_len)
+sr_rsi = sr_down1 == 0 ? 100 : sr_up1 == 0 ? 0 : 100 - 100 / (1 + sr_up1 / sr_down1)
+//   HMA source for CMO
+sr_n = 12
+sr_n2ma = 2 * wma(close, round(sr_n / 2))
+sr_nma = wma(close, sr_n)
+sr_diff = sr_n2ma - sr_nma
+sr_sqn = round(sqrt(sr_n))
+sr_c = 5
+sr_n2ma6 = 2 * wma(open, round(sr_c / 2))
+sr_nma6 = wma(open, sr_c)
+sr_diff6 = sr_n2ma6 - sr_nma6
+sr_sqn6 = round(sqrt(sr_c))
+sr_a1 = wma(sr_diff6, sr_sqn6)
+sr_a = wma(sr_diff, sr_sqn)
+//   CMO
+sr_len2 = 1
+sr_gains = sum(sr_a1 > sr_a ? 1 : 0, sr_len2)
+sr_losses = sum(sr_a1 < sr_a ? 1 : 0, sr_len2)
+sr_cmo = 100 * (sr_gains - sr_losses) / (sr_gains + sr_losses)
+//   Close Pivots
+sr_len5 = 2
+sr_h = highest(sr_len5)
+sr_h1 = dev(sr_h, sr_len5) ? na : sr_h
+sr_hpivot = fixnan(sr_h1)
+sr_l = lowest(sr_len5)
+sr_l1 = dev(sr_l, sr_len5) ? na : sr_l
+sr_lpivot = fixnan(sr_l1)
+//   Calc Values
+sr_sup = sr_rsi < 25 and sr_cmo > 50 and sr_lpivot
+sr_res = sr_rsi > 75 and sr_cmo < -50 and sr_hpivot
+sr_xup = 0.0
+sr_xup := sr_sup ? low : sr_xup[1]
+sr_xdown = 0.0
+sr_xdown := sr_res ? high : sr_xdown[1]
+
+// plot(sr_xup, "STP1", color=purple, linewidth=2, style=linebr, transp=20, join=false, editable=true)
+// plot(sr_xdown, "STP2", color=orange, linewidth=2, style=linebr, transp=20, join=false, editable=true)
+
+smart_take_level_within_range = sma_bullish ? 
+   take_level - sr_xdown <= take_level * (sl_inp + smart_take_profit_offset / 100) : 
+   sr_xup - take_level <= take_level * (sl_inp + smart_take_profit_offset / 100)
+smart_take_level = smart_take_profit_enable and smart_take_level_within_range 
+      ? sma_bullish 
+         ? sr_xdown 
+         : sr_xup 
+      : take_level
+
+// Volatility
+volatility_below_sl = atr(2) <= min_volatility_sl_factor * abs(stop_level - close)
+sma_above_atr = (abs(sma(close, 20) - sma(close, 50)) + abs(sma(close, 50) - sma(close, 200))) / 
+   2 >= atr(2)
+sma_growing = abs(sma(close, 20) - sma(close, 50)) + abs(sma(close, 50) - sma(close, 200)) > 
+   abs(sma(close[4], 20) - sma(close[4], 50)) + 
+   abs(sma(close[4], 50) - sma(close[4], 200))
+moderate_volatility = volatility_below_sl and sma_above_atr and sma_growing
+
+high_volatility_of_wide_market = vix_1d > min_vix
+
+// Potential
+atr_1d_potential_buy = atr_1d
+atr_1d_potential_sell = atr_1d
+sma_1d_20_potential_buy = open_1d < sma_1d_20 ? sma_1d_20 - open_1d : 999999
+sma_1d_50_potential_buy = open_1d < sma_1d_50 ? sma_1d_50 - open_1d : 999999
+sma_1d_200_potential_buy = open_1d < sma_1d_200 ? sma_1d_200 - open_1d : 999999
+sma_1d_20_potential_sell = open_1d > sma_1d_20 ? open_1d - sma_1d_20 : 999999
+sma_1d_50_potential_sell = open_1d > sma_1d_50 ? open_1d - sma_1d_50 : 999999
+sma_1d_200_potential_sell = open_1d > sma_1d_200 ? open_1d - sma_1d_200 : 999999
+closest_level_1_buy = open_1d < closest_level_1 ? closest_level_1 - open_1d : 999999
+closest_level_2_buy = open_1d < closest_level_2 ? closest_level_2 - open_1d : 999999
+closest_level_1_sell = open_1d > closest_level_1 ? open_1d - closest_level_1 : 999999
+closest_level_2_sell = open_1d > closest_level_2 ? open_1d - closest_level_2 : 999999
+// potential_buy = min(closest_level_1_buy, min(closest_level_2_buy, min(atr_1d_potential_buy, min(sma_1d_20_potential_buy, min(sma_1d_50_potential_buy, sma_1d_200_potential_buy)))))
+potential_buy = min(closest_level_1_buy, closest_level_2_buy)
+potential_sell = short_trades_by_atr_1d
+                  ? min(closest_level_1_sell, min(closest_level_2_sell, min(atr_1d_potential_sell, min(sma_1d_20_potential_sell, min(sma_1d_50_potential_sell, sma_1d_200_potential_sell)))))
+                  : min(closest_level_1_sell, closest_level_2_sell)
+plot(short_trades_by_atr_1d ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, color=color.gray, style=plot.style_linebr)
+plot(short_trades_by_atr_1d ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, color=color.gray, style=plot.style_linebr)
+enough_potential = sma_bullish ? 
+   take_level <= open_1d + potential_buy * (1 + lack_of_potential_tolerance / 100) : 
+   take_level >= open_1d - potential_sell * (1 + lack_of_potential_tolerance / 100)
+
+plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2)
+plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2)
+
+// // Closing all by RSI 1W
+// rsi_len = input(28, minval=1, title="Close RSI Length")
+// rsi_up = security(syminfo.tickerid, "1W", rma(max(change(close), 0), rsi_len))
+// rsi_down = security(syminfo.tickerid, "1W", rma(-min(change(close), 0), rsi_len))
+// rsi_1w = rsi_down == 0 ? 100 : rsi_up == 0 ? 0 : 100 - (100 / (1 + rsi_up / rsi_down))
+// rsi_1w_close_signal_long = rsi_1w < 66
+// rsi_1w_close_signal_short = rsi_1w > 26
+
+// // Closing all by SMA 1D
+// sma_1d_close_long = rsi_1w_close_signal_long and crossunder(sma_1d_20, sma_1d_50)
+// sma_1d_close_short = rsi_1w_close_signal_short and crossover(sma_1d_20, sma_1d_50)
+// // sma_1d_close_long = crossunder(sma_1d_50, sma_1d_200)
+// // sma_1d_close_short = crossover(sma_1d_50, sma_1d_200)
+// plot(long_trades and sma_1d_close_long ? close : na, style = plot.style_circles, color = color.lime, linewidth = 12)
+// plot(short_trades and sma_1d_close_short ? close : na, style = plot.style_circles, color = color.red, linewidth = 12)
+
+// Closing all by BB 1D
+// BB
+bb_1d_bblenght = input(46, minval=1, title="1D Avg Close: Bollinger Bars Lenght")
+bb_1d_bbstdev = input(0.35, minval=0.1, step=0.05, title="1D Avg Close: Bollinger Bars Standard Deviation")
+bb_1d_basis = security(syminfo.tickerid, "1D", sma(close, bb_1d_bblenght))
+bb_1d_dev = security(syminfo.tickerid, "1D", bb_1d_bbstdev * stdev(close, bb_1d_bblenght))
+bb_1d_upperBB = bb_1d_basis + bb_1d_dev
+bb_1d_lowerBB = bb_1d_basis - bb_1d_dev
+bb_1d_isOverBBTop = security(syminfo.tickerid, "1D", low > bb_1d_upperBB) ? true : false
+bb_1d_isUnderBBBottom = security(syminfo.tickerid, "1D", high < bb_1d_lowerBB) ? true : false
+bb_1d_newisOverBBTop = bb_1d_isOverBBTop != bb_1d_isOverBBTop[1]
+bb_1d_newisUnderBBBottom = bb_1d_isUnderBBBottom != bb_1d_isUnderBBBottom[1]
+bb_1d_high_range = security(syminfo.tickerid, "1D", valuewhen(bb_1d_newisOverBBTop, high, 0))
+bb_1d_low_range = security(syminfo.tickerid, "1D", valuewhen(bb_1d_newisUnderBBBottom, low, 0))
+bb_1d_bblow = security(syminfo.tickerid, "1D", valuewhen(bb_1d_newisOverBBTop, bb_1d_lowerBB / 0.00005 * 0.00005, 0))
+bb_1d_bbhigh = security(syminfo.tickerid, "1D", valuewhen(bb_1d_newisUnderBBBottom, (bb_1d_upperBB * 1000 / 5 + 5) * 5 / 1000, 0))
+bb_1d_bb_buy = bb_1d_isOverBBTop ? bb_1d_high_range == bb_1d_high_range[1] ? bb_1d_high_range + 0.001 : na : na
+bb_1d_bb_sell = bb_1d_isUnderBBBottom ? bb_1d_low_range == bb_1d_low_range[1] ? bb_1d_low_range - 0.001 : na : na
+// plot(bb_1d_upperBB, title="1D BB Upper Band", style=plot.style_linebr, linewidth=3, color=color.green)
+// plot(bb_1d_lowerBB, title="1D BB Bottom Band", style=plot.style_linebr, linewidth=3, color=color.purple)
+
+bb_1w_close_long = bb_1d_bb_sell
+bb_1w_close_short = bb_1d_bb_buy
+plot(long_trades and bb_1w_close_long ? close : na, style = plot.style_circles, transp = 30, color = color.lime, linewidth = 8)
+plot(short_trades and bb_1w_close_short ? close : na, style = plot.style_circles, transp = 20, color = color.purple, linewidth = 8)
+
+// close_all_avg = sma_1d_close_long or sma_1d_close_short
+close_all_avg_long = bb_1w_close_long
+close_all_avg_short = bb_1w_close_short
+
+entry_type = sma_bullish ? strategy.long : strategy.short
+entry_condition = make_trades and session_open and is_entry_time and 
+   (long_trades and sma_bullish and buy_limit_entry or 
+   high_volatility_of_wide_market and short_trades and sma_bearish and sell_limit_entry) and 
+   moderate_volatility and enough_potential
+
+// Trades per session
+num_trades = 0
+num_trades := session_open and nz(num_trades[1]) > 0 ? nz(num_trades[1]) : 0
+
+has_active_trade_2 = false
+has_active_trade_2 := has_active_trade_2[1]
+
+plot(long_trades and close_all_avg_long ? close : na, style = plot.style_circles, transp = 30, color = color.lime, linewidth = 8)
+plot(short_trades and close_all_avg_short ? close : na, style = plot.style_circles, transp = 20, color = color.purple, linewidth = 8)
+
+if not has_active_trade and entry_condition
+    num_trades := nz(num_trades[1]) + 1
+    if num_trades <= max_trades
+        has_active_trade := true
+        has_active_trade_2 := true
+      //   strategy.entry("BB entry", entry_type, when=entry_condition)
+      //   strategy.exit("BB exit", "BB entry", stop=stop_level, limit=smart_take_level)
+      //   strategy.exit("BB exit", "BB entry", limit=smart_take_level)
+
+if has_active_trade and trailing_stop_lock_in
+    has_active_trade := false
+
+if has_active_trade and smart_tp_immediate_lock_in and smart_take_profit_enable and smart_take_level_within_range
+    has_active_trade := false
+
+if has_active_trade and not hold_overnight and not session_open
+    has_active_trade := false
+
+if (long_trades and close_all_avg_long) or (short_trades and close_all_avg_short)
+   //  strategy.close_all()
+    has_active_trade := false
+    has_active_trade_2 := false
+
+s_blue = has_active_trade_2[2] and not has_active_trade_2
+s_red = not s_blue and close_all_avg_long and time(timeframe.period, entry_time) and security(syminfo.tickerid, "1D", (bar_index % 20) == 0)
+
+plot(s_blue ? close : na, style = plot.style_circles, color = color.blue, linewidth = 30)
+plot(s_red ? close : na, style = plot.style_circles, color = color.red, linewidth = 3)
+
+has_active_trade_3 = false
+has_active_trade_3 := has_active_trade_3[1]
+
+if make_trades and s_blue and has_active_trade_3
+    has_active_trade_3 := false
+    if partial_close
+        strategy.close("BB entry", qty_percent = partial_close_percent)
+    else
+        strategy.close_all()
+
+if make_trades and s_red
+    has_active_trade_3 := true
+    strategy.entry("BB entry", close_all_avg_long ? strategy.long : strategy.short)

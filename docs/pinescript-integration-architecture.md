@@ -479,11 +479,11 @@ docker-compose exec app node -e "
 ### Coexistence Strategy
 
 ```javascript
-// Option 1: Inline JavaScript (current)
-SYMBOL=BTCUSDT pnpm start
+// Phase 1: Inline JavaScript (COMPLETED)
+docker-compose exec runner pnpm start BTCUSDT 1h 100
 
-// Option 2: .pine file import (new)
-STRATEGY=strategies/ema_cross.pine SYMBOL=BTCUSDT pnpm start
+// Phase 2: .pine file import (PENDING)
+docker-compose exec runner pnpm start BTCUSDT 1h 100 strategies/ema_cross.pine
 ```
 
 ## Risk Assessment
