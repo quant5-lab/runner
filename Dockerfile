@@ -10,4 +10,4 @@ COPY PineTS /PineTS
 RUN npm install -g pnpm@10 && pnpm install --frozen-lockfile
 RUN pip3 install --break-system-packages --no-cache-dir -r services/pine-parser/requirements.txt
 
-CMD ["sh", "-c", "http-server out -p 8080 -c-1 & tail -f /dev/null"]
+CMD ["sh", "-c", "npx http-server out -p 8080 -c-1 & tail -f /dev/null"]
