@@ -10,13 +10,16 @@ services:
       - ./tests:/app/tests:ro
       - ./strategies:/app/strategies:rw
       - ./services:/app/services:ro
+      - ./out:/app/out:rw
       - ../PineTS:/PineTS:ro
     environment:
       - SYMBOL=${SYMBOL:-BTCUSDT}
       - TIMEFRAME=${TIMEFRAME:-1h}
       - BARS=${BARS:-100}
       - STRATEGY=${STRATEGY:-}
-    command: pnpm start
+    command: sh -c "http-server out -p 8080 -c-1 & tail -f /dev/null"
+    ports:
+      - "8080:8080"
     networks:
       - runner-net
 
