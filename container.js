@@ -1,6 +1,6 @@
 import { ProviderManager } from './classes/ProviderManager.js';
 import { TechnicalAnalysisEngine } from './classes/TechnicalAnalysisEngine.js';
-import { DataProcessor } from './classes/DataProcessor.js';
+import { CandlestickDataSanitizer } from './classes/CandlestickDataSanitizer.js';
 import { ConfigurationBuilder } from './classes/ConfigurationBuilder.js';
 import { JsonFileWriter } from './classes/JsonFileWriter.js';
 import { TradingOrchestrator } from './classes/TradingOrchestrator.js';
@@ -46,7 +46,7 @@ function createContainer(providerChain, defaults) {
       true,
     )
     .register('technicalAnalysisEngine', () => new TechnicalAnalysisEngine(), true)
-    .register('dataProcessor', () => new DataProcessor(), true)
+    .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
     .register('jsonFileWriter', () => new JsonFileWriter(), true)
     .register(
@@ -55,7 +55,7 @@ function createContainer(providerChain, defaults) {
         new TradingOrchestrator(
           c.resolve('providerManager'),
           c.resolve('technicalAnalysisEngine'),
-          c.resolve('dataProcessor'),
+          c.resolve('candlestickDataSanitizer'),
           c.resolve('configurationBuilder'),
           c.resolve('jsonFileWriter'),
           c.resolve('logger'),

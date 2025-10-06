@@ -1,4 +1,4 @@
-class DataProcessor {
+class CandlestickDataSanitizer {
   isValidCandle(candle) {
     const { open, high, low, close } = candle;
     const values = [open, high, low, close].map(parseFloat);
@@ -34,4 +34,4 @@ class DataProcessor {
   }
 }
 
-export { DataProcessor };
+export { CandlestickDataSanitizer };

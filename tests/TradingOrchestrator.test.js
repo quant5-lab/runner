@@ -5,7 +5,7 @@ describe('TradingOrchestrator', () => {
   let orchestrator;
   let mockProviderManager;
   let mockTechnicalAnalysisEngine;
-  let mockDataProcessor;
+  let mockCandlestickDataSanitizer;
   let mockConfigurationBuilder;
   let mockJsonFileWriter;
   let mockLogger;
@@ -19,7 +19,7 @@ describe('TradingOrchestrator', () => {
       runEMAStrategy: vi.fn(),
       getIndicatorMetadata: vi.fn(),
     };
-    mockDataProcessor = {
+    mockCandlestickDataSanitizer = {
       processCandlestickData: vi.fn(),
     };
     mockConfigurationBuilder = {
@@ -38,7 +38,7 @@ describe('TradingOrchestrator', () => {
     orchestrator = new TradingOrchestrator(
       mockProviderManager,
       mockTechnicalAnalysisEngine,
-      mockDataProcessor,
+      mockCandlestickDataSanitizer,
       mockConfigurationBuilder,
       mockJsonFileWriter,
       mockLogger,
@@ -49,7 +49,7 @@ describe('TradingOrchestrator', () => {
     it('should store all dependencies', () => {
       expect(orchestrator.providerManager).toBe(mockProviderManager);
       expect(orchestrator.technicalAnalysisEngine).toBe(mockTechnicalAnalysisEngine);
-      expect(orchestrator.dataProcessor).toBe(mockDataProcessor);
+      expect(orchestrator.candlestickDataSanitizer).toBe(mockCandlestickDataSanitizer);
       expect(orchestrator.configurationBuilder).toBe(mockConfigurationBuilder);
       expect(orchestrator.jsonFileWriter).toBe(mockJsonFileWriter);
       expect(orchestrator.logger).toBe(mockLogger);
@@ -99,7 +99,7 @@ describe('TradingOrchestrator', () => {
         plots: mockPlots,
       });
       mockTechnicalAnalysisEngine.getIndicatorMetadata.mockReturnValue(mockIndicatorMetadata);
-      mockDataProcessor.processCandlestickData.mockReturnValue(mockProcessedData);
+      mockCandlestickDataSanitizer.processCandlestickData.mockReturnValue(mockProcessedData);
       mockConfigurationBuilder.createTradingConfig.mockReturnValue(mockTradingConfig);
       mockConfigurationBuilder.generateChartConfig.mockReturnValue(mockChartConfig);
     });
@@ -111,7 +111,7 @@ describe('TradingOrchestrator', () => {
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
       expect(mockTechnicalAnalysisEngine.createPineTSAdapter).toHaveBeenCalled();
       expect(mockTechnicalAnalysisEngine.runEMAStrategy).toHaveBeenCalled();
-      expect(mockDataProcessor.processCandlestickData).toHaveBeenCalled();
+      expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalled();
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalled();
       expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalled();
     });
@@ -169,7 +169,7 @@ describe('TradingOrchestrator', () => {
     it('should process candlestick data', async () => {
       await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
 
-      expect(mockDataProcessor.processCandlestickData).toHaveBeenCalledWith(mockMarketData);
+      expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalledWith(mockMarketData);
     });
 
     it('should export chart data with processed candles and plots', async () => {

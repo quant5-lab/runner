@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DataProcessor } from '../classes/DataProcessor.js';
+import { CandlestickDataSanitizer } from '../classes/CandlestickDataSanitizer.js';
 
-describe('DataProcessor', () => {
+describe('CandlestickDataSanitizer', () => {
   let processor;
 
   beforeEach(() => {
-    processor = new DataProcessor();
+    processor = new CandlestickDataSanitizer();
   });
 
   describe('isValidCandle()', () => {

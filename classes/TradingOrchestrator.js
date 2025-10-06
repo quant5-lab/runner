@@ -2,14 +2,14 @@ class TradingOrchestrator {
   constructor(
     providerManager,
     technicalAnalysisEngine,
-    dataProcessor,
+    candlestickDataSanitizer,
     configurationBuilder,
     jsonFileWriter,
     logger,
   ) {
     this.providerManager = providerManager;
     this.technicalAnalysisEngine = technicalAnalysisEngine;
-    this.dataProcessor = dataProcessor;
+    this.candlestickDataSanitizer = candlestickDataSanitizer;
     this.configurationBuilder = configurationBuilder;
     this.jsonFileWriter = jsonFileWriter;
     this.logger = logger;
@@ -55,7 +55,7 @@ class TradingOrchestrator {
       throw new Error(`No valid market data available for ${symbol}`);
     }
 
-    const candlestickData = this.dataProcessor.processCandlestickData(data);
+    const candlestickData = this.candlestickDataSanitizer.processCandlestickData(data);
 
     this.jsonFileWriter.exportChartData(candlestickData, processedPlots);
 
