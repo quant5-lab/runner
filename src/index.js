@@ -22,22 +22,22 @@ async function main() {
 
       const loadStartTime = performance.now();
       const pineCode = await readFile(envStrategy, 'utf-8');
-      const loadDuration = ((performance.now() - loadStartTime)).toFixed(2);
+      const loadDuration = (performance.now() - loadStartTime).toFixed(2);
       logger.info(`Loading file:\ttook ${loadDuration}ms`);
 
       const transpileStartTime = performance.now();
       const jsCode = await transpiler.transpile(pineCode);
-      const transpileDuration = ((performance.now() - transpileStartTime)).toFixed(2);
+      const transpileDuration = (performance.now() - transpileStartTime).toFixed(2);
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
-      const runDuration = ((performance.now() - strategyStartTime)).toFixed(2);
+      const runDuration = (performance.now() - strategyStartTime).toFixed(2);
       await runner.run(envSymbol, envTimeframe, envBars, jsCode);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {
       await runner.run(envSymbol, envTimeframe, envBars);
     }
-    
-    const totalDuration = ((performance.now() - startTime)).toFixed(2);
+
+    const totalDuration = (performance.now() - startTime).toFixed(2);
     logger.info(`Completed in:\ttook ${totalDuration}ms total`);
   } catch (error) {
     const container = createContainer(createProviderChain, DEFAULTS);

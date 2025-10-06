@@ -15,8 +15,10 @@ class ProviderManager {
         const marketData = await instance.getMarketData(symbol, timeframe, bars);
 
         if (marketData?.length > 0) {
-          const providerDuration = ((performance.now() - providerStartTime)).toFixed(2);
-          this.logger.log(`Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`);
+          const providerDuration = (performance.now() - providerStartTime).toFixed(2);
+          this.logger.log(
+            `Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`,
+          );
           return { provider: name, data: marketData, instance };
         }
 

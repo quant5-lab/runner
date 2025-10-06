@@ -139,9 +139,7 @@ describe('TradingAnalysisRunner', () => {
     it('should log provider used', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Data source:\tBINANCE'),
-      );
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('Data source:\tBINANCE'));
     });
 
     it('should create PineTS adapter with market data', async () => {
@@ -193,7 +191,9 @@ describe('TradingAnalysisRunner', () => {
     it('should log success message with candle count', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('Processing:\t2 candles'));
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('Processing:\t2 candles'),
+      );
     });
 
     it('should throw error when no market data available', async () => {

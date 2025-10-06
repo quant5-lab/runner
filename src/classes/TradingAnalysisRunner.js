@@ -29,8 +29,8 @@ class TradingAnalysisRunner {
       timeframe,
       bars,
     );
-    
-    const fetchDuration = ((performance.now() - fetchStartTime)).toFixed(2);
+
+    const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
 
     let result, plots, indicatorMetadata;
@@ -51,7 +51,7 @@ class TradingAnalysisRunner {
           jsCode,
           marketData,
         );
-        const execDuration = ((performance.now() - execStartTime)).toFixed(2);
+        const execDuration = (performance.now() - execStartTime).toFixed(2);
         this.logger.log(`Execution:\ttook ${execDuration}ms`);
         plots = executionResult.plots || {};
         indicatorMetadata = {
@@ -99,7 +99,7 @@ class TradingAnalysisRunner {
     );
     this.jsonFileWriter.exportConfiguration(chartConfig);
 
-    const runDuration = ((performance.now() - runStartTime)).toFixed(2);
+    const runDuration = (performance.now() - runStartTime).toFixed(2);
     this.logger.log(`Processing:\t${candlestickData.length} candles (took ${runDuration}ms)`);
   }
 
