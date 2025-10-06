@@ -9,7 +9,7 @@ describe('PineScriptTranspiler', () => {
     mockLogger = {
       info: vi.fn(),
       warn: vi.fn(),
-      error: vi.fn()
+      error: vi.fn(),
     };
     transpiler = new PineScriptTranspiler(mockLogger);
   });
@@ -32,7 +32,7 @@ describe('PineScriptTranspiler', () => {
       const version = transpiler.detectVersion(pineCode);
       expect(version).toBe(5);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('No //@version comment found')
+        expect.stringContaining('No //@version comment found'),
       );
     });
 
@@ -41,7 +41,7 @@ describe('PineScriptTranspiler', () => {
       const version = transpiler.detectVersion(pineCode);
       expect(version).toBe(5);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Unsupported Pine Script version: 3')
+        expect.stringContaining('Unsupported Pine Script version: 3'),
       );
     });
   });
@@ -75,17 +75,17 @@ describe('PineScriptTranspiler', () => {
               type: 'CallExpression',
               callee: {
                 type: 'Identifier',
-                name: 'indicator'
+                name: 'indicator',
               },
               arguments: [
                 {
                   type: 'Literal',
-                  value: 'Test'
-                }
-              ]
-            }
-          }
-        ]
+                  value: 'Test',
+                },
+              ],
+            },
+          },
+        ],
       };
       const jsCode = transpiler.generateJavaScript(ast);
       expect(jsCode).toContain('indicator');

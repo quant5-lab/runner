@@ -180,10 +180,10 @@ describe('MoexProvider', () => {
       },
     };
 
-    it('should fetch and return market data', async () => {
+    it('should fetch and return market data', async() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async () => mockMoexResponse,
+        json: async() => mockMoexResponse,
       });
 
       const data = await provider.getMarketData('SBER', 'D', 100);
@@ -193,10 +193,10 @@ describe('MoexProvider', () => {
       expect(data[1].open).toBe(102);
     });
 
-    it('should return cached data on second call', async () => {
+    it('should return cached data on second call', async() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async () => mockMoexResponse,
+        json: async() => mockMoexResponse,
       });
 
       await provider.getMarketData('SBER', 'D', 100);
@@ -206,10 +206,10 @@ describe('MoexProvider', () => {
       expect(data).toHaveLength(2);
     });
 
-    it('should sort data by time ascending', async () => {
+    it('should sort data by time ascending', async() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async () => ({
+        json: async() => ({
           candles: {
             data: [
               ['102', '107', '108', '100', '60000', '1200', '2024-01-02', '2024-01-02'],
@@ -225,10 +225,10 @@ describe('MoexProvider', () => {
       expect(data[1].open).toBe(102);
     });
 
-    it('should apply limit to data', async () => {
+    it('should apply limit to data', async() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async () => ({
+        json: async() => ({
           candles: {
             data: Array(10)
               .fill(null)
@@ -251,7 +251,7 @@ describe('MoexProvider', () => {
       expect(data).toHaveLength(5);
     });
 
-    it('should return empty array on API error', async () => {
+    it('should return empty array on API error', async() => {
       global.fetch.mockResolvedValue({
         ok: false,
         status: 404,
@@ -263,10 +263,10 @@ describe('MoexProvider', () => {
       expect(data).toEqual([]);
     });
 
-    it('should return empty array when no candle data', async () => {
+    it('should return empty array when no candle data', async() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ candles: { data: null } }),
+        json: async() => ({ candles: { data: null } }),
       });
 
       const data = await provider.getMarketData('SBER', 'D', 100);
@@ -274,7 +274,7 @@ describe('MoexProvider', () => {
       expect(data).toEqual([]);
     });
 
-    it('should handle fetch rejection', async () => {
+    it('should handle fetch rejection', async() => {
       global.fetch.mockRejectedValue(new Error('Network error'));
 
       const data = await provider.getMarketData('SBER', 'D', 100);

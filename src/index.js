@@ -17,14 +17,14 @@ async function main() {
     if (envStrategy) {
       logger.info(`🌲 Pine Script strategy file: ${envStrategy}`);
       const transpiler = container.resolve('pineScriptTranspiler');
-      
+
       const pineCode = await readFile(envStrategy, 'utf-8');
       logger.info('📖 Pine Script code loaded, transpiling...');
-      
+
       const jsCode = await transpiler.transpile(pineCode);
       logger.info('✅ Transpilation complete, generated JavaScript');
       logger.info(`📝 Transpiled code length: ${jsCode.length} characters`);
-      
+
       await runner.run(envSymbol, envTimeframe, envBars, jsCode);
     } else {
       await runner.run(envSymbol, envTimeframe, envBars);

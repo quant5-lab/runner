@@ -10,7 +10,7 @@ describe('PineScriptStrategyRunner', () => {
   let runner;
   let mockPineTS;
 
-  beforeEach(async () => {
+  beforeEach(async() => {
     runner = new PineScriptStrategyRunner();
 
     /* Create mock PineTS instance */
@@ -25,7 +25,7 @@ describe('PineScriptStrategyRunner', () => {
   });
 
   describe('createPineTSAdapter()', () => {
-    it('should create PineTS instance with market data', async () => {
+    it('should create PineTS instance with market data', async() => {
       const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
       const data = [{ time: 1, open: 100, high: 105, low: 95, close: 102 }];
 
@@ -36,7 +36,7 @@ describe('PineScriptStrategyRunner', () => {
       expect(result).toBe(mockPineTS);
     });
 
-    it('should pass correct parameters to PineTS', async () => {
+    it('should pass correct parameters to PineTS', async() => {
       const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
       const data = [{ time: 1, open: 100 }];
 
@@ -45,7 +45,7 @@ describe('PineScriptStrategyRunner', () => {
       expect(PineTS).toHaveBeenCalledWith(data, 'AAPL', 'W', 200);
     });
 
-    it('should wait for PineTS ready()', async () => {
+    it('should wait for PineTS ready()', async() => {
       const data = [{ time: 1 }];
       await runner.createPineTSAdapter('TEST', data, {}, 'TEST', 'D', 100);
 
@@ -54,7 +54,7 @@ describe('PineScriptStrategyRunner', () => {
   });
 
   describe('runEMAStrategy()', () => {
-    it('should run PineTS strategy and return plots', async () => {
+    it('should run PineTS strategy and return plots', async() => {
       const mockPlots = {
         EMA9: [100, 101, 102],
         EMA18: [99, 100, 101],
@@ -71,7 +71,7 @@ describe('PineScriptStrategyRunner', () => {
       });
     });
 
-    it('should call PineTS.run with strategy function', async () => {
+    it('should call PineTS.run with strategy function', async() => {
       mockPineTS.run.mockResolvedValue({ plots: {} });
 
       await runner.runEMAStrategy(mockPineTS);
@@ -79,7 +79,7 @@ describe('PineScriptStrategyRunner', () => {
       expect(mockPineTS.run).toHaveBeenCalledWith(expect.any(Function));
     });
 
-    it('should handle empty plots', async () => {
+    it('should handle empty plots', async() => {
       mockPineTS.run.mockResolvedValue({ plots: null });
 
       const result = await runner.runEMAStrategy(mockPineTS);
@@ -87,7 +87,7 @@ describe('PineScriptStrategyRunner', () => {
       expect(result.plots).toEqual({});
     });
 
-    it('should handle undefined plots', async () => {
+    it('should handle undefined plots', async() => {
       mockPineTS.run.mockResolvedValue({});
 
       const result = await runner.runEMAStrategy(mockPineTS);
@@ -133,7 +133,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103, 104, 105],
         low: [99, 100, 101],
         close: [102, 103, 104],
-        volume: [1000, 1100, 1200]
+        volume: [1000, 1100, 1200],
       };
 
       const result = runner.executeTranspiledStrategy(jsCode, marketData);
@@ -154,7 +154,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103],
         low: [99],
         close: [102],
-        volume: [1000]
+        volume: [1000],
       };
 
       const result = runner.executeTranspiledStrategy(jsCode, marketData);
@@ -172,7 +172,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103, 104, 105],
         low: [99, 100, 101],
         close: [102, 103, 104],
-        volume: [1000, 1100, 1200]
+        volume: [1000, 1100, 1200],
       };
 
       const result = runner.executeTranspiledStrategy(jsCode, marketData);
@@ -188,7 +188,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103],
         low: [99],
         close: [102],
-        volume: [1000]
+        volume: [1000],
       };
 
       expect(() => {
@@ -203,7 +203,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103],
         low: [99],
         close: [102],
-        volume: [1000]
+        volume: [1000],
       };
 
       expect(() => {
@@ -218,7 +218,7 @@ describe('PineScriptStrategyRunner', () => {
         high: [103],
         low: [99],
         close: [102],
-        volume: [1000]
+        volume: [1000],
       };
 
       const result = runner.executeTranspiledStrategy(jsCode, marketData);

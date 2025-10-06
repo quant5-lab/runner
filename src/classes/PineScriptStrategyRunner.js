@@ -42,14 +42,14 @@ class PineScriptStrategyRunner {
   executeTranspiledStrategy(jsCode, marketData) {
     /* Create execution context with market data arrays and ta library stubs */
     const plots = [];
-    
+
     const context = {
       data: {
         open: marketData.open || [],
         high: marketData.high || [],
         low: marketData.low || [],
         close: marketData.close || [],
-        volume: marketData.volume || []
+        volume: marketData.volume || [],
       },
       ta: {
         ema: (src, len) => src,
@@ -57,13 +57,13 @@ class PineScriptStrategyRunner {
         rsi: (src, len) => src,
         stdev: (src, len) => 0,
         crossover: (a, b) => false,
-        crossunder: (a, b) => false
+        crossunder: (a, b) => false,
       },
       core: {
         plot: (series, title, options) => {
           plots.push({ title, series, options });
-        }
-      }
+        },
+      },
     };
 
     /* Provide global functions for Pine Script API */
@@ -94,7 +94,7 @@ class PineScriptStrategyRunner {
       },
       plotchar: (series, title, options) => {
         plots.push({ title, series, options, type: 'char' });
-      }
+      },
     };
 
     /* Execute transpiled code with Function constructor */

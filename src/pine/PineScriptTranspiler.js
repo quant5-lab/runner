@@ -19,7 +19,7 @@ export class PineScriptTranspiler {
 
   async transpile(pineScriptCode) {
     const cacheKey = this.getCacheKey(pineScriptCode);
-    
+
     if (this.cache.has(cacheKey)) {
       this.logger.info('Cache hit for Pine Script transpilation');
       return this.cache.get(cacheKey);
@@ -32,20 +32,20 @@ export class PineScriptTranspiler {
       const outputPath = `/tmp/output-${timestamp}.json`;
 
       await this.writeTempPineFile(inputPath, pineScriptCode);
-      
+
       const ast = await this.spawnPythonParser(inputPath, outputPath, version);
-      
+
       const jsCode = this.generateJavaScript(ast);
-      
+
       await this.cleanupTempFiles(inputPath, outputPath);
-      
+
       this.cache.set(cacheKey, jsCode);
-      
+
       return jsCode;
     } catch (error) {
       throw new PineScriptTranspilationError(
         `Failed to transpile Pine Script: ${error.message}`,
-        error
+        error,
       );
     }
   }
@@ -61,7 +61,7 @@ export class PineScriptTranspiler {
         stderr += data.toString();
       });
 
-      pythonProcess.on('close', async (code) => {
+      pythonProcess.on('close', async(code) => {
         if (code !== 0) {
           reject(new Error(`Python parser exited with code ${code}: ${stderr}`));
           return;
@@ -105,10 +105,10 @@ export class PineScriptTranspiler {
       return escodegen.generate(ast, {
         format: {
           indent: {
-            style: '  '
+            style: '  ',
           },
-          quotes: 'single'
-        }
+          quotes: 'single',
+        },
       });
     } catch (error) {
       throw new Error(`escodegen failed: ${error.message}`);
@@ -118,7 +118,7 @@ export class PineScriptTranspiler {
   detectVersion(pineScriptCode) {
     const firstLine = pineScriptCode.split('\n')[0];
     const versionMatch = firstLine.match(/\/\/@version=(\d+)/);
-    
+
     if (versionMatch) {
       const version = parseInt(versionMatch[1]);
       if (version === 4 || version === 5) {
@@ -127,7 +127,7 @@ export class PineScriptTranspiler {
       this.logger.warn(`Unsupported Pine Script version: ${version}, defaulting to 5`);
       return 5;
     }
-    
+
     this.logger.warn('No //@version comment found, defaulting to version 5');
     return 5;
   }

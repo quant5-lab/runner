@@ -42,9 +42,9 @@ class TradingAnalysisRunner {
           high: data.map(c => c.high),
           low: data.map(c => c.low),
           close: data.map(c => c.close),
-          volume: data.map(c => c.volume || 0)
+          volume: data.map(c => c.volume || 0),
         };
-        
+
         const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(jsCode, marketData);
         this.logger.log('✅ Strategy execution complete');
         plots = executionResult.plots || {};
