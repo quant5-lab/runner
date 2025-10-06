@@ -5,6 +5,7 @@ import { ConfigurationBuilder } from './classes/ConfigurationBuilder.js';
 import { JsonFileWriter } from './classes/JsonFileWriter.js';
 import { TradingAnalysisRunner } from './classes/TradingAnalysisRunner.js';
 import { Logger } from './classes/Logger.js';
+import { PineScriptTranspiler } from './pine/PineScriptTranspiler.js';
 
 class Container {
   constructor() {
@@ -46,6 +47,7 @@ function createContainer(providerChain, defaults) {
       true,
     )
     .register('pineScriptStrategyRunner', () => new PineScriptStrategyRunner(), true)
+    .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
     .register('jsonFileWriter', () => new JsonFileWriter(), true)
