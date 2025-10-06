@@ -108,7 +108,7 @@ COPY PineTS /PineTS
 RUN npm install -g pnpm@10 && pnpm install --frozen-lockfile
 RUN pip3 install --break-system-packages --no-cache-dir -r services/pine-parser/requirements.txt
 
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "http-server out -p 8080 -c-1 & tail -f /dev/null"]
 ```
 
 **Changes from Plan**:
@@ -116,6 +116,7 @@ CMD ["pnpm", "start"]
 - Used `--break-system-packages` flag for pip3 (Alpine Linux requirement)
 - Python 3.12.11 instead of 3.10+ (latest Alpine stable)
 - Installed: pynescript 0.2.0, antlr4-python3-runtime 4.13.2, click 8.3.0
+- CMD runs http-server on port 8080 permanently with container keepalive
 
 ### docker-compose.yml (IMPLEMENTED)
 
@@ -132,13 +133,11 @@ services:
       - ./tests:/app/tests:ro
       - ./strategies:/app/strategies:rw
       - ./services:/app/services:ro
+      - ./out:/app/out:rw
       - ../PineTS:/PineTS:ro
-    environment:
-      - SYMBOL=${SYMBOL:-BTCUSDT}
-      - TIMEFRAME=${TIMEFRAME:-1h}
-      - BARS=${BARS:-100}
-      - STRATEGY=${STRATEGY:-}
-    command: pnpm start
+    ports:
+      - "8080:8080"
+    command: sh -c "http-server out -p 8080 -c-1 & tail -f /dev/null"
     networks:
       - runner-net
 
@@ -149,9 +148,10 @@ networks:
 
 **Features**:
 - Read-only mounts for source code (src, tests, services)
-- Read-write mount for strategies output
-- Environment variables for runtime configuration
-- Network isolation for controlled testing
+- Read-write mounts for strategies and output directories
+- http-server runs permanently on port 8080
+- CLI parameters passed via docker-compose exec
+- Volume mounts ensure fresh code on every execution
 
 ### requirements.txt (IMPLEMENTED)
 
@@ -418,33 +418,38 @@ From arose26/pinestuff documentation:
 ### Container Development (WORKING)
 
 ```bash
-# Build and start containers
+# Build and start container (once)
 cd /Users/boris/proj/internal/borisquantlab/runner
 docker-compose up --build -d
 
-# Verify container status
+# Verify container and http-server
 docker-compose ps
+curl http://localhost:8080  # Chart visualization available
+
+# Execute runner with different parameters
+docker-compose exec runner pnpm start AAPL 1h 100
+docker-compose exec runner pnpm start BTCUSDT 4h 200
+docker-compose exec runner pnpm start LKOH 1d 300
+
+# Execute with Pine Script strategy
+docker-compose exec runner pnpm start BTCUSDT 1h 100 strategies/ema_cross.pine
+
+# Edit source code, then re-run immediately (fresh code via volume mount)
+# Edit src/index.js or src/classes/*.js
+docker-compose exec runner pnpm start AAPL 1h 100  # Uses updated code
 
 # Check logs
 docker-compose logs --tail=50 runner
 
-# Execute with specific symbol
-SYMBOL=AAPL docker-compose up -d
-
-# Stop containers
+# Stop container
 docker-compose down
 ```
 
-**Verified Commands**:
-- `docker-compose up --build -d` - Successfully builds and starts runner-dev container
-- `docker run --rm runner-app python3 --version` - Returns Python 3.12.11
-- `docker run --rm runner-app node --version` - Returns v18.20.8
-- `docker run --rm runner-app python3 -c "import pynescript; print('OK')"` - Confirms pynescript imports
-
-**Test Results**:
-- AAPL symbol: YahooFinance provider retrieved 126 candles, processed 100 successfully
-- Container logs show proper provider fallback: MOEX → Binance → YahooFinance
-- Network isolation working (no unexpected connections)
+**Verified Setup**:
+- Container stays alive with http-server on port 8080
+- Volume mounts provide fresh source code on every execution
+- No rebuild needed for code changes
+- CLI parameters override environment defaults
 
 ### Testing Transpilation (NOT YET IMPLEMENTED)
 
