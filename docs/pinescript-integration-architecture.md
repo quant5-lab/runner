@@ -34,8 +34,9 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 
 ### Phase 2: Python Parser Service
 
-- [ ] Install pynescript: `pip install pynescript>=0.2.0`
-- [ ] Install escodegen: `npm install escodegen`
+- [ ] Create `services/pine-parser/requirements.txt` with pynescript>=0.2.0
+- [ ] Create `services/pine-parser/setup.sh` for pip install
+- [ ] Install escodegen: `pnpm add escodegen`
 - [ ] Create `services/pine-parser/parser.py` based on arose26/pinestuff
 - [ ] Implement Pine Script AST → JavaScript AST converter class
 - [ ] Handle Pine Script v4/v5 version detection
@@ -43,7 +44,7 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 
 ### Phase 3: Transpilation Bridge
 
-- [ ] Create `classes/PineScriptTranspiler.js` - Node.js wrapper
+- [ ] Create `src/pine/PineScriptTranspiler.js` - Node.js wrapper
 - [ ] Implement Python subprocess spawning for parser service
 - [ ] Handle stdin/stdout communication between Node.js ↔ Python
 - [ ] Parse pynescript AST output into JavaScript code
@@ -53,7 +54,7 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 ### Phase 4: Strategy Loader
 
 - [ ] Create `strategies/` directory for `.pine` files
-- [ ] Implement `classes/PineScriptLoader.js` for file reading
+- [ ] Implement `src/pine/PineScriptLoader.js` for file reading
 - [ ] Add file validation (syntax, version, annotations)
 - [ ] Implement strategy metadata extraction (title, parameters)
 - [ ] Create file watcher for development hot-reload
@@ -61,7 +62,7 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 
 ### Phase 5: Execution Integration
 
-- [ ] Create `classes/StrategyExecutor.js` for transpiled code
+- [ ] Create `src/pine/StrategyExecutor.js` for transpiled code
 - [ ] Map transpiled JavaScript to PineTS context.run()
 - [ ] Handle Pine Script `input.*` parameters
 - [ ] Convert Pine Script `plot()` calls to PineTS plots
@@ -98,20 +99,23 @@ RUN apk add --no-cache python3 py3-pip python3-dev build-base
 
 WORKDIR /app
 
+# Copy PineTS sibling dependency
+COPY ../PineTS /PineTS
+
 # Install Node.js dependencies
-COPY package.json package-lock.json ./
-RUN npm install
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # Install Python dependencies
-COPY requirements.txt ./
-RUN pip3 install -r requirements.txt
+COPY services/pine-parser/requirements.txt ./services/pine-parser/
+RUN pip3 install -r services/pine-parser/requirements.txt
 
 # Copy application code
 COPY . .
 
 EXPOSE 8080
 
-CMD ["npm", "run", "dev"]
+CMD ["pnpm", "start"]
 ```
 
 ### requirements.txt
@@ -216,9 +220,26 @@ class StrategyExecutor {
 
 ```
 runner/
-├── Dockerfile                  # NEW: Multi-language container
-├── docker-compose.yml          # NEW: Development orchestration
-├── requirements.txt            # NEW: Python dependencies
+├── src/
+│   ├── classes/
+│   │   ├── ConfigurationBuilder.js
+│   │   ├── DataProcessor.js
+│   │   ├── FileExporter.js
+│   │   ├── Logger.js
+│   │   ├── ProviderManager.js
+│   │   ├── TechnicalAnalysisEngine.js
+│   │   └── TradingOrchestrator.js
+│   ├── providers/
+│   │   ├── AlphaVantageProvider.js
+│   │   ├── MoexProvider.js
+│   │   └── YahooFinanceProvider.js
+│   ├── pine/
+│   │   ├── PineScriptLoader.js    # NEW: Load .pine files
+│   │   ├── PineScriptTranspiler.js # NEW: Node.js ↔ Python bridge
+│   │   └── StrategyExecutor.js    # NEW: Execute transpiled strategies
+│   ├── config.js
+│   ├── container.js
+│   └── index.js
 ├── strategies/                 # NEW: Pine Script files
 │   ├── ema_cross.pine
 │   ├── rsi_divergence.pine
@@ -226,14 +247,18 @@ runner/
 │   └── custom/
 ├── services/
 │   └── pine-parser/
-│       └── parser.py          # NEW: pynescript → AST bridge
-├── classes/
-│   ├── PineScriptLoader.js    # NEW: Load .pine files
-│   ├── PineScriptTranspiler.js # NEW: Node.js ↔ Python bridge
-│   └── StrategyExecutor.js    # NEW: Execute transpiled strategies
-├── config.js
-├── container.js
-└── index.js
+│       ├── parser.py          # NEW: pynescript → AST bridge
+│       ├── requirements.txt
+│       └── setup.sh
+├── tests/
+├── out/
+│   └── index.html
+├── docs/
+├── Dockerfile                  # NEW: Multi-language container
+├── docker-compose.yml          # NEW: Development orchestration
+├── package.json
+├── pnpm-lock.yaml
+└── vitest.config.js
 ```
 
 ## Technical Details: arose26/pinestuff Implementation
@@ -364,7 +389,7 @@ docker-compose up --build
 open http://localhost:8080
 
 # Execute with specific .pine strategy
-STRATEGY=ema_cross.pine SYMBOL=BTCUSDT docker-compose exec app node index.js
+STRATEGY=ema_cross.pine SYMBOL=BTCUSDT docker-compose exec app pnpm start
 ```
 
 ### Testing Transpilation
@@ -375,7 +400,7 @@ docker-compose exec app python3 services/pine-parser/parser.py strategies/ema_cr
 
 # Test full transpilation pipeline
 docker-compose exec app node -e "
-  import('./classes/PineScriptTranspiler.js').then(({ PineScriptTranspiler }) => {
+  import('./src/pine/PineScriptTranspiler.js').then(({ PineScriptTranspiler }) => {
     const t = new PineScriptTranspiler();
     t.transpile('indicator(\"Test\", overlay=true)\nplot(close)').then(console.log);
   })
@@ -390,15 +415,16 @@ docker-compose exec app node -e "
 - ✅ Add .pine file loader as alternative input method
 - ✅ Use same ProviderManager, TechnicalAnalysisEngine, TradingOrchestrator
 - ✅ Extend IoC container with PineScriptLoader, PineScriptTranspiler
+- ✅ Add Python setup to package.json preinstall script
 
 ### Coexistence Strategy
 
 ```javascript
 // Option 1: Inline JavaScript (current)
-SYMBOL=BTCUSDT node index.js
+SYMBOL=BTCUSDT pnpm start
 
 // Option 2: .pine file import (new)
-STRATEGY=strategies/ema_cross.pine SYMBOL=BTCUSDT node index.js
+STRATEGY=strategies/ema_cross.pine SYMBOL=BTCUSDT pnpm start
 ```
 
 ## Risk Assessment
