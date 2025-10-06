@@ -92,7 +92,7 @@ Enable direct `.pine` file import and execution using **pynescript → PineTS tr
 ### Dockerfile
 
 ```dockerfile
-FROM node:22-alpine
+FROM node:18-alpine
 
 # Install Python and build dependencies
 RUN apk add --no-cache python3 py3-pip python3-dev build-base
@@ -100,18 +100,18 @@ RUN apk add --no-cache python3 py3-pip python3-dev build-base
 WORKDIR /app
 
 # Copy PineTS sibling dependency
-COPY ../PineTS /PineTS
+COPY PineTS /PineTS
 
 # Install Node.js dependencies
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+COPY runner/package.json runner/pnpm-lock.yaml ./
+RUN npm install -g pnpm@10 && pnpm install --frozen-lockfile
 
 # Install Python dependencies
-COPY services/pine-parser/requirements.txt ./services/pine-parser/
+COPY runner/services/pine-parser/requirements.txt ./services/pine-parser/
 RUN pip3 install -r services/pine-parser/requirements.txt
 
 # Copy application code
-COPY . .
+COPY runner ./
 
 EXPOSE 8080
 
