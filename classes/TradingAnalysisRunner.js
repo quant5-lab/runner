@@ -1,4 +1,4 @@
-class TradingOrchestrator {
+class TradingAnalysisRunner {
   constructor(
     providerManager,
     technicalAnalysisEngine,
@@ -15,7 +15,7 @@ class TradingOrchestrator {
     this.logger = logger;
   }
 
-  async runTradingAnalysis(symbol, timeframe, bars) {
+  async run(symbol, timeframe, bars) {
     this.logger.log(`📊 Configuration: Symbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
     const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars);
@@ -118,4 +118,4 @@ class TradingOrchestrator {
   }
 }
 
-export { TradingOrchestrator };
+export { TradingAnalysisRunner };

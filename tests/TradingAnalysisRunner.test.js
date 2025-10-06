@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TradingOrchestrator } from '../classes/TradingOrchestrator.js';
+import { TradingAnalysisRunner } from '../classes/TradingAnalysisRunner.js';
 
-describe('TradingOrchestrator', () => {
-  let orchestrator;
+describe('TradingAnalysisRunner', () => {
+  let runner;
   let mockProviderManager;
   let mockTechnicalAnalysisEngine;
   let mockCandlestickDataSanitizer;
@@ -35,7 +35,7 @@ describe('TradingOrchestrator', () => {
       error: vi.fn(),
     };
 
-    orchestrator = new TradingOrchestrator(
+    runner = new TradingAnalysisRunner(
       mockProviderManager,
       mockTechnicalAnalysisEngine,
       mockCandlestickDataSanitizer,
@@ -47,12 +47,12 @@ describe('TradingOrchestrator', () => {
 
   describe('constructor', () => {
     it('should store all dependencies', () => {
-      expect(orchestrator.providerManager).toBe(mockProviderManager);
-      expect(orchestrator.technicalAnalysisEngine).toBe(mockTechnicalAnalysisEngine);
-      expect(orchestrator.candlestickDataSanitizer).toBe(mockCandlestickDataSanitizer);
-      expect(orchestrator.configurationBuilder).toBe(mockConfigurationBuilder);
-      expect(orchestrator.jsonFileWriter).toBe(mockJsonFileWriter);
-      expect(orchestrator.logger).toBe(mockLogger);
+      expect(runner.providerManager).toBe(mockProviderManager);
+      expect(runner.technicalAnalysisEngine).toBe(mockTechnicalAnalysisEngine);
+      expect(runner.candlestickDataSanitizer).toBe(mockCandlestickDataSanitizer);
+      expect(runner.configurationBuilder).toBe(mockConfigurationBuilder);
+      expect(runner.jsonFileWriter).toBe(mockJsonFileWriter);
+      expect(runner.logger).toBe(mockLogger);
     });
   });
 
@@ -105,7 +105,7 @@ describe('TradingOrchestrator', () => {
     });
 
     it('should execute full trading analysis workflow', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalled();
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
@@ -117,7 +117,7 @@ describe('TradingOrchestrator', () => {
     });
 
     it('should log configuration at start', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
         '📊 Configuration: Symbol=BTCUSDT, Timeframe=D, Bars=100',
@@ -125,19 +125,19 @@ describe('TradingOrchestrator', () => {
     });
 
     it('should create trading config with correct parameters', async () => {
-      await orchestrator.runTradingAnalysis('AAPL', 'W', 200);
+      await runner.run('AAPL', 'W', 200);
 
       expect(mockConfigurationBuilder.createTradingConfig).toHaveBeenCalledWith('AAPL', 'W', 200);
     });
 
     it('should fetch market data from provider manager', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
     });
 
     it('should log provider used', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('Using BINANCE provider'),
@@ -145,7 +145,7 @@ describe('TradingOrchestrator', () => {
     });
 
     it('should create PineTS adapter with market data', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockTechnicalAnalysisEngine.createPineTSAdapter).toHaveBeenCalledWith(
         'BINANCE',
@@ -161,25 +161,25 @@ describe('TradingOrchestrator', () => {
       const mockPineTS = { ready: vi.fn() };
       mockTechnicalAnalysisEngine.createPineTSAdapter.mockResolvedValue(mockPineTS);
 
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockTechnicalAnalysisEngine.runEMAStrategy).toHaveBeenCalledWith(mockPineTS);
     });
 
     it('should process candlestick data', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalledWith(mockMarketData);
     });
 
     it('should export chart data with processed candles and plots', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalledWith(mockProcessedData, mockPlots);
     });
 
     it('should generate and export chart configuration', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockConfigurationBuilder.generateChartConfig).toHaveBeenCalledWith(
         mockTradingConfig,
@@ -189,7 +189,7 @@ describe('TradingOrchestrator', () => {
     });
 
     it('should log success message with candle count', async () => {
-      await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
+      await runner.run('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith('Successfully processed 2 candles for BTCUSDT');
     });
@@ -201,7 +201,7 @@ describe('TradingOrchestrator', () => {
         instance: {},
       });
 
-      await expect(orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100)).rejects.toThrow(
+      await expect(runner.run('BTCUSDT', 'D', 100)).rejects.toThrow(
         'No valid market data available for BTCUSDT',
       );
     });
@@ -213,7 +213,7 @@ describe('TradingOrchestrator', () => {
         instance: {},
       });
 
-      await expect(orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100)).rejects.toThrow(
+      await expect(runner.run('BTCUSDT', 'D', 100)).rejects.toThrow(
         'No valid market data available',
       );
     });
@@ -227,7 +227,7 @@ describe('TradingOrchestrator', () => {
 
     it('should process EMA9 plot data', () => {
       const result = { ema9: [100, 101] };
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(processed.EMA9).toBeDefined();
       expect(processed.EMA9.data).toHaveLength(2);
@@ -237,7 +237,7 @@ describe('TradingOrchestrator', () => {
 
     it('should process EMA18 plot data', () => {
       const result = { ema18: [99, 100] };
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(processed.EMA18).toBeDefined();
       expect(processed.EMA18.data).toHaveLength(2);
@@ -245,7 +245,7 @@ describe('TradingOrchestrator', () => {
 
     it('should process bullSignal as single value', () => {
       const result = { bullSignal: true };
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(processed.BullSignal).toBeDefined();
       expect(processed.BullSignal.data).toHaveLength(2);
@@ -254,7 +254,7 @@ describe('TradingOrchestrator', () => {
 
     it('should process bullSignal as array', () => {
       const result = { bullSignal: [true, false] };
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(processed.BullSignal.data[0].value).toBe(1);
       expect(processed.BullSignal.data[1].value).toBe(0);
@@ -262,14 +262,14 @@ describe('TradingOrchestrator', () => {
 
     it('should use timestamp from market data', () => {
       const result = { ema9: [100] };
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(processed.EMA9.data[0].time).toBe(1000);
     });
 
     it('should handle missing indicator data gracefully', () => {
       const result = {};
-      const processed = orchestrator.processIndicatorPlots(result, mockData);
+      const processed = runner.processIndicatorPlots(result, mockData);
 
       expect(Object.keys(processed)).toHaveLength(0);
     });

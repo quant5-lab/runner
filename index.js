@@ -9,9 +9,9 @@ async function main() {
     const envBars = parseInt(process.env.BARS) || bars;
 
     const container = createContainer(createProviderChain, DEFAULTS);
-    const orchestrator = container.resolve('tradingOrchestrator');
+    const runner = container.resolve('tradingAnalysisRunner');
 
-    await orchestrator.runTradingAnalysis(envSymbol, envTimeframe, envBars);
+    await runner.run(envSymbol, envTimeframe, envBars);
   } catch (error) {
     const container = createContainer(createProviderChain, DEFAULTS);
     const logger = container.resolve('logger');

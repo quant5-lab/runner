@@ -3,7 +3,7 @@ import { TechnicalAnalysisEngine } from './classes/TechnicalAnalysisEngine.js';
 import { CandlestickDataSanitizer } from './classes/CandlestickDataSanitizer.js';
 import { ConfigurationBuilder } from './classes/ConfigurationBuilder.js';
 import { JsonFileWriter } from './classes/JsonFileWriter.js';
-import { TradingOrchestrator } from './classes/TradingOrchestrator.js';
+import { TradingAnalysisRunner } from './classes/TradingAnalysisRunner.js';
 import { Logger } from './classes/Logger.js';
 
 class Container {
@@ -50,9 +50,9 @@ function createContainer(providerChain, defaults) {
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
     .register('jsonFileWriter', () => new JsonFileWriter(), true)
     .register(
-      'tradingOrchestrator',
+      'tradingAnalysisRunner',
       (c) =>
-        new TradingOrchestrator(
+        new TradingAnalysisRunner(
           c.resolve('providerManager'),
           c.resolve('technicalAnalysisEngine'),
           c.resolve('candlestickDataSanitizer'),

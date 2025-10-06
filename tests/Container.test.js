@@ -90,7 +90,7 @@ describe('createContainer', () => {
     expect(container.services.has('candlestickDataSanitizer')).toBe(true);
     expect(container.services.has('configurationBuilder')).toBe(true);
     expect(container.services.has('jsonFileWriter')).toBe(true);
-    expect(container.services.has('tradingOrchestrator')).toBe(true);
+    expect(container.services.has('tradingAnalysisRunner')).toBe(true);
   });
 
   it('should register all services as singletons', () => {
@@ -102,7 +102,7 @@ describe('createContainer', () => {
       'candlestickDataSanitizer',
       'configurationBuilder',
       'jsonFileWriter',
-      'tradingOrchestrator',
+      'tradingAnalysisRunner',
     ];
 
     serviceNames.forEach((name) => {
@@ -138,7 +138,7 @@ describe('createContainer', () => {
   it('should resolve tradingOrchestrator with all dependencies', () => {
     const mockProviderChain = (logger) => [];
     const container = createContainer(mockProviderChain, {});
-    const orchestrator = container.resolve('tradingOrchestrator');
+    const orchestrator = container.resolve('tradingAnalysisRunner');
     expect(orchestrator).toBeDefined();
     expect(orchestrator.providerManager).toBeDefined();
     expect(orchestrator.technicalAnalysisEngine).toBeDefined();
