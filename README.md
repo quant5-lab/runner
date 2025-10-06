@@ -19,15 +19,18 @@ npm install -g pnpm
 # Install dependencies
 pnpm install
 
+# Run tests before starting
+pnpm test
+
 # Generate analysis and start visualization server
-pnpm run visualize
+pnpm start
 ```
 
 Visit: http://localhost:8080/chart.html
 
 ## Configuration Parameters
 
-You can customize the analysis using environment variables:
+### Local Development
 
 ```bash
 # Symbol configuration
@@ -45,6 +48,20 @@ TIMEFRAME=D pnpm start          # Daily candles (default)
 
 # Combined configuration
 SYMBOL=AAPL BARS=150 TIMEFRAME=D pnpm start
+```
+
+### Docker Usage
+
+```bash
+# Start/restart runner with env vars
+SYMBOL=BTCUSDT TIMEFRAME=D pnpm docker:start
+
+# Run tests in Docker
+pnpm docker:test
+
+# Access running container
+docker-compose exec app pnpm test
+docker-compose exec app pnpm start
 ```
 
 ### Supported Symbols by Provider
@@ -72,18 +89,19 @@ SYMBOL=AAPL BARS=150 TIMEFRAME=D pnpm start
 
 ## Available Scripts
 
-### Core Commands
+### Local Development
 
-- `pnpm start` - Generate trading analysis data with current parameters
-- `pnpm run serve` - Start HTTP server for chart visualization
-- `pnpm run visualize` - Build data + start server (recommended)
+- `pnpm test` - Run tests with automatic network monitoring (if tcpdump available)
+- `pnpm test:ui` - Run tests with interactive UI
+- `pnpm start` - Run tests (prestart), then generate analysis and start HTTP server
+- `pnpm coverage` - Generate test coverage report
+- `pnpm lint` - Lint code
+- `pnpm format` - Format and fix code
 
-### Development
+### Docker Commands
 
-- `pnpm run dev` - Run analysis with file watching
-- `pnpm run dev:watch` - Run analysis + server with file watching
-- `pnpm run build` - Generate chart data and configuration
-- `pnpm run stop` - Stop HTTP server
+- `pnpm docker:test` - Run tests in Docker with network isolation
+- `pnpm docker:start` - Start runner in Docker (pass env vars: `SYMBOL=BTCUSDT pnpm docker:start`)
 
 ## Dynamic Provider Fallback
 
