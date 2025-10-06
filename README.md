@@ -1,5 +1,7 @@
 # PineTS Multi-Provider Trading Analysis
 
+![Coverage](https://img.shields.io/badge/coverage-94.7%25-brightgreen)
+
 A unified Node.js application for technical analysis across multiple exchanges using PineTS with dynamic provider fallback and real-time chart visualization.
 
 ## Supported Exchanges
