@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "prestart": "vitest run",
-    "start": "concurrently \"node --watch src/index.js\" \"http-server out -p 8080 -c-1\"",
+    "start": "node src/index.js",
     "test": "./scripts/test-with-isolation.sh",
     "test:ui": "vitest --ui",
     "docker:test": "docker-compose exec app pnpm test",
