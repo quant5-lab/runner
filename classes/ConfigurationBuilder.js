@@ -9,7 +9,6 @@ class ConfigurationBuilder {
       timeframe,
       bars,
       strategy: 'Multi-Provider Strategy',
-      indicators: this.defaultConfig.indicators,
     };
   }
 

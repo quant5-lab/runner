@@ -15,9 +15,4 @@ export const DEFAULTS = {
   timeframe: process.env.TIMEFRAME || 'D',
   bars: parseInt(process.env.BARS) || 100,
   strategy: 'EMA Crossover Strategy',
-  indicators: {
-    ema9: { period: 9, color: '#2196F3' },
-    ema18: { period: 18, color: '#F44336' },
-    signals: { color: '#4CAF50' },
-  },
 };
