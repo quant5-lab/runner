@@ -122,4 +122,108 @@ describe('PineScriptStrategyRunner', () => {
       expect(metadata.BullSignal.type).toBe('signal');
     });
   });
+
+  describe('executeTranspiledStrategy', () => {
+    it('should execute simple JavaScript code and return plots', () => {
+      const jsCode = `
+        context.core.plot([1, 2, 3], 'Test Plot', { color: 'blue' });
+      `;
+      const marketData = {
+        open: [100, 101, 102],
+        high: [103, 104, 105],
+        low: [99, 100, 101],
+        close: [102, 103, 104],
+        volume: [1000, 1100, 1200]
+      };
+
+      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+
+      expect(result).toHaveProperty('plots');
+      expect(Array.isArray(result.plots)).toBe(true);
+      expect(result.plots.length).toBe(1);
+      expect(result.plots[0].title).toBe('Test Plot');
+      expect(result.plots[0].series).toEqual([1, 2, 3]);
+    });
+
+    it('should provide market data arrays in context', () => {
+      const jsCode = `
+        context.core.plot(context.data.close, 'Close', {});
+      `;
+      const marketData = {
+        open: [100],
+        high: [103],
+        low: [99],
+        close: [102],
+        volume: [1000]
+      };
+
+      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+
+      expect(result.plots[0].series).toEqual([102]);
+    });
+
+    it('should provide ta library stubs in context', () => {
+      const jsCode = `
+        const ema = context.ta.ema(context.data.close, 9);
+        context.core.plot(ema, 'EMA', {});
+      `;
+      const marketData = {
+        open: [100, 101, 102],
+        high: [103, 104, 105],
+        low: [99, 100, 101],
+        close: [102, 103, 104],
+        volume: [1000, 1100, 1200]
+      };
+
+      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+
+      expect(result.plots.length).toBe(1);
+      expect(result.plots[0].title).toBe('EMA');
+    });
+
+    it('should throw error when executing invalid code', () => {
+      const jsCode = 'throw new Error("Test error");';
+      const marketData = {
+        open: [100],
+        high: [103],
+        low: [99],
+        close: [102],
+        volume: [1000]
+      };
+
+      expect(() => {
+        runner.executeTranspiledStrategy(jsCode, marketData);
+      }).toThrow('Strategy execution failed: Test error');
+    });
+
+    it('should handle syntax errors in transpiled code', () => {
+      const jsCode = 'const x = {invalid syntax';
+      const marketData = {
+        open: [100],
+        high: [103],
+        low: [99],
+        close: [102],
+        volume: [1000]
+      };
+
+      expect(() => {
+        runner.executeTranspiledStrategy(jsCode, marketData);
+      }).toThrow(/Strategy execution failed/);
+    });
+
+    it('should return empty plots array when no plots generated', () => {
+      const jsCode = 'const x = 1 + 1;';
+      const marketData = {
+        open: [100],
+        high: [103],
+        low: [99],
+        close: [102],
+        volume: [1000]
+      };
+
+      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+
+      expect(result.plots).toEqual([]);
+    });
+  });
 });

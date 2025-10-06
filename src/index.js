@@ -25,10 +25,10 @@ async function main() {
       logger.info('✅ Transpilation complete, generated JavaScript');
       logger.info(`📝 Transpiled code length: ${jsCode.length} characters`);
       
-      // TODO: Pass jsCode to runner when strategy execution is implemented
+      await runner.run(envSymbol, envTimeframe, envBars, jsCode);
+    } else {
+      await runner.run(envSymbol, envTimeframe, envBars);
     }
-
-    await runner.run(envSymbol, envTimeframe, envBars);
   } catch (error) {
     const container = createContainer(createProviderChain, DEFAULTS);
     const logger = container.resolve('logger');

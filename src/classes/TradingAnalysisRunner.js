@@ -15,7 +15,7 @@ class TradingAnalysisRunner {
     this.logger = logger;
   }
 
-  async run(symbol, timeframe, bars) {
+  async run(symbol, timeframe, bars, jsCode = null) {
     this.logger.log(`📊 Configuration: Symbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
     const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars);
@@ -32,17 +32,43 @@ class TradingAnalysisRunner {
 
     this.logger.log(`📊 Using ${provider} provider for ${symbol}`);
 
-    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
-      provider,
-      data,
-      instance,
-      symbol,
-      timeframe,
-      bars,
-    );
+    let result, plots, indicatorMetadata;
 
-    const { result, plots } = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
-    const indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
+    if (jsCode) {
+      /* Execute transpiled Pine Script strategy */
+      try {
+        const marketData = {
+          open: data.map(c => c.open),
+          high: data.map(c => c.high),
+          low: data.map(c => c.low),
+          close: data.map(c => c.close),
+          volume: data.map(c => c.volume || 0)
+        };
+        
+        const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(jsCode, marketData);
+        this.logger.log('✅ Strategy execution complete');
+        plots = executionResult.plots || {};
+        indicatorMetadata = { TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' } };
+      } catch (error) {
+        this.logger.error(`❌ Strategy execution failed: ${error.message}`);
+        throw error;
+      }
+    } else {
+      /* Execute default EMA strategy */
+      const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
+        provider,
+        data,
+        instance,
+        symbol,
+        timeframe,
+        bars,
+      );
+
+      const emaResult = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
+      result = emaResult.result;
+      plots = emaResult.plots;
+      indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
+    }
 
     // Process indicator plots - handle both custom providers and real PineTS
     let processedPlots = plots || {};

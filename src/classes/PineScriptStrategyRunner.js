@@ -38,6 +38,43 @@ class PineScriptStrategyRunner {
       BullSignal: { title: 'Bull Signal', type: 'signal' },
     };
   }
+
+  executeTranspiledStrategy(jsCode, marketData) {
+    /* Create execution context with market data arrays and ta library stubs */
+    const context = {
+      data: {
+        open: marketData.open || [],
+        high: marketData.high || [],
+        low: marketData.low || [],
+        close: marketData.close || [],
+        volume: marketData.volume || []
+      },
+      ta: {
+        ema: (src, len) => src,
+        sma: (src, len) => src,
+        rsi: (src, len) => src,
+        stdev: (src, len) => 0,
+        crossover: (a, b) => false,
+        crossunder: (a, b) => false
+      },
+      core: {
+        plot: (series, title, options) => {
+          if (!context.plots) context.plots = [];
+          context.plots.push({ title, series, options });
+        }
+      },
+      plots: []
+    };
+
+    /* Execute transpiled code with Function constructor */
+    try {
+      const strategyFunc = new Function('context', jsCode + '\nreturn context.plots;');
+      const plots = strategyFunc(context);
+      return { plots: plots || [] };
+    } catch (error) {
+      throw new Error(`Strategy execution failed: ${error.message}`);
+    }
+  }
 }
 
 export { PineScriptStrategyRunner };
