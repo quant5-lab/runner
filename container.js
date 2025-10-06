@@ -2,7 +2,7 @@ import { ProviderManager } from './classes/ProviderManager.js';
 import { TechnicalAnalysisEngine } from './classes/TechnicalAnalysisEngine.js';
 import { DataProcessor } from './classes/DataProcessor.js';
 import { ConfigurationBuilder } from './classes/ConfigurationBuilder.js';
-import { FileExporter } from './classes/FileExporter.js';
+import { JsonFileWriter } from './classes/JsonFileWriter.js';
 import { TradingOrchestrator } from './classes/TradingOrchestrator.js';
 import { Logger } from './classes/Logger.js';
 
@@ -48,7 +48,7 @@ function createContainer(providerChain, defaults) {
     .register('technicalAnalysisEngine', () => new TechnicalAnalysisEngine(), true)
     .register('dataProcessor', () => new DataProcessor(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
-    .register('fileExporter', () => new FileExporter(), true)
+    .register('jsonFileWriter', () => new JsonFileWriter(), true)
     .register(
       'tradingOrchestrator',
       (c) =>
@@ -57,7 +57,7 @@ function createContainer(providerChain, defaults) {
           c.resolve('technicalAnalysisEngine'),
           c.resolve('dataProcessor'),
           c.resolve('configurationBuilder'),
-          c.resolve('fileExporter'),
+          c.resolve('jsonFileWriter'),
           c.resolve('logger'),
         ),
       true,

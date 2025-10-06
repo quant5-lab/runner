@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { FileExporter } from '../classes/FileExporter.js';
+import { JsonFileWriter } from '../classes/JsonFileWriter.js';
 import * as fs from 'fs';
 
 vi.mock('fs', () => ({
@@ -11,11 +11,11 @@ vi.mock('path', () => ({
   join: vi.fn((...args) => args.join('/')),
 }));
 
-describe('FileExporter', () => {
+describe('JsonFileWriter', () => {
   let exporter;
 
   beforeEach(() => {
-    exporter = new FileExporter();
+    exporter = new JsonFileWriter();
     vi.clearAllMocks();
   });
 

@@ -4,14 +4,14 @@ class TradingOrchestrator {
     technicalAnalysisEngine,
     dataProcessor,
     configurationBuilder,
-    fileExporter,
+    jsonFileWriter,
     logger,
   ) {
     this.providerManager = providerManager;
     this.technicalAnalysisEngine = technicalAnalysisEngine;
     this.dataProcessor = dataProcessor;
     this.configurationBuilder = configurationBuilder;
-    this.fileExporter = fileExporter;
+    this.jsonFileWriter = jsonFileWriter;
     this.logger = logger;
   }
 
@@ -57,13 +57,13 @@ class TradingOrchestrator {
 
     const candlestickData = this.dataProcessor.processCandlestickData(data);
 
-    this.fileExporter.exportChartData(candlestickData, processedPlots);
+    this.jsonFileWriter.exportChartData(candlestickData, processedPlots);
 
     const chartConfig = this.configurationBuilder.generateChartConfig(
       tradingConfig,
       indicatorMetadata,
     );
-    this.fileExporter.exportConfiguration(chartConfig);
+    this.jsonFileWriter.exportConfiguration(chartConfig);
 
     this.logger.log(
       `Successfully processed ${candlestickData.length} candles for ${tradingConfig.symbol}`,

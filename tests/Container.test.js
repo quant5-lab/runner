@@ -89,7 +89,7 @@ describe('createContainer', () => {
     expect(container.services.has('technicalAnalysisEngine')).toBe(true);
     expect(container.services.has('dataProcessor')).toBe(true);
     expect(container.services.has('configurationBuilder')).toBe(true);
-    expect(container.services.has('fileExporter')).toBe(true);
+    expect(container.services.has('jsonFileWriter')).toBe(true);
     expect(container.services.has('tradingOrchestrator')).toBe(true);
   });
 
@@ -101,7 +101,7 @@ describe('createContainer', () => {
       'technicalAnalysisEngine',
       'dataProcessor',
       'configurationBuilder',
-      'fileExporter',
+      'jsonFileWriter',
       'tradingOrchestrator',
     ];
 
@@ -144,7 +144,7 @@ describe('createContainer', () => {
     expect(orchestrator.technicalAnalysisEngine).toBeDefined();
     expect(orchestrator.dataProcessor).toBeDefined();
     expect(orchestrator.configurationBuilder).toBeDefined();
-    expect(orchestrator.fileExporter).toBeDefined();
+    expect(orchestrator.jsonFileWriter).toBeDefined();
     expect(orchestrator.logger).toBeDefined();
   });
 });

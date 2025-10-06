@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-class FileExporter {
+class JsonFileWriter {
   ensureOutDirectory() {
     try {
       mkdirSync('out', { recursive: true });
@@ -27,4 +27,4 @@ class FileExporter {
   }
 }
 
-export { FileExporter };
+export { JsonFileWriter };

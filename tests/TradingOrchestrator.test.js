@@ -7,7 +7,7 @@ describe('TradingOrchestrator', () => {
   let mockTechnicalAnalysisEngine;
   let mockDataProcessor;
   let mockConfigurationBuilder;
-  let mockFileExporter;
+  let mockJsonFileWriter;
   let mockLogger;
 
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe('TradingOrchestrator', () => {
       createTradingConfig: vi.fn(),
       generateChartConfig: vi.fn(),
     };
-    mockFileExporter = {
+    mockJsonFileWriter = {
       exportChartData: vi.fn(),
       exportConfiguration: vi.fn(),
     };
@@ -40,7 +40,7 @@ describe('TradingOrchestrator', () => {
       mockTechnicalAnalysisEngine,
       mockDataProcessor,
       mockConfigurationBuilder,
-      mockFileExporter,
+      mockJsonFileWriter,
       mockLogger,
     );
   });
@@ -51,7 +51,7 @@ describe('TradingOrchestrator', () => {
       expect(orchestrator.technicalAnalysisEngine).toBe(mockTechnicalAnalysisEngine);
       expect(orchestrator.dataProcessor).toBe(mockDataProcessor);
       expect(orchestrator.configurationBuilder).toBe(mockConfigurationBuilder);
-      expect(orchestrator.fileExporter).toBe(mockFileExporter);
+      expect(orchestrator.jsonFileWriter).toBe(mockJsonFileWriter);
       expect(orchestrator.logger).toBe(mockLogger);
     });
   });
@@ -112,8 +112,8 @@ describe('TradingOrchestrator', () => {
       expect(mockTechnicalAnalysisEngine.createPineTSAdapter).toHaveBeenCalled();
       expect(mockTechnicalAnalysisEngine.runEMAStrategy).toHaveBeenCalled();
       expect(mockDataProcessor.processCandlestickData).toHaveBeenCalled();
-      expect(mockFileExporter.exportChartData).toHaveBeenCalled();
-      expect(mockFileExporter.exportConfiguration).toHaveBeenCalled();
+      expect(mockJsonFileWriter.exportChartData).toHaveBeenCalled();
+      expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalled();
     });
 
     it('should log configuration at start', async () => {
@@ -175,7 +175,7 @@ describe('TradingOrchestrator', () => {
     it('should export chart data with processed candles and plots', async () => {
       await orchestrator.runTradingAnalysis('BTCUSDT', 'D', 100);
 
-      expect(mockFileExporter.exportChartData).toHaveBeenCalledWith(mockProcessedData, mockPlots);
+      expect(mockJsonFileWriter.exportChartData).toHaveBeenCalledWith(mockProcessedData, mockPlots);
     });
 
     it('should generate and export chart configuration', async () => {
@@ -185,7 +185,7 @@ describe('TradingOrchestrator', () => {
         mockTradingConfig,
         mockIndicatorMetadata,
       );
-      expect(mockFileExporter.exportConfiguration).toHaveBeenCalledWith(mockChartConfig);
+      expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalledWith(mockChartConfig);
     });
 
     it('should log success message with candle count', async () => {
