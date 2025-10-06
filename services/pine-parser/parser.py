@@ -3,6 +3,7 @@
 import sys
 import json
 from pynescript.ast import parse, dump
+from pynescript.ast.grammar.asdl.generated.PinescriptASTNode import *
 
 
 class Node:
@@ -210,38 +211,82 @@ class PyneToJsAstConverter:
         return estree_node('Program', body=body, sourceType='module')
 
     def visit_Assign(self, node):
-        var_name = node.target.id
         js_value = self.visit(node.value)
-
-        if var_name not in self._declared_vars:
-            self._declared_vars.add(var_name)
-            declaration = estree_node('VariableDeclarator',
-                                      id=self.visit(node.target),
-                                      init=js_value)
-            return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+        
+        # Handle Tuple destructuring: [a, b, c] = func()
+        if isinstance(node.target, Tuple):
+            var_names = [elem.id for elem in node.target.elts]
+            new_vars = [v for v in var_names if v not in self._declared_vars]
+            
+            if new_vars:
+                # Declare all new variables
+                self._declared_vars.update(new_vars)
+                declaration = estree_node('VariableDeclarator',
+                                          id=self.visit(node.target),
+                                          init=js_value)
+                return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+            else:
+                # All already declared, assignment only
+                return estree_node('ExpressionStatement',
+                                   expression=estree_node('AssignmentExpression',
+                                                        operator='=',
+                                                        left=self.visit(node.target),
+                                                        right=js_value))
         else:
-            return estree_node('ExpressionStatement',
-                               expression=estree_node('AssignmentExpression',
-                                                    operator='=',
-                                                    left=self.visit(node.target),
-                                                    right=js_value))
+            # Simple assignment: x = value
+            var_name = node.target.id
+            
+            if var_name not in self._declared_vars:
+                self._declared_vars.add(var_name)
+                declaration = estree_node('VariableDeclarator',
+                                          id=self.visit(node.target),
+                                          init=js_value)
+                return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+            else:
+                return estree_node('ExpressionStatement',
+                                   expression=estree_node('AssignmentExpression',
+                                                        operator='=',
+                                                        left=self.visit(node.target),
+                                                        right=js_value))
 
     def visit_ReAssign(self, node):
-        var_name = node.target.id
         js_value = self.visit(node.value)
-
-        if var_name not in self._declared_vars:
-            self._declared_vars.add(var_name)
-            declaration = estree_node('VariableDeclarator',
-                                      id=self.visit(node.target),
-                                      init=js_value)
-            return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
+        
+        # Handle Tuple destructuring: [a, b, c] := func()
+        if isinstance(node.target, Tuple):
+            var_names = [elem.id for elem in node.target.elts]
+            new_vars = [v for v in var_names if v not in self._declared_vars]
+            
+            if new_vars:
+                # Declare new variables with let (ReAssign implies mutability)
+                self._declared_vars.update(new_vars)
+                declaration = estree_node('VariableDeclarator',
+                                          id=self.visit(node.target),
+                                          init=js_value)
+                return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
+            else:
+                # All already declared, assignment only
+                return estree_node('ExpressionStatement',
+                                   expression=estree_node('AssignmentExpression',
+                                                        operator='=',
+                                                        left=self.visit(node.target),
+                                                        right=js_value))
         else:
-            return estree_node('ExpressionStatement',
-                               expression=estree_node('AssignmentExpression',
-                                                    operator='=',
-                                                    left=self.visit(node.target),
-                                                    right=js_value))
+            # Simple reassignment: x := value
+            var_name = node.target.id
+            
+            if var_name not in self._declared_vars:
+                self._declared_vars.add(var_name)
+                declaration = estree_node('VariableDeclarator',
+                                          id=self.visit(node.target),
+                                          init=js_value)
+                return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
+            else:
+                return estree_node('ExpressionStatement',
+                                   expression=estree_node('AssignmentExpression',
+                                                        operator='=',
+                                                        left=self.visit(node.target),
+                                                        right=js_value))
 
     def visit_Name(self, node):
         return estree_node('Identifier', name=node.id)
@@ -254,6 +299,21 @@ class PyneToJsAstConverter:
                            operator=self._map_operator(node.op),
                            left=self.visit(node.left),
                            right=self.visit(node.right))
+
+    def visit_UnaryOp(self, node):
+        if isinstance(node.op, USub):
+            operator = '-'
+        elif isinstance(node.op, UAdd):
+            operator = '+'
+        elif isinstance(node.op, Not):
+            operator = '!'
+        else:
+            raise NotImplementedError(f"Unary operator {type(node.op)} not implemented")
+        
+        return estree_node('UnaryExpression',
+                           operator=operator,
+                           prefix=True,
+                           argument=self.visit(node.operand))
 
     def visit_Call(self, node):
         callee = self.visit(node.func)
@@ -347,6 +407,11 @@ class PyneToJsAstConverter:
                            object=obj,
                            property=prop,
                            computed=True)
+
+    def visit_Tuple(self, node):
+        # Tuple used in assignments for array destructuring
+        elements = [self.visit(elt) for elt in node.elts]
+        return estree_node('ArrayPattern', elements=elements)
 
     def visit_FunctionDef(self, node):
         func_name = node.name
