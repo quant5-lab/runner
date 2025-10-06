@@ -41,6 +41,8 @@ class PineScriptStrategyRunner {
 
   executeTranspiledStrategy(jsCode, marketData) {
     /* Create execution context with market data arrays and ta library stubs */
+    const plots = [];
+    
     const context = {
       data: {
         open: marketData.open || [],
@@ -59,18 +61,49 @@ class PineScriptStrategyRunner {
       },
       core: {
         plot: (series, title, options) => {
-          if (!context.plots) context.plots = [];
-          context.plots.push({ title, series, options });
+          plots.push({ title, series, options });
         }
+      }
+    };
+
+    /* Provide global functions for Pine Script API */
+    const globalScope = {
+      context,
+      plots,
+      /* Pine Script declaration functions */
+      indicator: (title, options) => {
+        /* Indicator declaration - no-op in execution */
+        return { title, ...options };
       },
-      plots: []
+      strategy: (title, options) => {
+        /* Strategy declaration - no-op in execution */
+        return { title, ...options };
+      },
+      /* Pine Script built-in variables */
+      close: context.data.close,
+      open: context.data.open,
+      high: context.data.high,
+      low: context.data.low,
+      volume: context.data.volume,
+      /* Pine Script plot function */
+      plot: (series, title = '', options = {}) => {
+        plots.push({ title, series, options });
+      },
+      plotshape: (series, title, options) => {
+        plots.push({ title, series, options, type: 'shape' });
+      },
+      plotchar: (series, title, options) => {
+        plots.push({ title, series, options, type: 'char' });
+      }
     };
 
     /* Execute transpiled code with Function constructor */
     try {
-      const strategyFunc = new Function('context', jsCode + '\nreturn context.plots;');
-      const plots = strategyFunc(context);
-      return { plots: plots || [] };
+      const paramNames = Object.keys(globalScope);
+      const paramValues = Object.values(globalScope);
+      const strategyFunc = new Function(...paramNames, jsCode + '\nreturn plots;');
+      const result = strategyFunc(...paramValues);
+      return { plots: result || plots };
     } catch (error) {
       throw new Error(`Strategy execution failed: ${error.message}`);
     }
