@@ -6,11 +6,7 @@ services:
     image: runner-app
     container_name: runner-dev
     volumes:
-      - ./src:/app/src:ro
-      - ./tests:/app/tests:ro
-      - ./strategies:/app/strategies:rw
-      - ./services:/app/services:ro
-      - ./out:/app/out:rw
+      - .:/app
       - ../PineTS:/PineTS:ro
     environment:
       - SYMBOL=${SYMBOL:-BTCUSDT}
