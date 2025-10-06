@@ -86,7 +86,7 @@ describe('createContainer', () => {
 
     expect(container.services.has('logger')).toBe(true);
     expect(container.services.has('providerManager')).toBe(true);
-    expect(container.services.has('technicalAnalysisEngine')).toBe(true);
+    expect(container.services.has('pineScriptStrategyRunner')).toBe(true);
     expect(container.services.has('candlestickDataSanitizer')).toBe(true);
     expect(container.services.has('configurationBuilder')).toBe(true);
     expect(container.services.has('jsonFileWriter')).toBe(true);
@@ -98,7 +98,7 @@ describe('createContainer', () => {
     const serviceNames = [
       'logger',
       'providerManager',
-      'technicalAnalysisEngine',
+      'pineScriptStrategyRunner',
       'candlestickDataSanitizer',
       'configurationBuilder',
       'jsonFileWriter',
@@ -141,7 +141,7 @@ describe('createContainer', () => {
     const orchestrator = container.resolve('tradingAnalysisRunner');
     expect(orchestrator).toBeDefined();
     expect(orchestrator.providerManager).toBeDefined();
-    expect(orchestrator.technicalAnalysisEngine).toBeDefined();
+    expect(orchestrator.pineScriptStrategyRunner).toBeDefined();
     expect(orchestrator.candlestickDataSanitizer).toBeDefined();
     expect(orchestrator.configurationBuilder).toBeDefined();
     expect(orchestrator.jsonFileWriter).toBeDefined();

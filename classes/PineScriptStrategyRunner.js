@@ -1,6 +1,6 @@
 import { PineTS } from '../../PineTS/dist/pinets.dev.es.js';
 
-class TechnicalAnalysisEngine {
+class PineScriptStrategyRunner {
   async createPineTSAdapter(provider, data, instance, symbol, timeframe, bars) {
     /* All providers now return consistent data arrays - create PineTS from data */
     const pineTS = new PineTS(data, symbol, timeframe, bars);
@@ -40,4 +40,4 @@ class TechnicalAnalysisEngine {
   }
 }
 
-export { TechnicalAnalysisEngine };
+export { PineScriptStrategyRunner };

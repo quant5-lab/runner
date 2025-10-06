@@ -1,5 +1,5 @@
 import { ProviderManager } from './classes/ProviderManager.js';
-import { TechnicalAnalysisEngine } from './classes/TechnicalAnalysisEngine.js';
+import { PineScriptStrategyRunner } from './classes/PineScriptStrategyRunner.js';
 import { CandlestickDataSanitizer } from './classes/CandlestickDataSanitizer.js';
 import { ConfigurationBuilder } from './classes/ConfigurationBuilder.js';
 import { JsonFileWriter } from './classes/JsonFileWriter.js';
@@ -45,7 +45,7 @@ function createContainer(providerChain, defaults) {
       (c) => new ProviderManager(providerChain(logger), c.resolve('logger')),
       true,
     )
-    .register('technicalAnalysisEngine', () => new TechnicalAnalysisEngine(), true)
+    .register('pineScriptStrategyRunner', () => new PineScriptStrategyRunner(), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
     .register('jsonFileWriter', () => new JsonFileWriter(), true)
@@ -54,7 +54,7 @@ function createContainer(providerChain, defaults) {
       (c) =>
         new TradingAnalysisRunner(
           c.resolve('providerManager'),
-          c.resolve('technicalAnalysisEngine'),
+          c.resolve('pineScriptStrategyRunner'),
           c.resolve('candlestickDataSanitizer'),
           c.resolve('configurationBuilder'),
           c.resolve('jsonFileWriter'),

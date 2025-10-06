@@ -4,7 +4,7 @@ import { TradingAnalysisRunner } from '../classes/TradingAnalysisRunner.js';
 describe('TradingAnalysisRunner', () => {
   let runner;
   let mockProviderManager;
-  let mockTechnicalAnalysisEngine;
+  let mockPineScriptStrategyRunner;
   let mockCandlestickDataSanitizer;
   let mockConfigurationBuilder;
   let mockJsonFileWriter;
@@ -14,7 +14,7 @@ describe('TradingAnalysisRunner', () => {
     mockProviderManager = {
       fetchMarketData: vi.fn(),
     };
-    mockTechnicalAnalysisEngine = {
+    mockPineScriptStrategyRunner = {
       createPineTSAdapter: vi.fn(),
       runEMAStrategy: vi.fn(),
       getIndicatorMetadata: vi.fn(),
@@ -37,7 +37,7 @@ describe('TradingAnalysisRunner', () => {
 
     runner = new TradingAnalysisRunner(
       mockProviderManager,
-      mockTechnicalAnalysisEngine,
+      mockPineScriptStrategyRunner,
       mockCandlestickDataSanitizer,
       mockConfigurationBuilder,
       mockJsonFileWriter,
@@ -48,7 +48,7 @@ describe('TradingAnalysisRunner', () => {
   describe('constructor', () => {
     it('should store all dependencies', () => {
       expect(runner.providerManager).toBe(mockProviderManager);
-      expect(runner.technicalAnalysisEngine).toBe(mockTechnicalAnalysisEngine);
+      expect(runner.pineScriptStrategyRunner).toBe(mockPineScriptStrategyRunner);
       expect(runner.candlestickDataSanitizer).toBe(mockCandlestickDataSanitizer);
       expect(runner.configurationBuilder).toBe(mockConfigurationBuilder);
       expect(runner.jsonFileWriter).toBe(mockJsonFileWriter);
@@ -93,12 +93,12 @@ describe('TradingAnalysisRunner', () => {
         data: mockMarketData,
         instance: {},
       });
-      mockTechnicalAnalysisEngine.createPineTSAdapter.mockResolvedValue({});
-      mockTechnicalAnalysisEngine.runEMAStrategy.mockResolvedValue({
+      mockPineScriptStrategyRunner.createPineTSAdapter.mockResolvedValue({});
+      mockPineScriptStrategyRunner.runEMAStrategy.mockResolvedValue({
         result: {},
         plots: mockPlots,
       });
-      mockTechnicalAnalysisEngine.getIndicatorMetadata.mockReturnValue(mockIndicatorMetadata);
+      mockPineScriptStrategyRunner.getIndicatorMetadata.mockReturnValue(mockIndicatorMetadata);
       mockCandlestickDataSanitizer.processCandlestickData.mockReturnValue(mockProcessedData);
       mockConfigurationBuilder.createTradingConfig.mockReturnValue(mockTradingConfig);
       mockConfigurationBuilder.generateChartConfig.mockReturnValue(mockChartConfig);
@@ -109,8 +109,8 @@ describe('TradingAnalysisRunner', () => {
 
       expect(mockLogger.log).toHaveBeenCalled();
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
-      expect(mockTechnicalAnalysisEngine.createPineTSAdapter).toHaveBeenCalled();
-      expect(mockTechnicalAnalysisEngine.runEMAStrategy).toHaveBeenCalled();
+      expect(mockPineScriptStrategyRunner.createPineTSAdapter).toHaveBeenCalled();
+      expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalled();
       expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalled();
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalled();
       expect(mockJsonFileWriter.exportConfiguration).toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('TradingAnalysisRunner', () => {
     it('should create PineTS adapter with market data', async () => {
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockTechnicalAnalysisEngine.createPineTSAdapter).toHaveBeenCalledWith(
+      expect(mockPineScriptStrategyRunner.createPineTSAdapter).toHaveBeenCalledWith(
         'BINANCE',
         mockMarketData,
         {},
@@ -159,11 +159,11 @@ describe('TradingAnalysisRunner', () => {
 
     it('should run EMA strategy', async () => {
       const mockPineTS = { ready: vi.fn() };
-      mockTechnicalAnalysisEngine.createPineTSAdapter.mockResolvedValue(mockPineTS);
+      mockPineScriptStrategyRunner.createPineTSAdapter.mockResolvedValue(mockPineTS);
 
       await runner.run('BTCUSDT', 'D', 100);
 
-      expect(mockTechnicalAnalysisEngine.runEMAStrategy).toHaveBeenCalledWith(mockPineTS);
+      expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalledWith(mockPineTS);
     });
 
     it('should process candlestick data', async () => {

@@ -1,14 +1,14 @@
 class TradingAnalysisRunner {
   constructor(
     providerManager,
-    technicalAnalysisEngine,
+    pineScriptStrategyRunner,
     candlestickDataSanitizer,
     configurationBuilder,
     jsonFileWriter,
     logger,
   ) {
     this.providerManager = providerManager;
-    this.technicalAnalysisEngine = technicalAnalysisEngine;
+    this.pineScriptStrategyRunner = pineScriptStrategyRunner;
     this.candlestickDataSanitizer = candlestickDataSanitizer;
     this.configurationBuilder = configurationBuilder;
     this.jsonFileWriter = jsonFileWriter;
@@ -32,7 +32,7 @@ class TradingAnalysisRunner {
 
     this.logger.log(`📊 Using ${provider} provider for ${symbol}`);
 
-    const pineTS = await this.technicalAnalysisEngine.createPineTSAdapter(
+    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
       provider,
       data,
       instance,
@@ -41,8 +41,8 @@ class TradingAnalysisRunner {
       bars,
     );
 
-    const { result, plots } = await this.technicalAnalysisEngine.runEMAStrategy(pineTS);
-    const indicatorMetadata = this.technicalAnalysisEngine.getIndicatorMetadata();
+    const { result, plots } = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
+    const indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
 
     // Process indicator plots - handle both custom providers and real PineTS
     let processedPlots = plots || {};
