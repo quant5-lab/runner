@@ -6,6 +6,7 @@ describe('ProviderManager', () => {
   let mockProvider1;
   let mockProvider2;
   let mockProvider3;
+  let mockLogger;
 
   beforeEach(() => {
     mockProvider1 = {
@@ -17,6 +18,11 @@ describe('ProviderManager', () => {
     mockProvider3 = {
       getMarketData: vi.fn(),
     };
+    mockLogger = {
+      log: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    };
   });
 
   describe('constructor', () => {
@@ -25,7 +31,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
       expect(manager.providerChain).toEqual(chain);
     });
   });
@@ -36,7 +42,7 @@ describe('ProviderManager', () => {
       mockProvider1.getMarketData.mockResolvedValue(marketData);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -57,7 +63,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -78,7 +84,7 @@ describe('ProviderManager', () => {
         { name: 'Provider2', instance: mockProvider2 },
         { name: 'Provider3', instance: mockProvider3 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -96,7 +102,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       await expect(manager.fetchMarketData('BTCUSDT', 'D', 100)).rejects.toThrow(
         'All providers failed for symbol: BTCUSDT',
@@ -112,7 +118,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -129,7 +135,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -145,7 +151,7 @@ describe('ProviderManager', () => {
         { name: 'Provider1', instance: mockProvider1 },
         { name: 'Provider2', instance: mockProvider2 },
       ];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 
@@ -156,7 +162,7 @@ describe('ProviderManager', () => {
       mockProvider1.getMarketData.mockResolvedValue([{ openTime: 1000 }]);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       await manager.fetchMarketData('AAPL', 'W', 200);
 
@@ -168,7 +174,7 @@ describe('ProviderManager', () => {
       mockProvider1.getMarketData.mockResolvedValue(marketData);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
-      manager = new ProviderManager(chain);
+      manager = new ProviderManager(chain, mockLogger);
 
       const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
 

@@ -1,5 +1,5 @@
 import { createContainer } from './container.js';
-import { PROVIDER_CHAIN, DEFAULTS } from './config.js';
+import { createProviderChain, DEFAULTS } from './config.js';
 
 async function main() {
   try {
@@ -8,12 +8,12 @@ async function main() {
     const envTimeframe = process.env.TIMEFRAME || timeframe;
     const envBars = parseInt(process.env.BARS) || bars;
 
-    const container = createContainer(PROVIDER_CHAIN, DEFAULTS);
+    const container = createContainer(createProviderChain, DEFAULTS);
     const orchestrator = container.resolve('tradingOrchestrator');
 
     await orchestrator.runTradingAnalysis(envSymbol, envTimeframe, envBars);
   } catch (error) {
-    const container = createContainer(PROVIDER_CHAIN, DEFAULTS);
+    const container = createContainer(createProviderChain, DEFAULTS);
     const logger = container.resolve('logger');
     logger.error('Error:', error);
     process.exit(1);

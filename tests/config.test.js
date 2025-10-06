@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PROVIDER_CHAIN, DEFAULTS } from '../config.js';
+import { createProviderChain, DEFAULTS } from '../config.js';
 
 vi.mock('../PineTS/dist/pinets.dev.es.js', () => ({
   Provider: {
@@ -8,24 +8,32 @@ vi.mock('../PineTS/dist/pinets.dev.es.js', () => ({
 }));
 
 describe('config', () => {
-  describe('PROVIDER_CHAIN', () => {
-    it('should have 3 providers', () => {
-      expect(PROVIDER_CHAIN).toHaveLength(3);
+  describe('createProviderChain', () => {
+    it('should return 3 providers', () => {
+      const mockLogger = { debug: vi.fn(), log: vi.fn() };
+      const chain = createProviderChain(mockLogger);
+      expect(chain).toHaveLength(3);
     });
 
     it('should have MOEX as first provider', () => {
-      expect(PROVIDER_CHAIN[0].name).toBe('MOEX');
-      expect(PROVIDER_CHAIN[0].instance).toBeDefined();
+      const mockLogger = { debug: vi.fn(), log: vi.fn() };
+      const chain = createProviderChain(mockLogger);
+      expect(chain[0].name).toBe('MOEX');
+      expect(chain[0].instance).toBeDefined();
     });
 
     it('should have Binance as second provider', () => {
-      expect(PROVIDER_CHAIN[1].name).toBe('Binance');
-      expect(PROVIDER_CHAIN[1].instance).toBeDefined();
+      const mockLogger = { debug: vi.fn(), log: vi.fn() };
+      const chain = createProviderChain(mockLogger);
+      expect(chain[1].name).toBe('Binance');
+      expect(chain[1].instance).toBeDefined();
     });
 
     it('should have YahooFinance as third provider', () => {
-      expect(PROVIDER_CHAIN[2].name).toBe('YahooFinance');
-      expect(PROVIDER_CHAIN[2].instance).toBeDefined();
+      const mockLogger = { debug: vi.fn(), log: vi.fn() };
+      const chain = createProviderChain(mockLogger);
+      expect(chain[2].name).toBe('YahooFinance');
+      expect(chain[2].instance).toBeDefined();
     });
   });
 

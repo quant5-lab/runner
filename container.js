@@ -36,24 +36,29 @@ class Container {
 
 function createContainer(providerChain, defaults) {
   const container = new Container();
+  const logger = new Logger();
 
   container
-    .register('logger', () => new Logger(), true)
-    .register('providerManager', () => new ProviderManager(providerChain), true)
+    .register('logger', () => logger, true)
+    .register(
+      'providerManager',
+      (c) => new ProviderManager(providerChain(logger), c.resolve('logger')),
+      true,
+    )
     .register('technicalAnalysisEngine', () => new TechnicalAnalysisEngine(), true)
     .register('dataProcessor', () => new DataProcessor(), true)
-    .register('configurationBuilder', () => new ConfigurationBuilder(defaults), true)
+    .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
     .register('fileExporter', () => new FileExporter(), true)
     .register(
       'tradingOrchestrator',
-      (container) =>
+      (c) =>
         new TradingOrchestrator(
-          container.resolve('providerManager'),
-          container.resolve('technicalAnalysisEngine'),
-          container.resolve('dataProcessor'),
-          container.resolve('configurationBuilder'),
-          container.resolve('fileExporter'),
-          container.resolve('logger'),
+          c.resolve('providerManager'),
+          c.resolve('technicalAnalysisEngine'),
+          c.resolve('dataProcessor'),
+          c.resolve('configurationBuilder'),
+          c.resolve('fileExporter'),
+          c.resolve('logger'),
         ),
       true,
     );

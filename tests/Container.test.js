@@ -120,11 +120,11 @@ describe('createContainer', () => {
   });
 
   it('should resolve providerManager with correct providerChain', () => {
-    const providerChain = ['MOEX', 'YAHOO'];
-    const container = createContainer(providerChain, {});
+    const mockProviderChain = (logger) => ['MOEX', 'YAHOO'];
+    const container = createContainer(mockProviderChain, {});
     const providerManager = container.resolve('providerManager');
     expect(providerManager).toBeDefined();
-    expect(providerManager.providerChain).toEqual(providerChain);
+    expect(providerManager.providerChain).toEqual(['MOEX', 'YAHOO']);
   });
 
   it('should resolve configurationBuilder with defaults', () => {
@@ -136,7 +136,8 @@ describe('createContainer', () => {
   });
 
   it('should resolve tradingOrchestrator with all dependencies', () => {
-    const container = createContainer([], {});
+    const mockProviderChain = (logger) => [];
+    const container = createContainer(mockProviderChain, {});
     const orchestrator = container.resolve('tradingOrchestrator');
     expect(orchestrator).toBeDefined();
     expect(orchestrator.providerManager).toBeDefined();

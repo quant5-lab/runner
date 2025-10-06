@@ -1,9 +1,10 @@
 // MOEX (Moscow Exchange) Provider for PineTS
 export class MoexProvider {
-  constructor() {
+  constructor(logger) {
     this.baseUrl = 'https://iss.moex.com/iss';
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000; // 5 minutes
+    this.logger = logger;
   }
 
   /* MOEX timeframe mapping */
@@ -145,7 +146,7 @@ export class MoexProvider {
       const data = await response.json();
 
       if (!data.candles || !data.candles.data) {
-        console.warn('No candle data from MOEX for:', tickerId);
+        this.logger.debug(`No candle data from MOEX for: ${tickerId}`);
         return [];
       }
 
@@ -161,7 +162,7 @@ export class MoexProvider {
 
       return limitedData;
     } catch (error) {
-      console.error('MOEX Provider error:', error);
+      this.logger.debug(`MOEX Provider error: ${error.message}`);
       return [];
     }
   }

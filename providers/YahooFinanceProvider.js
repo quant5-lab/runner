@@ -1,12 +1,13 @@
 // Yahoo Finance Provider for PineTS - Real market data for US stocks
 export class YahooFinanceProvider {
-  constructor() {
+  constructor(logger) {
     this.baseUrl = 'https://query1.finance.yahoo.com/v8/finance/chart';
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000; // 5 minutes
     this.headers = {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     };
+    this.logger = logger;
   }
 
   /* Yahoo Finance interval mapping */
@@ -178,9 +179,9 @@ export class YahooFinanceProvider {
       // Apply limit
       return convertedData.slice(-limit);
     } catch (error) {
-      console.error(`Yahoo Finance provider error for ${symbol}:`, error.message);
+      this.logger.debug(`Yahoo Finance provider error for ${symbol}: ${error.message}`);
       if (error.stack) {
-        console.error('Yahoo Finance error stack:', error.stack);
+        this.logger.debug(`Yahoo Finance error stack: ${error.stack}`);
       }
       return [];
     }
