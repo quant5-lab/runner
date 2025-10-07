@@ -11,7 +11,7 @@ class ProviderManager {
 
     const mostRecentCandle = marketData[marketData.length - 1];
 
-    const timeField = mostRecentCandle.time || mostRecentCandle.openTime;
+    const timeField = mostRecentCandle.time || mostRecentCandle.closeTime;
 
     const candleTime = new Date(timeField * (timeField > 1000000000000 ? 1 : 1000));
 

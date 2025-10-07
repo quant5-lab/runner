@@ -125,6 +125,9 @@ class MoexProvider {
 
       params.append('from', this.formatDate(startDate.getTime()));
       params.append('till', this.formatEndDate(endDate.getTime()));
+      
+      // MOEX returns oldest 500 candles by default - use reverse to get newest
+      params.append('iss.reverse', 'true');
     }
 
     return url + (params.toString() ? '?' + params.toString() : '');
@@ -189,9 +192,8 @@ class MoexProvider {
 
       const convertedData = data.candles.data
         .map((candle) => this.convertMoexCandle(candle))
-        .sort((a, b) => a.openTime - b.openTime); // Sort by time ascending
+        .sort((a, b) => a.openTime - b.openTime);
 
-      // Apply limit if specified - take the most recent N candles
       const limitedData = limit ? convertedData.slice(-limit) : convertedData;
 
       this.setCache(cacheKey, limitedData);
