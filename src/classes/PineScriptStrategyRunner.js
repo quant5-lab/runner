@@ -35,6 +35,10 @@ class PineScriptStrategyRunner {
   }
 
   executeTranspiledStrategy(jsCode, marketData) {
+    console.log('=== TRANSPILED JS CODE ===');
+    console.log(jsCode);
+    console.log('=== END TRANSPILED CODE ===');
+    
     /* STUB - execution context with market data arrays and ta library stubs */
     const plots = [];
 
@@ -66,6 +70,19 @@ class PineScriptStrategyRunner {
     const globalScope = {
       context,
       plots,
+      /* STUB - Pine Script built-in objects */
+      ta: context.ta,
+      color: {
+        red: 'red',
+        green: 'green',
+        blue: 'blue',
+        yellow: 'yellow',
+        white: 'white',
+        black: 'black',
+        orange: 'orange',
+        purple: 'purple',
+        gray: 'gray',
+      },
       /* STUB - Pine Script declaration functions */
       indicator: (title, options) => {
         return { title, ...options };
