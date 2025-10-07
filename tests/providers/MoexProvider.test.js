@@ -221,6 +221,38 @@ describe('MoexProvider', () => {
       expect(url).toContain('till=');
     });
 
+    it('should include iss.reverse=true parameter to get newest candles', () => {
+      const url = provider.buildUrl('SBER', 'D', 100, null, null);
+      expect(url).toContain('iss.reverse=true');
+    });
+
+    it('should include reverse parameter for all timeframes when using limit', () => {
+      const timeframes = ['1', '10', '60', 'D', 'W', 'M'];
+      
+      timeframes.forEach((timeframe) => {
+        const url = provider.buildUrl('SBER', timeframe, 100, null, null);
+        expect(url).toContain('iss.reverse=true');
+      });
+    });
+
+    it('should NOT include reverse parameter when custom dates provided', () => {
+      const sDate = new Date('2024-01-01').getTime();
+      const eDate = new Date('2024-01-31').getTime();
+      const url = provider.buildUrl('SBER', 'D', null, sDate, eDate);
+
+      expect(url).not.toContain('iss.reverse=true');
+      expect(url).toContain('from=2024-01-01');
+      expect(url).toContain('till=2024-01-31');
+    });
+
+    it('should include reverse parameter when limit provided without custom dates', () => {
+      const url = provider.buildUrl('SBER', '1h', 50, null, null);
+      
+      expect(url).toContain('iss.reverse=true');
+      expect(url).toContain('from=');
+      expect(url).toContain('till=');
+    });
+
     describe('Enhanced date calculation with trading period multipliers', () => {
       it('should apply 1.4x multiplier for daily+ timeframes to account for weekends/holidays', () => {
         const url = provider.buildUrl('SBER', '1d', 100, null, null);

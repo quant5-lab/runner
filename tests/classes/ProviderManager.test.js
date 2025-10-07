@@ -189,4 +189,114 @@ describe('ProviderManager', () => {
       expect(result.instance).toBe(mockProvider1);
     });
   });
+
+  describe('validateDataFreshness() - closeTime fallback', () => {
+    it('should use time field when present for freshness validation', async() => {
+      const currentTime = Date.now();
+      const marketData = [
+        {
+          time: Math.floor(currentTime / 1000),
+          closeTime: Math.floor((currentTime - 10 * 24 * 60 * 60 * 1000) / 1000), // 10 days old
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
+      mockProvider1.getMarketData.mockResolvedValue(marketData);
+
+      const chain = [{ name: 'Provider1', instance: mockProvider1 }];
+      manager = new ProviderManager(chain, mockLogger);
+
+      const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
+
+      expect(result.provider).toBe('Provider1');
+      expect(result.data).toEqual(marketData);
+    });
+
+    it('should fallback to closeTime when time field is missing', async() => {
+      const currentTime = Date.now();
+      const marketData = [
+        {
+          closeTime: Math.floor(currentTime / 1000),
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
+      mockProvider1.getMarketData.mockResolvedValue(marketData);
+
+      const chain = [{ name: 'Provider1', instance: mockProvider1 }];
+      manager = new ProviderManager(chain, mockLogger);
+
+      const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
+
+      expect(result.provider).toBe('Provider1');
+      expect(result.data).toEqual(marketData);
+    });
+
+    it('should reject stale data using closeTime field', async() => {
+      const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
+      const marketData = [
+        {
+          closeTime: Math.floor(tenDaysAgo / 1000),
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
+      mockProvider1.getMarketData.mockResolvedValue(marketData);
+
+      const chain = [{ name: 'Provider1', instance: mockProvider1 }];
+      manager = new ProviderManager(chain, mockLogger);
+
+      await expect(manager.fetchMarketData('BTCUSDT', 'D', 100)).rejects.toThrow(
+        /Provider1 returned stale data/,
+      );
+    });
+
+    it('should handle millisecond timestamps for closeTime', async() => {
+      const currentTime = Date.now();
+      const marketData = [
+        {
+          closeTime: currentTime, // milliseconds
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
+      mockProvider1.getMarketData.mockResolvedValue(marketData);
+
+      const chain = [{ name: 'Provider1', instance: mockProvider1 }];
+      manager = new ProviderManager(chain, mockLogger);
+
+      const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
+
+      expect(result.provider).toBe('Provider1');
+    });
+
+    it('should handle second timestamps for closeTime', async() => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const marketData = [
+        {
+          closeTime: currentTime, // seconds
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
+      mockProvider1.getMarketData.mockResolvedValue(marketData);
+
+      const chain = [{ name: 'Provider1', instance: mockProvider1 }];
+      manager = new ProviderManager(chain, mockLogger);
+
+      const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
+
+      expect(result.provider).toBe('Provider1');
+    });
+  });
 });
