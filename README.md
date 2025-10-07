@@ -1,6 +1,6 @@
 # Pine Script Trading Analysis Runner
 
-![Coverage](https://img.shields.io/badge/coverage-94.7%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-81.9%25-brightgreen)
 
 Node.js application for Pine Script strategy transpilation and execution across multiple exchanges with dynamic provider fallback and real-time chart visualization.
 

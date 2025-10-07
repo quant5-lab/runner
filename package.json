@@ -11,7 +11,7 @@
     "test:ui": "vitest --ui",
     "docker:test": "docker-compose exec app pnpm test",
     "docker:start": "docker-compose up -d",
-    "coverage": "vitest run --coverage && node scripts/update-coverage-badge.js",
+    "coverage": "vitest run --coverage; node scripts/update-coverage-badge.js",
     "lint": "eslint .",
     "format": "eslint . --fix && prettier --write ."
   },
