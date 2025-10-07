@@ -7,6 +7,7 @@ services:
     container_name: runner-dev
     volumes:
       - ./src:/app/src
+      - ./services:/app/services
       - ./strategies:/app/strategies
       - ./tests:/app/tests
       - ./scripts:/app/scripts

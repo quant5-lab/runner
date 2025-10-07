@@ -1,0 +1,14 @@
+//@version=5
+indicator("EMA Strategy", shorttitle="EMA", overlay=true)
+
+// EMA calculation
+ema9 = ta.ema(close, 9)
+ema18 = ta.ema(close, 18)
+
+// Bull signal when EMA9 > EMA18
+bullSignal = ema9 > ema18 ? 1 : 0
+
+// Plot the indicators
+plot(ema9, "EMA 9", color=color.blue, linewidth=2)
+plot(ema18, "EMA 18", color=color.red, linewidth=2)
+plot(bullSignal, "Bull Signal", color=color.green, linewidth=1)
