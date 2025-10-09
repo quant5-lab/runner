@@ -8,18 +8,25 @@ class PineScriptStrategyRunner {
       const { close, open, high, low, volume } = context.data;
       const ta = context.ta;
       const request = context.request;
-      const security = request.security.bind(request);
       const { plot, color } = context.core;
       const tickerid = context.tickerId;
-      const sma = ta.sma.bind(ta);
+      
+      /* Pine Script version compatibility aliases
+       * v3/v4: Used global functions sma(), security(), study()
+       * v5: Uses namespaced functions ta.sma(), request.security(), indicator()
+       * Reference: Pine Script Language Reference Manual v5 (tradingview.com/pine-script-reference/v5)
+       * These function declarations bridge v3/v4 syntax to v5 PineTS runtime context */
+      function security(sym, tf, expr) { return request.security(sym, tf, expr); }
+      function sma(src, len) { return ta.sma(src, len); }
+      function indicator() {}
+      function strategy() {}
+      function study() {}
+      
       const yellow = 'yellow';
       const green = color.green;
       const red = color.red;
       const line = 'line';
       const linebr = 'linebr';
-      function indicator() {}
-      function strategy() {}
-      function study() {}
       
       ${jsCode}
     }`;
