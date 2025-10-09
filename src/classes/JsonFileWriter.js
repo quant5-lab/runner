@@ -6,7 +6,7 @@ class JsonFileWriter {
     try {
       mkdirSync('out', { recursive: true });
     } catch (error) {
-      /* Directory already exists */
+      return;
     }
   }
 

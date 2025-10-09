@@ -1,3 +1,5 @@
+import { CHART_COLORS } from '../constants/chartColors.js';
+
 class TradingAnalysisRunner {
   constructor(
     providerManager,
@@ -38,36 +40,16 @@ class TradingAnalysisRunner {
     this.logger.debug('=== TRANSPILED JAVASCRIPT CODE START ===');
     this.logger.debug(jsCode);
     this.logger.debug('=== TRANSPILED JAVASCRIPT CODE END ===');
-    
-    const marketData = {
-      open: data.map((c) => c.open),
-      high: data.map((c) => c.high),
-      low: data.map((c) => c.low),
-      close: data.map((c) => c.close),
-      volume: data.map((c) => c.volume || 0),
-    };
 
-    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
-      provider,
-      data,
-      instance,
-      symbol,
-      timeframe,
-      bars,
-    );
-
-    const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(
+    const executionResult = await this.pineScriptStrategyRunner.executeTranspiledStrategy(
       jsCode,
-      marketData,
-      pineTS,
+      data,
     );
     const execDuration = (performance.now() - execStartTime).toFixed(2);
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
     
     const plots = executionResult.plots || {};
-    const indicatorMetadata = {
-      TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' },
-    };
+    const indicatorMetadata = this.extractIndicatorMetadata(plots);
 
     if (!data?.length) {
       throw new Error(`No valid market data available for ${symbol}`);
@@ -104,16 +86,7 @@ class TradingAnalysisRunner {
     const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
 
-    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
-      provider,
-      data,
-      instance,
-      symbol,
-      timeframe,
-      bars,
-    );
-
-    const emaResult = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
+    const emaResult = await this.pineScriptStrategyRunner.runEMAStrategy(data);
     const result = emaResult.result;
     const plots = emaResult.plots;
     const indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
@@ -144,14 +117,12 @@ class TradingAnalysisRunner {
   processIndicatorPlots(result, data) {
     const processedPlots = {};
 
-    // Ensure consistent time base for all indicators
     const createTimestamp = (i, length) => {
       return data[i]?.openTime
         ? Math.floor(data[i].openTime / 1000)
         : Math.floor((Date.now() - (length - i - 1) * 86400000) / 1000);
     };
 
-    // For real PineTS, extract plot data from result
     if (result.ema9 && Array.isArray(result.ema9)) {
       processedPlots.EMA9 = {
         data: result.ema9.map((value, i) => ({
@@ -171,7 +142,6 @@ class TradingAnalysisRunner {
     }
 
     if (result.bullSignal !== undefined) {
-      // Handle both single value and array
       const bullValues = Array.isArray(result.bullSignal)
         ? result.bullSignal
         : data.map((_, i) => (i === data.length - 1 ? (result.bullSignal ? 1 : 0) : 0));
@@ -186,6 +156,31 @@ class TradingAnalysisRunner {
     }
 
     return processedPlots;
+  }
+
+  extractIndicatorMetadata(plots) {
+    const metadata = {};
+    
+    Object.keys(plots).forEach((plotKey) => {
+      const color = this.extractPlotColor(plots[plotKey]);
+      
+      metadata[plotKey] = {
+        color,
+        title: plotKey,
+        type: 'indicator',
+      };
+    });
+    
+    return metadata;
+  }
+
+  extractPlotColor(plotData) {
+    if (!plotData?.data || !Array.isArray(plotData.data)) {
+      return CHART_COLORS.DEFAULT_PLOT;
+    }
+    
+    const firstPointWithColor = plotData.data.find(point => point?.options?.color);
+    return firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
   }
 }
 

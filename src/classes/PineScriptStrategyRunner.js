@@ -1,73 +1,30 @@
 import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 
 class PineScriptStrategyRunner {
-  async createPineTSAdapter(provider, data, instance, symbol, timeframe, bars) {
-    const pineTS = new PineTS(data, symbol, timeframe, bars);
-    await pineTS.ready();
-    return pineTS;
+  async executeTranspiledStrategy(jsCode, data) {
+    const pineTS = new PineTS(data);
+    
+    const wrappedCode = `(context) => {
+      const { close, open, high, low, volume } = context.data;
+      const ta = context.ta;
+      const request = context.request;
+      const security = request.security.bind(request);
+      const { plot, color } = context.core;
+      const tickerid = context.tickerId;
+      const indicator = () => {};
+      const strategy = () => {};
+      const study = indicator;
+      
+      ${jsCode}
+    }`;
+    
+    const result = await pineTS.run(wrappedCode);
+    return { plots: result?.plots || [] };
   }
 
-  executeTranspiledStrategy(jsCode, marketData, pineTS) {
-    /* Execute transpiled code with static context - don't use pineTS.run() */
-    const plots = [];
+  async runEMAStrategy(data) {
+    const pineTS = new PineTS(data);
     
-    /* Static color object from PineTS Core class */
-    const color = {
-      red: 'red',
-      green: 'green',
-      blue: 'blue',
-      yellow: 'yellow',
-      white: 'white',
-      black: 'black',
-      gray: 'gray',
-      lime: 'lime',
-      maroon: 'maroon',
-      orange: 'orange',
-      purple: 'purple',
-    };
-    
-    /* Stub ta object */
-    const ta = {
-      ema: (src, len) => src,
-      sma: (src, len) => src,
-      rsi: (src, len) => src,
-      stdev: (src, len) => 0,
-      crossover: (a, b) => false,
-      crossunder: (a, b) => false,
-    };
-    
-    /* Execute with Function constructor */
-    const func = new Function(
-      'ta',
-      'color',
-      'close',
-      'open',
-      'high',
-      'low',
-      'volume',
-      'plot',
-      'indicator',
-      'strategy',
-      jsCode
-    );
-
-    func(
-      ta,
-      color,
-      marketData.close,
-      marketData.open,
-      marketData.high,
-      marketData.low,
-      marketData.volume,
-      (series, title = '', options = {}) => plots.push({ title, series, options }),
-      (title, options) => ({ title, ...options }),
-      (title, options) => ({ title, ...options })
-    );
-
-    return { plots };
-  }
-
-  async runEMAStrategy(pineTS) {
     const { plots } = await pineTS.run((context) => {
       const { close } = context.data;
       const { plot } = context.core;

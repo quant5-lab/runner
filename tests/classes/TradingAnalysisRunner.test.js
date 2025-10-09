@@ -15,9 +15,9 @@ describe('TradingAnalysisRunner', () => {
       fetchMarketData: vi.fn(),
     };
     mockPineScriptStrategyRunner = {
-      createPineTSAdapter: vi.fn(),
       runEMAStrategy: vi.fn(),
       getIndicatorMetadata: vi.fn(),
+      executeTranspiledStrategy: vi.fn(),
     };
     mockCandlestickDataSanitizer = {
       processCandlestickData: vi.fn(),
@@ -33,6 +33,7 @@ describe('TradingAnalysisRunner', () => {
     mockLogger = {
       log: vi.fn(),
       error: vi.fn(),
+      debug: vi.fn(),
     };
 
     runner = new TradingAnalysisRunner(
@@ -93,7 +94,6 @@ describe('TradingAnalysisRunner', () => {
         data: mockMarketData,
         instance: {},
       });
-      mockPineScriptStrategyRunner.createPineTSAdapter.mockResolvedValue({});
       mockPineScriptStrategyRunner.runEMAStrategy.mockResolvedValue({
         result: {},
         plots: mockPlots,
@@ -105,11 +105,10 @@ describe('TradingAnalysisRunner', () => {
     });
 
     it('should execute full trading analysis workflow', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalled();
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
-      expect(mockPineScriptStrategyRunner.createPineTSAdapter).toHaveBeenCalled();
       expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalled();
       expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalled();
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalled();
@@ -117,7 +116,7 @@ describe('TradingAnalysisRunner', () => {
     });
 
     it('should log configuration at start', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
         'Configuration:\tSymbol=BTCUSDT, Timeframe=D, Bars=100',
@@ -125,47 +124,31 @@ describe('TradingAnalysisRunner', () => {
     });
 
     it('should create trading config with correct parameters', async() => {
-      await runner.run('AAPL', 'W', 200);
+      await runner.runDefaultStrategy('AAPL', 'W', 200);
 
       expect(mockConfigurationBuilder.createTradingConfig).toHaveBeenCalledWith('AAPL', 'W', 200, 'Multi-Provider Strategy');
     });
 
     it('should fetch market data from provider manager', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockProviderManager.fetchMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
     });
 
     it('should log provider used', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('Data source:\tBINANCE'));
     });
 
-    it('should create PineTS adapter with market data', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+    it('should run EMA strategy with data array', async() => {
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
-      expect(mockPineScriptStrategyRunner.createPineTSAdapter).toHaveBeenCalledWith(
-        'BINANCE',
-        mockMarketData,
-        {},
-        'BTCUSDT',
-        'D',
-        100,
-      );
-    });
-
-    it('should run EMA strategy', async() => {
-      const mockPineTS = { ready: vi.fn() };
-      mockPineScriptStrategyRunner.createPineTSAdapter.mockResolvedValue(mockPineTS);
-
-      await runner.run('BTCUSDT', 'D', 100);
-
-      expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalledWith(mockPineTS);
+      expect(mockPineScriptStrategyRunner.runEMAStrategy).toHaveBeenCalledWith(mockMarketData);
     });
 
     it('should process candlestick data', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockCandlestickDataSanitizer.processCandlestickData).toHaveBeenCalledWith(
         mockMarketData,
@@ -173,13 +156,13 @@ describe('TradingAnalysisRunner', () => {
     });
 
     it('should export chart data with processed candles and plots', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockJsonFileWriter.exportChartData).toHaveBeenCalledWith(mockProcessedData, mockPlots);
     });
 
     it('should generate and export chart configuration', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockConfigurationBuilder.generateChartConfig).toHaveBeenCalledWith(
         mockTradingConfig,
@@ -189,7 +172,7 @@ describe('TradingAnalysisRunner', () => {
     });
 
     it('should log success message with candle count', async() => {
-      await runner.run('BTCUSDT', 'D', 100);
+      await runner.runDefaultStrategy('BTCUSDT', 'D', 100);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('Processing:\t2 candles'),
@@ -203,7 +186,7 @@ describe('TradingAnalysisRunner', () => {
         instance: {},
       });
 
-      await expect(runner.run('BTCUSDT', 'D', 100)).rejects.toThrow(
+      await expect(runner.runDefaultStrategy('BTCUSDT', 'D', 100)).rejects.toThrow(
         'No valid market data available for BTCUSDT',
       );
     });
@@ -215,7 +198,7 @@ describe('TradingAnalysisRunner', () => {
         instance: {},
       });
 
-      await expect(runner.run('BTCUSDT', 'D', 100)).rejects.toThrow(
+      await expect(runner.runDefaultStrategy('BTCUSDT', 'D', 100)).rejects.toThrow(
         'No valid market data available',
       );
     });

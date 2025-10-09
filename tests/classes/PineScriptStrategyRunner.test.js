@@ -24,37 +24,10 @@ describe('PineScriptStrategyRunner', () => {
     PineTS.mockImplementation(() => mockPineTS);
   });
 
-  describe('createPineTSAdapter()', () => {
-    it('should create PineTS instance with market data', async() => {
+  describe('runEMAStrategy()', () => {
+    it('should create PineTS and run strategy', async() => {
       const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
       const data = [{ time: 1, open: 100, high: 105, low: 95, close: 102 }];
-
-      const result = await runner.createPineTSAdapter('BINANCE', data, {}, 'BTCUSDT', 'D', 100);
-
-      expect(PineTS).toHaveBeenCalledWith(data, 'BTCUSDT', 'D', 100);
-      expect(mockPineTS.ready).toHaveBeenCalled();
-      expect(result).toBe(mockPineTS);
-    });
-
-    it('should pass correct parameters to PineTS', async() => {
-      const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
-      const data = [{ time: 1, open: 100 }];
-
-      await runner.createPineTSAdapter('YAHOO', data, {}, 'AAPL', 'W', 200);
-
-      expect(PineTS).toHaveBeenCalledWith(data, 'AAPL', 'W', 200);
-    });
-
-    it('should wait for PineTS ready()', async() => {
-      const data = [{ time: 1 }];
-      await runner.createPineTSAdapter('TEST', data, {}, 'TEST', 'D', 100);
-
-      expect(mockPineTS.ready).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('runEMAStrategy()', () => {
-    it('should run PineTS strategy and return plots', async() => {
       const mockPlots = {
         EMA9: [100, 101, 102],
         EMA18: [99, 100, 101],
@@ -62,8 +35,9 @@ describe('PineScriptStrategyRunner', () => {
       };
       mockPineTS.run.mockResolvedValue({ plots: mockPlots });
 
-      const result = await runner.runEMAStrategy(mockPineTS);
+      const result = await runner.runEMAStrategy(data);
 
+      expect(PineTS).toHaveBeenCalledWith(data);
       expect(mockPineTS.run).toHaveBeenCalledTimes(1);
       expect(result).toEqual({
         result: mockPlots,
@@ -72,25 +46,28 @@ describe('PineScriptStrategyRunner', () => {
     });
 
     it('should call PineTS.run with strategy function', async() => {
+      const data = [{ time: 1, open: 100 }];
       mockPineTS.run.mockResolvedValue({ plots: {} });
 
-      await runner.runEMAStrategy(mockPineTS);
+      await runner.runEMAStrategy(data);
 
       expect(mockPineTS.run).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('should handle empty plots', async() => {
+      const data = [{ time: 1, open: 100 }];
       mockPineTS.run.mockResolvedValue({ plots: null });
 
-      const result = await runner.runEMAStrategy(mockPineTS);
+      const result = await runner.runEMAStrategy(data);
 
       expect(result.plots).toEqual({});
     });
 
     it('should handle undefined plots', async() => {
+      const data = [{ time: 1, open: 100 }];
       mockPineTS.run.mockResolvedValue({});
 
-      const result = await runner.runEMAStrategy(mockPineTS);
+      const result = await runner.runEMAStrategy(data);
 
       expect(result.plots).toEqual({});
     });
@@ -124,104 +101,55 @@ describe('PineScriptStrategyRunner', () => {
   });
 
   describe('executeTranspiledStrategy', () => {
-    it('should execute simple JavaScript code and return plots', () => {
-      const jsCode = `
-        context.core.plot([1, 2, 3], 'Test Plot', { color: 'blue' });
-      `;
-      const marketData = {
-        open: [100, 101, 102],
-        high: [103, 104, 105],
-        low: [99, 100, 101],
-        close: [102, 103, 104],
-        volume: [1000, 1100, 1200],
-      };
+    it('should create PineTS and execute wrapped code', async() => {
+      const { PineTS } = await import('../../../PineTS/dist/pinets.dev.es.js');
+      const jsCode = 'plot(close, "Close", { color: color.blue });';
+      const data = [{ time: 1, open: 100, high: 105, low: 95, close: 102 }];
+      mockPineTS.run.mockResolvedValue({});
 
-      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+      const result = await runner.executeTranspiledStrategy(jsCode, data);
 
-      expect(result).toHaveProperty('plots');
-      expect(Array.isArray(result.plots)).toBe(true);
-      expect(result.plots.length).toBe(1);
-      expect(result.plots[0].title).toBe('Test Plot');
-      expect(result.plots[0].series).toEqual([1, 2, 3]);
+      expect(PineTS).toHaveBeenCalledWith(data);
+      expect(mockPineTS.run).toHaveBeenCalledTimes(1);
+      expect(mockPineTS.run).toHaveBeenCalledWith(expect.stringContaining(jsCode));
+      expect(result).toEqual({ plots: [] });
     });
 
-    it('should provide market data arrays in context', () => {
-      const jsCode = `
-        context.core.plot(context.data.close, 'Close', {});
-      `;
-      const marketData = {
-        open: [100],
-        high: [103],
-        low: [99],
-        close: [102],
-        volume: [1000],
-      };
+    it('should wrap jsCode in arrow function string', async() => {
+      const jsCode = 'const ema = ta.ema(close, 9);';
+      const data = [{ time: 1, open: 100 }];
+      mockPineTS.run.mockResolvedValue({});
 
-      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+      await runner.executeTranspiledStrategy(jsCode, data);
 
-      expect(result.plots[0].series).toEqual([102]);
+      const callArg = mockPineTS.run.mock.calls[0][0];
+      expect(callArg).toContain('(context) => {');
+      expect(callArg).toContain('const ta = context.ta;');
+      expect(callArg).toContain('const { plot, color } = context.core;');
+      expect(callArg).toContain('const security = request.security.bind(request);');
+      expect(callArg).toContain('const tickerid = context.tickerId;');
+      expect(callArg).toContain('const study = indicator;');
+      expect(callArg).toContain(jsCode);
     });
 
-    it('should provide ta library stubs in context', () => {
-      const jsCode = `
-        const ema = context.ta.ema(context.data.close, 9);
-        context.core.plot(ema, 'EMA', {});
-      `;
-      const marketData = {
-        open: [100, 101, 102],
-        high: [103, 104, 105],
-        low: [99, 100, 101],
-        close: [102, 103, 104],
-        volume: [1000, 1100, 1200],
-      };
+    it('should provide indicator and strategy stubs', async() => {
+      const jsCode = 'indicator("Test", { overlay: true });';
+      const data = [{ time: 1, open: 100 }];
+      mockPineTS.run.mockResolvedValue({});
 
-      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+      await runner.executeTranspiledStrategy(jsCode, data);
 
-      expect(result.plots.length).toBe(1);
-      expect(result.plots[0].title).toBe('EMA');
+      const callArg = mockPineTS.run.mock.calls[0][0];
+      expect(callArg).toContain('const indicator = () => {};');
+      expect(callArg).toContain('const strategy = () => {};');
     });
 
-    it('should throw error when executing invalid code', () => {
-      const jsCode = 'throw new Error("Test error");';
-      const marketData = {
-        open: [100],
-        high: [103],
-        low: [99],
-        close: [102],
-        volume: [1000],
-      };
-
-      expect(() => {
-        runner.executeTranspiledStrategy(jsCode, marketData);
-      }).toThrow('Strategy execution failed: Test error');
-    });
-
-    it('should handle syntax errors in transpiled code', () => {
-      const jsCode = 'const x = {invalid syntax';
-      const marketData = {
-        open: [100],
-        high: [103],
-        low: [99],
-        close: [102],
-        volume: [1000],
-      };
-
-      expect(() => {
-        runner.executeTranspiledStrategy(jsCode, marketData);
-      }).toThrow(/Strategy execution failed/);
-    });
-
-    it('should return empty plots array when no plots generated', () => {
+    it('should return empty plots array', async() => {
       const jsCode = 'const x = 1 + 1;';
-      const marketData = {
-        open: [100],
-        high: [103],
-        low: [99],
-        close: [102],
-        volume: [1000],
-      };
+      const data = [{ time: 1, open: 100 }];
+      mockPineTS.run.mockResolvedValue({});
 
-      const result = runner.executeTranspiledStrategy(jsCode, marketData);
+      const result = await runner.executeTranspiledStrategy(jsCode, data);
 
       expect(result.plots).toEqual([]);
     });

@@ -8,17 +8,14 @@ class MoexProvider {
     this.cacheDuration = 5 * 60 * 1000;
   }
 
-  /* Convert PineTS timeframe to MOEX interval */
   convertTimeframe(timeframe) {
     return TimeframeParser.toMoexInterval(timeframe);
   }
 
-  /* Generate cache key */
   getCacheKey(tickerId, timeframe, limit, sDate, eDate) {
     return `${tickerId}_${timeframe}_${limit}_${sDate}_${eDate}`;
   }
 
-  /* Check cache */
   getFromCache(key) {
     const cached = this.cache.get(key);
     if (!cached) return null;

@@ -1,3 +1,5 @@
+import { CHART_COLORS } from '../constants/chartColors.js';
+
 class ConfigurationBuilder {
   constructor(defaultConfig) {
     this.defaultConfig = defaultConfig;
@@ -19,11 +21,11 @@ class ConfigurationBuilder {
       chartLayout: this.buildLayoutConfig(),
       seriesConfig: {
         candlestick: {
-          upColor: '#26a69a',
-          downColor: '#ef5350',
+          upColor: CHART_COLORS.CANDLESTICK_UP,
+          downColor: CHART_COLORS.CANDLESTICK_DOWN,
           borderVisible: false,
-          wickUpColor: '#26a69a',
-          wickDownColor: '#ef5350',
+          wickUpColor: CHART_COLORS.CANDLESTICK_UP,
+          wickDownColor: CHART_COLORS.CANDLESTICK_DOWN,
         },
         series: this.buildSeriesConfig(indicatorMetadata),
       },
