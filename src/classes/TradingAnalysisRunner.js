@@ -39,6 +39,11 @@ class TradingAnalysisRunner {
       /* Execute transpiled Pine Script strategy */
       try {
         const execStartTime = performance.now();
+        
+        console.log('=== TRANSPILED JAVASCRIPT CODE START ===');
+        console.log(jsCode);
+        console.log('=== TRANSPILED JAVASCRIPT CODE END ===');
+        
         const marketData = {
           open: data.map((c) => c.open),
           high: data.map((c) => c.high),
@@ -47,9 +52,19 @@ class TradingAnalysisRunner {
           volume: data.map((c) => c.volume || 0),
         };
 
+        const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
+          provider,
+          data,
+          instance,
+          symbol,
+          timeframe,
+          bars,
+        );
+
         const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(
           jsCode,
           marketData,
+          pineTS,
         );
         const execDuration = (performance.now() - execStartTime).toFixed(2);
         this.logger.log(`Execution:\ttook ${execDuration}ms`);

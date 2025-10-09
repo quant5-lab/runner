@@ -7,6 +7,66 @@ class PineScriptStrategyRunner {
     return pineTS;
   }
 
+  executeTranspiledStrategy(jsCode, marketData, pineTS) {
+    /* Execute transpiled code with static context - don't use pineTS.run() */
+    const plots = [];
+    
+    /* Static color object from PineTS Core class */
+    const color = {
+      red: 'red',
+      green: 'green',
+      blue: 'blue',
+      yellow: 'yellow',
+      white: 'white',
+      black: 'black',
+      gray: 'gray',
+      lime: 'lime',
+      maroon: 'maroon',
+      orange: 'orange',
+      purple: 'purple',
+    };
+    
+    /* Stub ta object */
+    const ta = {
+      ema: (src, len) => src,
+      sma: (src, len) => src,
+      rsi: (src, len) => src,
+      stdev: (src, len) => 0,
+      crossover: (a, b) => false,
+      crossunder: (a, b) => false,
+    };
+    
+    /* Execute with Function constructor */
+    const func = new Function(
+      'ta',
+      'color',
+      'close',
+      'open',
+      'high',
+      'low',
+      'volume',
+      'plot',
+      'indicator',
+      'strategy',
+      jsCode
+    );
+
+    func(
+      ta,
+      color,
+      marketData.close,
+      marketData.open,
+      marketData.high,
+      marketData.low,
+      marketData.volume,
+      (series, title = '', options = {}) => plots.push({ title, series, options }),
+      (title, options) => ({ title, ...options }),
+      (title, options) => ({ title, ...options })
+    );
+
+    return { plots };
+  }
+
   async runEMAStrategy(pineTS) {
     const { plots } = await pineTS.run((context) => {
       const { close } = context.data;
@@ -32,93 +92,6 @@ class PineScriptStrategyRunner {
       EMA18: { title: 'EMA 18', type: 'moving_average' },
       BullSignal: { title: 'Bull Signal', type: 'signal' },
     };
-  }
-
-  executeTranspiledStrategy(jsCode, marketData) {
-    console.log('=== TRANSPILED JS CODE ===');
-    console.log(jsCode);
-    console.log('=== END TRANSPILED CODE ===');
-    
-    /* STUB - execution context with market data arrays and ta library stubs */
-    const plots = [];
-
-    const context = {
-      data: {
-        open: marketData.open || [],
-        high: marketData.high || [],
-        low: marketData.low || [],
-        close: marketData.close || [],
-        volume: marketData.volume || [],
-      },
-      ta: {
-        /* STUB - ta library functions */
-        ema: (src, len) => src,
-        sma: (src, len) => src,
-        rsi: (src, len) => src,
-        stdev: (src, len) => 0,
-        crossover: (a, b) => false,
-        crossunder: (a, b) => false,
-      },
-      core: {
-        plot: (series, title, options) => {
-          plots.push({ title, series, options });
-        },
-      },
-    };
-
-    /* STUB - global functions for Pine Script API */
-    const globalScope = {
-      context,
-      plots,
-      /* STUB - Pine Script built-in objects */
-      ta: context.ta,
-      color: {
-        red: 'red',
-        green: 'green',
-        blue: 'blue',
-        yellow: 'yellow',
-        white: 'white',
-        black: 'black',
-        orange: 'orange',
-        purple: 'purple',
-        gray: 'gray',
-      },
-      /* STUB - Pine Script declaration functions */
-      indicator: (title, options) => {
-        return { title, ...options };
-      },
-      strategy: (title, options) => {
-        return { title, ...options };
-      },
-      /* STUB - Pine Script built-in variables */
-      close: context.data.close,
-      open: context.data.open,
-      high: context.data.high,
-      low: context.data.low,
-      volume: context.data.volume,
-      /* STUB - Pine Script plot functions */
-      plot: (series, title = '', options = {}) => {
-        plots.push({ title, series, options });
-      },
-      plotshape: (series, title, options) => {
-        plots.push({ title, series, options, type: 'shape' });
-      },
-      plotchar: (series, title, options) => {
-        plots.push({ title, series, options, type: 'char' });
-      },
-    };
-
-    /* STUB - execute transpiled code with Function constructor */
-    try {
-      const paramNames = Object.keys(globalScope);
-      const paramValues = Object.values(globalScope);
-      // eslint-disable-next-line no-new-func
-      const strategyFunc = new Function(...paramNames, jsCode + '\nreturn plots;');
-      const result = strategyFunc(...paramValues);
-      return { plots: result || plots };
-    } catch (error) {
-      throw new Error(`Strategy execution failed: ${error.message}`);
-    }
   }
 }
 
