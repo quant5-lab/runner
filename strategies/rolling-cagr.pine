@@ -1,0 +1,25 @@
+//@version=5
+//You can change the "overlay = true" from true to false if you want a separate chart
+indicator(title = "Rolling CAGR", shorttitle = "Rolling CAGR", overlay = true, format = format.percent, scale = scale.right) 
+
+// rolling period in years. You can change the value "1" in "yA = 1" to the desire rolling period in years
+yA = input.float(1, title='Rolling CAGR Year N')
+iyA = math.pow(yA, -1)
+
+// input for the selected source
+src = input.source(title = "Data Source", defval = close, tooltip = "Selected data source to find the rolling CAGR on")
+varip first_value = barstate.isfirst ? src[0] : src
+
+// number of values in the rolling period
+interval_multiplier = timeframe.ismonthly ? 12 : timeframe.isdaily ? 252 : timeframe.isweekly ? 52 : na
+nA = interval_multiplier * yA
+
+// finding the start and end value
+viA = src[nA]
+vf = src[0]
+
+// calculating the CAGR
+cagrA = (math.pow(vf / viA, iyA) - 1) * 100
+
+// ploting the CAGR
+plot(cagrA, title="CAGR A", color=color.blue)
