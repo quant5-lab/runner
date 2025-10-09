@@ -70,6 +70,9 @@ docker-compose exec runner pnpm test
 # Format code
 docker-compose exec runner pnpm format
 
+# Show transpiled JavaScript code
+docker-compose exec -e DEBUG=true runner pnpm start AAPL 1h 100 strategies/test.pine
+
 # Access running container shell
 docker-compose exec runner sh
 ```
@@ -174,6 +177,10 @@ Custom strategies with full Pine Script v4/v5 support including:
 - **strategies/** - Pine Script strategy files (.pine)
 - **out/** - Generated output files (chart-data.json, chart-config.json)
 - **chart.html** - TradingView-style visualization
+
+## Environment Variables
+
+- `DEBUG=true` - Show verbose output
 
 ## Dependencies
 

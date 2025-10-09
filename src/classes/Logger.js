@@ -1,6 +1,6 @@
 class Logger {
   constructor() {
-    this.verbose = process.env.VERBOSE === 'true';
+    this.debugEnabled = process.env.DEBUG === 'true';
   }
 
   log(message) {
@@ -16,7 +16,7 @@ class Logger {
   }
 
   debug(message) {
-    if (this.verbose) {
+    if (this.debugEnabled) {
       console.log(message);
     }
   }

@@ -35,9 +35,9 @@ class TradingAnalysisRunner {
 
     const execStartTime = performance.now();
     
-    console.log('=== TRANSPILED JAVASCRIPT CODE START ===');
-    console.log(jsCode);
-    console.log('=== TRANSPILED JAVASCRIPT CODE END ===');
+    this.logger.debug('=== TRANSPILED JAVASCRIPT CODE START ===');
+    this.logger.debug(jsCode);
+    this.logger.debug('=== TRANSPILED JAVASCRIPT CODE END ===');
     
     const marketData = {
       open: data.map((c) => c.open),
