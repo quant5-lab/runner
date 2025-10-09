@@ -30,11 +30,12 @@ async function main() {
       const transpileDuration = (performance.now() - transpileStartTime).toFixed(2);
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
+      await runner.runPineScriptStrategy(envSymbol, envTimeframe, envBars, jsCode, envStrategy);
+      
       const runDuration = (performance.now() - strategyStartTime).toFixed(2);
-      await runner.run(envSymbol, envTimeframe, envBars, jsCode, envStrategy);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {
-      await runner.run(envSymbol, envTimeframe, envBars);
+      await runner.runDefaultStrategy(envSymbol, envTimeframe, envBars);
     }
 
     const totalDuration = (performance.now() - startTime).toFixed(2);

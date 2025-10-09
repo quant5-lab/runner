@@ -15,7 +15,7 @@ class TradingAnalysisRunner {
     this.logger = logger;
   }
 
-  async run(symbol, timeframe, bars, jsCode = null, strategyPath = 'Multi-Provider Strategy') {
+  async runPineScriptStrategy(symbol, timeframe, bars, jsCode, strategyPath) {
     const runStartTime = performance.now();
     this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
@@ -33,67 +33,91 @@ class TradingAnalysisRunner {
     const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
 
-    let result, plots, indicatorMetadata;
+    const execStartTime = performance.now();
+    
+    console.log('=== TRANSPILED JAVASCRIPT CODE START ===');
+    console.log(jsCode);
+    console.log('=== TRANSPILED JAVASCRIPT CODE END ===');
+    
+    const marketData = {
+      open: data.map((c) => c.open),
+      high: data.map((c) => c.high),
+      low: data.map((c) => c.low),
+      close: data.map((c) => c.close),
+      volume: data.map((c) => c.volume || 0),
+    };
 
-    if (jsCode) {
-      /* Execute transpiled Pine Script strategy */
-      try {
-        const execStartTime = performance.now();
-        
-        console.log('=== TRANSPILED JAVASCRIPT CODE START ===');
-        console.log(jsCode);
-        console.log('=== TRANSPILED JAVASCRIPT CODE END ===');
-        
-        const marketData = {
-          open: data.map((c) => c.open),
-          high: data.map((c) => c.high),
-          low: data.map((c) => c.low),
-          close: data.map((c) => c.close),
-          volume: data.map((c) => c.volume || 0),
-        };
+    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
+      provider,
+      data,
+      instance,
+      symbol,
+      timeframe,
+      bars,
+    );
 
-        const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
-          provider,
-          data,
-          instance,
-          symbol,
-          timeframe,
-          bars,
-        );
+    const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(
+      jsCode,
+      marketData,
+      pineTS,
+    );
+    const execDuration = (performance.now() - execStartTime).toFixed(2);
+    this.logger.log(`Execution:\ttook ${execDuration}ms`);
+    
+    const plots = executionResult.plots || {};
+    const indicatorMetadata = {
+      TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' },
+    };
 
-        const executionResult = this.pineScriptStrategyRunner.executeTranspiledStrategy(
-          jsCode,
-          marketData,
-          pineTS,
-        );
-        const execDuration = (performance.now() - execStartTime).toFixed(2);
-        this.logger.log(`Execution:\ttook ${execDuration}ms`);
-        plots = executionResult.plots || {};
-        indicatorMetadata = {
-          TranspiledStrategy: { title: 'Pine Script Strategy', type: 'custom' },
-        };
-      } catch (error) {
-        this.logger.error(`Execution failed:\t${error.message}`);
-        throw error;
-      }
-    } else {
-      /* Execute default EMA strategy */
-      const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
-        provider,
-        data,
-        instance,
-        symbol,
-        timeframe,
-        bars,
-      );
-
-      const emaResult = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
-      result = emaResult.result;
-      plots = emaResult.plots;
-      indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
+    if (!data?.length) {
+      throw new Error(`No valid market data available for ${symbol}`);
     }
 
-    // Process indicator plots - handle both custom providers and real PineTS
+    const candlestickData = this.candlestickDataSanitizer.processCandlestickData(data);
+    this.jsonFileWriter.exportChartData(candlestickData, plots);
+
+    const chartConfig = this.configurationBuilder.generateChartConfig(
+      tradingConfig,
+      indicatorMetadata,
+    );
+    this.jsonFileWriter.exportConfiguration(chartConfig);
+
+    const runDuration = (performance.now() - runStartTime).toFixed(2);
+    this.logger.log(`Processing:\t${candlestickData.length} candles (took ${runDuration}ms)`);
+  }
+
+  async runDefaultStrategy(symbol, timeframe, bars) {
+    const runStartTime = performance.now();
+    this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
+
+    const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars, 'Multi-Provider Strategy');
+
+    const fetchStartTime = performance.now();
+    this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
+
+    const { provider, data, instance } = await this.providerManager.fetchMarketData(
+      symbol,
+      timeframe,
+      bars,
+    );
+
+    const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
+    this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
+
+    const pineTS = await this.pineScriptStrategyRunner.createPineTSAdapter(
+      provider,
+      data,
+      instance,
+      symbol,
+      timeframe,
+      bars,
+    );
+
+    const emaResult = await this.pineScriptStrategyRunner.runEMAStrategy(pineTS);
+    const result = emaResult.result;
+    const plots = emaResult.plots;
+    const indicatorMetadata = this.pineScriptStrategyRunner.getIndicatorMetadata();
+
     let processedPlots = plots || {};
 
     if (result && Object.keys(processedPlots).length === 0) {
@@ -105,7 +129,6 @@ class TradingAnalysisRunner {
     }
 
     const candlestickData = this.candlestickDataSanitizer.processCandlestickData(data);
-
     this.jsonFileWriter.exportChartData(candlestickData, processedPlots);
 
     const chartConfig = this.configurationBuilder.generateChartConfig(
