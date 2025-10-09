@@ -11,9 +11,15 @@ class PineScriptStrategyRunner {
       const security = request.security.bind(request);
       const { plot, color } = context.core;
       const tickerid = context.tickerId;
-      const indicator = () => {};
-      const strategy = () => {};
-      const study = indicator;
+      const sma = ta.sma.bind(ta);
+      const yellow = 'yellow';
+      const green = color.green;
+      const red = color.red;
+      const line = 'line';
+      const linebr = 'linebr';
+      function indicator() {}
+      function strategy() {}
+      function study() {}
       
       ${jsCode}
     }`;
