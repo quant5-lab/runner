@@ -154,17 +154,52 @@ export class YahooFinanceProvider {
   /* Main method - get market data */
   async getMarketData(symbol, timeframe, limit = 100, sDate, eDate) {
     try {
-      const interval = this.convertTimeframe(timeframe);
-      const range = this.getDateRange(limit, timeframe);
+      /* Try to convert timeframe - if fails, test with 1d to check if symbol exists */
+      let interval, range, url;
+      try {
+        interval = this.convertTimeframe(timeframe);
+        range = this.getDateRange(limit, timeframe);
+        url = this.buildUrl(symbol, interval, range);
+      } catch (error) {
+        if (error instanceof TimeframeError) {
+          /* Timeframe unsupported - test with 1d to check if symbol exists */
+          this.logger.debug(`Yahoo: Timeframe ${timeframe} unsupported, testing ${symbol} with 1d`);
+          
+          const testInterval = TimeframeParser.toYahooInterval('1d');
+          const testRange = '1d';
+          const testUrl = this.buildUrl(symbol, testInterval, testRange);
+          
+          const testResponse = await fetch(testUrl, { headers: this.headers });
+          
+          if (testResponse.ok) {
+            const testText = await testResponse.text();
+            const testData = JSON.parse(testText);
+            
+            if (
+              testData.chart?.result?.[0]?.timestamp &&
+              testData.chart.result[0].timestamp.length > 0
+            ) {
+              /* Symbol EXISTS but timeframe INVALID */
+              throw new TimeframeError(timeframe, symbol, 'YahooFinance');
+            }
+          }
+          
+          /* Symbol NOT FOUND or test failed */
+          return [];
+        }
+        /* Other errors - return [] to allow next provider */
+        this.logger.debug(`Yahoo buildUrl error: ${error.message}`);
+        return [];
+      }
+
       const cacheKey = this.getCacheKey(symbol, interval, range);
 
       const cached = this.getFromCache(cacheKey);
       if (cached) {
         console.log('Yahoo Finance cache hit:', symbol, interval);
-        return cached.slice(-limit); // Apply limit to cached data
+        return cached.slice(-limit);
       }
 
-      const url = this.buildUrl(symbol, interval, range);
       console.log('Yahoo Finance API request:', url);
       console.log('Yahoo Finance headers:', JSON.stringify(this.headers));
 
@@ -207,8 +242,33 @@ export class YahooFinanceProvider {
       const quote = result.indicators.quote[0];
       const { open, high, low, close, volume } = quote;
 
+      /* Empty response - disambiguate with 1d test */
       if (!timestamps || timestamps.length === 0) {
         console.warn('No timestamps in Yahoo Finance data for:', symbol);
+        
+        if (timeframe !== '1d') {
+          /* Test with 1d to determine if symbol exists or timeframe invalid */
+          const testInterval = TimeframeParser.toYahooInterval('1d');
+          const testRange = '1d';
+          const testUrl = this.buildUrl(symbol, testInterval, testRange);
+          
+          const testResponse = await fetch(testUrl, { headers: this.headers });
+          
+          if (testResponse.ok) {
+            const testText = await testResponse.text();
+            const testData = JSON.parse(testText);
+            
+            if (
+              testData.chart?.result?.[0]?.timestamp &&
+              testData.chart.result[0].timestamp.length > 0
+            ) {
+              /* Symbol EXISTS but original timeframe INVALID */
+              throw new TimeframeError(timeframe, symbol, 'YahooFinance');
+            }
+          }
+        }
+        
+        /* Symbol NOT FOUND */
         return [];
       }
 

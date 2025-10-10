@@ -1,4 +1,5 @@
 import { TimeframeParser } from '../utils/timeframeParser.js';
+import { TimeframeError } from '../errors/TimeframeError.js';
 
 class MoexProvider {
   constructor(logger) {
@@ -8,6 +9,7 @@ class MoexProvider {
     this.cacheDuration = 5 * 60 * 1000;
   }
 
+  /* Convert timeframe - throws TimeframeError if invalid */
   convertTimeframe(timeframe) {
     return TimeframeParser.toMoexInterval(timeframe);
   }
@@ -172,35 +174,87 @@ class MoexProvider {
         return cached;
       }
 
-      const url = this.buildUrl(tickerId, timeframe, limit, sDate, eDate);
+      /* Try to convert timeframe - if fails, test with 1d to check if symbol exists */
+      let url;
+      try {
+        url = this.buildUrl(tickerId, timeframe, limit, sDate, eDate);
+      } catch (error) {
+        if (error instanceof TimeframeError) {
+          /* Timeframe unsupported - test with 1d to check if symbol exists */
+          this.logger.debug(`MOEX: Timeframe ${timeframe} unsupported, testing ${tickerId} with 1d`);
+          
+          const testUrl = this.buildUrl(tickerId, '1d', 1, sDate, eDate);
+          const testResponse = await fetch(testUrl);
+          
+          if (testResponse.ok) {
+            const testData = await testResponse.json();
+            
+            if (testData.candles?.data?.length > 0) {
+              /* Symbol EXISTS but timeframe INVALID */
+              throw new TimeframeError(timeframe, tickerId, 'MOEX');
+            }
+          }
+          
+          /* Symbol NOT FOUND or test failed */
+          return [];
+        }
+        /* Other errors - return [] to allow next provider */
+        this.logger.debug(`MOEX buildUrl error: ${error.message}`);
+        return [];
+      }
+
       console.log('MOEX API request:', url);
 
       const response = await fetch(url);
+      
+      /* HTTP error - return [] to allow next provider to try */
       if (!response.ok) {
-        throw new Error(`MOEX API error: ${response.status} ${response.statusText}`);
+        this.logger.debug(`MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`);
+        return [];
       }
 
       const data = await response.json();
 
-      if (!data.candles || !data.candles.data) {
-        this.logger.debug(`No candle data from MOEX for: ${tickerId}`);
-        return [];
+      /* Data found - success */
+      if (data.candles?.data?.length > 0) {
+        const convertedData = data.candles.data
+          .map((candle) => this.convertMoexCandle(candle))
+          .sort((a, b) => a.openTime - b.openTime);
+
+        const limitedData = limit ? convertedData.slice(-limit) : convertedData;
+
+        this.setCache(cacheKey, limitedData);
+        console.log(`MOEX data retrieved: ${limitedData.length} candles for ${tickerId}`);
+
+        return limitedData;
       }
 
-      const convertedData = data.candles.data
-        .map((candle) => this.convertMoexCandle(candle))
-        .sort((a, b) => a.openTime - b.openTime);
+      /* Empty response - disambiguate: symbol not found OR invalid timeframe */
+      if (timeframe !== '1d') {
+        this.logger.debug(`MOEX: Empty response for ${tickerId} ${timeframe}, testing with 1d`);
+        
+        const testUrl = this.buildUrl(tickerId, '1d', 1, sDate, eDate);
+        const testResponse = await fetch(testUrl);
+        
+        if (testResponse.ok) {
+          const testData = await testResponse.json();
+          if (testData.candles?.data?.length > 0) {
+            /* Symbol exists but requested timeframe invalid */
+            throw new TimeframeError(timeframe, tickerId, 'MOEX');
+          }
+        }
+      }
 
-      const limitedData = limit ? convertedData.slice(-limit) : convertedData;
+      /* Symbol not found - return [] to allow next provider to try */
+      this.logger.debug(`MOEX: Symbol not found: ${tickerId}`);
+      return [];
 
-      this.setCache(cacheKey, limitedData);
-      console.log(`MOEX data retrieved: ${limitedData.length} candles for ${tickerId}`);
-
-      return limitedData;
     } catch (error) {
-      if (error.name === 'TimeframeError') {
-        throw error; // Re-throw TimeframeError to be handled by ProviderManager
+      /* TimeframeError - symbol exists but timeframe invalid - STOP chain */
+      if (error instanceof TimeframeError) {
+        throw error;
       }
+      /* Other errors (network, etc) - return [] to allow next provider to try */
       this.logger.debug(`MOEX Provider error: ${error.message}`);
       return [];
     }

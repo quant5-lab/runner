@@ -1,13 +1,13 @@
-/**
- * Custom error class for timeframe validation failures
- */
+/* Custom error for invalid timeframe on FOUND symbol
+ * Signals: symbol exists in provider but timeframe not supported
+ * Provider chain behavior: STOP execution, do NOT continue to next provider */
 export class TimeframeError extends Error {
-  constructor(timeframe, provider, supportedTimeframes) {
-    const message = `${provider} does not support ${timeframe} timeframe. Supported: ${supportedTimeframes}`;
+  constructor(timeframe, symbol, providerName) {
+    const message = `Timeframe '${timeframe}' not supported for symbol '${symbol}' by provider ${providerName}`;
     super(message);
     this.name = 'TimeframeError';
     this.timeframe = timeframe;
-    this.provider = provider;
-    this.supportedTimeframes = supportedTimeframes;
+    this.symbol = symbol;
+    this.providerName = providerName;
   }
 }
