@@ -1,8 +1,17 @@
 import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
+import TimeframeConverter from '../utils/timeframeConverter.js';
 
 class PineScriptStrategyRunner {
-  async executeTranspiledStrategy(jsCode, data) {
-    const pineTS = new PineTS(data);
+  async executeTranspiledStrategy(jsCode, data, symbol, timeframe) {
+    const pineTF = TimeframeConverter.toPineTS(timeframe);
+    const pineTS = new PineTS(
+      data,
+      symbol,
+      pineTF,
+      data.length,
+      null,
+      null
+    );
     
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;

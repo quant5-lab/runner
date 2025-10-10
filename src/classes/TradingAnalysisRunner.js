@@ -44,6 +44,8 @@ class TradingAnalysisRunner {
     const executionResult = await this.pineScriptStrategyRunner.executeTranspiledStrategy(
       jsCode,
       data,
+      symbol,
+      timeframe,
     );
     const execDuration = (performance.now() - execStartTime).toFixed(2);
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
