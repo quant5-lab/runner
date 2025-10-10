@@ -21,9 +21,8 @@ export class TimeframeParser {
     if (str === 'W') return 10080; // Weekly = 7 * 1440 minutes
     if (str === 'M') return 43200; // Monthly = 30 * 1440 minutes
 
-    // Parse number + unit format (e.g., "15m", "1h", "1d")
-    // Note: "1w", "1M", "1W" etc. are INVALID - large timeframes don't support digits
-    const match = str.match(/^(\d+)([mhd])$/);
+    // Parse number + unit format (e.g., "15m", "1h", "1d", "1w", "1M")
+    const match = str.match(/^(\d+)([mhdwM])$/);
     if (!match) {
       return 1440; // Default to daily if can't parse
     }
@@ -35,6 +34,8 @@ export class TimeframeParser {
       case 'm': return num; // minutes
       case 'h': return num * 60; // hours to minutes
       case 'd': return num * 1440; // days to minutes
+      case 'w': return num * 10080; // weeks to minutes (7 * 1440)
+      case 'M': return num * 43200; // months to minutes (30 * 1440)
       default: return 1440; // Default to daily
     }
   }

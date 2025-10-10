@@ -1,0 +1,9 @@
+study(title="20-50-200 SMA", shorttitle="SMA Lines", overlay=true)
+
+ma20 = sma(close, 20)
+ma50 = sma(close, 50)
+ma200 = sma(close, 200)
+
+plot(ma20, color=yellow, style=linebr, title="SMA20", linewidth=2)
+plot(ma50, color=green, style=line, title="SMA50", linewidth=2)
+plot(ma200, color=red, style=line, title="SMA200", linewidth=2)

@@ -46,7 +46,7 @@ function createContainer(providerChain, defaults) {
       (c) => new ProviderManager(providerChain(logger), c.resolve('logger')),
       true,
     )
-    .register('pineScriptStrategyRunner', () => new PineScriptStrategyRunner(), true)
+    .register('pineScriptStrategyRunner', (c) => new PineScriptStrategyRunner(c.resolve('providerManager')), true)
     .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
