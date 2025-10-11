@@ -225,4 +225,78 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toBinanceTimeframe('1d')).toBe('D');
     });
   });
+
+  describe('unified format backward compatibility', () => {
+    test('should handle legacy daily formats', () => {
+      /* Legacy '1d' → unified D */
+      expect(TimeframeParser.parseToMinutes('1d')).toBe(1440);
+      expect(TimeframeParser.toMoexInterval('1d')).toBe('24');
+      expect(TimeframeParser.toYahooInterval('1d')).toBe('1d');
+      expect(TimeframeParser.toBinanceTimeframe('1d')).toBe('D');
+    });
+
+    test('should handle legacy weekly formats', () => {
+      /* Legacy '1w' → unified W */
+      expect(TimeframeParser.parseToMinutes('1w')).toBe(10080);
+      expect(TimeframeParser.toMoexInterval('1w')).toBe('7');
+      expect(TimeframeParser.toYahooInterval('1w')).toBe('1wk');
+      expect(TimeframeParser.toBinanceTimeframe('1w')).toBe('W');
+
+      /* Yahoo legacy '1wk' → unified W */
+      expect(TimeframeParser.parseToMinutes('1wk')).toBe(10080);
+      expect(TimeframeParser.toYahooInterval('1wk')).toBe('1wk');
+    });
+
+    test('should handle legacy monthly formats', () => {
+      /* Legacy '1M' → unified M */
+      expect(TimeframeParser.parseToMinutes('1M')).toBe(43200);
+      expect(TimeframeParser.toMoexInterval('1M')).toBe('31');
+      expect(TimeframeParser.toYahooInterval('1M')).toBe('1mo');
+      expect(TimeframeParser.toBinanceTimeframe('1M')).toBe('M');
+
+      /* Yahoo legacy '1mo' → unified M */
+      expect(TimeframeParser.parseToMinutes('1mo')).toBe(43200);
+      expect(TimeframeParser.toYahooInterval('1mo')).toBe('1mo');
+    });
+
+    test('should handle unified format across all providers', () => {
+      /* Unified D format */
+      expect(TimeframeParser.toMoexInterval('D')).toBe('24');
+      expect(TimeframeParser.toYahooInterval('D')).toBe('1d');
+      expect(TimeframeParser.toBinanceTimeframe('D')).toBe('D');
+
+      /* Unified W format */
+      expect(TimeframeParser.toMoexInterval('W')).toBe('7');
+      expect(TimeframeParser.toYahooInterval('W')).toBe('1wk');
+      expect(TimeframeParser.toBinanceTimeframe('W')).toBe('W');
+
+      /* Unified M format */
+      expect(TimeframeParser.toMoexInterval('M')).toBe('31');
+      expect(TimeframeParser.toYahooInterval('M')).toBe('1mo');
+      expect(TimeframeParser.toBinanceTimeframe('M')).toBe('M');
+    });
+
+    test('should round-trip convert unified formats', () => {
+      /* D: unified → minutes → provider format */
+      const dailyMinutes = TimeframeParser.parseToMinutes('D');
+      expect(dailyMinutes).toBe(1440);
+      expect(TimeframeParser.toMoexInterval(dailyMinutes)).toBe('24');
+      expect(TimeframeParser.toYahooInterval(dailyMinutes)).toBe('1d');
+      expect(TimeframeParser.toBinanceTimeframe(dailyMinutes)).toBe('D');
+
+      /* W: unified → minutes → provider format */
+      const weeklyMinutes = TimeframeParser.parseToMinutes('W');
+      expect(weeklyMinutes).toBe(10080);
+      expect(TimeframeParser.toMoexInterval(weeklyMinutes)).toBe('7');
+      expect(TimeframeParser.toYahooInterval(weeklyMinutes)).toBe('1wk');
+      expect(TimeframeParser.toBinanceTimeframe(weeklyMinutes)).toBe('W');
+
+      /* M: unified → minutes → provider format */
+      const monthlyMinutes = TimeframeParser.parseToMinutes('M');
+      expect(monthlyMinutes).toBe(43200);
+      expect(TimeframeParser.toMoexInterval(monthlyMinutes)).toBe('31');
+      expect(TimeframeParser.toYahooInterval(monthlyMinutes)).toBe('1mo');
+      expect(TimeframeParser.toBinanceTimeframe(monthlyMinutes)).toBe('M');
+    });
+  });
 });
