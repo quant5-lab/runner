@@ -1,6 +1,10 @@
 # Pine Script Trading Analysis Runner
 
-![Coverage](https://img.shields.io/badge/coverage-81.9%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-80.75%25-brightgreen)
+
+Node.js application for Pine Script strategy transpilation and execution across multiple exchanges with dynamic provider fallback and real-time chart visualization.e Script Trading Analysis Runner
+
+![Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen)
 
 Node.js application for Pine Script strategy transpilation and execution across multiple exchanges with dynamic provider fallback and real-time chart visualization.
 
@@ -160,7 +164,7 @@ The application transpiles and executes Pine Script strategies:
 
 ### Pine Script Strategies
 
-Custom strategies with full Pine Script v4/v5 support including:
+Custom strategies with full Pine Script v3/v4/v5 support (auto-migration) including:
 
 - Built-in functions: `indicator()`, `strategy()`, `plot()`
 - Built-in variables: `close`, `open`, `high`, `low`, `volume`
