@@ -8,7 +8,7 @@ class PineSecurityAdapter {
 
   async getMarketData(symbol, timeframe, limit, sDate, eDate) {
     const ourTimeframe = TimeframeConverter.fromPineTS(timeframe);
-    
+
     const cacheKey = `${symbol}|${ourTimeframe}|${limit || 'all'}`;
     if (this.marketDataCache.has(cacheKey)) {
       return this.marketDataCache.get(cacheKey);
