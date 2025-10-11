@@ -77,29 +77,10 @@
 - [x] Format and satisfy linter, ensure tests not broken
   - COMPLETED: Ran eslint locally. Fixed 35 auto-fixable errors (trailing spaces, missing commas). Fixed 8 manual errors: removed unused 'instance' variables (2x), added TimeframeError import to YahooFinanceProvider, removed unused TimeframeError import from timeframeParser, fixed duplicate closeTime key in test, added eslint-disable comment for Function constructor. 0 linting errors. All 260 tests passing.
 
-## In Progress 🔄
+- [x] **TODO 23 FINAL CLEANUP**
+  - COMPLETED: Fixed colors migration (color=yellow → color=color.yellow). Fixed v3/v4 syntax detection regex (exclude ta.* functions). Moved test files to tests/fixtures/strategies/. Extracted v3/v4 detection to PineVersionMigrator.hasV3V4Syntax() method. Updated src/index.js to use method instead of inline regex. Single source of truth achieved. All 297 tests passing. 0 linting errors.
 
-- [ ] **TODO 23 FINAL CLEANUP**
-  - ✅ Fixed colors migration (color=yellow → color=color.yellow)
-  - ✅ Fixed v3/v4 syntax detection regex (exclude ta.* functions)
-  - ✅ Fixed test expectations (297/297 passing)
-  - ⚠️ **REMAINING TASKS:**
-    1. **Move test assets to proper location**
-       - Move `strategies/test-v3-syntax.pine` → `tests/fixtures/strategies/test-v3-syntax.pine`
-       - Move `strategies/test-v4-security.pine` → `tests/fixtures/strategies/test-v4-security.pine`
-       - Move `strategies/test-v5-syntax.pine` → `tests/fixtures/strategies/test-v5-syntax.pine`
-       - Do not pollute `/strategies` directory with test files
-    
-    2. **Extract v3/v4 detection logic (DRY/SOLID violation)**
-       - Current code in `src/index.js` line 31:
-         ```javascript
-         const hasV3V4Syntax = /\b(study|(?<!ta\.|request\.|math\.|ticker\.|str\.)(?:sma|ema|rsi|security))\s*\(/.test(pineCode);
-         ```
-       - VIOLATION: Duplicates knowledge from `PineVersionMigrator.V5_MAPPINGS`
-       - FIX: Add `PineVersionMigrator.hasV3V4Syntax(pineCode)` static method
-       - Move regex pattern logic into PineVersionMigrator class
-       - Update `src/index.js` to use `PineVersionMigrator.hasV3V4Syntax(pineCode)`
-       - Ensure single source of truth for v3/v4 function names
+## In Progress 🔄
 
 - [ ] **Debug and fix daily-lines strategy issues**
   - Test daily-lines.pine strategy on multiple timeframes (1m, 5m, 15m, 1h, 4h, 1d, 1w)
