@@ -6,6 +6,7 @@ class PineVersionMigrator {
   static V5_MAPPINGS = {
     // No namespace changes
     study: 'indicator',
+    '(?<!syminfo\\.)\\bticerid\\b': 'syminfo.tickerid',
     'tickerid()': 'ticker.new()',
 
     // Color constants in assignments (color=yellow → color=color.yellow)
@@ -154,22 +155,33 @@ class PineVersionMigrator {
 
     let migrated = pineCode;
 
-    // Apply all mappings
+    /* Apply function patterns first (longer patterns), then simple identifiers */
+    const functionPatterns = [];
+    const identifierPatterns = [];
+    
     for (const [v4Pattern, v5Replacement] of Object.entries(this.V5_MAPPINGS)) {
-      // Check if pattern is already a regex pattern (contains backslash escapes)
-      const isRegexPattern = v4Pattern.includes('\\');
+      if (v4Pattern.includes('(')) {
+        functionPatterns.push([v4Pattern, v5Replacement]);
+      } else {
+        identifierPatterns.push([v4Pattern, v5Replacement]);
+      }
+    }
 
+    /* Process function calls first to avoid partial matches */
+    for (const [v4Pattern, v5Replacement] of functionPatterns) {
+      const regex = new RegExp(this.escapeRegex(v4Pattern), 'g');
+      migrated = migrated.replace(regex, v5Replacement);
+    }
+
+    /* Then process identifiers and regex patterns */
+    for (const [v4Pattern, v5Replacement] of identifierPatterns) {
+      const isRegexPattern = v4Pattern.includes('\\');
+      
       if (isRegexPattern) {
-        // Use pattern as-is for regex patterns like '=\\s*yellow\\b'
         const regex = new RegExp(v4Pattern, 'g');
         migrated = migrated.replace(regex, v5Replacement);
-      } else if (!v4Pattern.includes('(')) {
-        // Word boundary for simple identifiers
-        const regex = new RegExp(`\\b${this.escapeRegex(v4Pattern)}\\b`, 'g');
-        migrated = migrated.replace(regex, v5Replacement);
       } else {
-        // Function calls - match pattern with opening parenthesis
-        const regex = new RegExp(this.escapeRegex(v4Pattern), 'g');
+        const regex = new RegExp(`\\b${this.escapeRegex(v4Pattern)}\\b`, 'g');
         migrated = migrated.replace(regex, v5Replacement);
       }
     }
