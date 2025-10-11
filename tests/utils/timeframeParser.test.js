@@ -38,9 +38,9 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.parseToMinutes(undefined)).toBe(1440);
       expect(TimeframeParser.parseToMinutes('')).toBe(1440);
       expect(TimeframeParser.parseToMinutes('xyz')).toBe(1440);
-      /* Valid numeric+letter formats: 1w, 1M correctly parse */
-      expect(TimeframeParser.parseToMinutes('1w')).toBe(10080); // Valid weekly
-      expect(TimeframeParser.parseToMinutes('1W')).toBe(1440); // Invalid - capital W without digit
+      /* Valid formats: legacy '1w', unified 'W', '1M' */
+      expect(TimeframeParser.parseToMinutes('1w')).toBe(10080); // Valid weekly legacy
+      expect(TimeframeParser.parseToMinutes('W')).toBe(10080); // Valid unified weekly
       expect(TimeframeParser.parseToMinutes('1M')).toBe(43200); // Valid monthly
     });
   });

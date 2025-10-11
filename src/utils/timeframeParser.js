@@ -1,10 +1,11 @@
 import { TimeframeError } from '../errors/TimeframeError.js';
 
-/* Shared constants: Supported timeframes in universal app format (DRY principle) */
+/* Shared constants: Supported timeframes in unified app format (DRY principle) */
+/* Unified format: D (daily), W (weekly), M (monthly), xh (hourly), xm (minute) */
 export const SUPPORTED_TIMEFRAMES = {
-  MOEX: ['1m', '10m', '1h', '1d', '1w', '1M'],
-  BINANCE: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'],
-  YAHOO: ['1m', '2m', '5m', '15m', '30m', '1h', '90m', '1d', '1wk', '1mo'],
+  MOEX: ['1m', '10m', '1h', 'D', 'W', 'M'],
+  BINANCE: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', 'D', '3d', 'W', 'M'],
+  YAHOO: ['1m', '2m', '5m', '15m', '30m', '1h', '90m', 'D', 'W', 'M'],
 };
 
 /**
@@ -12,7 +13,8 @@ export const SUPPORTED_TIMEFRAMES = {
  */
 export class TimeframeParser {
   /**
-   * Parse timeframe string (e.g., "15m", "1h", "1d") into minutes
+   * Parse timeframe string (e.g., "15m", "1h", "D") into minutes
+   * Supports unified format (D, W, M) and legacy formats (1d, 1w, 1M, 1wk, 1mo)
    * @param {string|number} timeframe - Input timeframe
    * @returns {number} - Timeframe in minutes
    */
@@ -23,13 +25,21 @@ export class TimeframeParser {
 
     const str = String(timeframe);
 
-    // Handle simple letter formats - D, W, M don't support digit prefixes
-    if (str === 'D') return 1440; // Daily = 1440 minutes
-    if (str === 'W') return 10080; // Weekly = 7 * 1440 minutes
-    if (str === 'M') return 43200; // Monthly = 30 * 1440 minutes
+    /* Normalize legacy formats to unified format for backward compatibility */
+    const normalized = str
+      .replace(/^1d$/i, 'D')      // 1d → D (daily)
+      .replace(/^1wk$/i, 'W')     // 1wk → W (weekly, Yahoo legacy)
+      .replace(/^1w$/i, 'W')      // 1w → W (weekly, provider legacy)
+      .replace(/^1mo$/i, 'M');    // 1mo → M (monthly, Yahoo legacy)
+      // Note: 1M stays as-is, handled in next section
 
-    // Parse number + unit format (e.g., "15m", "1h", "1d", "1w", "1M")
-    const match = str.match(/^(\d+)([mhdwM])$/);
+    // Handle unified letter formats - D, W, M don't support digit prefixes
+    if (normalized === 'D') return 1440; // Daily = 1440 minutes
+    if (normalized === 'W') return 10080; // Weekly = 7 * 1440 minutes
+    if (normalized === 'M' || normalized === '1M') return 43200; // Monthly = 30 * 1440 minutes
+
+    // Parse number + unit format (e.g., "15m", "1h")
+    const match = normalized.match(/^(\d+)([mh])$/);
     if (!match) {
       return 1440; // Default to daily if can't parse
     }
@@ -40,9 +50,6 @@ export class TimeframeParser {
     switch (unit) {
       case 'm': return num; // minutes
       case 'h': return num * 60; // hours to minutes
-      case 'd': return num * 1440; // days to minutes
-      case 'w': return num * 10080; // weeks to minutes (7 * 1440)
-      case 'M': return num * 43200; // months to minutes (30 * 1440)
       default: return 1440; // Default to daily
     }
   }
