@@ -65,7 +65,7 @@ class ProviderManager {
           throw error;
         }
         if (error instanceof TimeframeError) {
-          throw new Error(`Timeframe '${timeframe}' not supported for symbol '${symbol}'. ${error.message}`);
+          throw error;
         }
         this.logger.log(`Failed:\t\t${name} > ${symbol}`);
         this.logger.debug(`Error from ${name} provider: ${error}`);

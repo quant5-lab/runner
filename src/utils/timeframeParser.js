@@ -1,4 +1,5 @@
 import { TimeframeError } from '../errors/TimeframeError.js';
+import TimeframeConverter from './timeframeConverter.js';
 
 /* Shared constants: Supported timeframes in unified app format (DRY principle) */
 /* Unified format: D (daily), W (weekly), M (monthly), xh (hourly), xm (minute) */
@@ -55,35 +56,12 @@ export class TimeframeParser {
   }
 
   /**
-   * Generic conversion helper - DRY pattern
-   * @param {string|number} timeframe - Input timeframe
-   * @param {Object} mapping - Minutes to provider format mapping
-   * @param {string} providerName - Provider name for error messages
-   * @param {Array} supportedTimeframes - Supported timeframes list
-   * @returns {string} - Converted timeframe
-   * @private
-   */
-  static _convertTimeframe(timeframe, mapping, providerName, supportedTimeframes) {
-    const minutes = this.parseToMinutes(timeframe);
-    const converted = mapping[minutes];
-    if (converted === undefined) {
-      throw new TimeframeError(timeframe, providerName, supportedTimeframes);
-    }
-    return converted;
-  }
-
-  /**
    * Convert timeframe to MOEX interval format
    * @param {string|number} timeframe - Input timeframe
    * @returns {string} - MOEX interval
    */
   static toMoexInterval(timeframe) {
-    /* MOEX specific mapping - based on actual API testing */
-    const mapping = {
-      1: '1', 10: '10', 60: '60',
-      1440: '24', 10080: '7', 43200: '31',
-    };
-    return this._convertTimeframe(timeframe, mapping, 'MOEX', SUPPORTED_TIMEFRAMES.MOEX);
+    return TimeframeConverter.toMoex(this.parseToMinutes(timeframe), timeframe);
   }
 
   /**
@@ -92,13 +70,7 @@ export class TimeframeParser {
    * @returns {string} - Yahoo Finance interval
    */
   static toYahooInterval(timeframe) {
-    /* Yahoo Finance specific mapping */
-    const mapping = {
-      1: '1m', 2: '2m', 5: '5m', 15: '15m', 30: '30m',
-      60: '1h', 90: '90m',
-      1440: '1d', 10080: '1wk', 43200: '1mo',
-    };
-    return this._convertTimeframe(timeframe, mapping, 'Yahoo Finance', SUPPORTED_TIMEFRAMES.YAHOO);
+    return TimeframeConverter.toYahoo(this.parseToMinutes(timeframe), timeframe);
   }
 
   /**
@@ -107,12 +79,6 @@ export class TimeframeParser {
    * @returns {string} - Binance timeframe format
    */
   static toBinanceTimeframe(timeframe) {
-    /* Binance expects numeric strings for most timeframes */
-    const mapping = {
-      1: '1', 3: '3', 5: '5', 15: '15', 30: '30',
-      60: '60', 120: '120', 240: '240', 360: '360', 480: '480', 720: '720',
-      1440: 'D', 10080: 'W', 43200: 'M',
-    };
-    return this._convertTimeframe(timeframe, mapping, 'Binance', SUPPORTED_TIMEFRAMES.BINANCE);
+    return TimeframeConverter.toBinance(this.parseToMinutes(timeframe), timeframe);
   }
 }
