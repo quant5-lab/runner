@@ -26,10 +26,10 @@ class PineScriptStrategyRunner {
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
+      const { plot: corePlot, color } = context.core;
       const ta = context.ta;
       const request = context.request;
-      const { plot: corePlot, color } = context.core;
-      const tickerid = context.tickerId;
+      const syminfo = context.syminfo;
       
       ${plotAdapterSource}
       
