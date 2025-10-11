@@ -1,4 +1,3 @@
-import { TimeframeError } from '../errors/TimeframeError.js';
 import TimeframeConverter from './timeframeConverter.js';
 
 /* Shared constants: Supported timeframes in unified app format (DRY principle) */
@@ -28,10 +27,10 @@ export class TimeframeParser {
 
     /* Normalize legacy formats to unified format for backward compatibility */
     const normalized = str
-      .replace(/^1d$/i, 'D')      // 1d → D (daily)
-      .replace(/^1wk$/i, 'W')     // 1wk → W (weekly, Yahoo legacy)
-      .replace(/^1w$/i, 'W')      // 1w → W (weekly, provider legacy)
-      .replace(/^1mo$/i, 'M');    // 1mo → M (monthly, Yahoo legacy)
+      .replace(/^1d$/i, 'D') // 1d → D (daily)
+      .replace(/^1wk$/i, 'W') // 1wk → W (weekly, Yahoo legacy)
+      .replace(/^1w$/i, 'W') // 1w → W (weekly, provider legacy)
+      .replace(/^1mo$/i, 'M'); // 1mo → M (monthly, Yahoo legacy)
       // Note: 1M stays as-is, handled in next section
 
     // Handle unified letter formats - D, W, M don't support digit prefixes

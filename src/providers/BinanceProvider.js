@@ -26,18 +26,18 @@ class BinanceProvider {
     } catch (error) {
       /* Parse Binance API error messages */
       const errorMsg = error.message || '';
-      
+
       /* Invalid symbol - return [] to continue chain */
       if (errorMsg.includes('Invalid symbol')) {
         this.logger.debug(`Binance: Invalid symbol ${symbol}`);
         return [];
       }
-      
+
       /* Invalid interval - throw TimeframeError to stop chain */
       if (errorMsg.includes('Invalid interval') || error instanceof TimeframeError) {
         throw new TimeframeError(timeframe, symbol, 'Binance', this.supportedTimeframes);
       }
-      
+
       /* Other errors - return [] to allow next provider to try */
       this.logger.debug(`Binance Provider error: ${error.message}`);
       return [];

@@ -13,9 +13,16 @@ vi.mock('path', () => ({
 
 describe('JsonFileWriter', () => {
   let exporter;
+  let mockLogger;
 
   beforeEach(() => {
-    exporter = new JsonFileWriter();
+    mockLogger = {
+      debug: vi.fn(),
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    exporter = new JsonFileWriter(mockLogger);
     vi.clearAllMocks();
   });
 

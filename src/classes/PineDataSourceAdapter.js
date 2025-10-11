@@ -11,7 +11,7 @@ class PineDataSourceAdapter {
     const { data } = await this.providerManager.fetchMarketData(
       symbol,
       ourTimeframe,
-      limit
+      limit,
     );
 
     return data;

@@ -1,5 +1,6 @@
 // Yahoo Finance Provider for PineTS - Real market data for US stocks
 import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
+import { TimeframeError } from '../errors/TimeframeError.js';
 
 export class YahooFinanceProvider {
   constructor(logger) {
@@ -165,17 +166,17 @@ export class YahooFinanceProvider {
         if (error instanceof TimeframeError) {
           /* Timeframe unsupported - test with 1d to check if symbol exists */
           this.logger.debug(`Yahoo: Timeframe ${timeframe} unsupported, testing ${symbol} with 1d`);
-          
+
           const testInterval = TimeframeParser.toYahooInterval('1d');
           const testRange = '1d';
           const testUrl = this.buildUrl(symbol, testInterval, testRange);
-          
+
           const testResponse = await fetch(testUrl, { headers: this.headers });
-          
+
           if (testResponse.ok) {
             const testText = await testResponse.text();
             const testData = JSON.parse(testText);
-            
+
             if (
               testData.chart?.result?.[0]?.timestamp &&
               testData.chart.result[0].timestamp.length > 0
@@ -184,7 +185,7 @@ export class YahooFinanceProvider {
               throw new TimeframeError(timeframe, symbol, 'YahooFinance', this.supportedTimeframes);
             }
           }
-          
+
           /* Symbol NOT FOUND or test failed */
           return [];
         }
@@ -246,19 +247,19 @@ export class YahooFinanceProvider {
       /* Empty response - disambiguate with 1d test */
       if (!timestamps || timestamps.length === 0) {
         console.warn('No timestamps in Yahoo Finance data for:', symbol);
-        
+
         if (timeframe !== '1d') {
           /* Test with 1d to determine if symbol exists or timeframe invalid */
           const testInterval = TimeframeParser.toYahooInterval('1d');
           const testRange = '1d';
           const testUrl = this.buildUrl(symbol, testInterval, testRange);
-          
+
           const testResponse = await fetch(testUrl, { headers: this.headers });
-          
+
           if (testResponse.ok) {
             const testText = await testResponse.text();
             const testData = JSON.parse(testText);
-            
+
             if (
               testData.chart?.result?.[0]?.timestamp &&
               testData.chart.result[0].timestamp.length > 0
@@ -268,7 +269,7 @@ export class YahooFinanceProvider {
             }
           }
         }
-        
+
         /* Symbol NOT FOUND */
         return [];
       }

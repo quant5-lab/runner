@@ -1,10 +1,10 @@
 /* Pine Script plot() adapter - bridges PyneScript transpiler output to PineTS API
- * 
+ *
  * PyneScript transpiles: plot(series, color=X, title=Y)
  * Into: plot(series, {color: X, title: Y})
- * 
+ *
  * PineTS expects: plot(series, title, options)
- * 
+ *
  * This adapter extracts title from options object and calls PineTS correctly.
  */
 
@@ -29,6 +29,7 @@ export const plotAdapterSource = `function plot(series, titleOrOptions, maybeOpt
  * @returns {Function} - Adapted plot function
  */
 export function createPlotAdapter(corePlot) {
+  // eslint-disable-next-line no-new-func
   const fn = new Function('corePlot', `${plotAdapterSource}; return plot;`);
   return fn(corePlot);
 }

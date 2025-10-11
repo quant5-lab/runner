@@ -20,9 +20,9 @@ class PineScriptStrategyRunner {
       pineTSTimeframe,
       bars,
       null,
-      null
+      null,
     );
-    
+
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
       const ta = context.ta;
@@ -51,14 +51,14 @@ class PineScriptStrategyRunner {
       
       ${jsCode}
     }`;
-    
+
     const result = await pineTS.run(wrappedCode);
     return { plots: result?.plots || [] };
   }
 
   async runEMAStrategy(data) {
     const pineTS = new PineTS(data);
-    
+
     const { plots } = await pineTS.run((context) => {
       const { close } = context.data;
       const { plot } = context.core;

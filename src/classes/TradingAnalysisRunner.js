@@ -26,7 +26,7 @@ class TradingAnalysisRunner {
     const fetchStartTime = performance.now();
     this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
 
-    const { provider, data, instance } = await this.providerManager.fetchMarketData(
+    const { provider, data } = await this.providerManager.fetchMarketData(
       symbol,
       timeframe,
       bars,
@@ -36,7 +36,7 @@ class TradingAnalysisRunner {
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
 
     const execStartTime = performance.now();
-    
+
     this.logger.debug('=== TRANSPILED JAVASCRIPT CODE START ===');
     this.logger.debug(jsCode);
     this.logger.debug('=== TRANSPILED JAVASCRIPT CODE END ===');
@@ -49,7 +49,7 @@ class TradingAnalysisRunner {
     );
     const execDuration = (performance.now() - execStartTime).toFixed(2);
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
-    
+
     const plots = executionResult.plots || {};
     const indicatorMetadata = this.extractIndicatorMetadata(plots);
 
@@ -79,7 +79,7 @@ class TradingAnalysisRunner {
     const fetchStartTime = performance.now();
     this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
 
-    const { provider, data, instance } = await this.providerManager.fetchMarketData(
+    const { provider, data } = await this.providerManager.fetchMarketData(
       symbol,
       timeframe,
       bars,
@@ -162,17 +162,17 @@ class TradingAnalysisRunner {
 
   extractIndicatorMetadata(plots) {
     const metadata = {};
-    
+
     Object.keys(plots).forEach((plotKey) => {
       const color = this.extractPlotColor(plots[plotKey]);
-      
+
       metadata[plotKey] = {
         color,
         title: plotKey,
         type: 'indicator',
       };
     });
-    
+
     return metadata;
   }
 
@@ -180,7 +180,7 @@ class TradingAnalysisRunner {
     if (!plotData?.data || !Array.isArray(plotData.data)) {
       return CHART_COLORS.DEFAULT_PLOT;
     }
-    
+
     const firstPointWithColor = plotData.data.find(point => point?.options?.color);
     return firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
   }

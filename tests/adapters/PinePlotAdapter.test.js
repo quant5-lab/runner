@@ -26,7 +26,7 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(
         series,
         'EMA 20',
-        { color: 'red', style: undefined, linewidth: 1 }
+        { color: 'red', style: undefined, linewidth: 1 },
       );
     });
 
@@ -41,7 +41,7 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(
         series,
         'Signal',
-        { color: 'green', style: 'line', linewidth: undefined }
+        { color: 'green', style: 'line', linewidth: undefined },
       );
     });
 
@@ -55,7 +55,7 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(
         series,
         undefined,
-        { color: undefined, style: undefined, linewidth: undefined }
+        { color: undefined, style: undefined, linewidth: undefined },
       );
     });
 
@@ -78,7 +78,7 @@ describe('PinePlotAdapter', () => {
         color: 'yellow',
         style: 'linebr',
         linewidth: 3,
-        unrelatedProp: 'ignored'
+        unrelatedProp: 'ignored',
       };
 
       plot(series, options);
@@ -86,7 +86,7 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(
         series,
         'Custom',
-        { color: 'yellow', style: 'linebr', linewidth: 3 }
+        { color: 'yellow', style: 'linebr', linewidth: 3 },
       );
     });
   });

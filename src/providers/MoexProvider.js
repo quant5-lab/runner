@@ -125,7 +125,7 @@ class MoexProvider {
 
       params.append('from', this.formatDate(startDate.getTime()));
       params.append('till', this.formatEndDate(endDate.getTime()));
-      
+
       // MOEX returns oldest 500 candles by default - use reverse to get newest
       params.append('iss.reverse', 'true');
     }
@@ -183,19 +183,19 @@ class MoexProvider {
         if (error instanceof TimeframeError) {
           /* Timeframe unsupported - test with 1d to check if symbol exists */
           this.logger.debug(`MOEX: Timeframe ${timeframe} unsupported, testing ${tickerId} with 1d`);
-          
+
           const testUrl = this.buildUrl(tickerId, '1d', 1, sDate, eDate);
           const testResponse = await fetch(testUrl);
-          
+
           if (testResponse.ok) {
             const testData = await testResponse.json();
-            
+
             if (testData.candles?.data?.length > 0) {
               /* Symbol EXISTS but timeframe INVALID */
               throw new TimeframeError(timeframe, tickerId, 'MOEX', this.supportedTimeframes);
             }
           }
-          
+
           /* Symbol NOT FOUND or test failed */
           return [];
         }
@@ -207,7 +207,7 @@ class MoexProvider {
       console.log('MOEX API request:', url);
 
       const response = await fetch(url);
-      
+
       /* HTTP error - return [] to allow next provider to try */
       if (!response.ok) {
         this.logger.debug(`MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`);
@@ -233,10 +233,10 @@ class MoexProvider {
       /* Empty response - disambiguate: symbol not found OR invalid timeframe */
       if (timeframe !== '1d') {
         this.logger.debug(`MOEX: Empty response for ${tickerId} ${timeframe}, testing with 1d`);
-        
+
         const testUrl = this.buildUrl(tickerId, '1d', 1, sDate, eDate);
         const testResponse = await fetch(testUrl);
-        
+
         if (testResponse.ok) {
           const testData = await testResponse.json();
           if (testData.candles?.data?.length > 0) {
@@ -249,7 +249,6 @@ class MoexProvider {
       /* Symbol not found - return [] to allow next provider to try */
       this.logger.debug(`MOEX: Symbol not found: ${tickerId}`);
       return [];
-
     } catch (error) {
       /* TimeframeError - symbol exists but timeframe invalid - STOP chain */
       if (error instanceof TimeframeError) {

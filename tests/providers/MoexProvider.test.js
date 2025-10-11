@@ -228,7 +228,7 @@ describe('MoexProvider', () => {
 
     it('should include reverse parameter for all timeframes when using limit', () => {
       const timeframes = ['1', '10', '60', 'D', 'W', 'M'];
-      
+
       timeframes.forEach((timeframe) => {
         const url = provider.buildUrl('SBER', timeframe, 100, null, null);
         expect(url).toContain('iss.reverse=true');
@@ -247,7 +247,7 @@ describe('MoexProvider', () => {
 
     it('should include reverse parameter when limit provided without custom dates', () => {
       const url = provider.buildUrl('SBER', '1h', 50, null, null);
-      
+
       expect(url).toContain('iss.reverse=true');
       expect(url).toContain('from=');
       expect(url).toContain('till=');
@@ -476,7 +476,7 @@ describe('MoexProvider', () => {
         await expect(provider.getMarketData('CHMF', '15m', 100))
           .rejects
           .toThrow("Timeframe '15m' not supported for symbol 'CHMF' by provider MOEX");
-        
+
         expect(global.fetch).toHaveBeenCalledTimes(1); // Only 1d probe fetch
       });
 

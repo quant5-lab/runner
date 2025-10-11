@@ -167,7 +167,7 @@ describe('TimeframeParser', () => {
       const moexUnsupported = ['5m', '15m', '30m', '4h'];
 
       for (const tf of moexUnsupported) {
-        expect(() => TimeframeParser.toMoexInterval(tf)).toThrow("not supported");
+        expect(() => TimeframeParser.toMoexInterval(tf)).toThrow('not supported');
       }
     });
   });

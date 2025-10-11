@@ -2,11 +2,15 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 class JsonFileWriter {
+  constructor(logger) {
+    this.logger = logger;
+  }
+
   ensureOutDirectory() {
     try {
       mkdirSync('out', { recursive: true });
     } catch (error) {
-      return;
+      this.logger.debug(`Failed to create output directory: ${error.message}`);
     }
   }
 

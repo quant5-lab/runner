@@ -50,7 +50,7 @@ function createContainer(providerChain, defaults) {
     .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)
-    .register('jsonFileWriter', () => new JsonFileWriter(), true)
+    .register('jsonFileWriter', (c) => new JsonFileWriter(c.resolve('logger')), true)
     .register(
       'tradingAnalysisRunner',
       (c) =>

@@ -31,7 +31,7 @@ async function main() {
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
       await runner.runPineScriptStrategy(envSymbol, envTimeframe, envBars, jsCode, envStrategy);
-      
+
       const runDuration = (performance.now() - strategyStartTime).toFixed(2);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {

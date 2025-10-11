@@ -3,8 +3,8 @@
  * Provider chain behavior: STOP execution, do NOT continue to next provider */
 export class TimeframeError extends Error {
   constructor(timeframe, symbol, providerName, supportedTimeframes = []) {
-    const supportedList = supportedTimeframes.length > 0 
-      ? `. Supported timeframes: ${supportedTimeframes.join(', ')}` 
+    const supportedList = supportedTimeframes.length > 0
+      ? `. Supported timeframes: ${supportedTimeframes.join(', ')}`
       : '';
     const message = `Timeframe '${timeframe}' not supported for symbol '${symbol}' by provider ${providerName}${supportedList}`;
     super(message);

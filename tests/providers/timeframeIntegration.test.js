@@ -205,7 +205,7 @@ describe('Provider Timeframe Integration Tests', () => {
 
       // MOEX should throw TimeframeError for unsupported timeframes
       moexUnsupportedTimeframes.forEach(tf => {
-        expect(() => moexProvider.convertTimeframe(tf)).toThrow("not supported");
+        expect(() => moexProvider.convertTimeframe(tf)).toThrow('not supported');
       });
 
       // Yahoo should handle its supported formats without errors
