@@ -1,3 +1,12 @@
+
+
+
+For running use docker. Docker already running, just run start 
+
+docker compose exec -e DEBUG=true runner node src/index.js SBER 10m 1000 strategies/test-security.pine
+
+source code is volume mapped, and you must examine source code locally in this workspace. PineTS is located in sibling dir to this workspace. Also source code is available as a `pinets.dev.es.js` bundle attached
+
 # TODO List - BorisQuantLab Runner
 
 ## Completed ✅
