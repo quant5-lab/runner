@@ -1,4 +1,4 @@
-import { TimeframeParser } from '../utils/timeframeParser.js';
+import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
 import { TimeframeError } from '../errors/TimeframeError.js';
 
 class MoexProvider {
@@ -7,6 +7,7 @@ class MoexProvider {
     this.baseUrl = 'https://iss.moex.com/iss';
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000;
+    this.supportedTimeframes = SUPPORTED_TIMEFRAMES.MOEX;
   }
 
   /* Convert timeframe - throws TimeframeError if invalid */
@@ -191,7 +192,7 @@ class MoexProvider {
             
             if (testData.candles?.data?.length > 0) {
               /* Symbol EXISTS but timeframe INVALID */
-              throw new TimeframeError(timeframe, tickerId, 'MOEX');
+              throw new TimeframeError(timeframe, tickerId, 'MOEX', this.supportedTimeframes);
             }
           }
           
@@ -240,7 +241,7 @@ class MoexProvider {
           const testData = await testResponse.json();
           if (testData.candles?.data?.length > 0) {
             /* Symbol exists but requested timeframe invalid */
-            throw new TimeframeError(timeframe, tickerId, 'MOEX');
+            throw new TimeframeError(timeframe, tickerId, 'MOEX', this.supportedTimeframes);
           }
         }
       }

@@ -1,5 +1,12 @@
 import { TimeframeError } from '../errors/TimeframeError.js';
 
+/* Shared constants: Supported timeframes in universal app format (DRY principle) */
+export const SUPPORTED_TIMEFRAMES = {
+  MOEX: ['1m', '10m', '1h', '1d', '1w', '1M'],
+  BINANCE: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'],
+  YAHOO: ['1m', '2m', '5m', '15m', '30m', '1h', '90m', '1d', '1wk', '1mo'],
+};
+
 /**
  * Utility to parse timeframe strings into standardized formats
  */
@@ -60,7 +67,7 @@ export class TimeframeParser {
 
     const moexInterval = mapping[minutes];
     if (moexInterval === undefined) {
-      throw new TimeframeError(timeframe, 'MOEX', '1m,10m,1h,1d,1w,1M');
+      throw new TimeframeError(timeframe, 'MOEX', SUPPORTED_TIMEFRAMES.MOEX);
     }
 
     return moexInterval;
@@ -90,7 +97,7 @@ export class TimeframeParser {
 
     const yahooInterval = mapping[minutes];
     if (yahooInterval === undefined) {
-      throw new TimeframeError(timeframe, 'Yahoo Finance', '1m,2m,5m,15m,30m,1h,90m,1d,1wk,1mo');
+      throw new TimeframeError(timeframe, 'Yahoo Finance', SUPPORTED_TIMEFRAMES.YAHOO);
     }
 
     return yahooInterval;
@@ -125,7 +132,7 @@ export class TimeframeParser {
 
     const binanceTimeframe = mapping[minutes];
     if (binanceTimeframe === undefined) {
-      throw new TimeframeError(timeframe, 'Binance', '1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,1w,1M');
+      throw new TimeframeError(timeframe, 'Binance', SUPPORTED_TIMEFRAMES.BINANCE);
     }
 
     return binanceTimeframe;

@@ -1,5 +1,5 @@
 // Yahoo Finance Provider for PineTS - Real market data for US stocks
-import { TimeframeParser } from '../utils/timeframeParser.js';
+import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
 
 export class YahooFinanceProvider {
   constructor(logger) {
@@ -10,6 +10,7 @@ export class YahooFinanceProvider {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     };
     this.logger = logger;
+    this.supportedTimeframes = SUPPORTED_TIMEFRAMES.YAHOO;
   }
 
   /* Convert PineTS timeframe to Yahoo interval */
@@ -180,7 +181,7 @@ export class YahooFinanceProvider {
               testData.chart.result[0].timestamp.length > 0
             ) {
               /* Symbol EXISTS but timeframe INVALID */
-              throw new TimeframeError(timeframe, symbol, 'YahooFinance');
+              throw new TimeframeError(timeframe, symbol, 'YahooFinance', this.supportedTimeframes);
             }
           }
           
@@ -263,7 +264,7 @@ export class YahooFinanceProvider {
               testData.chart.result[0].timestamp.length > 0
             ) {
               /* Symbol EXISTS but original timeframe INVALID */
-              throw new TimeframeError(timeframe, symbol, 'YahooFinance');
+              throw new TimeframeError(timeframe, symbol, 'YahooFinance', this.supportedTimeframes);
             }
           }
         }

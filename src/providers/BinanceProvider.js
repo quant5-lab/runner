@@ -1,11 +1,12 @@
 import { Provider } from '../../../PineTS/dist/pinets.dev.es.js';
-import { TimeframeParser } from '../utils/timeframeParser.js';
+import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
 import { TimeframeError } from '../errors/TimeframeError.js';
 
 class BinanceProvider {
   constructor(logger) {
     this.logger = logger;
     this.binanceProvider = Provider.Binance;
+    this.supportedTimeframes = SUPPORTED_TIMEFRAMES.BINANCE;
   }
 
   async getMarketData(symbol, timeframe, limit = 100, sDate, eDate) {
@@ -34,7 +35,7 @@ class BinanceProvider {
       
       /* Invalid interval - throw TimeframeError to stop chain */
       if (errorMsg.includes('Invalid interval') || error instanceof TimeframeError) {
-        throw new TimeframeError(timeframe, symbol, 'Binance');
+        throw new TimeframeError(timeframe, symbol, 'Binance', this.supportedTimeframes);
       }
       
       /* Other errors - return [] to allow next provider to try */

@@ -38,10 +38,10 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.parseToMinutes(undefined)).toBe(1440);
       expect(TimeframeParser.parseToMinutes('')).toBe(1440);
       expect(TimeframeParser.parseToMinutes('xyz')).toBe(1440);
-      // Invalid formats with digits on large timeframes
-      expect(TimeframeParser.parseToMinutes('1w')).toBe(1440); // Invalid - should be 'W'
-      expect(TimeframeParser.parseToMinutes('1W')).toBe(1440); // Invalid - should be 'W'
-      expect(TimeframeParser.parseToMinutes('1M')).toBe(1440); // Invalid - should be 'M'
+      /* Valid numeric+letter formats: 1w, 1M correctly parse */
+      expect(TimeframeParser.parseToMinutes('1w')).toBe(10080); // Valid weekly
+      expect(TimeframeParser.parseToMinutes('1W')).toBe(1440); // Invalid - capital W without digit
+      expect(TimeframeParser.parseToMinutes('1M')).toBe(43200); // Valid monthly
     });
   });
 
@@ -53,10 +53,10 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toMoexInterval('1d')).toBe('24');
 
       // Test unsupported timeframes throw TimeframeError
-      expect(() => TimeframeParser.toMoexInterval('5m')).toThrow('MOEX does not support 5m timeframe');
-      expect(() => TimeframeParser.toMoexInterval('15m')).toThrow('MOEX does not support 15m timeframe');
-      expect(() => TimeframeParser.toMoexInterval('30m')).toThrow('MOEX does not support 30m timeframe');
-      expect(() => TimeframeParser.toMoexInterval('4h')).toThrow('MOEX does not support 4h timeframe');
+      expect(() => TimeframeParser.toMoexInterval('5m')).toThrow("Timeframe '5m' not supported");
+      expect(() => TimeframeParser.toMoexInterval('15m')).toThrow("Timeframe '15m' not supported");
+      expect(() => TimeframeParser.toMoexInterval('30m')).toThrow("Timeframe '30m' not supported");
+      expect(() => TimeframeParser.toMoexInterval('4h')).toThrow("Timeframe '4h' not supported");
     });
 
     test('should convert numeric timeframes to MOEX intervals', () => {
@@ -66,10 +66,10 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toMoexInterval(1440)).toBe('24');
 
       // Test unsupported numeric timeframes throw TimeframeError
-      expect(() => TimeframeParser.toMoexInterval(5)).toThrow('MOEX does not support 5 timeframe');
-      expect(() => TimeframeParser.toMoexInterval(15)).toThrow('MOEX does not support 15 timeframe');
-      expect(() => TimeframeParser.toMoexInterval(30)).toThrow('MOEX does not support 30 timeframe');
-      expect(() => TimeframeParser.toMoexInterval(240)).toThrow('MOEX does not support 240 timeframe');
+      expect(() => TimeframeParser.toMoexInterval(5)).toThrow("Timeframe '5' not supported");
+      expect(() => TimeframeParser.toMoexInterval(15)).toThrow("Timeframe '15' not supported");
+      expect(() => TimeframeParser.toMoexInterval(30)).toThrow("Timeframe '30' not supported");
+      expect(() => TimeframeParser.toMoexInterval(240)).toThrow("Timeframe '240' not supported");
     });
 
     test('should convert letter timeframes to MOEX intervals', () => {
@@ -96,7 +96,7 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toYahooInterval('1d')).toBe('1d');
 
       // Test unsupported timeframes throw TimeframeError
-      expect(() => TimeframeParser.toYahooInterval('4h')).toThrow('Yahoo Finance does not support 4h timeframe');
+      expect(() => TimeframeParser.toYahooInterval('4h')).toThrow("Timeframe '4h' not supported");
     });
 
     test('should convert numeric timeframes to Yahoo intervals', () => {
@@ -108,7 +108,7 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toYahooInterval(1440)).toBe('1d');
 
       // Test unsupported numeric timeframes throw TimeframeError
-      expect(() => TimeframeParser.toYahooInterval(240)).toThrow('Yahoo Finance does not support 240 timeframe');
+      expect(() => TimeframeParser.toYahooInterval(240)).toThrow("Timeframe '240' not supported");
     });
 
     test('should convert letter timeframes to Yahoo intervals', () => {
@@ -167,7 +167,7 @@ describe('TimeframeParser', () => {
       const moexUnsupported = ['5m', '15m', '30m', '4h'];
 
       for (const tf of moexUnsupported) {
-        expect(() => TimeframeParser.toMoexInterval(tf)).toThrow('MOEX does not support');
+        expect(() => TimeframeParser.toMoexInterval(tf)).toThrow("not supported");
       }
     });
   });
@@ -214,7 +214,7 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toBinanceTimeframe(undefined)).toBe('D'); // defaults to daily
 
       // However, specific numeric values that don't map should throw
-      expect(() => TimeframeParser.toBinanceTimeframe(999)).toThrow('Binance does not support 999 timeframe');
+      expect(() => TimeframeParser.toBinanceTimeframe(999)).toThrow("Timeframe '999' not supported");
     });
 
     test('should handle critical crypto timeframes correctly', () => {

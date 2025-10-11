@@ -16,6 +16,9 @@ vi.mock('../../src/utils/timeframeParser.js', () => ({
   TimeframeParser: {
     toBinanceTimeframe: vi.fn(),
   },
+  SUPPORTED_TIMEFRAMES: {
+    BINANCE: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'],
+  },
 }));
 
 describe('BinanceProvider', () => {
@@ -123,12 +126,12 @@ describe('BinanceProvider', () => {
     }
   });
 
-  it('should propagate errors from underlying provider', async() => {
+  it('should return empty array for provider errors', async() => {
     const error = new Error('Binance API error');
     TimeframeParser.toBinanceTimeframe.mockReturnValue('60');
     mockBinanceProvider.getMarketData.mockRejectedValue(error);
 
-    await expect(provider.getMarketData('BTCUSDT', '1h', 100))
-      .rejects.toThrow('Binance API error');
+    const result = await provider.getMarketData('BTCUSDT', '1h', 100);
+    expect(result).toEqual([]);
   });
 });

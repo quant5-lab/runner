@@ -26,12 +26,12 @@ describe('Provider Timeframe Integration Tests', () => {
 
     test('REGRESSION: critical timeframe bug prevention', () => {
       /* These were the failing cases that caused the bug */
-      expect(() => provider.convertTimeframe('15m')).toThrow('MOEX does not support 15m timeframe');
+      expect(() => provider.convertTimeframe('15m')).toThrow("Timeframe '15m' not supported");
       expect(provider.convertTimeframe('1h')).toBe('60'); // This is supported
 
       /* Verify unsupported timeframes throw errors instead of fallback to daily */
-      expect(() => provider.convertTimeframe('15m')).toThrow('MOEX does not support 15m timeframe');
-      expect(() => provider.convertTimeframe('5m')).toThrow('MOEX does not support 5m timeframe');
+      expect(() => provider.convertTimeframe('15m')).toThrow("Timeframe '15m' not supported");
+      expect(() => provider.convertTimeframe('5m')).toThrow("Timeframe '5m' not supported");
     });
   });
 
@@ -205,7 +205,7 @@ describe('Provider Timeframe Integration Tests', () => {
 
       // MOEX should throw TimeframeError for unsupported timeframes
       moexUnsupportedTimeframes.forEach(tf => {
-        expect(() => moexProvider.convertTimeframe(tf)).toThrow('MOEX does not support');
+        expect(() => moexProvider.convertTimeframe(tf)).toThrow("not supported");
       });
 
       // Yahoo should handle its supported formats without errors

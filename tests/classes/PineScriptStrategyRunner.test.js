@@ -125,10 +125,10 @@ describe('PineScriptStrategyRunner', () => {
       const callArg = mockPineTS.run.mock.calls[0][0];
       expect(callArg).toContain('(context) => {');
       expect(callArg).toContain('const ta = context.ta;');
-      expect(callArg).toContain('const { plot, color } = context.core;');
-      expect(callArg).toContain('const security = request.security.bind(request);');
+      expect(callArg).toContain('const { plot: corePlot, color } = context.core;');
+      expect(callArg).toContain('function security(sym, tf, expr) { return request.security(sym, tf, expr); }');
       expect(callArg).toContain('const tickerid = context.tickerId;');
-      expect(callArg).toContain('const study = indicator;');
+      expect(callArg).toContain('function study() {}');
       expect(callArg).toContain(jsCode);
     });
 
@@ -140,8 +140,8 @@ describe('PineScriptStrategyRunner', () => {
       await runner.executeTranspiledStrategy(jsCode, data);
 
       const callArg = mockPineTS.run.mock.calls[0][0];
-      expect(callArg).toContain('const indicator = () => {};');
-      expect(callArg).toContain('const strategy = () => {};');
+      expect(callArg).toContain('function indicator() {}');
+      expect(callArg).toContain('function strategy() {}');
     });
 
     it('should return empty plots array', async() => {

@@ -41,8 +41,8 @@ describe('MoexProvider', () => {
     });
 
     it('should throw TimeframeError for unsupported numeric timeframes', () => {
-      expect(() => provider.convertTimeframe(5)).toThrow('MOEX does not support 5 timeframe');
-      expect(() => provider.convertTimeframe(15)).toThrow('MOEX does not support 15 timeframe');
+      expect(() => provider.convertTimeframe(5)).toThrow("Timeframe '5' not supported");
+      expect(() => provider.convertTimeframe(15)).toThrow("Timeframe '15' not supported");
     });
 
     it('should convert letter timeframes', () => {
@@ -463,6 +463,65 @@ describe('MoexProvider', () => {
       const data = await provider.getMarketData('SBER', 'D', 100);
 
       expect(data).toEqual([]);
+    });
+
+    describe('1d test probe disambiguation', () => {
+      it('should throw TimeframeError when empty response and 1d test returns data', async() => {
+        /* 15m throws TimeframeError during buildUrl, then 1d test fetch returns data */
+        global.fetch.mockResolvedValueOnce({
+          ok: true,
+          json: async() => mockMoexResponse,
+        });
+
+        await expect(provider.getMarketData('CHMF', '15m', 100))
+          .rejects
+          .toThrow("Timeframe '15m' not supported for symbol 'CHMF' by provider MOEX");
+        
+        expect(global.fetch).toHaveBeenCalledTimes(1); // Only 1d probe fetch
+      });
+
+      it('should return [] when empty response and 1d test returns empty', async() => {
+        /* 15m throws TimeframeError, 1d test fetch returns empty - symbol not found */
+        global.fetch.mockResolvedValueOnce({
+          ok: true,
+          json: async() => ({ candles: { data: [] } }),
+        });
+
+        const data = await provider.getMarketData('INVALID_SYMBOL', '15m', 100);
+
+        expect(data).toEqual([]);
+        expect(global.fetch).toHaveBeenCalledTimes(1); // Only 1d probe fetch
+      });
+
+      it('should return [] when empty response and timeframe is 1d', async() => {
+        /* Empty response for 1d - no test needed */
+        global.fetch.mockResolvedValue({
+          ok: true,
+          json: async() => ({ candles: { data: [] } }),
+        });
+
+        const data = await provider.getMarketData('INVALID_SYMBOL', '1d', 100);
+
+        expect(data).toEqual([]);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+      });
+
+      it('should handle 1d test failure gracefully', async() => {
+        /* First call returns empty, 1d test fails with API error */
+        global.fetch
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async() => ({ candles: { data: [] } }),
+          })
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+          });
+
+        const data = await provider.getMarketData('SBER', '15m', 100);
+
+        expect(data).toEqual([]);
+      });
     });
   });
 });
