@@ -2,6 +2,7 @@ import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
 import PineDataSourceAdapter from './PineDataSourceAdapter.js';
+import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
 
 class PineScriptStrategyRunner {
   constructor(providerManager) {
@@ -29,25 +30,7 @@ class PineScriptStrategyRunner {
       const { plot: corePlot, color } = context.core;
       const tickerid = context.tickerId;
       
-      /* Adapter: PyneScript transpiles plot(series, color=X, title=Y) to plot(series, {color: X, title: Y})
-       * PineTS expects: plot(series, title, options)
-       * This wrapper extracts title from options and calls PineTS correctly */
-      function plot(series, titleOrOptions, maybeOptions) {
-        if (typeof titleOrOptions === 'string') {
-          return corePlot(series, titleOrOptions, maybeOptions || {});
-        }
-        /* CRITICAL: Use inline expressions to avoid $.const variable accumulation bug
-         * PineTS unshift()s all $.const variables after each bar, causing concatenation */
-        return corePlot(
-          series,
-          ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).title,
-          {
-            color: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).color,
-            style: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).style,
-            linewidth: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).linewidth
-          }
-        );
-      }
+      ${plotAdapterSource}
       
       /* Pine Script version compatibility aliases
        * v3/v4: Used global functions sma(), security(), study()
