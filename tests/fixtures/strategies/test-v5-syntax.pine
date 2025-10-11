@@ -1,0 +1,10 @@
+//@version=5
+indicator("V5 Syntax Test", overlay=true)
+
+ma20 = ta.sma(close, 20)
+ma50 = ta.sma(close, 50)
+ma200 = ta.sma(close, 200)
+
+plot(ma20, color=color.yellow, linewidth=2, title="SMA 20")
+plot(ma50, color=color.green, linewidth=2, title="SMA 50")
+plot(ma200, color=color.red, linewidth=2, title="SMA 200")

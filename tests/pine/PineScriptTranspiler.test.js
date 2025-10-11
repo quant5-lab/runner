@@ -31,18 +31,12 @@ describe('PineScriptTranspiler', () => {
       const pineCode = 'indicator("Test")';
       const version = transpiler.detectVersion(pineCode);
       expect(version).toBe(5);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('No //@version comment found'),
-      );
     });
 
-    it('should default to version 5 for unsupported versions', () => {
+    it('should return actual version for all versions', () => {
       const pineCode = '//@version=3\nindicator("Test")';
       const version = transpiler.detectVersion(pineCode);
-      expect(version).toBe(5);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Unsupported Pine Script version: 3'),
-      );
+      expect(version).toBe(3);
     });
   });
 

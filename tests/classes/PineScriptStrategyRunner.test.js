@@ -126,9 +126,9 @@ describe('PineScriptStrategyRunner', () => {
       expect(callArg).toContain('(context) => {');
       expect(callArg).toContain('const ta = context.ta;');
       expect(callArg).toContain('const { plot: corePlot, color } = context.core;');
-      expect(callArg).toContain('function security(sym, tf, expr) { return request.security(sym, tf, expr); }');
       expect(callArg).toContain('const tickerid = context.tickerId;');
-      expect(callArg).toContain('function study() {}');
+      expect(callArg).toContain('function indicator() {}');
+      expect(callArg).toContain('function strategy() {}');
       expect(callArg).toContain(jsCode);
     });
 

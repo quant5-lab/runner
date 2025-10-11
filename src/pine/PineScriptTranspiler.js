@@ -120,15 +120,9 @@ export class PineScriptTranspiler {
     const versionMatch = firstLine.match(/\/\/@version=(\d+)/);
 
     if (versionMatch) {
-      const version = parseInt(versionMatch[1]);
-      if (version === 4 || version === 5) {
-        return version;
-      }
-      this.logger.warn(`Unsupported Pine Script version: ${version}, defaulting to 5`);
-      return 5;
+      return parseInt(versionMatch[1]);
     }
 
-    this.logger.warn('No //@version comment found, defaulting to version 5');
     return 5;
   }
 

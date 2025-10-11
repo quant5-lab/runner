@@ -3,6 +3,7 @@ import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
 import PineSecurityAdapter from './PineSecurityAdapter.js';
 import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
+import PineVersionMigrator from '../pine/PineVersionMigrator.js';
 
 class PineScriptStrategyRunner {
   constructor(providerManager) {
@@ -32,22 +33,8 @@ class PineScriptStrategyRunner {
       
       ${plotAdapterSource}
       
-      /* Pine Script version compatibility aliases
-       * v3/v4: Used global functions sma(), security(), study()
-       * v5: Uses namespaced functions ta.sma(), request.security(), indicator()
-       * Reference: Pine Script Language Reference Manual v5 (tradingview.com/pine-script-reference/v5)
-       * These function declarations bridge v3/v4 syntax to v5 PineTS runtime context */
-      function security(sym, tf, expr) { return request.security(sym, tf, expr); }
-      function sma(src, len) { return ta.sma(src, len); }
       function indicator() {}
       function strategy() {}
-      function study() {}
-      
-      const yellow = 'yellow';
-      const green = color.green;
-      const red = color.red;
-      const line = 'line';
-      const linebr = 'linebr';
       
       ${jsCode}
     }`;

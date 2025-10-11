@@ -1,7 +1,7 @@
 import { createContainer } from './container.js';
 import { createProviderChain, DEFAULTS } from './config.js';
 import { readFile } from 'fs/promises';
-
+import PineVersionMigrator from './pine/PineVersionMigrator.js';
 async function main() {
   const startTime = performance.now();
   try {
@@ -25,8 +25,21 @@ async function main() {
       const loadDuration = (performance.now() - loadStartTime).toFixed(2);
       logger.info(`Loading file:\ttook ${loadDuration}ms`);
 
+      let version = transpiler.detectVersion(pineCode);
+
+      /* Force migration for files without @version that contain v3/v4 syntax */
+      if (version === 5 && PineVersionMigrator.hasV3V4Syntax(pineCode)) {
+        logger.info('v3/v4 syntax detected, applying migration');
+        version = 4;
+      }
+
+      const migratedCode = PineVersionMigrator.migrate(pineCode, version);
+      if (version && version < 5) {
+        logger.info(`Migrated v${version} → v5`);
+      }
+
       const transpileStartTime = performance.now();
-      const jsCode = await transpiler.transpile(pineCode);
+      const jsCode = await transpiler.transpile(migratedCode);
       const transpileDuration = (performance.now() - transpileStartTime).toFixed(2);
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 

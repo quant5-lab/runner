@@ -1,0 +1,8 @@
+//@version=3
+study("V3 Syntax Test", overlay=true)
+
+ma20 = sma(close, 20)
+ma50 = sma(close, 50)
+
+plot(ma20, color=yellow, linewidth=2, title="SMA 20")
+plot(ma50, color=green, linewidth=2, title="SMA 50")

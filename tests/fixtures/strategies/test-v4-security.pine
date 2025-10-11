@@ -1,0 +1,9 @@
+//@version=4
+study("V4 Security Test", overlay=true)
+
+// v4 uses security() not request.security()
+dailyMA = security(tickerid, 'D', sma(close, 20))
+weeklyMA = security(tickerid, 'W', sma(close, 50))
+
+plot(dailyMA, color=color.yellow, linewidth=2, title="Daily SMA 20")
+plot(weeklyMA, color=color.green, linewidth=2, title="Weekly SMA 50")
