@@ -1,0 +1,4 @@
+//@version=5
+indicator("SMA with Security", overlay=true)
+sma20_daily = request.security(syminfo.tickerid, 'D', ta.sma(close, 20))
+plot(sma20_daily, color=color.blue, title="SMA20 Daily")

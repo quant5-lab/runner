@@ -10,6 +10,23 @@ class PineScriptStrategyRunner {
     this.providerManager = providerManager;
   }
 
+  parseSecurityCalls(jsCode) {
+    /* Extract security() calls: request.security(symbol, timeframe, expression) */
+    const regex = /request\.security\(\s*([^,]+)\s*,\s*['"]([^'"]+)['"]/g;
+    const calls = [];
+    let match;
+
+    while ((match = regex.exec(jsCode)) !== null) {
+      calls.push({
+        symbolExpr: match[1].trim(),
+        timeframe: match[2],
+      });
+    }
+
+    console.log('!!! PARSED SECURITY CALLS:', calls);
+    return calls;
+  }
+
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
     const adapter = new PineSecurityAdapter(this.providerManager);
 
@@ -23,6 +40,34 @@ class PineScriptStrategyRunner {
       null,
       null,
     );
+
+    /* Parse and prefetch security() data */
+    const securityCalls = this.parseSecurityCalls(jsCode);
+    const sourceDurationMinutes = bars * minutes;
+    
+    const prefetchData = securityCalls.map(call => {
+      const resolvedSymbol = call.symbolExpr === 'syminfo.tickerid' 
+        ? symbol 
+        : call.symbolExpr;
+      
+      /* Calculate correct limit based on duration */
+      const targetMinutes = TimeframeParser.parseToMinutes(call.timeframe);
+      const targetLimit = Math.ceil(sourceDurationMinutes / targetMinutes);
+      
+      console.log(`!!! DURATION CALC: ${bars} bars × ${minutes}m = ${sourceDurationMinutes}m → ${call.timeframe} (${targetMinutes}m) = ${targetLimit} candles`);
+      
+      return {
+        symbol: resolvedSymbol,
+        timeframe: call.timeframe,
+        limit: targetLimit,
+      };
+    });
+
+    console.log('!!! PREFETCH DATA:', prefetchData);
+    if (prefetchData.length > 0) {
+      await pineTS.prefetchSecurityData(prefetchData);
+      console.log('!!! PREFETCH COMPLETE');
+    }
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;

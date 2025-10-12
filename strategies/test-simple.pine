@@ -1,0 +1,4 @@
+//@version=5
+indicator("Simple SMA", overlay=true)
+sma20 = ta.sma(close, 20)
+plot(sma20, color=color.blue, title="SMA20")

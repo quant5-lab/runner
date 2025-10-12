@@ -168,7 +168,9 @@ class MoexProvider {
   async getMarketData(tickerId, timeframe, limit, sDate, eDate) {
     try {
       const cacheKey = this.getCacheKey(tickerId, timeframe, limit, sDate, eDate);
+      console.log('!!! MOEX CACHE KEY:', cacheKey);
       const cached = this.getFromCache(cacheKey);
+      console.log('!!! MOEX CACHE RESULT:', cached ? `HIT (${cached.length} candles)` : 'MISS');
 
       if (cached) {
         console.log('MOEX cache hit:', tickerId, timeframe);
@@ -224,6 +226,7 @@ class MoexProvider {
 
         const limitedData = limit ? convertedData.slice(-limit) : convertedData;
 
+        console.log('!!! MOEX SETTING CACHE:', cacheKey, `(${limitedData.length} candles)`);
         this.setCache(cacheKey, limitedData);
         console.log(`MOEX data retrieved: ${limitedData.length} candles for ${tickerId}`);
 
