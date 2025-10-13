@@ -196,14 +196,14 @@ describe('ApiStatsCollector', () => {
   });
 
   describe('logSummary()', () => {
-    it('should call logger.info with stats summary', () => {
+    it('should call logger.debug with stats summary', () => {
       collector.recordRequest('MOEX', '10m');
       collector.recordCacheHit();
       
       collector.logSummary(mockLogger);
       
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('API Statistics:'));
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('"totalRequests": 1'));
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('API Statistics:'));
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('"totalRequests": 1'));
     });
 
     it('should log correct stats object', () => {
@@ -214,7 +214,7 @@ describe('ApiStatsCollector', () => {
       
       collector.logSummary(mockLogger);
       
-      const loggedMessage = mockLogger.info.mock.calls[0][0];
+      const loggedMessage = mockLogger.debug.mock.calls[0][0];
       expect(loggedMessage).toContain('API Statistics:');
       expect(loggedMessage).toContain('"totalRequests": 2');
       expect(loggedMessage).toContain('"cacheHits": 1');
@@ -225,8 +225,8 @@ describe('ApiStatsCollector', () => {
     it('should log empty stats when no operations recorded', () => {
       collector.logSummary(mockLogger);
       
-      expect(mockLogger.info).toHaveBeenCalled();
-      const loggedMessage = mockLogger.info.mock.calls[0][0];
+      expect(mockLogger.debug).toHaveBeenCalled();
+      const loggedMessage = mockLogger.debug.mock.calls[0][0];
       expect(loggedMessage).toContain('API Statistics:');
       expect(loggedMessage).toContain('"totalRequests": 0');
       expect(loggedMessage).toContain('"cacheHits": 0');
