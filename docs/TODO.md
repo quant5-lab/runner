@@ -89,15 +89,17 @@ source code is volume mapped, and you must examine source code locally in this w
 - [x] **TODO 23 FINAL CLEANUP**
   - COMPLETED: Fixed colors migration (color=yellow → color=color.yellow). Fixed v3/v4 syntax detection regex (exclude ta.* functions). Moved test files to tests/fixtures/strategies/. Extracted v3/v4 detection to PineVersionMigrator.hasV3V4Syntax() method. Updated src/index.js to use method instead of inline regex. Single source of truth achieved. All 297 tests passing. 0 linting errors.
 
-## In Progress 🔄
+- [x] **Eliminate API flooding for security() calls**
+  - COMPLETED: Created TickeridMigrator utility (15 tests). Integrated into PineVersionMigrator. Implemented duration-based limit calculation in PineTS.security() (_calculateDurationBasedLimit, _timeframeToMinutes). Fixed symbol resolution (tickerid→syminfo.tickerid). Result: API requests reduced from 79→3 for daily-lines.pine (3 security() calls). All 312 tests passing. Cache key format: SBER|D|1 (correct limit).
 
-- [ ] **Debug and fix daily-lines strategy issues**
-  - Test daily-lines.pine strategy on multiple timeframes (1m, 5m, 15m, 1h, 4h, 1d, 1w)
-  - Identify and fix any calculation errors, plot issues, or runtime failures
-  - Focus on security() parameter passing bug: PineTS transpiler wraps arguments with .param() calls, causing tuples ['BSPB', 'p5'] instead of raw values
-  - Current status: Migration working, colors fixed, but parameter passing issue remains
+- [x] **Remove debug logging, add API statistics**
+  - COMPLETED: Created ApiStatsCollector singleton (21 unit tests). Integrated via IoC container dependency injection. Tracks: totalRequests, cacheHits, cacheMisses, cacheHitRate, byTimeframe, byProvider. Stats injected into all 3 providers (MOEX, Binance, YahooFinance) and PineSecurityAdapter. Single summary log at strategy completion. All 333 tests passing.
 
 ## High Priority 🔴
+
+- [ ] **Fix security() returning empty object issue**
+  - Investigate and fix issue when `value: {}` is returned from security() calls
+  - Ensure proper value extraction and context handling
 
 - [ ] **Implement remaining logic of security() method**
   - Complete implementation of security() method functionality beyond basic wrapper
