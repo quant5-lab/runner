@@ -98,19 +98,19 @@ describe('PineVersionMigrator', () => {
     it('should migrate security to request.security', () => {
       const pineCode = '//@version=4\ndailyClose = security(tickerid, "D", close)';
       const result = PineVersionMigrator.migrate(pineCode, 4);
-      expect(result).toContain('dailyClose = request.security(tickerid, "D", close)');
+      expect(result).toContain('dailyClose = request.security(syminfo.tickerid, "D", close)');
     });
 
     it('should migrate financial to request.financial', () => {
       const pineCode = '//@version=4\nearnings = financial(tickerid, "EARNINGS")';
       const result = PineVersionMigrator.migrate(pineCode, 4);
-      expect(result).toContain('request.financial(tickerid, "EARNINGS")');
+      expect(result).toContain('request.financial(syminfo.tickerid, "EARNINGS")');
     });
 
     it('should migrate splits to request.splits', () => {
       const pineCode = '//@version=4\nsplitData = splits(tickerid)';
       const result = PineVersionMigrator.migrate(pineCode, 4);
-      expect(result).toContain('request.splits(tickerid)');
+      expect(result).toContain('request.splits(syminfo.tickerid)');
     });
   });
 
@@ -146,13 +146,13 @@ describe('PineVersionMigrator', () => {
     it('should migrate heikinashi to ticker.heikinashi', () => {
       const pineCode = '//@version=4\nhaData = heikinashi(tickerid)';
       const result = PineVersionMigrator.migrate(pineCode, 4);
-      expect(result).toContain('ticker.heikinashi(tickerid)');
+      expect(result).toContain('ticker.heikinashi(syminfo.tickerid)');
     });
 
     it('should migrate renko to ticker.renko', () => {
       const pineCode = '//@version=4\nrenkoData = renko(tickerid)';
       const result = PineVersionMigrator.migrate(pineCode, 4);
-      expect(result).toContain('ticker.renko(tickerid)');
+      expect(result).toContain('ticker.renko(syminfo.tickerid)');
     });
 
     it('should migrate tickerid() to ticker.new()', () => {
@@ -200,7 +200,7 @@ rsiVal = rsi(close, 14)`;
 
       const result = PineVersionMigrator.migrate(pineCode, 4);
       expect(result).toContain('indicator("V4 Security")');
-      expect(result).toContain('request.security(tickerid');
+      expect(result).toContain('request.security(syminfo.tickerid');
       expect(result).toContain('ta.sma(close, 20)');
       expect(result).toContain('ta.rsi(close, 14)');
     });

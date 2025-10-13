@@ -2,11 +2,12 @@
  * Transforms v3/v4 syntax to v5 before transpilation
  * Based on: https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-5/ */
 
+import TickeridMigrator from '../utils/tickeridMigrator.js';
+
 class PineVersionMigrator {
   static V5_MAPPINGS = {
     // No namespace changes
     study: 'indicator',
-    '(?<!syminfo\\.)\\bticerid\\b': 'syminfo.tickerid',
     'tickerid()': 'ticker.new()',
 
     // Color constants in assignments (color=yellow → color=color.yellow)
@@ -154,6 +155,9 @@ class PineVersionMigrator {
     }
 
     let migrated = pineCode;
+
+    /* Migrate tickerid references first (handles all variants) */
+    migrated = TickeridMigrator.migrate(migrated);
 
     /* Apply function patterns first (longer patterns), then simple identifiers */
     const functionPatterns = [];

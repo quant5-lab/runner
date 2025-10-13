@@ -46,7 +46,7 @@ class PineScriptStrategyRunner {
     const sourceDurationMinutes = bars * minutes;
     
     const prefetchData = securityCalls.map(call => {
-      const resolvedSymbol = call.symbolExpr === 'syminfo.tickerid' 
+      const resolvedSymbol = (call.symbolExpr === 'syminfo.tickerid' || call.symbolExpr === 'tickerid')
         ? symbol 
         : call.symbolExpr;
       
