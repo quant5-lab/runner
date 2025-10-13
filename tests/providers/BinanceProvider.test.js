@@ -25,6 +25,7 @@ describe('BinanceProvider', () => {
   let provider;
   let mockLogger;
   let mockBinanceProvider;
+  let mockStatsCollector;
 
   beforeEach(async() => {
     mockLogger = {
@@ -32,12 +33,17 @@ describe('BinanceProvider', () => {
       error: vi.fn(),
       debug: vi.fn(),
     };
+    mockStatsCollector = {
+      recordRequest: vi.fn(),
+      recordCacheHit: vi.fn(),
+      recordCacheMiss: vi.fn(),
+    };
 
     // Get the mocked Binance provider
     const { Provider } = await import('../../../PineTS/dist/pinets.dev.es.js');
     mockBinanceProvider = Provider.Binance;
 
-    provider = new BinanceProvider(mockLogger);
+    provider = new BinanceProvider(mockLogger, mockStatsCollector);
 
     // Reset all mocks
     vi.clearAllMocks();

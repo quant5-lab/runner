@@ -3,7 +3,7 @@ import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.
 import { TimeframeError } from '../errors/TimeframeError.js';
 
 export class YahooFinanceProvider {
-  constructor(logger) {
+  constructor(logger, statsCollector) {
     this.baseUrl = 'https://query1.finance.yahoo.com/v8/finance/chart';
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000; // 5 minutes
@@ -11,6 +11,7 @@ export class YahooFinanceProvider {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     };
     this.logger = logger;
+    this.stats = statsCollector;
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.YAHOO;
   }
 
@@ -205,6 +206,7 @@ export class YahooFinanceProvider {
       console.log('Yahoo Finance API request:', url);
       console.log('Yahoo Finance headers:', JSON.stringify(this.headers));
 
+      this.stats.recordRequest('YahooFinance', timeframe);
       const response = await fetch(url, { headers: this.headers });
       console.log('Yahoo Finance response status:', response.status, response.statusText);
       console.log(

@@ -7,6 +7,7 @@ global.fetch = vi.fn();
 describe('MoexProvider', () => {
   let provider;
   let mockLogger;
+  let mockStatsCollector;
 
   beforeEach(() => {
     mockLogger = {
@@ -14,7 +15,12 @@ describe('MoexProvider', () => {
       debug: vi.fn(),
       error: vi.fn(),
     };
-    provider = new MoexProvider(mockLogger);
+    mockStatsCollector = {
+      recordRequest: vi.fn(),
+      recordCacheHit: vi.fn(),
+      recordCacheMiss: vi.fn(),
+    };
+    provider = new MoexProvider(mockLogger, mockStatsCollector);
     vi.clearAllMocks();
     provider.cache.clear();
   });

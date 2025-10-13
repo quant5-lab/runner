@@ -6,6 +6,7 @@ global.fetch = vi.fn();
 describe('YahooFinanceProvider', () => {
   let provider;
   let mockLogger;
+  let mockStatsCollector;
 
   beforeEach(() => {
     mockLogger = {
@@ -13,7 +14,12 @@ describe('YahooFinanceProvider', () => {
       debug: vi.fn(),
       error: vi.fn(),
     };
-    provider = new YahooFinanceProvider(mockLogger);
+    mockStatsCollector = {
+      recordRequest: vi.fn(),
+      recordCacheHit: vi.fn(),
+      recordCacheMiss: vi.fn(),
+    };
+    provider = new YahooFinanceProvider(mockLogger, mockStatsCollector);
     vi.clearAllMocks();
     provider.cache.clear();
   });

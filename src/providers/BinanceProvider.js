@@ -3,8 +3,9 @@ import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.
 import { TimeframeError } from '../errors/TimeframeError.js';
 
 class BinanceProvider {
-  constructor(logger) {
+  constructor(logger, statsCollector) {
     this.logger = logger;
+    this.stats = statsCollector;
     this.binanceProvider = Provider.Binance;
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.BINANCE;
   }
@@ -14,6 +15,7 @@ class BinanceProvider {
       /* Convert timeframe to Binance format */
       const convertedTimeframe = TimeframeParser.toBinanceTimeframe(timeframe);
 
+      this.stats.recordRequest('Binance', timeframe);
       const result = await this.binanceProvider.getMarketData(symbol, convertedTimeframe, limit, sDate, eDate);
 
       /* Symbol not found or no data - return [] to allow next provider to try */

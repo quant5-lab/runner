@@ -6,8 +6,9 @@ import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
 import PineVersionMigrator from '../pine/PineVersionMigrator.js';
 
 class PineScriptStrategyRunner {
-  constructor(providerManager) {
+  constructor(providerManager, statsCollector) {
     this.providerManager = providerManager;
+    this.statsCollector = statsCollector;
   }
 
   parseSecurityCalls(jsCode) {
@@ -23,12 +24,11 @@ class PineScriptStrategyRunner {
       });
     }
 
-    console.log('!!! PARSED SECURITY CALLS:', calls);
     return calls;
   }
 
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
-    const adapter = new PineSecurityAdapter(this.providerManager);
+    const adapter = new PineSecurityAdapter(this.providerManager, this.statsCollector);
 
     const minutes = TimeframeParser.parseToMinutes(timeframe);
     const pineTSTimeframe = TimeframeConverter.toPineTS(minutes);
@@ -54,8 +54,6 @@ class PineScriptStrategyRunner {
       const targetMinutes = TimeframeParser.parseToMinutes(call.timeframe);
       const targetLimit = Math.ceil(sourceDurationMinutes / targetMinutes);
       
-      console.log(`!!! DURATION CALC: ${bars} bars × ${minutes}m = ${sourceDurationMinutes}m → ${call.timeframe} (${targetMinutes}m) = ${targetLimit} candles`);
-      
       return {
         symbol: resolvedSymbol,
         timeframe: call.timeframe,
@@ -63,10 +61,8 @@ class PineScriptStrategyRunner {
       };
     });
 
-    console.log('!!! PREFETCH DATA:', prefetchData);
     if (prefetchData.length > 0) {
       await pineTS.prefetchSecurityData(prefetchData);
-      console.log('!!! PREFETCH COMPLETE');
     }
 
     const wrappedCode = `(context) => {

@@ -6,6 +6,7 @@ import { JsonFileWriter } from './classes/JsonFileWriter.js';
 import { TradingAnalysisRunner } from './classes/TradingAnalysisRunner.js';
 import { Logger } from './classes/Logger.js';
 import { PineScriptTranspiler } from './pine/PineScriptTranspiler.js';
+import ApiStatsCollector from './utils/ApiStatsCollector.js';
 
 class Container {
   constructor() {
@@ -41,12 +42,13 @@ function createContainer(providerChain, defaults) {
 
   container
     .register('logger', () => logger, true)
+    .register('apiStatsCollector', () => new ApiStatsCollector(), true)
     .register(
       'providerManager',
-      (c) => new ProviderManager(providerChain(logger), c.resolve('logger')),
+      (c) => new ProviderManager(providerChain(logger, c.resolve('apiStatsCollector')), c.resolve('logger')),
       true,
     )
-    .register('pineScriptStrategyRunner', (c) => new PineScriptStrategyRunner(c.resolve('providerManager')), true)
+    .register('pineScriptStrategyRunner', (c) => new PineScriptStrategyRunner(c.resolve('providerManager'), c.resolve('apiStatsCollector')), true)
     .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)

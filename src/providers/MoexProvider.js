@@ -2,8 +2,9 @@ import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.
 import { TimeframeError } from '../errors/TimeframeError.js';
 
 class MoexProvider {
-  constructor(logger) {
+  constructor(logger, statsCollector) {
     this.logger = logger;
+    this.stats = statsCollector;
     this.baseUrl = 'https://iss.moex.com/iss';
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000;
@@ -168,14 +169,15 @@ class MoexProvider {
   async getMarketData(tickerId, timeframe, limit, sDate, eDate) {
     try {
       const cacheKey = this.getCacheKey(tickerId, timeframe, limit, sDate, eDate);
-      console.log('!!! MOEX CACHE KEY:', cacheKey);
       const cached = this.getFromCache(cacheKey);
-      console.log('!!! MOEX CACHE RESULT:', cached ? `HIT (${cached.length} candles)` : 'MISS');
 
       if (cached) {
+        this.stats.recordCacheHit();
         console.log('MOEX cache hit:', tickerId, timeframe);
         return cached;
       }
+
+      this.stats.recordCacheMiss();
 
       /* Try to convert timeframe - if fails, test with 1d to check if symbol exists */
       let url;
@@ -208,6 +210,7 @@ class MoexProvider {
 
       console.log('MOEX API request:', url);
 
+      this.stats.recordRequest('MOEX', timeframe);
       const response = await fetch(url);
 
       /* HTTP error - return [] to allow next provider to try */
@@ -226,7 +229,6 @@ class MoexProvider {
 
         const limitedData = limit ? convertedData.slice(-limit) : convertedData;
 
-        console.log('!!! MOEX SETTING CACHE:', cacheKey, `(${limitedData.length} candles)`);
         this.setCache(cacheKey, limitedData);
         console.log(`MOEX data retrieved: ${limitedData.length} candles for ${tickerId}`);
 
