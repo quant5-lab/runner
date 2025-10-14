@@ -1,8 +1,6 @@
 import { createContainer } from './container.js';
 import { createProviderChain, DEFAULTS } from './config.js';
 import { readFile } from 'fs/promises';
-import { TradingAnalysisRunner } from './classes/TradingAnalysisRunner.js';
-import { PineScriptTranspiler } from './pine/PineScriptTranspiler.js';
 import PineVersionMigrator from './pine/PineVersionMigrator.js';
 
 async function main() {

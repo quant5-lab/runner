@@ -162,7 +162,7 @@ class PineVersionMigrator {
     /* Apply function patterns first (longer patterns), then simple identifiers */
     const functionPatterns = [];
     const identifierPatterns = [];
-    
+
     for (const [v4Pattern, v5Replacement] of Object.entries(this.V5_MAPPINGS)) {
       if (v4Pattern.includes('(')) {
         functionPatterns.push([v4Pattern, v5Replacement]);
@@ -180,7 +180,7 @@ class PineVersionMigrator {
     /* Then process identifiers and regex patterns */
     for (const [v4Pattern, v5Replacement] of identifierPatterns) {
       const isRegexPattern = v4Pattern.includes('\\');
-      
+
       if (isRegexPattern) {
         const regex = new RegExp(v4Pattern, 'g');
         migrated = migrated.replace(regex, v5Replacement);

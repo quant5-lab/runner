@@ -5,6 +5,30 @@ class ProviderManager {
   constructor(providerChain, logger) {
     this.providerChain = providerChain;
     this.logger = logger;
+    this.pending = new Map();
+  }
+
+  getCacheKey(symbol, timeframe, limit) {
+    return `${symbol}|${timeframe}|${limit}`;
+  }
+
+  async getMarketData(symbol, timeframe, limit, sDate, eDate) {
+    const ourTimeframe = TimeframeConverter.fromPineTS(timeframe);
+    const cacheKey = this.getCacheKey(symbol, ourTimeframe, limit);
+
+    if (this.pending.has(cacheKey)) {
+      return (await this.pending.get(cacheKey)).data;
+    }
+
+    const fetchPromise = this.fetchMarketData(symbol, ourTimeframe, limit);
+    this.pending.set(cacheKey, fetchPromise);
+
+    try {
+      const result = await fetchPromise;
+      return result.data;
+    } finally {
+      this.pending.delete(cacheKey);
+    }
   }
 
   validateDataFreshness(marketData, symbol, timeframe, providerName) {
@@ -38,12 +62,6 @@ class ProviderManager {
         `Expected data within ${maxAgeDays} days.`,
       );
     }
-  }
-
-  async getMarketData(symbol, timeframe, limit, sDate, eDate) {
-    const ourTimeframe = TimeframeConverter.fromPineTS(timeframe);
-    const result = await this.fetchMarketData(symbol, ourTimeframe, limit);
-    return result.data;
   }
 
   async fetchMarketData(symbol, timeframe, bars) {

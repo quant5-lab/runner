@@ -41,8 +41,8 @@ class ApiStatsCollector {
   getSummary() {
     const { totalRequests, cacheHits, cacheMisses, byTimeframe, byProvider } = this.stats;
     const totalCacheOps = cacheHits + cacheMisses;
-    const cacheHitRate = totalCacheOps > 0 
-      ? ((cacheHits / totalCacheOps) * 100).toFixed(1) 
+    const cacheHitRate = totalCacheOps > 0
+      ? ((cacheHits / totalCacheOps) * 100).toFixed(1)
       : 0;
 
     return {

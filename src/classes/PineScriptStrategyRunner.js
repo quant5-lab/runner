@@ -2,12 +2,16 @@ import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
 import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
-import PineVersionMigrator from '../pine/PineVersionMigrator.js';
+import { deduplicate } from '../utils/deduplicate.js';
 
 class PineScriptStrategyRunner {
   constructor(providerManager, statsCollector) {
     this.providerManager = providerManager;
     this.statsCollector = statsCollector;
+  }
+
+  deduplicatePrefetchData(prefetchData) {
+    return deduplicate(prefetchData, item => `${item.symbol}:${item.timeframe}:${item.limit}`);
   }
 
   parseSecurityCalls(jsCode) {
@@ -41,16 +45,15 @@ class PineScriptStrategyRunner {
     /* Parse and prefetch security() data */
     const securityCalls = this.parseSecurityCalls(jsCode);
     const sourceDurationMinutes = bars * minutes;
-    
+
     const prefetchData = securityCalls.map(call => {
       const resolvedSymbol = (call.symbolExpr === 'syminfo.tickerid' || call.symbolExpr === 'tickerid')
-        ? symbol 
+        ? symbol
         : call.symbolExpr;
-      
-      /* Calculate correct limit based on duration */
+
       const targetMinutes = TimeframeParser.parseToMinutes(call.timeframe);
       const targetLimit = Math.ceil(sourceDurationMinutes / targetMinutes);
-      
+
       return {
         symbol: resolvedSymbol,
         timeframe: call.timeframe,
@@ -58,8 +61,10 @@ class PineScriptStrategyRunner {
       };
     });
 
-    if (prefetchData.length > 0) {
-      await pineTS.prefetchSecurityData(prefetchData);
+    const uniquePrefetchData = this.deduplicatePrefetchData(prefetchData);
+
+    if (uniquePrefetchData.length > 0) {
+      await pineTS.prefetchSecurityData(uniquePrefetchData);
     }
 
     const wrappedCode = `(context) => {
