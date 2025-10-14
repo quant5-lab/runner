@@ -112,12 +112,12 @@ describe('Provider Timeframe Integration Tests', () => {
       const testCases = [
         {
           timeframe: '1h',
-          expectedCalc: 60 / 540 * 1.4, // 60 min ÷ 540 trading min/day × 1.4 weekend buffer
+          expectedCalc: (60 / 540) * 1.4, // 60 min ÷ 540 trading min/day × 1.4 weekend buffer
           description: '1 hour accounting for ~9 trading hours/day + weekend buffer',
         },
         {
           timeframe: '15m',
-          expectedCalc: 15 / 540 * 1.4, // 15 min ÷ 540 trading min/day × 1.4 weekend buffer
+          expectedCalc: (15 / 540) * 1.4, // 15 min ÷ 540 trading min/day × 1.4 weekend buffer
           description: '15 minutes accounting for trading hours + weekend buffer',
         },
         {
@@ -145,11 +145,27 @@ describe('Provider Timeframe Integration Tests', () => {
 
     test('Yahoo getDateRange should return appropriate ranges', () => {
       const testCases = [
-        { timeframe: '1h', expectedRange: '1mo', description: 'Hourly data needs 1 month for ~130 points' },
-        { timeframe: '15m', expectedRange: '5d', description: '15-minute data needs 5 days based on dynamic logic' },
-        { timeframe: '1d', expectedRange: '6mo', description: 'Daily data needs 6 months for 100 points' },
+        {
+          timeframe: '1h',
+          expectedRange: '1mo',
+          description: 'Hourly data needs 1 month for ~130 points',
+        },
+        {
+          timeframe: '15m',
+          expectedRange: '5d',
+          description: '15-minute data needs 5 days based on dynamic logic',
+        },
+        {
+          timeframe: '1d',
+          expectedRange: '6mo',
+          description: 'Daily data needs 6 months for 100 points',
+        },
         { timeframe: 'D', expectedRange: '6mo', description: 'Daily (letter) data needs 6 months' },
-        { timeframe: 'W', expectedRange: '2y', description: 'Weekly data needs 2 years for 100 points' },
+        {
+          timeframe: 'W',
+          expectedRange: '2y',
+          description: 'Weekly data needs 2 years for 100 points',
+        },
       ];
 
       testCases.forEach(({ timeframe, expectedRange, description }) => {
@@ -163,7 +179,7 @@ describe('Provider Timeframe Integration Tests', () => {
 
       // MOEX: 1h timeframe should calculate for trading hours, not full days
       const moexHourlyDays = moexProvider.getTimeframeDays('1h');
-      const expectedMoexDays = 60 / 540 * 1.4; // ~0.156 days accounting for trading hours + buffer
+      const expectedMoexDays = (60 / 540) * 1.4; // ~0.156 days accounting for trading hours + buffer
       expect(moexHourlyDays).toBeCloseTo(expectedMoexDays, 3);
       expect(moexHourlyDays).toBeGreaterThan(0.1); // Should be reasonable fraction
       expect(moexHourlyDays).toBeLessThan(1); // Should be less than full day
@@ -185,18 +201,23 @@ describe('Provider Timeframe Integration Tests', () => {
       // Verify that both providers handle timeframes according to their capabilities
       const moexSupportedTimeframes = [
         // MOEX supported formats based on evidence
-        '1m', '10m', '1h', '1d',
-        1, 10, 60, 1440,
-        'D', 'W', 'M',
+        '1m',
+        '10m',
+        '1h',
+        '1d',
+        1,
+        10,
+        60,
+        1440,
+        'D',
+        'W',
+        'M',
       ];
 
-      const moexUnsupportedTimeframes = [
-        '5m', '15m', '30m', '4h',
-        5, 15, 30, 240,
-      ];
+      const moexUnsupportedTimeframes = ['5m', '15m', '30m', '4h', 5, 15, 30, 240];
 
       // MOEX should handle supported timeframes without errors
-      moexSupportedTimeframes.forEach(tf => {
+      moexSupportedTimeframes.forEach((tf) => {
         expect(() => moexProvider.convertTimeframe(tf)).not.toThrow();
         expect(() => moexProvider.getTimeframeDays(tf)).not.toThrow();
         expect(moexProvider.convertTimeframe(tf)).toBeTruthy();
@@ -204,18 +225,34 @@ describe('Provider Timeframe Integration Tests', () => {
       });
 
       // MOEX should throw TimeframeError for unsupported timeframes
-      moexUnsupportedTimeframes.forEach(tf => {
+      moexUnsupportedTimeframes.forEach((tf) => {
         expect(() => moexProvider.convertTimeframe(tf)).toThrow('not supported');
       });
 
       // Yahoo should handle its supported formats without errors
       const yahooSupportedTimeframes = [
-        '1m', '2m', '5m', '15m', '30m', '1h', '90m', '1d',
-        1, 2, 5, 15, 30, 60, 90, 1440,
-        'D', 'W', 'M',
+        '1m',
+        '2m',
+        '5m',
+        '15m',
+        '30m',
+        '1h',
+        '90m',
+        '1d',
+        1,
+        2,
+        5,
+        15,
+        30,
+        60,
+        90,
+        1440,
+        'D',
+        'W',
+        'M',
       ];
 
-      yahooSupportedTimeframes.forEach(tf => {
+      yahooSupportedTimeframes.forEach((tf) => {
         expect(() => yahooProvider.convertTimeframe(tf)).not.toThrow();
         expect(() => yahooProvider.getDateRange(100, tf)).not.toThrow();
         expect(yahooProvider.convertTimeframe(tf)).toBeTruthy();

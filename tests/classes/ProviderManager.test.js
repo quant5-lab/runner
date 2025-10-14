@@ -38,9 +38,18 @@ describe('ProviderManager', () => {
   });
 
   describe('fetchMarketData()', () => {
-    it('should return data from first successful provider', async() => {
+    it('should return data from first successful provider', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockResolvedValue(marketData);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
@@ -56,9 +65,18 @@ describe('ProviderManager', () => {
       expect(mockProvider1.getMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
     });
 
-    it('should fallback to second provider when first fails', async() => {
+    it('should fallback to second provider when first fails', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockRejectedValue(new Error('Provider1 failed'));
       mockProvider2.getMarketData.mockResolvedValue(marketData);
 
@@ -76,9 +94,18 @@ describe('ProviderManager', () => {
       expect(mockProvider2.getMarketData).toHaveBeenCalled();
     });
 
-    it('should fallback through all providers in chain', async() => {
+    it('should fallback through all providers in chain', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockRejectedValue(new Error('Fail'));
       mockProvider2.getMarketData.mockRejectedValue(new Error('Fail'));
       mockProvider3.getMarketData.mockResolvedValue(marketData);
@@ -98,7 +125,7 @@ describe('ProviderManager', () => {
       expect(mockProvider3.getMarketData).toHaveBeenCalled();
     });
 
-    it('should throw error when all providers fail', async() => {
+    it('should throw error when all providers fail', async () => {
       mockProvider1.getMarketData.mockRejectedValue(new Error('Fail1'));
       mockProvider2.getMarketData.mockRejectedValue(new Error('Fail2'));
 
@@ -113,9 +140,18 @@ describe('ProviderManager', () => {
       );
     });
 
-    it('should skip provider returning empty array', async() => {
+    it('should skip provider returning empty array', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockResolvedValue([]);
       mockProvider2.getMarketData.mockResolvedValue(marketData);
 
@@ -131,9 +167,18 @@ describe('ProviderManager', () => {
       expect(result.data).toEqual(marketData);
     });
 
-    it('should skip provider returning null', async() => {
+    it('should skip provider returning null', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockResolvedValue(null);
       mockProvider2.getMarketData.mockResolvedValue(marketData);
 
@@ -148,9 +193,18 @@ describe('ProviderManager', () => {
       expect(result.provider).toBe('Provider2');
     });
 
-    it('should skip provider returning undefined', async() => {
+    it('should skip provider returning undefined', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockResolvedValue(undefined);
       mockProvider2.getMarketData.mockResolvedValue(marketData);
 
@@ -165,9 +219,11 @@ describe('ProviderManager', () => {
       expect(result.provider).toBe('Provider2');
     });
 
-    it('should pass symbol, timeframe, and bars to provider', async() => {
+    it('should pass symbol, timeframe, and bars to provider', async () => {
       const currentTime = Date.now();
-      mockProvider1.getMarketData.mockResolvedValue([{ openTime: currentTime, closeTime: currentTime }]);
+      mockProvider1.getMarketData.mockResolvedValue([
+        { openTime: currentTime, closeTime: currentTime },
+      ]);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
       manager = new ProviderManager(chain, mockLogger);
@@ -177,9 +233,18 @@ describe('ProviderManager', () => {
       expect(mockProvider1.getMarketData).toHaveBeenCalledWith('AAPL', 'W', 200);
     });
 
-    it('should return provider instance in result', async() => {
+    it('should return provider instance in result', async () => {
       const currentTime = Date.now();
-      const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, high: 105, low: 95, close: 102 }];
+      const marketData = [
+        {
+          openTime: currentTime,
+          closeTime: currentTime,
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+        },
+      ];
       mockProvider1.getMarketData.mockResolvedValue(marketData);
 
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
@@ -192,7 +257,7 @@ describe('ProviderManager', () => {
   });
 
   describe('validateDataFreshness() - closeTime fallback', () => {
-    it('should use time field when present for freshness validation', async() => {
+    it('should use time field when present for freshness validation', async () => {
       const currentTime = Date.now();
       const marketData = [
         {
@@ -215,7 +280,7 @@ describe('ProviderManager', () => {
       expect(result.data).toEqual(marketData);
     });
 
-    it('should fallback to closeTime when time field is missing', async() => {
+    it('should fallback to closeTime when time field is missing', async () => {
       const currentTime = Date.now();
       const marketData = [
         {
@@ -237,7 +302,7 @@ describe('ProviderManager', () => {
       expect(result.data).toEqual(marketData);
     });
 
-    it('should reject stale data using closeTime field', async() => {
+    it('should reject stale data using closeTime field', async () => {
       const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
       const marketData = [
         {
@@ -258,7 +323,7 @@ describe('ProviderManager', () => {
       );
     });
 
-    it('should handle millisecond timestamps for closeTime', async() => {
+    it('should handle millisecond timestamps for closeTime', async () => {
       const currentTime = Date.now();
       const marketData = [
         {
@@ -279,7 +344,7 @@ describe('ProviderManager', () => {
       expect(result.provider).toBe('Provider1');
     });
 
-    it('should handle second timestamps for closeTime', async() => {
+    it('should handle second timestamps for closeTime', async () => {
       const currentTime = Math.floor(Date.now() / 1000);
       const marketData = [
         {
@@ -302,13 +367,17 @@ describe('ProviderManager', () => {
   });
 
   describe('TimeframeError handling with 3 mocked providers', () => {
-    it('should stop chain when first provider throws TimeframeError', async() => {
+    it('should stop chain when first provider throws TimeframeError', async () => {
       const supportedTimeframes = ['1m', '10m', '1h', '1d'];
       const timeframeError = new TimeframeError('5s', 'SBER', 'MockProvider1', supportedTimeframes);
 
       mockProvider1.getMarketData.mockRejectedValue(timeframeError);
-      mockProvider2.getMarketData.mockResolvedValue([{ openTime: Date.now(), closeTime: Date.now() }]);
-      mockProvider3.getMarketData.mockResolvedValue([{ openTime: Date.now(), closeTime: Date.now() }]);
+      mockProvider2.getMarketData.mockResolvedValue([
+        { openTime: Date.now(), closeTime: Date.now() },
+      ]);
+      mockProvider3.getMarketData.mockResolvedValue([
+        { openTime: Date.now(), closeTime: Date.now() },
+      ]);
 
       const chain = [
         { name: 'MockProvider1', instance: mockProvider1 },
@@ -326,7 +395,7 @@ describe('ProviderManager', () => {
       expect(mockProvider3.getMarketData).not.toHaveBeenCalled();
     });
 
-    it('should include supported timeframes list in error message', async() => {
+    it('should include supported timeframes list in error message', async () => {
       const supportedTimeframes = ['1m', '10m', '1h', '1d', '1w', '1M'];
       const timeframeError = new TimeframeError('5s', 'CHMF', 'MOEX', supportedTimeframes);
 
@@ -340,7 +409,7 @@ describe('ProviderManager', () => {
       );
     });
 
-    it('should continue chain when provider returns empty array', async() => {
+    it('should continue chain when provider returns empty array', async () => {
       const currentTime = Date.now();
       const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, close: 102 }];
 
@@ -364,13 +433,15 @@ describe('ProviderManager', () => {
       expect(mockProvider3.getMarketData).toHaveBeenCalled();
     });
 
-    it('should stop chain when middle provider throws TimeframeError', async() => {
+    it('should stop chain when middle provider throws TimeframeError', async () => {
       const supportedTimeframes = ['1m', '3m', '5m', '15m', '1h'];
       const timeframeError = new TimeframeError('5s', 'BTCUSDT', 'Binance', supportedTimeframes);
 
       mockProvider1.getMarketData.mockResolvedValue([]);
       mockProvider2.getMarketData.mockRejectedValue(timeframeError);
-      mockProvider3.getMarketData.mockResolvedValue([{ openTime: Date.now(), closeTime: Date.now() }]);
+      mockProvider3.getMarketData.mockResolvedValue([
+        { openTime: Date.now(), closeTime: Date.now() },
+      ]);
 
       const chain = [
         { name: 'MOEX', instance: mockProvider1 },
@@ -388,7 +459,7 @@ describe('ProviderManager', () => {
       expect(mockProvider3.getMarketData).not.toHaveBeenCalled();
     });
 
-    it('should continue chain on non-TimeframeError exceptions', async() => {
+    it('should continue chain on non-TimeframeError exceptions', async () => {
       const currentTime = Date.now();
       const marketData = [{ openTime: currentTime, closeTime: currentTime, open: 100, close: 102 }];
 
@@ -412,7 +483,7 @@ describe('ProviderManager', () => {
       expect(mockProvider3.getMarketData).toHaveBeenCalled();
     });
 
-    it('should preserve original TimeframeError properties', async() => {
+    it('should preserve original TimeframeError properties', async () => {
       const supportedTimeframes = ['1m', '2m', '5m', '15m', '1h', '1d'];
       const timeframeError = new TimeframeError('7m', 'AAPL', 'Yahoo', supportedTimeframes);
 
@@ -430,11 +501,15 @@ describe('ProviderManager', () => {
       }
     });
 
-    it('should re-throw stale data error without continuing chain', async() => {
-      const staleError = new Error('Provider1 returned stale data for BTCUSDT 1h: latest candle is 10 days old');
+    it('should re-throw stale data error without continuing chain', async () => {
+      const staleError = new Error(
+        'Provider1 returned stale data for BTCUSDT 1h: latest candle is 10 days old',
+      );
 
       mockProvider1.getMarketData.mockRejectedValue(staleError);
-      mockProvider2.getMarketData.mockResolvedValue([{ openTime: Date.now(), closeTime: Date.now() }]);
+      mockProvider2.getMarketData.mockResolvedValue([
+        { openTime: Date.now(), closeTime: Date.now() },
+      ]);
 
       const chain = [
         { name: 'Provider1', instance: mockProvider1 },

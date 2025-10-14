@@ -45,7 +45,8 @@ function updateReadme(coverage) {
   const badge = `![Coverage](https://img.shields.io/badge/coverage-${coverage}%25-${color})`;
 
   /* Replace existing badge or add new one - matches both valid numbers and NaN */
-  const badgeRegex = /!\[Coverage\]\(https:\/\/img\.shields\.io\/badge\/coverage-([\d.]+|NaN)%25-\w+\)/;
+  const badgeRegex =
+    /!\[Coverage\]\(https:\/\/img\.shields\.io\/badge\/coverage-([\d.]+|NaN)%25-\w+\)/;
 
   if (badgeRegex.test(readme)) {
     readme = readme.replace(badgeRegex, badge);

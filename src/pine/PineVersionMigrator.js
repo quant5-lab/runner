@@ -146,7 +146,9 @@ class PineVersionMigrator {
 
   static hasV3V4Syntax(pineCode) {
     /* Detect v3/v4 syntax patterns that need migration */
-    return /\b(study|(?<!ta\.|request\.|math\.|ticker\.|str\.)(?:sma|ema|rsi|security))\s*\(/.test(pineCode);
+    return /\b(study|(?<!ta\.|request\.|math\.|ticker\.|str\.)(?:sma|ema|rsi|security))\s*\(/.test(
+      pineCode,
+    );
   }
 
   static migrate(pineCode, version) {

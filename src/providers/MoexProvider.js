@@ -120,9 +120,10 @@ class MoexProvider {
       const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
       // For intraday timeframes, extend end date to ensure current day data is included
-      const endDate = minutes < 1440
-        ? new Date(now.getTime() + 24 * 60 * 60 * 1000) // Tomorrow for intraday
-        : now; // Today for daily+
+      const endDate =
+        minutes < 1440
+          ? new Date(now.getTime() + 24 * 60 * 60 * 1000) // Tomorrow for intraday
+          : now; // Today for daily+
 
       params.append('from', this.formatDate(startDate.getTime()));
       params.append('till', this.formatEndDate(endDate.getTime()));
@@ -186,7 +187,9 @@ class MoexProvider {
       } catch (error) {
         if (error instanceof TimeframeError) {
           /* Timeframe unsupported - test with 1d to check if symbol exists */
-          this.logger.debug(`MOEX: Timeframe ${timeframe} unsupported, testing ${tickerId} with 1d`);
+          this.logger.debug(
+            `MOEX: Timeframe ${timeframe} unsupported, testing ${tickerId} with 1d`,
+          );
 
           const testUrl = this.buildUrl(tickerId, '1d', 1, sDate, eDate);
           const testResponse = await fetch(testUrl);
@@ -215,7 +218,9 @@ class MoexProvider {
 
       /* HTTP error - return [] to allow next provider to try */
       if (!response.ok) {
-        this.logger.debug(`MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`);
+        this.logger.debug(
+          `MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`,
+        );
         return [];
       }
 

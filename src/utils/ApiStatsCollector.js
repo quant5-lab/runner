@@ -41,9 +41,7 @@ class ApiStatsCollector {
   getSummary() {
     const { totalRequests, cacheHits, cacheMisses, byTimeframe, byProvider } = this.stats;
     const totalCacheOps = cacheHits + cacheMisses;
-    const cacheHitRate = totalCacheOps > 0
-      ? ((cacheHits / totalCacheOps) * 100).toFixed(1)
-      : 0;
+    const cacheHitRate = totalCacheOps > 0 ? ((cacheHits / totalCacheOps) * 100).toFixed(1) : 0;
 
     return {
       totalRequests,
@@ -56,7 +54,8 @@ class ApiStatsCollector {
   }
 
   logSummary(logger) {
-    const { totalRequests, cacheHits, cacheMisses, cacheHitRate, byTimeframe, byProvider } = this.getSummary();
+    const { totalRequests, cacheHits, cacheMisses, cacheHitRate, byTimeframe, byProvider } =
+      this.getSummary();
 
     const lines = [];
     lines.push('API Statistics:');

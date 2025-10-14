@@ -45,10 +45,19 @@ function createContainer(providerChain, defaults) {
     .register('apiStatsCollector', () => new ApiStatsCollector(), true)
     .register(
       'providerManager',
-      (c) => new ProviderManager(providerChain(logger, c.resolve('apiStatsCollector')), c.resolve('logger')),
+      (c) =>
+        new ProviderManager(
+          providerChain(logger, c.resolve('apiStatsCollector')),
+          c.resolve('logger'),
+        ),
       true,
     )
-    .register('pineScriptStrategyRunner', (c) => new PineScriptStrategyRunner(c.resolve('providerManager'), c.resolve('apiStatsCollector')), true)
+    .register(
+      'pineScriptStrategyRunner',
+      (c) =>
+        new PineScriptStrategyRunner(c.resolve('providerManager'), c.resolve('apiStatsCollector')),
+      true,
+    )
     .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)
     .register('candlestickDataSanitizer', () => new CandlestickDataSanitizer(), true)
     .register('configurationBuilder', (c) => new ConfigurationBuilder(defaults), true)

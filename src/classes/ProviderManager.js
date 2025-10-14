@@ -58,8 +58,8 @@ class ProviderManager {
     if (ageInDays > maxAgeDays) {
       throw new Error(
         `${providerName} returned stale data for ${symbol} ${timeframe}: ` +
-        `latest candle is ${Math.floor(ageInDays)} days old (${candleTime.toDateString()}). ` +
-        `Expected data within ${maxAgeDays} days.`,
+          `latest candle is ${Math.floor(ageInDays)} days old (${candleTime.toDateString()}). ` +
+          `Expected data within ${maxAgeDays} days.`,
       );
     }
   }

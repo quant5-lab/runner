@@ -17,7 +17,23 @@ vi.mock('../../src/utils/timeframeParser.js', () => ({
     toBinanceTimeframe: vi.fn(),
   },
   SUPPORTED_TIMEFRAMES: {
-    BINANCE: ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'],
+    BINANCE: [
+      '1m',
+      '3m',
+      '5m',
+      '15m',
+      '30m',
+      '1h',
+      '2h',
+      '4h',
+      '6h',
+      '8h',
+      '12h',
+      '1d',
+      '3d',
+      '1w',
+      '1M',
+    ],
   },
 }));
 
@@ -27,7 +43,7 @@ describe('BinanceProvider', () => {
   let mockBinanceProvider;
   let mockStatsCollector;
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     mockLogger = {
       log: vi.fn(),
       error: vi.fn(),
@@ -54,7 +70,7 @@ describe('BinanceProvider', () => {
     expect(provider.binanceProvider).toBe(mockBinanceProvider);
   });
 
-  it('should convert timeframe and call underlying Binance provider', async() => {
+  it('should convert timeframe and call underlying Binance provider', async () => {
     // Setup mocks
     const mockTimeframe = '1h';
     const convertedTimeframe = '60';
@@ -84,7 +100,7 @@ describe('BinanceProvider', () => {
     expect(result).toBe(mockData);
   });
 
-  it('should pass sDate and eDate to underlying provider', async() => {
+  it('should pass sDate and eDate to underlying provider', async () => {
     const mockSymbol = 'ETHUSDT';
     const mockTimeframe = '15m';
     const convertedTimeframe = '15';
@@ -107,7 +123,7 @@ describe('BinanceProvider', () => {
     );
   });
 
-  it('should handle various timeframe formats', async() => {
+  it('should handle various timeframe formats', async () => {
     const testCases = [
       { input: '1h', expected: '60' },
       { input: '15m', expected: '15' },
@@ -132,7 +148,7 @@ describe('BinanceProvider', () => {
     }
   });
 
-  it('should return empty array for provider errors', async() => {
+  it('should return empty array for provider errors', async () => {
     const error = new Error('Binance API error');
     TimeframeParser.toBinanceTimeframe.mockReturnValue('60');
     mockBinanceProvider.getMarketData.mockRejectedValue(error);

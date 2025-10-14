@@ -21,16 +21,17 @@ class TradingAnalysisRunner {
     const runStartTime = performance.now();
     this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
-    const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars, strategyPath);
+    const tradingConfig = this.configurationBuilder.createTradingConfig(
+      symbol,
+      timeframe,
+      bars,
+      strategyPath,
+    );
 
     const fetchStartTime = performance.now();
     this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
 
-    const { provider, data } = await this.providerManager.fetchMarketData(
-      symbol,
-      timeframe,
-      bars,
-    );
+    const { provider, data } = await this.providerManager.fetchMarketData(symbol, timeframe, bars);
 
     const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
@@ -74,16 +75,17 @@ class TradingAnalysisRunner {
     const runStartTime = performance.now();
     this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
-    const tradingConfig = this.configurationBuilder.createTradingConfig(symbol, timeframe, bars, 'Multi-Provider Strategy');
+    const tradingConfig = this.configurationBuilder.createTradingConfig(
+      symbol,
+      timeframe,
+      bars,
+      'Multi-Provider Strategy',
+    );
 
     const fetchStartTime = performance.now();
     this.logger.log(`Fetching data:\t${symbol} (${timeframe})`);
 
-    const { provider, data } = await this.providerManager.fetchMarketData(
-      symbol,
-      timeframe,
-      bars,
-    );
+    const { provider, data } = await this.providerManager.fetchMarketData(symbol, timeframe, bars);
 
     const fetchDuration = (performance.now() - fetchStartTime).toFixed(2);
     this.logger.log(`Data source:\t${provider} (took ${fetchDuration}ms)`);
@@ -181,7 +183,7 @@ class TradingAnalysisRunner {
       return CHART_COLORS.DEFAULT_PLOT;
     }
 
-    const firstPointWithColor = plotData.data.find(point => point?.options?.color);
+    const firstPointWithColor = plotData.data.find((point) => point?.options?.color);
     return firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
   }
 }

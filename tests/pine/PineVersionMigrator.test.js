@@ -74,7 +74,8 @@ describe('PineVersionMigrator', () => {
     });
 
     it('should migrate multiple ta functions', () => {
-      const pineCode = '//@version=3\nma20 = sma(close, 20)\nma50 = ema(close, 50)\nrsi14 = rsi(close, 14)';
+      const pineCode =
+        '//@version=3\nma20 = sma(close, 20)\nma50 = ema(close, 50)\nrsi14 = rsi(close, 14)';
       const result = PineVersionMigrator.migrate(pineCode, 3);
       expect(result).toContain('ta.sma(close, 20)');
       expect(result).toContain('ta.ema(close, 50)');

@@ -5,6 +5,7 @@
 **rolling-cagr.pine:** 2 namespaces need implementation (`timeframe.is*` checks + `barstate.isfirst`)
 
 **bb-strategy dependencies:** 6 namespaces/functions missing
+
 - `strategy.*` (entry/exit/position tracking)
 - `syminfo.*` (tickerid for security calls)
 - `barmerge.*` (lookahead constants)
@@ -43,61 +44,61 @@
 
 ## Implementation Status by Namespace
 
-### ✅ **Technical Analysis (ta.*)** - FULLY IMPLEMENTED
+### ✅ **Technical Analysis (ta.\*)** - FULLY IMPLEMENTED
 
 **Evidence:** https://alaa-eddine.github.io/PineTS/api-coverage/ta.html
 
-| Function | Status | Priority |
-|----------|--------|----------|
-| ta.ema() | ✅ Tested | HIGH |
-| ta.sma() | ✅ Tested | HIGH |
-| ta.rsi() | ✅ Tested | HIGH |
-| ta.atr() | ✅ Tested | HIGH |
-| ta.wma() | ✅ Tested | MEDIUM |
-| ta.hma() | ✅ Tested | MEDIUM |
-| ta.rma() | ✅ Tested | MEDIUM |
-| ta.vwma() | ✅ Tested | MEDIUM |
-| ta.change() | ✅ Tested | HIGH |
-| ta.mom() | ✅ Tested | MEDIUM |
-| ta.roc() | ✅ Tested | MEDIUM |
-| ta.dev() | ✅ Tested | MEDIUM |
-| ta.variance() | ✅ Tested | LOW |
-| ta.highest() | ✅ Tested | HIGH |
-| ta.lowest() | ✅ Tested | HIGH |
-| ta.median() | ✅ Tested | LOW |
-| ta.stdev() | ✅ Tested | HIGH |
-| ta.crossover() | ✔️ Implemented | MEDIUM |
-| ta.crossunder() | ✔️ Implemented | MEDIUM |
-| ta.pivothigh() | ✔️ Implemented | HIGH |
-| ta.pivotlow() | ✔️ Implemented | HIGH |
-| ta.tema() | ✔️ Implemented | LOW |
-| ta.linreg() | ✔️ Implemented | LOW |
-| ta.tr() | ✔️ Implemented | HIGH |
-| ta.supertrend() | ✔️ Implemented | LOW |
+| Function        | Status         | Priority |
+| --------------- | -------------- | -------- |
+| ta.ema()        | ✅ Tested      | HIGH     |
+| ta.sma()        | ✅ Tested      | HIGH     |
+| ta.rsi()        | ✅ Tested      | HIGH     |
+| ta.atr()        | ✅ Tested      | HIGH     |
+| ta.wma()        | ✅ Tested      | MEDIUM   |
+| ta.hma()        | ✅ Tested      | MEDIUM   |
+| ta.rma()        | ✅ Tested      | MEDIUM   |
+| ta.vwma()       | ✅ Tested      | MEDIUM   |
+| ta.change()     | ✅ Tested      | HIGH     |
+| ta.mom()        | ✅ Tested      | MEDIUM   |
+| ta.roc()        | ✅ Tested      | MEDIUM   |
+| ta.dev()        | ✅ Tested      | MEDIUM   |
+| ta.variance()   | ✅ Tested      | LOW      |
+| ta.highest()    | ✅ Tested      | HIGH     |
+| ta.lowest()     | ✅ Tested      | HIGH     |
+| ta.median()     | ✅ Tested      | LOW      |
+| ta.stdev()      | ✅ Tested      | HIGH     |
+| ta.crossover()  | ✔️ Implemented | MEDIUM   |
+| ta.crossunder() | ✔️ Implemented | MEDIUM   |
+| ta.pivothigh()  | ✔️ Implemented | HIGH     |
+| ta.pivotlow()   | ✔️ Implemented | HIGH     |
+| ta.tema()       | ✔️ Implemented | LOW      |
+| ta.linreg()     | ✔️ Implemented | LOW      |
+| ta.tr()         | ✔️ Implemented | HIGH     |
+| ta.supertrend() | ✔️ Implemented | LOW      |
 
 **Used in strategies:** bb-strategy-7-rus.pine (320 lines)
 
 ---
 
-### ✅ **Input Functions (input.*)** - FULLY IMPLEMENTED
+### ✅ **Input Functions (input.\*)** - FULLY IMPLEMENTED
 
 **Evidence:** https://alaa-eddine.github.io/PineTS/api-coverage/input.html + GitHub source
 
-| Function | Status | Usage Count |
-|----------|--------|-------------|
-| input.int() | ✅ Tested | 15+ |
-| input.float() | ✅ Tested | 20+ |
-| input.bool() | ✅ Tested | 10+ |
-| input.string() | ✅ Tested | 5+ |
-| input.session() | ✅ Tested | 2+ |
-| input.timeframe() | ✅ Tested | - |
-| input.time() | ✅ Tested | - |
-| input.price() | ✅ Tested | - |
-| input.source() | ✅ Tested | - |
-| input.symbol() | ✅ Tested | - |
-| input.text_area() | ✅ Tested | - |
-| input.enum() | ✅ Tested | - |
-| input.color() | ✅ Tested | - |
+| Function          | Status    | Usage Count |
+| ----------------- | --------- | ----------- |
+| input.int()       | ✅ Tested | 15+         |
+| input.float()     | ✅ Tested | 20+         |
+| input.bool()      | ✅ Tested | 10+         |
+| input.string()    | ✅ Tested | 5+          |
+| input.session()   | ✅ Tested | 2+          |
+| input.timeframe() | ✅ Tested | -           |
+| input.time()      | ✅ Tested | -           |
+| input.price()     | ✅ Tested | -           |
+| input.source()    | ✅ Tested | -           |
+| input.symbol()    | ✅ Tested | -           |
+| input.text_area() | ✅ Tested | -           |
+| input.enum()      | ✅ Tested | -           |
+| input.color()     | ✅ Tested | -           |
 
 **Evidence from parser.py:** Automatic type detection based on first argument value
 
@@ -116,22 +117,23 @@ elif isinstance(first_arg_py_value, int):
 
 **Evidence:** Core.d.ts TypeScript definitions + dist analysis
 
-| Function | Status | Implementation |
-|----------|--------|----------------|
-| na() | ✅ Tested | context.core.na() |
-| nz() | ✅ Tested | context.core.nz() |
-| plot() | ✅ Tested | context.core.plot() |
+| Function    | Status    | Implementation           |
+| ----------- | --------- | ------------------------ |
+| na()        | ✅ Tested | context.core.na()        |
+| nz()        | ✅ Tested | context.core.nz()        |
+| plot()      | ✅ Tested | context.core.plot()      |
 | indicator() | ✅ Tested | context.core.indicator() |
-| color.* | ✅ Tested | context.core.color.* |
+| color.\*    | ✅ Tested | context.core.color.\*    |
 
 **Code Evidence from Core.d.ts:**
+
 ```typescript
 export declare class Core {
-    na(series: any): boolean;
-    nz(series: any, replacement?: number): any;
-    plot(series: any, title: string, options: PlotOptions): void;
-    indicator(title: string, shorttitle?: string, options?: IndicatorOptions): void;
-    color: { rgb, new, white, lime, green, red, maroon, black, gray, blue };
+  na(series: any): boolean;
+  nz(series: any, replacement?: number): any;
+  plot(series: any, title: string, options: PlotOptions): void;
+  indicator(title: string, shorttitle?: string, options?: IndicatorOptions): void;
+  color: { rgb; new; white; lime; green; red; maroon; black; gray; blue };
 }
 ```
 
@@ -141,12 +143,13 @@ export declare class Core {
 
 **Evidence:** PineRequest.d.ts + dist grep confirmation
 
-| Function | Status | Usage |
-|----------|--------|-------|
+| Function           | Status    | Usage           |
+| ------------------ | --------- | --------------- |
 | request.security() | ✅ Tested | Multi-timeframe |
-| security() | ✅ Tested | Legacy alias |
+| security()         | ✅ Tested | Legacy alias    |
 
 **Used extensively in bb-strategy-7-rus.pine:**
+
 ```pine
 highUsePivot = security(syminfo.tickerid, "1D", fixnan(pivothigh(leftBars, rightBars)[1]))
 sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
@@ -157,26 +160,29 @@ open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
 
 ### ⚠️ **Syminfo Namespace** - PARTIALLY IMPLEMENTED
 
-**Evidence:** 
+**Evidence:**
+
 - Official docs page: https://alaa-eddine.github.io/PineTS/api-coverage/syminfo.html
 - TypeScript definitions exist: `/PineTS/dist/types/namespaces/Syminfo.d.ts`
 - Dist grep: NO matches for `syminfo.` in runtime code
 
-| Variable | Pine Script v5 | PineTS Docs | Runtime Status |
-|----------|----------------|-------------|----------------|
-| syminfo.ticker() | ✅ VERIFIED | ⚠️ Listed | ❓ Unknown |
-| syminfo.prefix() | ✅ VERIFIED | ⚠️ Listed | ❓ Unknown |
-| syminfo.tickerid | ✅ VERIFIED | ❌ Missing | ❌ Not Found |
-| syminfo.type | ✅ VERIFIED | ❌ Missing | ❌ Not Found |
-| syminfo.currency | ✅ VERIFIED | ❌ Missing | ❌ Not Found |
-| syminfo.session | ✅ VERIFIED | ❌ Missing | ❌ Not Found |
+| Variable         | Pine Script v5 | PineTS Docs | Runtime Status |
+| ---------------- | -------------- | ----------- | -------------- |
+| syminfo.ticker() | ✅ VERIFIED    | ⚠️ Listed   | ❓ Unknown     |
+| syminfo.prefix() | ✅ VERIFIED    | ⚠️ Listed   | ❓ Unknown     |
+| syminfo.tickerid | ✅ VERIFIED    | ❌ Missing  | ❌ Not Found   |
+| syminfo.type     | ✅ VERIFIED    | ❌ Missing  | ❌ Not Found   |
+| syminfo.currency | ✅ VERIFIED    | ❌ Missing  | ❌ Not Found   |
+| syminfo.session  | ✅ VERIFIED    | ❌ Missing  | ❌ Not Found   |
 
 **Critical Usage in strategies (5+ occurrences):**
+
 ```pine
 security(syminfo.tickerid, "1D", ...)
 ```
 
 **Required Implementation:**
+
 - `syminfo.tickerid` returns current symbol ticker ID
 - `syminfo.ticker` returns current symbol name
 - Context enrichment in PineScriptStrategyRunner wrapper
@@ -187,16 +193,17 @@ security(syminfo.tickerid, "1D", ...)
 
 **Evidence:** https://alaa-eddine.github.io/PineTS/api-coverage/strategy.html (empty checkboxes)
 
-| Category | Functions | Status |
-|----------|-----------|--------|
-| Declaration | strategy() | ❌ Stub only |
-| Entry | strategy.entry() | ❌ Required |
-| Exit | strategy.exit(), strategy.close(), strategy.close_all() | ❌ Required |
-| Position Info | strategy.position_avg_price, strategy.position_size | ❌ Required |
-| Account Info | strategy.equity, strategy.opentrades, strategy.closedtrades | ❌ Required |
-| Constants | strategy.long, strategy.short, strategy.cash, strategy.commission.* | ❌ Required |
+| Category      | Functions                                                            | Status       |
+| ------------- | -------------------------------------------------------------------- | ------------ |
+| Declaration   | strategy()                                                           | ❌ Stub only |
+| Entry         | strategy.entry()                                                     | ❌ Required  |
+| Exit          | strategy.exit(), strategy.close(), strategy.close_all()              | ❌ Required  |
+| Position Info | strategy.position_avg_price, strategy.position_size                  | ❌ Required  |
+| Account Info  | strategy.equity, strategy.opentrades, strategy.closedtrades          | ❌ Required  |
+| Constants     | strategy.long, strategy.short, strategy.cash, strategy.commission.\* | ❌ Required  |
 
 **Usage in bb-strategy-7-rus.pine (10+ occurrences):**
+
 ```pine
 strategy(title="BB Strategy 7 rus", overlay=true, default_qty_type=strategy.cash, ...)
 has_active_trade = not na(strategy.position_avg_price)
@@ -206,6 +213,7 @@ strategy.close_all()
 ```
 
 **Current Implementation Status:**
+
 ```javascript
 // PineScriptStrategyRunner.js - STUB ONLY
 const strategy = () => {}; // Does nothing
@@ -219,25 +227,27 @@ const strategy = () => {}; // Does nothing
 
 **Evidence:** Dist grep returns NO matches for `barmerge`
 
-| Constant | Pine Script v5 | Usage | Status |
-|----------|----------------|-------|--------|
-| barmerge.gaps_on | ✅ VERIFIED | Allow na gaps | ❌ Not Found |
-| barmerge.gaps_off | ✅ VERIFIED | Fill gaps | ❌ Not Found |
-| barmerge.lookahead_on | ✅ VERIFIED | Future leak | ❌ Not Found |
-| barmerge.lookahead_off | ✅ VERIFIED | No future leak | ❌ Not Found |
+| Constant               | Pine Script v5 | Usage          | Status       |
+| ---------------------- | -------------- | -------------- | ------------ |
+| barmerge.gaps_on       | ✅ VERIFIED    | Allow na gaps  | ❌ Not Found |
+| barmerge.gaps_off      | ✅ VERIFIED    | Fill gaps      | ❌ Not Found |
+| barmerge.lookahead_on  | ✅ VERIFIED    | Future leak    | ❌ Not Found |
+| barmerge.lookahead_off | ✅ VERIFIED    | No future leak | ❌ Not Found |
 
 **Critical Usage in security() calls:**
+
 ```pine
 open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
 ```
 
 **Required Implementation:**
+
 ```javascript
 const barmerge = {
   gaps_on: 'gaps_on',
   gaps_off: 'gaps_off',
   lookahead_on: 'lookahead_on',
-  lookahead_off: 'lookahead_off'
+  lookahead_off: 'lookahead_off',
 };
 ```
 
@@ -247,17 +257,18 @@ const barmerge = {
 
 **Evidence:** https://alaa-eddine.github.io/PineTS/api-coverage/others.html (empty checkboxes)
 
-| Function | Category | Status | Usage |
-|----------|----------|--------|-------|
-| fixnan() | Data cleaning | ❌ Not Implemented | HIGH |
-| time() | Date/Time | ❌ Not Implemented | MEDIUM |
-| timeframe.period | Runtime info | ❌ Not Implemented | MEDIUM |
-| timeframe.ismonthly | Timeframe check | ❌ Not Implemented | LOW |
-| timeframe.isdaily | Timeframe check | ❌ Not Implemented | LOW |
-| timeframe.isweekly | Timeframe check | ❌ Not Implemented | LOW |
-| barstate.isfirst | Bar state | ❌ Not Implemented | LOW |
+| Function            | Category        | Status             | Usage  |
+| ------------------- | --------------- | ------------------ | ------ |
+| fixnan()            | Data cleaning   | ❌ Not Implemented | HIGH   |
+| time()              | Date/Time       | ❌ Not Implemented | MEDIUM |
+| timeframe.period    | Runtime info    | ❌ Not Implemented | MEDIUM |
+| timeframe.ismonthly | Timeframe check | ❌ Not Implemented | LOW    |
+| timeframe.isdaily   | Timeframe check | ❌ Not Implemented | LOW    |
+| timeframe.isweekly  | Timeframe check | ❌ Not Implemented | LOW    |
+| barstate.isfirst    | Bar state       | ❌ Not Implemented | LOW    |
 
 **Critical Usage:**
+
 ```pine
 // fixnan() - used in security() calls
 highUsePivot = security(syminfo.tickerid, "1D", fixnan(pivothigh(...)))
@@ -369,39 +380,39 @@ Layer 3: Strategy State Manager (REQUIRED)
 ```javascript
 async executeTranspiledStrategy(jsCode, data) {
   const pineTS = new PineTS(data);
-  
+
   const wrappedCode = `(context) => {
     /* ✅ WORKING: Data series */
     const { close, open, high, low, volume } = context.data;
-    
+
     /* ✅ WORKING: Technical Analysis */
     const ta = context.ta;
-    
+
     /* ✅ WORKING: Request functions */
     const request = context.request;
     const security = request.security.bind(request);
-    
+
     /* ✅ WORKING: Core functions */
     const { plot, color } = context.core;
-    
+
     /* ❌ MISSING: Built-in variables */
     const tickerid = context.tickerId; // Exists but not as syminfo.tickerid
-    
+
     /* ⚠️ STUB ONLY: Strategy functions */
     const indicator = () => {};
     const strategy = () => {};
     const study = indicator;
-    
+
     /* ❌ MISSING: All strategy.* namespace */
     /* ❌ MISSING: All barmerge.* constants */
     /* ❌ MISSING: fixnan() function */
     /* ❌ MISSING: time() function */
-    
+
     ${jsCode}
-    
+
     return { plots: context.plots };
   }`;
-  
+
   await pineTS.run(wrappedCode);
   return { plots: [] };
 }
@@ -427,6 +438,7 @@ async executeTranspiledStrategy(jsCode, data) {
 12. ✅ Local .pine files for usage patterns (4 strategies)
 
 **Evidence Sources:**
+
 - Official PineTS documentation: https://alaa-eddine.github.io/PineTS/
 - PineTS TypeScript definitions: `/PineTS/dist/types/namespaces/`
 - PineTS runtime distribution: `/PineTS/dist/pinets.dev.es.js`
@@ -439,6 +451,7 @@ async executeTranspiledStrategy(jsCode, data) {
 ## Missing Features in Our Strategy Files
 
 **Strategy File Analysis:**
+
 - Total: 1,034 lines across 7 files
 - Complex strategies: bb-strategy-7-rus (276), bb-strategy-8-rus (343), bb-strategy-9-rus (367)
 - Simple indicators: ema-strategy (13), daily-lines (8), rolling-cagr (24), test (3)
@@ -446,6 +459,7 @@ async executeTranspiledStrategy(jsCode, data) {
 ### bb-strategy-7-rus.pine (276 lines) - CRITICAL
 
 **Missing Features:**
+
 ```
 STRATEGY NAMESPACE (10 occurrences):
 ├─ Line 2: strategy(title=..., default_qty_type=strategy.cash, commission_type=strategy.commission.percent, ...)
@@ -487,6 +501,7 @@ INPUT FUNCTIONS (25+ occurrences - ALL WORKING):
 ### bb-strategy-8-rus.pine (343 lines) - CRITICAL
 
 **Missing Features (similar to bb-strategy-7):**
+
 ```
 STRATEGY NAMESPACE (6 occurrences):
 ├─ Line 2: strategy(title=..., pyramiding=999, ...)
@@ -511,6 +526,7 @@ TIME() FUNCTION (2 occurrences):
 ### bb-strategy-9-rus.pine (367 lines) - CRITICAL
 
 **Missing Features (similar pattern):**
+
 ```
 STRATEGY NAMESPACE (10+ occurrences)
 SYMINFO NAMESPACE (20+ occurrences)
@@ -522,6 +538,7 @@ TIME() FUNCTION (3 occurrences including line 351)
 ### rolling-cagr.pine (24 lines) - MEDIUM
 
 **Missing Features:**
+
 ```
 TIMEFRAME NAMESPACE (3 occurrences):
 └─ Line 14: timeframe.ismonthly ? 12 : timeframe.isdaily ? 252 : timeframe.isweekly ? 52
@@ -536,6 +553,7 @@ INPUT FUNCTIONS (2 occurrences - WORKING):
 ### daily-lines.pine (8 lines) - LOW
 
 **Missing Features:**
+
 ```
 SYMINFO NAMESPACE (implicit):
 └─ Lines 2-5: security(tickerid, 'D', sma(...))
@@ -556,28 +574,28 @@ Note: Uses legacy 'tickerid' variable instead of syminfo.tickerid
 
 ### CRITICAL (Blocks 3 main strategies: 986 lines)
 
-| Feature | Occurrences | Files Affected |
-|---------|-------------|----------------|
-| **strategy.*** | 26+ | bb-strategy-7/8/9 |
-| **syminfo.tickerid** | 48+ | bb-strategy-7/8/9, daily-lines |
-| **barmerge.lookahead_on** | 3 | bb-strategy-7/8/9 |
-| **fixnan()** | 18 | bb-strategy-7/8/9 |
+| Feature                   | Occurrences | Files Affected                 |
+| ------------------------- | ----------- | ------------------------------ |
+| **strategy.\***           | 26+         | bb-strategy-7/8/9              |
+| **syminfo.tickerid**      | 48+         | bb-strategy-7/8/9, daily-lines |
+| **barmerge.lookahead_on** | 3           | bb-strategy-7/8/9              |
+| **fixnan()**              | 18          | bb-strategy-7/8/9              |
 
 ### HIGH (Enables session filtering: 986 lines)
 
-| Feature | Occurrences | Files Affected |
-|---------|-------------|----------------|
-| **time()** | 7 | bb-strategy-7/8/9 |
-| **timeframe.period** | 7 | bb-strategy-7/8/9 |
+| Feature              | Occurrences | Files Affected    |
+| -------------------- | ----------- | ----------------- |
+| **time()**           | 7           | bb-strategy-7/8/9 |
+| **timeframe.period** | 7           | bb-strategy-7/8/9 |
 
 ### MEDIUM (Enables rolling-cagr: 24 lines)
 
-| Feature | Occurrences | Files Affected |
-|---------|-------------|----------------|
-| **timeframe.ismonthly** | 1 | rolling-cagr |
-| **timeframe.isdaily** | 1 | rolling-cagr |
-| **timeframe.isweekly** | 1 | rolling-cagr |
-| **barstate.isfirst** | 1 | rolling-cagr |
+| Feature                 | Occurrences | Files Affected |
+| ----------------------- | ----------- | -------------- |
+| **timeframe.ismonthly** | 1           | rolling-cagr   |
+| **timeframe.isdaily**   | 1           | rolling-cagr   |
+| **timeframe.isweekly**  | 1           | rolling-cagr   |
+| **barstate.isfirst**    | 1           | rolling-cagr   |
 
 ### Implementation Impact
 
@@ -603,38 +621,44 @@ WITH CRITICAL IMPLEMENTATIONS:
 ## Conclusion
 
 **✅ FULLY WORKING:**
-- Technical Analysis namespace (ta.*) - 25+ functions
-- Input namespace (input.*) - 13+ types  
-- Core functions (na, nz, plot, indicator, color.*)
+
+- Technical Analysis namespace (ta.\*) - 25+ functions
+- Input namespace (input.\*) - 13+ types
+- Core functions (na, nz, plot, indicator, color.\*)
 - Request/Security (request.security, security)
 - Data series (close, open, high, low, volume, hl2, hlc3, ohlc4)
 
 **⚠️ PARTIALLY IMPLEMENTED:**
+
 - Syminfo namespace - TypeScript definitions exist, runtime unclear
 - Only 2 functions documented: syminfo.ticker(), syminfo.prefix()
 - Missing critical syminfo.tickerid used in all security() calls
 
 **❌ NOT IMPLEMENTED:**
+
 - Strategy namespace (60+ functions/variables/constants) - CRITICAL
 - Barmerge constants (4 constants) - CRITICAL
 - fixnan() function - HIGH priority
 - time() function - MEDIUM priority
-- timeframe.* namespace - MEDIUM priority
-- barstate.* namespace - LOW priority
+- timeframe.\* namespace - MEDIUM priority
+- barstate.\* namespace - LOW priority
 
 **REAL-WORLD IMPACT:**
+
 - 986 lines (95.4%) of strategy code BLOCKED without implementations
 - 3 main strategies completely non-functional
 - Only 2 simple indicators (16 lines) work out-of-the-box
 
 **ARCHITECTURE RECOMMENDATION:**
 Implement 3-layer hybrid approach:
-1. Use PineTS for ta.*, input.*, core.*, request.* (WORKING)
+
+1. Use PineTS for ta._, input._, core._, request._ (WORKING)
 2. Inject context wrappers for syminfo, barmerge, timeframe, barstate
-3. Build strategy state manager for strategy.* namespace (60+ items)
+3. Build strategy state manager for strategy.\* namespace (60+ items)
 
 **ESTIMATED IMPLEMENTATION PRIORITY:**
-1. Phase 1 (CRITICAL): syminfo.tickerid, barmerge.*, fixnan() - Unlocks 986 lines
+
+1. Phase 1 (CRITICAL): syminfo.tickerid, barmerge.\*, fixnan() - Unlocks 986 lines
 2. Phase 2 (HIGH): strategy.entry/exit/close, position tracking - Enables trading
-3. Phase 3 (MEDIUM): time(), timeframe.* - Enables session filtering + rolling-cagr
-4. Phase 4 (LOW): barstate.*, advanced strategy analytics - Polish features
+3. Phase 3 (MEDIUM): time(), timeframe.\* - Enables session filtering + rolling-cagr
+4. Phase 4 (LOW): barstate.\*, advanced strategy analytics - Polish features

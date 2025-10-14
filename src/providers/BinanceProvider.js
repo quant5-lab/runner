@@ -16,7 +16,13 @@ class BinanceProvider {
       const convertedTimeframe = TimeframeParser.toBinanceTimeframe(timeframe);
 
       this.stats.recordRequest('Binance', timeframe);
-      const result = await this.binanceProvider.getMarketData(symbol, convertedTimeframe, limit, sDate, eDate);
+      const result = await this.binanceProvider.getMarketData(
+        symbol,
+        convertedTimeframe,
+        limit,
+        sDate,
+        eDate,
+      );
 
       /* Symbol not found or no data - return [] to allow next provider to try */
       if (!result || result.length === 0) {

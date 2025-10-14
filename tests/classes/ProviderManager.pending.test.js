@@ -18,9 +18,9 @@ describe('ProviderManager - pending requests deduplication', () => {
       {
         name: 'TestProvider',
         instance: {
-          getMarketData: vi.fn(async() => {
+          getMarketData: vi.fn(async () => {
             callCount++;
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             return [{ openTime: 1, close: 100 }];
           }),
         },
@@ -40,7 +40,7 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(key3).not.toBe(key1);
   });
 
-  it('should deduplicate simultaneous identical requests', async() => {
+  it('should deduplicate simultaneous identical requests', async () => {
     const promise1 = providerManager.getMarketData('BTCUSDT', '60', 240);
     const promise2 = providerManager.getMarketData('BTCUSDT', '60', 240);
     const promise3 = providerManager.getMarketData('BTCUSDT', '60', 240);
@@ -52,7 +52,7 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(result2).toEqual(result3);
   });
 
-  it('should allow sequential requests after first completes', async() => {
+  it('should allow sequential requests after first completes', async () => {
     const result1 = await providerManager.getMarketData('BTCUSDT', '60', 240);
     const result2 = await providerManager.getMarketData('BTCUSDT', '60', 240);
 
@@ -60,7 +60,7 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(result1).toEqual(result2);
   });
 
-  it('should not deduplicate different symbols', async() => {
+  it('should not deduplicate different symbols', async () => {
     const promise1 = providerManager.getMarketData('BTCUSDT', '60', 240);
     const promise2 = providerManager.getMarketData('ETHUSDT', '60', 240);
 
@@ -69,7 +69,7 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(callCount).toBe(2);
   });
 
-  it('should not deduplicate different timeframes', async() => {
+  it('should not deduplicate different timeframes', async () => {
     const promise1 = providerManager.getMarketData('BTCUSDT', '60', 240);
     const promise2 = providerManager.getMarketData('BTCUSDT', '1440', 240);
 
@@ -78,7 +78,7 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(callCount).toBe(2);
   });
 
-  it('should not deduplicate different limits', async() => {
+  it('should not deduplicate different limits', async () => {
     const promise1 = providerManager.getMarketData('BTCUSDT', '60', 240);
     const promise2 = providerManager.getMarketData('BTCUSDT', '60', 500);
 
@@ -87,13 +87,13 @@ describe('ProviderManager - pending requests deduplication', () => {
     expect(callCount).toBe(2);
   });
 
-  it('should clean up pending map after request completes', async() => {
+  it('should clean up pending map after request completes', async () => {
     await providerManager.getMarketData('BTCUSDT', '60', 240);
 
     expect(providerManager.pending.size).toBe(0);
   });
 
-  it('should clean up pending map even on error', async() => {
+  it('should clean up pending map even on error', async () => {
     mockProviderChain[0].instance.getMarketData.mockRejectedValueOnce(new Error('Test error'));
 
     try {

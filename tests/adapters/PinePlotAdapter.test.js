@@ -23,11 +23,11 @@ describe('PinePlotAdapter', () => {
 
       plot(series, options);
 
-      expect(corePlot).toHaveBeenCalledWith(
-        series,
-        'EMA 20',
-        { color: 'red', style: undefined, linewidth: 1 },
-      );
+      expect(corePlot).toHaveBeenCalledWith(series, 'EMA 20', {
+        color: 'red',
+        style: undefined,
+        linewidth: 1,
+      });
     });
 
     test('should handle options array (PyneScript array wrapper)', () => {
@@ -38,11 +38,11 @@ describe('PinePlotAdapter', () => {
 
       plot(series, options);
 
-      expect(corePlot).toHaveBeenCalledWith(
-        series,
-        'Signal',
-        { color: 'green', style: 'line', linewidth: undefined },
-      );
+      expect(corePlot).toHaveBeenCalledWith(series, 'Signal', {
+        color: 'green',
+        style: 'line',
+        linewidth: undefined,
+      });
     });
 
     test('should handle missing options gracefully', () => {
@@ -52,11 +52,11 @@ describe('PinePlotAdapter', () => {
 
       plot(series, null);
 
-      expect(corePlot).toHaveBeenCalledWith(
-        series,
-        undefined,
-        { color: undefined, style: undefined, linewidth: undefined },
-      );
+      expect(corePlot).toHaveBeenCalledWith(series, undefined, {
+        color: undefined,
+        style: undefined,
+        linewidth: undefined,
+      });
     });
 
     test('should default to empty options when maybeOptions not provided', () => {
@@ -83,11 +83,11 @@ describe('PinePlotAdapter', () => {
 
       plot(series, options);
 
-      expect(corePlot).toHaveBeenCalledWith(
-        series,
-        'Custom',
-        { color: 'yellow', style: 'linebr', linewidth: 3 },
-      );
+      expect(corePlot).toHaveBeenCalledWith(series, 'Custom', {
+        color: 'yellow',
+        style: 'linebr',
+        linewidth: 3,
+      });
     });
   });
 });

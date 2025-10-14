@@ -65,10 +65,10 @@ describe('MoexProvider', () => {
   describe('getTimeframeDays()', () => {
     it('should convert string timeframes to correct day fractions', () => {
       // For 1m and 5m: (minutes / 540 * 1.4) + 2 days delay buffer
-      expect(provider.getTimeframeDays('1m')).toBeCloseTo((1 / 540 * 1.4) + 2, 5); // 1 min with delay buffer
-      expect(provider.getTimeframeDays('15m')).toBeCloseTo(15 / 540 * 1.4, 5); // 15 min in trading days with buffer
-      expect(provider.getTimeframeDays('1h')).toBeCloseTo(60 / 540 * 1.4, 5); // 1 hour in trading days with buffer
-      expect(provider.getTimeframeDays('4h')).toBeCloseTo(240 / 540 * 1.4, 5); // 4 hours in trading days with buffer
+      expect(provider.getTimeframeDays('1m')).toBeCloseTo((1 / 540) * 1.4 + 2, 5); // 1 min with delay buffer
+      expect(provider.getTimeframeDays('15m')).toBeCloseTo((15 / 540) * 1.4, 5); // 15 min in trading days with buffer
+      expect(provider.getTimeframeDays('1h')).toBeCloseTo((60 / 540) * 1.4, 5); // 1 hour in trading days with buffer
+      expect(provider.getTimeframeDays('4h')).toBeCloseTo((240 / 540) * 1.4, 5); // 4 hours in trading days with buffer
       // Daily and above use calendar days
       expect(provider.getTimeframeDays('1d')).toBe(1440 / 1440); // 1 day = 1 calendar day
     });
@@ -81,8 +81,8 @@ describe('MoexProvider', () => {
 
     it('should convert numeric timeframes to correct day fractions', () => {
       // For 1m: (1 / 540 * 1.4) + 2 days delay buffer
-      expect(provider.getTimeframeDays(1)).toBeCloseTo((1 / 540 * 1.4) + 2, 5); // 1 minute with delay buffer
-      expect(provider.getTimeframeDays(60)).toBeCloseTo(60 / 540 * 1.4, 5); // 60 minutes = 1 hour
+      expect(provider.getTimeframeDays(1)).toBeCloseTo((1 / 540) * 1.4 + 2, 5); // 1 minute with delay buffer
+      expect(provider.getTimeframeDays(60)).toBeCloseTo((60 / 540) * 1.4, 5); // 60 minutes = 1 hour
       // Daily timeframes use calendar days
       expect(provider.getTimeframeDays(1440)).toBe(1440 / 1440); // 1440 minutes = 1 calendar day
     });
@@ -97,7 +97,7 @@ describe('MoexProvider', () => {
     it('REGRESSION: should fix the original date range bug', () => {
       // This test prevents the bug where "1h" was treated as 1 day instead of trading hours
       const hourlyDays = provider.getTimeframeDays('1h');
-      const expectedHourlyDays = 60 / 540 * 1.4; // ~0.156 days for 1 hour with trading hours + buffer
+      const expectedHourlyDays = (60 / 540) * 1.4; // ~0.156 days for 1 hour with trading hours + buffer
 
       expect(hourlyDays).toBeCloseTo(expectedHourlyDays, 3);
       expect(hourlyDays).toBeGreaterThan(0.1); // Should be reasonable fraction of day
@@ -105,7 +105,7 @@ describe('MoexProvider', () => {
 
       // Verify 15m also uses trading hours calculation
       const fifteenMinDays = provider.getTimeframeDays('15m');
-      expect(fifteenMinDays).toBeCloseTo(15 / 540 * 1.4, 3);
+      expect(fifteenMinDays).toBeCloseTo((15 / 540) * 1.4, 3);
       expect(fifteenMinDays).toBeLessThan(hourlyDays); // 15min should be less than 1h
     });
   });
@@ -369,10 +369,10 @@ describe('MoexProvider', () => {
       },
     };
 
-    it('should fetch and return market data', async() => {
+    it('should fetch and return market data', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async() => mockMoexResponse,
+        json: async () => mockMoexResponse,
       });
 
       const data = await provider.getMarketData('SBER', 'D', 100);
@@ -382,10 +382,10 @@ describe('MoexProvider', () => {
       expect(data[1].open).toBe(102);
     });
 
-    it('should return cached data on second call', async() => {
+    it('should return cached data on second call', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async() => mockMoexResponse,
+        json: async () => mockMoexResponse,
       });
 
       await provider.getMarketData('SBER', 'D', 100);
@@ -395,10 +395,10 @@ describe('MoexProvider', () => {
       expect(data).toHaveLength(2);
     });
 
-    it('should sort data by time ascending', async() => {
+    it('should sort data by time ascending', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async() => ({
+        json: async () => ({
           candles: {
             data: [
               ['102', '107', '108', '100', '60000', '1200', '2024-01-02', '2024-01-02'],
@@ -414,10 +414,10 @@ describe('MoexProvider', () => {
       expect(data[1].open).toBe(102);
     });
 
-    it('should apply limit to data', async() => {
+    it('should apply limit to data', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async() => ({
+        json: async () => ({
           candles: {
             data: Array(10)
               .fill(null)
@@ -440,7 +440,7 @@ describe('MoexProvider', () => {
       expect(data).toHaveLength(5);
     });
 
-    it('should return empty array on API error', async() => {
+    it('should return empty array on API error', async () => {
       global.fetch.mockResolvedValue({
         ok: false,
         status: 404,
@@ -452,10 +452,10 @@ describe('MoexProvider', () => {
       expect(data).toEqual([]);
     });
 
-    it('should return empty array when no candle data', async() => {
+    it('should return empty array when no candle data', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: async() => ({ candles: { data: null } }),
+        json: async () => ({ candles: { data: null } }),
       });
 
       const data = await provider.getMarketData('SBER', 'D', 100);
@@ -463,7 +463,7 @@ describe('MoexProvider', () => {
       expect(data).toEqual([]);
     });
 
-    it('should handle fetch rejection', async() => {
+    it('should handle fetch rejection', async () => {
       global.fetch.mockRejectedValue(new Error('Network error'));
 
       const data = await provider.getMarketData('SBER', 'D', 100);
@@ -472,25 +472,25 @@ describe('MoexProvider', () => {
     });
 
     describe('1d test probe disambiguation', () => {
-      it('should throw TimeframeError when empty response and 1d test returns data', async() => {
+      it('should throw TimeframeError when empty response and 1d test returns data', async () => {
         /* 15m throws TimeframeError during buildUrl, then 1d test fetch returns data */
         global.fetch.mockResolvedValueOnce({
           ok: true,
-          json: async() => mockMoexResponse,
+          json: async () => mockMoexResponse,
         });
 
-        await expect(provider.getMarketData('CHMF', '15m', 100))
-          .rejects
-          .toThrow("Timeframe '15m' not supported for symbol 'CHMF' by provider MOEX");
+        await expect(provider.getMarketData('CHMF', '15m', 100)).rejects.toThrow(
+          "Timeframe '15m' not supported for symbol 'CHMF' by provider MOEX",
+        );
 
         expect(global.fetch).toHaveBeenCalledTimes(1); // Only 1d probe fetch
       });
 
-      it('should return [] when empty response and 1d test returns empty', async() => {
+      it('should return [] when empty response and 1d test returns empty', async () => {
         /* 15m throws TimeframeError, 1d test fetch returns empty - symbol not found */
         global.fetch.mockResolvedValueOnce({
           ok: true,
-          json: async() => ({ candles: { data: [] } }),
+          json: async () => ({ candles: { data: [] } }),
         });
 
         const data = await provider.getMarketData('INVALID_SYMBOL', '15m', 100);
@@ -499,11 +499,11 @@ describe('MoexProvider', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1); // Only 1d probe fetch
       });
 
-      it('should return [] when empty response and timeframe is 1d', async() => {
+      it('should return [] when empty response and timeframe is 1d', async () => {
         /* Empty response for 1d - no test needed */
         global.fetch.mockResolvedValue({
           ok: true,
-          json: async() => ({ candles: { data: [] } }),
+          json: async () => ({ candles: { data: [] } }),
         });
 
         const data = await provider.getMarketData('INVALID_SYMBOL', '1d', 100);
@@ -512,12 +512,12 @@ describe('MoexProvider', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1);
       });
 
-      it('should handle 1d test failure gracefully', async() => {
+      it('should handle 1d test failure gracefully', async () => {
         /* First call returns empty, 1d test fails with API error */
         global.fetch
           .mockResolvedValueOnce({
             ok: true,
-            json: async() => ({ candles: { data: [] } }),
+            json: async () => ({ candles: { data: [] } }),
           })
           .mockResolvedValueOnce({
             ok: false,

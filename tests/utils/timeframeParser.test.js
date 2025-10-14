@@ -214,7 +214,9 @@ describe('TimeframeParser', () => {
       expect(TimeframeParser.toBinanceTimeframe(undefined)).toBe('D'); // defaults to daily
 
       // However, specific numeric values that don't map should throw
-      expect(() => TimeframeParser.toBinanceTimeframe(999)).toThrow("Timeframe '999' not supported");
+      expect(() => TimeframeParser.toBinanceTimeframe(999)).toThrow(
+        "Timeframe '999' not supported",
+      );
     });
 
     test('should handle critical crypto timeframes correctly', () => {

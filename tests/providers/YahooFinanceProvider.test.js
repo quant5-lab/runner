@@ -85,7 +85,7 @@ describe('YahooFinanceProvider', () => {
       const letterFormats = ['D', 'W', 'M'];
 
       // All should return valid range strings
-      [...stringFormats, ...numericFormats, ...letterFormats].forEach(tf => {
+      [...stringFormats, ...numericFormats, ...letterFormats].forEach((tf) => {
         const range = provider.getDateRange(100, tf);
         expect(range).toBeTruthy();
         expect(typeof range).toBe('string');
@@ -116,13 +116,13 @@ describe('YahooFinanceProvider', () => {
       },
     };
 
-    it('should fetch and return market data', async() => {
+    it('should fetch and return market data', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         status: 200,
         statusText: 'OK',
         headers: new Map(),
-        text: async() => JSON.stringify(mockYahooResponse),
+        text: async () => JSON.stringify(mockYahooResponse),
       });
 
       const data = await provider.getMarketData('AAPL', 'D', 100);
@@ -131,12 +131,12 @@ describe('YahooFinanceProvider', () => {
       expect(data[0].open).toBe(100);
     });
 
-    it('should return empty array on error', async() => {
+    it('should return empty array on error', async () => {
       global.fetch.mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        text: async() => 'Not Found',
+        text: async () => 'Not Found',
       });
 
       const data = await provider.getMarketData('INVALID', 'D', 100);

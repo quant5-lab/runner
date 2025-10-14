@@ -12,14 +12,7 @@ class PineScriptStrategyRunner {
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
     const minutes = TimeframeParser.parseToMinutes(timeframe);
     const pineTSTimeframe = TimeframeConverter.toPineTS(minutes);
-    const pineTS = new PineTS(
-      this.providerManager,
-      symbol,
-      pineTSTimeframe,
-      bars,
-      null,
-      null,
-    );
+    const pineTS = new PineTS(this.providerManager, symbol, pineTSTimeframe, bars, null, null);
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
