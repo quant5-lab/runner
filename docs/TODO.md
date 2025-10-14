@@ -102,13 +102,26 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Test**: tests/issues/security-empty-object.test.js documents current behavior
   - **COMPLETED**: Full analysis of design pattern where security() reruns entire strategy in nested context for expression evaluation
 
-- [ ] **Fix security() Promise bug and implement remaining logic**
-  - PineTS was updated and this is now fixed. We need to integrate latest version and adapt to their changes
+- [x] **Migrate to PineTS rev3 API**
+  - **COMPLETED**: Migrated prefetchSecurityData() from array to code string signature
+  - **Evidence**: Removed ~60 lines (parseSecurityCalls, deduplicatePrefetchData, manual parsing)
+  - **Result**: Single line `await pineTS.prefetchSecurityData(wrappedCode)`
+  - **Validation**: All 358 tests passing, daily-lines.pine executes successfully
+  - **Documentation**: PINETS_REV3_MIGRATION.md
 
-- [ ] **Extend security() for higher and lower timeframes**
-  - Adjust PineTS source code in sibling directory to support both higher and lower timeframe requests
-  - Commit PineTS to repository, rebuild PineTS distribution
-  - Current limitation: only higher timeframes supported
+- [ ] **BLOCKED: Fix security() empty object bug in PineTS library**
+  - **Status**: Bug confirmed in PineTS - security() returns empty objects {} instead of numeric values
+  - **Root Cause**: Indicator functions (ta.sma, etc.) don't store results in context.params during prefetch
+  - **Evidence**: bug-report-pinets-security-empty-params.js, BUG_REPORT_PINETS.md, out/chart-data.json
+  - **Impact**: All security() calls with indicator expressions return empty plot values
+  - **Recommendation**: Fix in PineTS library - modify security() to auto-store expression results
+  - **Waiting**: PineTS developer to implement fix (3 proposed solutions documented)
+
+- [ ] **Add downscaling support to PineTS security()**
+  - Modify PineTS source to support lower timeframe requests (e.g., security(D) on W chart)
+  - Current limitation: "Only higher timeframes are supported" error at line 1782
+  - Required for strategies that need daily data on weekly/monthly charts
+  - Commit changes to PineTS repository, rebuild distribution
 
 ## Medium Priority 🟡
 
@@ -134,6 +147,8 @@ source code is volume mapped, and you must examine source code locally in this w
 ## Current Status
 - **Total Tests**: 358/358 passing ✅
 - **Linting**: 0 errors ✅
+- **PineTS rev3 Migration**: Complete ✅
+- **security() Bug**: Documented, blocked on PineTS fix ❌
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅
 - **API Stats**: Tab-separated ASCII format ✅
