@@ -2,32 +2,11 @@ import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
 import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
-import { deduplicate } from '../utils/deduplicate.js';
 
 class PineScriptStrategyRunner {
   constructor(providerManager, statsCollector) {
     this.providerManager = providerManager;
     this.statsCollector = statsCollector;
-  }
-
-  deduplicatePrefetchData(prefetchData) {
-    return deduplicate(prefetchData, item => `${item.symbol}:${item.timeframe}:${item.limit}`);
-  }
-
-  parseSecurityCalls(jsCode) {
-    /* Extract security() calls: request.security(symbol, timeframe, expression) */
-    const regex = /request\.security\(\s*([^,]+)\s*,\s*['"]([^'"]+)['"]/g;
-    const calls = [];
-    let match;
-
-    while ((match = regex.exec(jsCode)) !== null) {
-      calls.push({
-        symbolExpr: match[1].trim(),
-        timeframe: match[2],
-      });
-    }
-
-    return calls;
   }
 
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
@@ -41,31 +20,6 @@ class PineScriptStrategyRunner {
       null,
       null,
     );
-
-    /* Parse and prefetch security() data */
-    const securityCalls = this.parseSecurityCalls(jsCode);
-    const sourceDurationMinutes = bars * minutes;
-
-    const prefetchData = securityCalls.map(call => {
-      const resolvedSymbol = (call.symbolExpr === 'syminfo.tickerid' || call.symbolExpr === 'tickerid')
-        ? symbol
-        : call.symbolExpr;
-
-      const targetMinutes = TimeframeParser.parseToMinutes(call.timeframe);
-      const targetLimit = Math.ceil(sourceDurationMinutes / targetMinutes);
-
-      return {
-        symbol: resolvedSymbol,
-        timeframe: call.timeframe,
-        limit: targetLimit,
-      };
-    });
-
-    const uniquePrefetchData = this.deduplicatePrefetchData(prefetchData);
-
-    if (uniquePrefetchData.length > 0) {
-      await pineTS.prefetchSecurityData(uniquePrefetchData);
-    }
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
@@ -81,6 +35,8 @@ class PineScriptStrategyRunner {
       
       ${jsCode}
     }`;
+
+    await pineTS.prefetchSecurityData(wrappedCode);
 
     const result = await pineTS.run(wrappedCode);
     return { plots: result?.plots || [] };
