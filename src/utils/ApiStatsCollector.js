@@ -56,8 +56,30 @@ class ApiStatsCollector {
   }
 
   logSummary(logger) {
-    const summary = this.getSummary();
-    logger.debug(`API Statistics: ${JSON.stringify(summary, null, 2)}`);
+    const { totalRequests, cacheHits, cacheMisses, cacheHitRate, byTimeframe, byProvider } = this.getSummary();
+
+    const lines = [];
+    lines.push('API Statistics:');
+    lines.push(`Total Requests:\t${totalRequests}`);
+    lines.push(`Cache Hits:\t${cacheHits}`);
+    lines.push(`Cache Misses:\t${cacheMisses}`);
+    lines.push(`Cache Hit Rate:\t${cacheHitRate}`);
+
+    if (Object.keys(byTimeframe).length > 0) {
+      lines.push('By Timeframe:');
+      Object.entries(byTimeframe)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([tf, count]) => lines.push(`  ${tf}:\t${count}`));
+    }
+
+    if (Object.keys(byProvider).length > 0) {
+      lines.push('By Provider:');
+      Object.entries(byProvider)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([provider, count]) => lines.push(`  ${provider}:\t${count}`));
+    }
+
+    logger.debug(lines.join('\n'));
   }
 }
 

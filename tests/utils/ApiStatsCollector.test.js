@@ -203,10 +203,10 @@ describe('ApiStatsCollector', () => {
       collector.logSummary(mockLogger);
 
       expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('API Statistics:'));
-      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('"totalRequests": 1'));
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Total Requests:\t1'));
     });
 
-    it('should log correct stats object', () => {
+    it('should log correct stats in tab-separated format', () => {
       collector.recordRequest('MOEX', 'D');
       collector.recordRequest('Binance', '1h');
       collector.recordCacheHit();
@@ -216,10 +216,12 @@ describe('ApiStatsCollector', () => {
 
       const loggedMessage = mockLogger.debug.mock.calls[0][0];
       expect(loggedMessage).toContain('API Statistics:');
-      expect(loggedMessage).toContain('"totalRequests": 2');
-      expect(loggedMessage).toContain('"cacheHits": 1');
-      expect(loggedMessage).toContain('"cacheMisses": 1');
-      expect(loggedMessage).toContain('"cacheHitRate": "50.0%"');
+      expect(loggedMessage).toContain('Total Requests:\t2');
+      expect(loggedMessage).toContain('Cache Hits:\t1');
+      expect(loggedMessage).toContain('Cache Misses:\t1');
+      expect(loggedMessage).toContain('Cache Hit Rate:\t50.0%');
+      expect(loggedMessage).toContain('By Timeframe:');
+      expect(loggedMessage).toContain('By Provider:');
     });
 
     it('should log empty stats when no operations recorded', () => {
@@ -228,9 +230,9 @@ describe('ApiStatsCollector', () => {
       expect(mockLogger.debug).toHaveBeenCalled();
       const loggedMessage = mockLogger.debug.mock.calls[0][0];
       expect(loggedMessage).toContain('API Statistics:');
-      expect(loggedMessage).toContain('"totalRequests": 0');
-      expect(loggedMessage).toContain('"cacheHits": 0');
-      expect(loggedMessage).toContain('"cacheMisses": 0');
+      expect(loggedMessage).toContain('Total Requests:\t0');
+      expect(loggedMessage).toContain('Cache Hits:\t0');
+      expect(loggedMessage).toContain('Cache Misses:\t0');
     });
   });
 
