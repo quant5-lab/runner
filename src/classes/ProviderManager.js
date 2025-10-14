@@ -1,4 +1,5 @@
 import { TimeframeError } from '../errors/TimeframeError.js';
+import TimeframeConverter from '../utils/timeframeConverter.js';
 
 class ProviderManager {
   constructor(providerChain, logger) {
@@ -37,6 +38,12 @@ class ProviderManager {
         `Expected data within ${maxAgeDays} days.`,
       );
     }
+  }
+
+  async getMarketData(symbol, timeframe, limit, sDate, eDate) {
+    const ourTimeframe = TimeframeConverter.fromPineTS(timeframe);
+    const result = await this.fetchMarketData(symbol, ourTimeframe, limit);
+    return result.data;
   }
 
   async fetchMarketData(symbol, timeframe, bars) {

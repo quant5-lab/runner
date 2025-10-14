@@ -1,7 +1,6 @@
 import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
-import PineSecurityAdapter from './PineSecurityAdapter.js';
 import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
 import PineVersionMigrator from '../pine/PineVersionMigrator.js';
 
@@ -28,12 +27,10 @@ class PineScriptStrategyRunner {
   }
 
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
-    const adapter = new PineSecurityAdapter(this.providerManager, this.statsCollector);
-
     const minutes = TimeframeParser.parseToMinutes(timeframe);
     const pineTSTimeframe = TimeframeConverter.toPineTS(minutes);
     const pineTS = new PineTS(
-      adapter,
+      this.providerManager,
       symbol,
       pineTSTimeframe,
       bars,
