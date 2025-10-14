@@ -96,13 +96,18 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## High Priority 🔴
 
-- [ ] **Understand security() strategy rerun pattern**
+- [x] **Understand security() strategy rerun pattern**
   - **Observation**: PineTS security() reruns entire strategy code in nested context via `await pineTS.run(this.context.pineTSCode)` at PineTS/dist/pinets.dev.es.js:1794
   - **Goal**: Examine design goals and benefits of this pattern vs expression-only evaluation
   - **Test**: tests/issues/security-empty-object.test.js documents current behavior
+  - **COMPLETED**: Full analysis of design pattern where security() reruns entire strategy in nested context for expression evaluation
 
-- [ ] **Implement remaining logic of security() method**
-  - Complete implementation of security() method functionality beyond basic wrapper
+- [ ] **Fix security() Promise bug and implement remaining logic**
+  - **ROOT CAUSE IDENTIFIED**: security() is async but transpiler doesn't inject await → returns Promise { <pending> } instead of numeric values
+  - **EVIDENCE**: Live execution proof via test-security-debug.js, source code analysis (PineRequest.ts:24 async), transpiler has no AwaitExpression handling
+  - **SOLUTION**: Make security() synchronous using prefetch cache infrastructure (already exists and works)
+  - **IMPLEMENTATION REQUIRED**: Modify PineRequest.ts line 24: remove async, read from cache synchronously, throw if not prefetched
+  - Duration calculation code exists: PineRequest.ts:96-101 (_calculateDurationBasedLimit)
   - Handle context resolution, data fetching for requested symbol/timeframe combinations
   - Fix parameter passing issue (tuples vs raw values)
 
