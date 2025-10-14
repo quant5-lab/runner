@@ -103,13 +103,7 @@ source code is volume mapped, and you must examine source code locally in this w
   - **COMPLETED**: Full analysis of design pattern where security() reruns entire strategy in nested context for expression evaluation
 
 - [ ] **Fix security() Promise bug and implement remaining logic**
-  - **ROOT CAUSE IDENTIFIED**: security() is async but transpiler doesn't inject await → returns Promise { <pending> } instead of numeric values
-  - **EVIDENCE**: Live execution proof via test-security-debug.js, source code analysis (PineRequest.ts:24 async), transpiler has no AwaitExpression handling
-  - **SOLUTION**: Make security() synchronous using prefetch cache infrastructure (already exists and works)
-  - **IMPLEMENTATION REQUIRED**: Modify PineRequest.ts line 24: remove async, read from cache synchronously, throw if not prefetched
-  - Duration calculation code exists: PineRequest.ts:96-101 (_calculateDurationBasedLimit)
-  - Handle context resolution, data fetching for requested symbol/timeframe combinations
-  - Fix parameter passing issue (tuples vs raw values)
+  - PineTS was updated and this is now fixed. We need to integrate latest version and adapt to their changes
 
 - [ ] **Extend security() for higher and lower timeframes**
   - Adjust PineTS source code in sibling directory to support both higher and lower timeframe requests
