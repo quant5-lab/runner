@@ -89,17 +89,17 @@ source code is volume mapped, and you must examine source code locally in this w
 - [x] **TODO 23 FINAL CLEANUP**
   - COMPLETED: Fixed colors migration (color=yellow → color=color.yellow). Fixed v3/v4 syntax detection regex (exclude ta.* functions). Moved test files to tests/fixtures/strategies/. Extracted v3/v4 detection to PineVersionMigrator.hasV3V4Syntax() method. Updated src/index.js to use method instead of inline regex. Single source of truth achieved. All 297 tests passing. 0 linting errors.
 
+### Performance & Statistics
 - [x] **Eliminate API flooding for security() calls**
   - COMPLETED: Created TickeridMigrator utility (15 tests). Integrated into PineVersionMigrator. Implemented duration-based limit calculation in PineTS.security() (_calculateDurationBasedLimit, _timeframeToMinutes). Fixed symbol resolution (tickerid→syminfo.tickerid). Result: API requests reduced from 79→3 for daily-lines.pine (3 security() calls). All 312 tests passing. Cache key format: SBER|D|1 (correct limit).
 
-- [x] **Remove debug logging, add API statistics**
-  - COMPLETED: Created ApiStatsCollector singleton (21 unit tests). Integrated via IoC container dependency injection. Tracks: totalRequests, cacheHits, cacheMisses, cacheHitRate, byTimeframe, byProvider. Stats injected into all 3 providers (MOEX, Binance, YahooFinance) and PineSecurityAdapter. Single summary log at strategy completion. All 333 tests passing.
 
 ## High Priority 🔴
 
-- [ ] **Fix security() returning empty object issue**
-  - Investigate and fix issue when `value: {}` is returned from security() calls
-  - Ensure proper value extraction and context handling
+- [ ] **Understand security() strategy rerun pattern**
+  - **Observation**: PineTS security() reruns entire strategy code in nested context via `await pineTS.run(this.context.pineTSCode)` at PineTS/dist/pinets.dev.es.js:1794
+  - **Goal**: Examine design goals and benefits of this pattern vs expression-only evaluation
+  - **Test**: tests/issues/security-empty-object.test.js documents current behavior
 
 - [ ] **Implement remaining logic of security() method**
   - Complete implementation of security() method functionality beyond basic wrapper
@@ -133,7 +133,8 @@ source code is volume mapped, and you must examine source code locally in this w
 ---
 
 ## Current Status
-- **Total Tests**: 297/297 passing ✅
+- **Total Tests**: 358/358 passing ✅
 - **Linting**: 0 errors ✅
-- **Migration System**: Fully functional (v3/v4/v5 support) ✅
-- **Next Focus**: Complete TODO 23 cleanup (move test files + extract v3/v4 detection)
+- **Race Condition Fix**: Duplicate API calls eliminated ✅
+- **Universal Utilities**: deduplicate() with keyGetter pattern ✅
+- **API Stats**: Tab-separated ASCII format ✅
