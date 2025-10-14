@@ -94,13 +94,11 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Validation**: All 358 tests passing, daily-lines.pine executes successfully
   - **Documentation**: PINETS_REV3_MIGRATION.md
 
-- [ ] **BLOCKED: Fix security() empty object bug in PineTS library**
-  - **Status**: Bug confirmed in PineTS - security() returns empty objects {} instead of numeric values
-  - **Root Cause**: Indicator functions (ta.sma, etc.) don't store results in context.params during prefetch
-  - **Evidence**: bug-report-pinets-security-empty-params.js, BUG_REPORT_PINETS.md, out/chart-data.json
-  - **Impact**: All security() calls with indicator expressions return empty plot values
-  - **Recommendation**: Fix in PineTS library - modify security() to auto-store expression results
-  - **Waiting**: PineTS developer to implement fix (3 proposed solutions documented)
+- [x] **Fix security() empty object bug in PineTS library**
+  - **Status**: RESOLVED ✅
+  - **Resolution**: Fixed in PineTS library - security() now correctly returns numeric values
+  - **Validation**: daily-lines.pine strategy executes successfully with security() calls
+  - **Result**: Security function fully functional with indicator expressions
 
 - [ ] **Add downscaling support to PineTS security()**
   - Modify PineTS source to support lower timeframe requests (e.g., security(D) on W chart)
@@ -109,6 +107,11 @@ source code is volume mapped, and you must examine source code locally in this w
   - Commit changes to PineTS repository, rebuild distribution
 
 ## Medium Priority 🟡
+
+- [ ] **Debug and fix rolling-cagr strategy issues**
+  - **Priority**: NEXT TASK 🎯
+  - Test rolling-cagr.pine strategy on multiple timeframes
+  - Identify and fix any calculation errors, CAGR computation issues, or runtime failures
 
 - [ ] **Debug and fix rolling-cagr strategy issues**
   - Test rolling-cagr.pine strategy on multiple timeframes
@@ -131,10 +134,12 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Current Status
 
-- **Total Tests**: 358/358 passing ✅
+- **Total Tests**: 351/351 passing ✅
 - **Linting**: 0 errors ✅
 - **PineTS rev3 Migration**: Complete ✅
-- **security() Bug**: Documented, blocked on PineTS fix ❌
+- **security() Bug**: RESOLVED ✅
+- **security() Function**: Fully functional in daily-lines.pine ✅
+- **Next Task**: Debug and fix rolling-cagr strategy 🎯
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅
 - **API Stats**: Tab-separated ASCII format ✅
