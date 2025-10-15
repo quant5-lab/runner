@@ -211,24 +211,47 @@ class MoexProvider {
         return [];
       }
 
-      console.log('MOEX API request:', url);
+      /* Fetch data with pagination support */
+      const allCandles = [];
+      let start = 0;
+      const pageSize = 500; // MOEX default page size
 
-      this.stats.recordRequest('MOEX', timeframe);
-      const response = await fetch(url);
+      while (true) {
+        const paginatedUrl = start === 0 ? url : `${url}&start=${start}`;
+        console.log('MOEX API request:', paginatedUrl);
 
-      /* HTTP error - return [] to allow next provider to try */
-      if (!response.ok) {
-        this.logger.debug(
-          `MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`,
-        );
-        return [];
+        this.stats.recordRequest('MOEX', timeframe);
+        const response = await fetch(paginatedUrl);
+
+        /* HTTP error - return [] to allow next provider to try */
+        if (!response.ok) {
+          this.logger.debug(
+            `MOEX API error: ${response.status} ${response.statusText} for ${tickerId}`,
+          );
+          return [];
+        }
+
+        const data = await response.json();
+
+        /* No data in this batch - stop pagination */
+        if (!data.candles?.data?.length) {
+          break;
+        }
+
+        /* Add batch to results */
+        allCandles.push(...data.candles.data);
+
+        /* Stop if we got less than page size (last page) or reached requested limit */
+        if (data.candles.data.length < pageSize || (limit && allCandles.length >= limit)) {
+          break;
+        }
+
+        start += pageSize;
       }
 
-      const data = await response.json();
-
       /* Data found - success */
-      if (data.candles?.data?.length > 0) {
-        const convertedData = data.candles.data
+      if (allCandles.length > 0) {
+        const convertedData = allCandles
           .map((candle) => this.convertMoexCandle(candle))
           .sort((a, b) => a.openTime - b.openTime);
 
