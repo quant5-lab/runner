@@ -100,18 +100,27 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Validation**: daily-lines.pine strategy executes successfully with security() calls
   - **Result**: Security function fully functional with indicator expressions
 
-- [ ] **Add downscaling support to PineTS security()**
-  - Modify PineTS source to support lower timeframe requests (e.g., security(D) on W chart)
-  - Current limitation: "Only higher timeframes are supported" error at line 1782
-  - Required for strategies that need daily data on weekly/monthly charts
-  - Commit changes to PineTS repository, rebuild distribution
+- [x] **Implement downscaling for PineTS security()**
+  - **Status**: COMPLETED ✅
+  - **Solution**: Option B - downsample parameter added to security() function
+  - **Strategies**: "first", "last", "high", "low", "avg", "mean"
+  - **Default**: "last" (uses last confirmed lower TF bar, no lookahead)
+  - **Validation**: daily-lines.pine executes on W timeframe (100 candles, 3829.75ms)
+  - **Result**: Downscaling functional, all 351 tests passing
 
 ## Medium Priority 🟡
 
-- [ ] **Debug and fix rolling-cagr strategy issues**
-  - **Priority**: NEXT TASK 🎯
-  - Test rolling-cagr.pine strategy on multiple timeframes
-  - Identify and fix any calculation errors, CAGR computation issues, or runtime failures
+- [ ] **Fix PineTS downscaling sparse data issue**
+  - **Priority**: CRITICAL - 82-89% null values in downsampled plots 🔴
+  - **Evidence**: W chart with 500 bars + D data = dailyMMA20 (18% non-null), dailyMMA50 (16.8% non-null), dailyMMA200 (10.6% non-null)
+  - **Root Cause**: Duration calculation in PineTS uses requested limit (700) instead of actual data length (500)
+  - **Fix Applied**: Changed `calculateDurationBasedLimit()` and `_calculateAdjustedLimit()` to use `this._periods`/`marketData.length`
+  - **Next**: Verify fix with test run, measure non-null percentage improvement
+
+- [ ] **Investigate provider limit vs requested bars mismatch**
+  - **Evidence**: Requested 700 W bars, received 500 W bars (MOEX hard limit)
+  - **Question**: Should runner respect provider limits and adjust expectations?
+  - **Analysis Needed**: Check if this causes issues beyond downscaling (strategy assumptions, backtest validity)
 
 - [ ] **Debug and fix rolling-cagr strategy issues**
   - Test rolling-cagr.pine strategy on multiple timeframes
@@ -138,7 +147,7 @@ source code is volume mapped, and you must examine source code locally in this w
 - **Linting**: 0 errors ✅
 - **PineTS rev3 Migration**: Complete ✅
 - **security() Bug**: RESOLVED ✅
-- **security() Function**: Fully functional in daily-lines.pine ✅
+- **security() Downscaling**: COMPLETE ✅
 - **Next Task**: Debug and fix rolling-cagr strategy 🎯
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅
