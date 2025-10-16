@@ -110,6 +110,14 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Medium Priority 🟡
 
+- [x] Fix pagination issue : add tolerance to overlapping pages returned by MOEX provider
+- [x] **Fix upscaling issue : Yahoo security() sparse points**
+  - **Root Cause**: Yahoo hardcoded closeTime = openTime + 60000ms regardless of timeframe
+  - **Fix**: Changed to closeTime = openTime + intervalMinutes * 60 * 1000 - 1
+  - **Validation**: AMZN 15m + daily security() now shows stepped lines (229.6874992371 repeated)
+  - **Result**: Universal timeframe support
+- [ ] Fix upscaling issue : `security()` to always fetch extra 500 candlesticks for upper timeframes, to properly render cumulative studies which require to accumulate a buffer (in trading buffers are rarely larger than 500 candlesticks, so to always fetch extra 500 bars is pretty much fine)
+
 - [ ] **Fix PineTS downscaling sparse data issue**
   - **Priority**: CRITICAL - 82-89% null values in downsampled plots 🔴
   - **Evidence**: W chart with 500 bars + D data = dailyMMA20 (18% non-null), dailyMMA50 (16.8% non-null), dailyMMA200 (10.6% non-null)
