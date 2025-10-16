@@ -1,5 +1,6 @@
 import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
 import { TimeframeError } from '../errors/TimeframeError.js';
+import { deduplicate } from '../utils/deduplicate.js';
 
 class MoexProvider {
   constructor(logger, statsCollector) {
@@ -255,7 +256,10 @@ class MoexProvider {
           .map((candle) => this.convertMoexCandle(candle))
           .sort((a, b) => a.openTime - b.openTime);
 
-        const limitedData = limit ? convertedData.slice(-limit) : convertedData;
+        /* Deduplicate by openTime to handle overlapping pages */
+        const deduplicatedData = deduplicate(convertedData, (candle) => candle.openTime);
+
+        const limitedData = limit ? deduplicatedData.slice(-limit) : deduplicatedData;
 
         this.setCache(cacheKey, limitedData);
         console.log(`MOEX data retrieved: ${limitedData.length} candles for ${tickerId}`);
