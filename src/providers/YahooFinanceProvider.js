@@ -47,15 +47,18 @@ export class YahooFinanceProvider {
   }
 
   /* Convert Yahoo Finance data to PineTS format */
-  convertYahooCandle(timestamp, open, high, low, close, volume) {
+  convertYahooCandle(timestamp, open, high, low, close, volume, timeframe) {
+    const intervalMinutes = TimeframeParser.parseToMinutes(timeframe);
+    const openTime = timestamp * 1000;
+    const closeTime = openTime + intervalMinutes * 60 * 1000 - 1;
     return {
-      openTime: timestamp * 1000, // Convert to milliseconds
+      openTime,
       open: parseFloat(open),
       high: parseFloat(high),
       low: parseFloat(low),
       close: parseFloat(close),
       volume: parseFloat(volume || 0),
-      closeTime: timestamp * 1000 + 60000, // Add 1 minute
+      closeTime,
       quoteAssetVolume: parseFloat(close) * parseFloat(volume || 0),
       numberOfTrades: 0,
       takerBuyBaseAssetVolume: 0,
@@ -280,7 +283,7 @@ export class YahooFinanceProvider {
       for (let i = 0; i < timestamps.length; i++) {
         if (open[i] !== null && high[i] !== null && low[i] !== null && close[i] !== null) {
           convertedData.push(
-            this.convertYahooCandle(timestamps[i], open[i], high[i], low[i], close[i], volume[i]),
+            this.convertYahooCandle(timestamps[i], open[i], high[i], low[i], close[i], volume[i], timeframe),
           );
         }
       }
