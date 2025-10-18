@@ -116,29 +116,46 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Fix**: Changed to closeTime = openTime + intervalMinutes * 60 * 1000 - 1
   - **Validation**: AMZN 15m + daily security() now shows stepped lines (229.6874992371 repeated)
   - **Result**: Universal timeframe support
-- [ ] Fix upscaling issue : `security()` to always fetch extra 500 candlesticks for upper timeframes, to properly render cumulative studies which require to accumulate a buffer (in trading buffers are rarely larger than 500 candlesticks, so to always fetch extra 500 bars is pretty much fine)
+- [x] **Fix upscaling issue : `security()` extra 500 candlesticks for upper timeframes**
+  - **Status**: RESOLVED ✅
+  - **Resolution**: Fixed in PineTS library via TimeframeCalculator.calculateAdjustedLimit()
+  - **Implementation**: `if (targetTfMinutes > sourceTfMinutes) return baseLimit + UPSCALING_BUFFER`
+  - **Result**: Upscaling now adds 500-bar buffer for cumulative studies (ta.sma(200), ta.ema(50))
+  - **Validation**: PineTS line 1755-1763 confirms UPSCALING_BUFFER applied only when targetTfMinutes > sourceTfMinutes
 
-- [ ] **Fix PineTS downscaling sparse data issue**
-  - **Priority**: CRITICAL - 82-89% null values in downsampled plots 🔴
-  - **Evidence**: W chart with 500 bars + D data = dailyMMA20 (18% non-null), dailyMMA50 (16.8% non-null), dailyMMA200 (10.6% non-null)
-  - **Root Cause**: Duration calculation in PineTS uses requested limit (700) instead of actual data length (500)
-  - **Fix Applied**: Changed `calculateDurationBasedLimit()` and `_calculateAdjustedLimit()` to use `this._periods`/`marketData.length`
-  - **Next**: Verify fix with test run, measure non-null percentage improvement
+- [x] **Fix PineTS downscaling sparse data issue**
+  - **Status**: RESOLVED ✅
+  - **Resolution**: Fixed in PineTS library via TimeframeCalculator.calculateAdjustedLimit()
+  - **Implementation**: Duration-based calculation delegates to TimeframeCalculator static method
+  - **Result**: Downscaling uses correct baseLimit calculation without unnecessary buffer
 
 - [ ] **Investigate provider limit vs requested bars mismatch**
   - **Evidence**: Requested 700 W bars, received 500 W bars (MOEX hard limit)
   - **Question**: Should runner respect provider limits and adjust expectations?
   - **Analysis Needed**: Check if this causes issues beyond downscaling (strategy assumptions, backtest validity)
 
-- [ ] **Debug and fix rolling-cagr strategy issues**
-  - Test rolling-cagr.pine strategy on multiple timeframes
-  - Identify and fix any calculation errors, CAGR computation issues, or runtime failures
+- [x] **Debug and fix rolling-cagr strategy issues**
+  - **Status**: ROOT CAUSE IDENTIFIED ✅
+  - **Issue**: varip keyword transpiles to 'let' but lacks intra-bar persistence semantics
+  - **Impact**: Variables reset on each script execution within same bar (incorrect behavior)
+  - **Evidence**: Pine Script v5 docs specify varip must persist between executions on same bar
+  - **PineTS Gap**: Zero varip-specific code in runtime (3155 lines searched)
+  - **Handoff**: HANDOFF_VARIP_IMPLEMENTATION.md created for PineTS developer
+  - **Test Case**: Transpiled rolling-cagr.pine AST provided in handoff document
+  - **Dependencies**: Requires barstate.isfirst, timeframe.ismonthly/isdaily/isweekly implementation
+  - **Priority**: MEDIUM (blocks 1 strategy, not critical path)
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
   - Design and plan necessary code extensions: new indicators, signal logic, parameter handling, strategy-specific features
 
 ## Low Priority 🟢
+
+- [ ] **Implement varip runtime persistence in PineTS**
+  - **Handoff**: HANDOFF_VARIP_IMPLEMENTATION.md
+  - **Required**: Context.varipStorage Map, initVarIp/setVarIp methods, parser AST transformation
+  - **Test Case**: rolling-cagr.pine (transpiled AST provided)
+  - **Blocker**: barstate.isfirst, timeframe.is* implementations also required
 
 - [ ] **Increase test coverage to 80%**
   - Add unit tests for uncovered code paths

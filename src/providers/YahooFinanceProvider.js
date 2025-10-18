@@ -129,8 +129,10 @@ export class YahooFinanceProvider {
       if (limit <= 30) return '1mo';
       if (limit <= 90) return '3mo';
       if (limit <= 180) return '6mo';
-      if (limit <= 250) return '1y';
-      return '2y';
+      if (limit <= 365) return '1y';
+      if (limit <= 730) return '2y';
+      if (limit <= 1825) return '5y';
+      return '10y'; // Max Yahoo range
     }
 
     if (minutes <= 10080) {

@@ -15,6 +15,11 @@ class BinanceProvider {
       /* Convert timeframe to Binance format */
       const convertedTimeframe = TimeframeParser.toBinanceTimeframe(timeframe);
 
+      /* Binance API hard limit: 1000 candles per request - use pagination for more */
+      if (limit > 1000) {
+        return await this.getPaginatedData(symbol, convertedTimeframe, limit);
+      }
+
       this.stats.recordRequest('Binance', timeframe);
       const result = await this.binanceProvider.getMarketData(
         symbol,
@@ -50,6 +55,33 @@ class BinanceProvider {
       this.logger.debug(`Binance Provider error: ${error.message}`);
       return [];
     }
+  }
+
+  async getPaginatedData(symbol, convertedTimeframe, limit) {
+    const allData = [];
+    let oldestTime = null;
+
+    while (allData.length < limit) {
+      const batchSize = Math.min(1000, limit - allData.length);
+      this.stats.recordRequest('Binance', convertedTimeframe);
+
+      const batch = await this.binanceProvider.getMarketData(
+        symbol,
+        convertedTimeframe,
+        batchSize,
+        null,
+        oldestTime ? oldestTime - 1 : null,
+      );
+
+      if (!batch || batch.length === 0) break;
+
+      allData.unshift(...batch);
+      oldestTime = batch[0].openTime;
+
+      if (batch.length < batchSize) break;
+    }
+
+    return allData.slice(-limit);
   }
 }
 
