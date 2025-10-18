@@ -100,8 +100,49 @@ export class PineScriptTranspiler {
     }
   }
 
+  wrapHistoricalReferences(node) {
+    if (!node || typeof node !== 'object') return;
+
+    // Wrap MemberExpression with historical index (e.g., counter[1] -> (counter[1] || 0))
+    if (node.type === 'MemberExpression' && node.computed && 
+        node.property && node.property.type === 'Literal' && node.property.value > 0) {
+      // Return wrapped node
+      return {
+        type: 'LogicalExpression',
+        operator: '||',
+        left: node,
+        right: { type: 'Literal', value: 0, raw: '0' }
+      };
+    }
+
+    // Recursively process all node properties
+    for (const key in node) {
+      if (node.hasOwnProperty(key) && key !== 'loc' && key !== 'range') {
+        const value = node[key];
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i++) {
+            const wrapped = this.wrapHistoricalReferences(value[i]);
+            if (wrapped && wrapped !== value[i]) {
+              value[i] = wrapped;
+            }
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          const wrapped = this.wrapHistoricalReferences(value);
+          if (wrapped && wrapped !== value) {
+            node[key] = wrapped;
+          }
+        }
+      }
+    }
+
+    return node;
+  }
+
   generateJavaScript(ast) {
     try {
+      // Transform AST to wrap historical references with || 0
+      this.wrapHistoricalReferences(ast);
+      
       return escodegen.generate(ast, {
         format: {
           indent: {

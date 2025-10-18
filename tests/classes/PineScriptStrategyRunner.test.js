@@ -126,7 +126,7 @@ describe('PineScriptStrategyRunner', () => {
       const callArg = mockPineTS.run.mock.calls[0][0];
       expect(callArg).toContain('(context) => {');
       expect(callArg).toContain('const ta = context.ta;');
-      expect(callArg).toContain('const { plot: corePlot, color } = context.core;');
+      expect(callArg).toContain('const { plot: corePlot, color, na, nz } = context.core;');
       expect(callArg).toContain('const syminfo = context.syminfo;');
       expect(callArg).toContain('function indicator() {}');
       expect(callArg).toContain('function strategy() {}');

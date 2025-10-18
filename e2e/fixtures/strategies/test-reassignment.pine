@@ -1,0 +1,69 @@
+//@version=5
+indicator("Test Reassignment Operator Fix", overlay=false)
+
+// ============================================
+// Test 1: Simple cumulative counter
+// Expected: [1, 2, 3, 4, 5, ...]
+// ============================================
+simple_counter = 0
+simple_counter := simple_counter[1] + 1
+plot(simple_counter, title="Simple Counter", color=color.green)
+
+// ============================================
+// Test 2: Counter with different increment
+// Expected: [2, 4, 6, 8, 10, ...]
+// ============================================
+step_counter = 0
+step_counter := step_counter[1] + 2
+plot(step_counter, title="Step Counter +2", color=color.blue)
+
+// ============================================
+// Test 3: Conditional counter (BB strategy pattern)
+// Increments only when close > close[1]
+// Expected: Increments on bullish bars only
+// ============================================
+conditional_counter = 0
+conditional_counter := close > close[1] ? conditional_counter[1] + 1 : conditional_counter[1]
+plot(conditional_counter, title="Conditional Counter", color=color.orange)
+
+// ============================================
+// Test 4: Running maximum (BB strategy pattern)
+// Expected: Monotonically increasing, tracking highest high
+// ============================================
+running_high = high
+running_high := math.max(running_high[1], high)
+plot(running_high, title="Running High", color=color.red)
+
+// ============================================
+// Test 5: Running minimum
+// Expected: Monotonically decreasing, tracking lowest low
+// ============================================
+running_low = low
+running_low := math.min(running_low[1], low)
+plot(running_low, title="Running Low", color=color.purple)
+
+// ============================================
+// Test 6: Multiple reassignments in sequence
+// BB strategy pattern: has_active_trade logic
+// ============================================
+trade_state = 0
+trade_state := close > open ? 1 : trade_state[1]
+trade_state := close < open and trade_state[1] == 1 ? 0 : trade_state[1]
+plot(trade_state * 100, title="Trade State", color=color.aqua)
+
+// ============================================
+// Test 7: Trailing stop level pattern (BB v8)
+// Expected: Steps up on bullish bars
+// ============================================
+trailing_level = 0.0
+step_size = 10.0
+trailing_level := close > close[1] ? trailing_level[1] + step_size : trailing_level[1]
+plot(trailing_level, title="Trailing Level", color=color.fuchsia)
+
+// ============================================
+// Test 8: Complex historical reference chain
+// Uses [1], [2], [3] in expression
+// ============================================
+multi_hist = 0.0
+multi_hist := (multi_hist[1] + multi_hist[2] + multi_hist[3]) / 3 + 1
+plot(multi_hist, title="Multi-Historical", color=color.maroon)

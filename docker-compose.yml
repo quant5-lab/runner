@@ -10,6 +10,7 @@ services:
       - ./services:/app/services
       - ./strategies:/app/strategies
       - ./tests:/app/tests
+      - ./e2e:/app/e2e
       - ./scripts:/app/scripts
       - ./package.json:/app/package.json
       - ./pnpm-lock.yaml:/app/pnpm-lock.yaml

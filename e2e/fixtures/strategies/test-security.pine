@@ -1,0 +1,10 @@
+//@version=5
+indicator("Security Test", overlay=true)
+
+// Test 1: Daily SMA from hourly chart
+sma20_daily = request.security(syminfo.tickerid, 'D', ta.sma(close, 20))
+plot(sma20_daily, color=color.blue, title="SMA20 Daily")
+
+// Test 2: Daily close
+daily_close = request.security(syminfo.tickerid, 'D', close)
+plot(daily_close, color=color.red, title="Daily Close")

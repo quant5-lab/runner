@@ -26,6 +26,9 @@ pnpm install
 # Run tests before starting
 pnpm test
 
+# Run E2E tests
+docker compose run --rm runner sh e2e/run-all.sh
+
 # Run Pine Script strategy analysis
 pnpm start AAPL 1h 100 strategies/test.pine
 

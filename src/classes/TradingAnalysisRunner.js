@@ -69,6 +69,8 @@ class TradingAnalysisRunner {
 
     const runDuration = (performance.now() - runStartTime).toFixed(2);
     this.logger.log(`Processing:\t${candlestickData.length} candles (took ${runDuration}ms)`);
+
+    return executionResult;
   }
 
   async runDefaultStrategy(symbol, timeframe, bars) {

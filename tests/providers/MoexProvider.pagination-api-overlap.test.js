@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import { MoexProvider } from '../../src/providers/MoexProvider.js';
 import { createServer } from 'http';
+
+/* Mock fetch globally to prevent any real API calls */
+const originalFetch = global.fetch;
+const mockFetch = vi.fn();
 
 /* TEST 2: Real provider + fake API - verify API parameters don't overlap */
 describe('MoexProvider Pagination Overlap Prevention - Fake API', () => {
@@ -11,20 +15,16 @@ describe('MoexProvider Pagination Overlap Prevention - Fake API', () => {
   let capturedApiRequests;
   let serverPort;
 
-  beforeEach(async () => {
-    mockLogger = {
-      log: vi.fn(),
-      debug: vi.fn(),
-      error: vi.fn(),
-    };
-    mockStatsCollector = {
-      recordRequest: vi.fn(),
-      recordCacheHit: vi.fn(),
-      recordCacheMiss: vi.fn(),
-    };
-    capturedApiRequests = [];
+  beforeAll(async () => {
+    /* Replace global fetch with mock that only allows localhost */
+    global.fetch = mockFetch.mockImplementation(async (url, options) => {
+      if (!url.toString().includes('localhost')) {
+        throw new Error(`SECURITY VIOLATION: Test attempted to fetch non-localhost URL: ${url}`);
+      }
+      return originalFetch(url, options);
+    });
 
-    /* Start fake MOEX API server */
+    /* Create HTTP server ONCE for all tests - SINGLETON */
     await new Promise((resolve) => {
       fakeServer = createServer((req, res) => {
         const url = new URL(req.url, `http://localhost:${serverPort}`);
@@ -72,13 +72,13 @@ describe('MoexProvider Pagination Overlap Prevention - Fake API', () => {
         resolve();
       });
     });
-
-    provider = new MoexProvider(mockLogger, mockStatsCollector);
-    provider.baseUrl = `http://localhost:${serverPort}`;
-    vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterAll(() => {
+    /* Restore original fetch */
+    global.fetch = originalFetch;
+
+    /* Close server once after all tests */
     return new Promise((resolve) => {
       if (fakeServer) {
         fakeServer.close(() => resolve());
@@ -86,6 +86,25 @@ describe('MoexProvider Pagination Overlap Prevention - Fake API', () => {
         resolve();
       }
     });
+  });
+
+  beforeEach(() => {
+    mockFetch.mockClear();
+    mockLogger = {
+      log: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    };
+    mockStatsCollector = {
+      recordRequest: vi.fn(),
+      recordCacheHit: vi.fn(),
+      recordCacheMiss: vi.fn(),
+    };
+    capturedApiRequests = [];
+
+    provider = new MoexProvider(mockLogger, mockStatsCollector);
+    provider.baseUrl = `http://localhost:${serverPort}`;
+    vi.clearAllMocks();
   });
 
   /* Verify no overlapping API start parameters */

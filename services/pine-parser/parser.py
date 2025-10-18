@@ -25,10 +25,11 @@ class ReAssign(Node):
 
 
 class Assign(Node):
-    def __init__(self, target, value, annotations):
+    def __init__(self, target, value, annotations, mode=None):
         self.target = target
         self.value = value
         self.annotations = annotations
+        self.mode = mode
 
 
 class Name(Node):
@@ -213,18 +214,24 @@ class PyneToJsAstConverter:
     def visit_Assign(self, node):
         js_value = self.visit(node.value)
         
+        # varip mode means mutable variable (use let instead of const)
+        is_varip = hasattr(node, 'mode') and node.mode is not None
+        
         # Handle Tuple destructuring: [a, b, c] = func()
         if isinstance(node.target, Tuple):
             var_names = [elem.id for elem in node.target.elts]
             new_vars = [v for v in var_names if v not in self._declared_vars]
             
             if new_vars:
+                # All user variables are let (series in Pine)
+                var_kind = 'let'
+                
                 # Declare all new variables
                 self._declared_vars.update(new_vars)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
-                return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+                return estree_node('VariableDeclaration', declarations=[declaration], kind=var_kind)
             else:
                 # All already declared, assignment only
                 return estree_node('ExpressionStatement',
@@ -237,11 +244,14 @@ class PyneToJsAstConverter:
             var_name = node.target.id
             
             if var_name not in self._declared_vars:
+                # All user variables are let (series in Pine)
+                var_kind = 'let'
+                
                 self._declared_vars.add(var_name)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
-                return estree_node('VariableDeclaration', declarations=[declaration], kind='const')
+                return estree_node('VariableDeclaration', declarations=[declaration], kind=var_kind)
             else:
                 return estree_node('ExpressionStatement',
                                    expression=estree_node('AssignmentExpression',

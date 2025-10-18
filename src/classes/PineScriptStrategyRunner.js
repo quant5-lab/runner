@@ -16,10 +16,12 @@ class PineScriptStrategyRunner {
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
-      const { plot: corePlot, color } = context.core;
+      const { plot: corePlot, color, na, nz } = context.core;
       const ta = context.ta;
+      const math = context.math;
       const request = context.request;
       const syminfo = context.syminfo;
+      const dayofweek = context.dayofweek;
       
       ${plotAdapterSource}
       
