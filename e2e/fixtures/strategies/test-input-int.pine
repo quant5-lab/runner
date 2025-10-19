@@ -1,0 +1,15 @@
+//@version=5
+indicator("Test input.int() defval parameter", overlay=true)
+
+length1 = input.int(title = "Length 1 (named defval)", defval = 14, minval = 1, maxval = 100)
+length2 = input.int(defval = 20, title = "Length 2 (defval first)")
+length3 = input.int(10, "Length 3 (positional)")
+
+sma1 = ta.sma(close, length1)
+sma2 = ta.sma(close, length2)
+sma3 = ta.sma(close, length3)
+
+plot(sma1, "SMA with named defval", color=color.blue)
+plot(sma2, "SMA with defval first", color=color.red)
+plot(sma3, "SMA with positional", color=color.green)
+

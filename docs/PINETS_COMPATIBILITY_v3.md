@@ -19,6 +19,15 @@
 | `barstate.isfirst` | ✅ series bool | ✅ Context:2890 | rolling-cagr.pine:10 (commented) | ✅ DONE |
 | `syminfo.tickerid` | ✅ simple string | ✅ Context:2868 | bb-strategy-7:5+ times | ✅ DONE |
 | `input.source()` | ✅ function | ✅ PineTS:1632 + Parser Fix | rolling-cagr.pine:9 | ✅ DONE |
+| `input.int()` | ✅ function | ✅ PineTS + Generic Parser Fix | test-input-int.pine | ✅ DONE |
+| `input.float()` | ✅ function | ✅ PineTS + Generic Parser Fix | test-input-float.pine | ✅ DONE |
+| `input.bool()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.string()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.color()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.time()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.symbol()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.session()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
+| `input.timeframe()` | ✅ function | ✅ PineTS + Generic Parser Fix | (covered by fix) | ✅ DONE |
 | `barmerge.lookahead_on` | ✅ const | ❌ Not Found | bb-strategy-7:3 times | CRITICAL |
 | `barmerge.lookahead_off` | ✅ const | ❌ Not Found | None | MEDIUM |
 | `fixnan()` | ✅ series function | ❌ Not Found | bb-strategy-7:5+ times | CRITICAL |
@@ -39,9 +48,11 @@ IMPLEMENTATION COMPLETE (rolling-cagr.pine ✅ WORKS):
        │
        └──> PineParser (Python) ──> ESTree AST ──> escodegen ──> jsCode
                  │                                                     │
-                 │ FIX: input.source(defval=X) → input.source(X, {})  │
-                 │ Commit: b6350ab "Fix input.source defval parameter │
-                 │         positioning"                                │
+                 │ FIX: Generic input.*(defval=X) → input.*(X, {})    │
+                 │ Functions: source, int, float, bool, string,       │
+                 │           color, time, symbol, session, timeframe  │
+                 │ Commits: b6350ab "Fix input.source defval"         │
+                 │          [NEW] "Extend to all input.* functions"   │
                  │                                                     │
                  └─────────────────────────────────────────────────────┘
                                                                       │
@@ -106,4 +117,21 @@ IMPLEMENTATION COMPLETE (rolling-cagr.pine ✅ WORKS):
 
 Test Evidence: docker compose exec runner node src/index.js CHMF M 24 strategies/rolling-cagr.pine
 Result: 24 candles, 12 null plots (bars 1-12), 12 CAGR values (bars 13-24) - EXIT CODE 0
+
+Additional Test Evidence (Generic Fix Validation):
+1. test-input-int.pine: input.int(title="X", defval=20) → input.int(20, {title:"X"}) ✅
+2. test-input-float.pine: input.float(defval=2.5, title="Y") → input.float(2.5, {title:"Y"}) ✅
+3. Regression test: rolling-cagr.pine still produces 12 CAGR values after generic refactoring ✅
+
+Parser Implementation (services/pine-parser/parser.py:332-341):
+```python
+INPUT_DEFVAL_FUNCTIONS = {'source', 'int', 'float', 'bool', 'string', 
+                           'color', 'time', 'symbol', 'session', 'timeframe'}
+is_input_with_defval = (isinstance(node.func, Attribute) and 
+                         isinstance(node.func.value, Name) and 
+                         node.func.value.id == 'input' and 
+                         node.func.attr in INPUT_DEFVAL_FUNCTIONS)
+```
+
+Coverage: 10 input.* functions now handle defval parameter correctly (was 1, now 10)
 

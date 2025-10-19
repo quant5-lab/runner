@@ -4,6 +4,7 @@ import sys
 import json
 from pynescript.ast import parse, dump
 from pynescript.ast.grammar.asdl.generated.PinescriptASTNode import *
+from input_function_transformer import InputFunctionTransformer
 
 
 class Node:
@@ -213,40 +214,30 @@ class PyneToJsAstConverter:
 
     def visit_Assign(self, node):
         js_value = self.visit(node.value)
-        
-        # varip mode means mutable variable (use let instead of const)
         is_varip = hasattr(node, 'mode') and node.mode is not None
         
-        # Handle Tuple destructuring: [a, b, c] = func()
         if isinstance(node.target, Tuple):
             var_names = [elem.id for elem in node.target.elts]
             new_vars = [v for v in var_names if v not in self._declared_vars]
             
             if new_vars:
-                # All user variables are let (series in Pine)
                 var_kind = 'let'
-                
-                # Declare all new variables
                 self._declared_vars.update(new_vars)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
                 return estree_node('VariableDeclaration', declarations=[declaration], kind=var_kind)
             else:
-                # All already declared, assignment only
                 return estree_node('ExpressionStatement',
                                    expression=estree_node('AssignmentExpression',
                                                         operator='=',
                                                         left=self.visit(node.target),
                                                         right=js_value))
         else:
-            # Simple assignment: x = value
             var_name = node.target.id
             
             if var_name not in self._declared_vars:
-                # All user variables are let (series in Pine)
                 var_kind = 'let'
-                
                 self._declared_vars.add(var_name)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
@@ -262,27 +253,23 @@ class PyneToJsAstConverter:
     def visit_ReAssign(self, node):
         js_value = self.visit(node.value)
         
-        # Handle Tuple destructuring: [a, b, c] := func()
         if isinstance(node.target, Tuple):
             var_names = [elem.id for elem in node.target.elts]
             new_vars = [v for v in var_names if v not in self._declared_vars]
             
             if new_vars:
-                # Declare new variables with let (ReAssign implies mutability)
                 self._declared_vars.update(new_vars)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
                 return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
             else:
-                # All already declared, assignment only
                 return estree_node('ExpressionStatement',
                                    expression=estree_node('AssignmentExpression',
                                                         operator='=',
                                                         left=self.visit(node.target),
                                                         right=js_value))
         else:
-            # Simple reassignment: x := value
             var_name = node.target.id
             
             if var_name not in self._declared_vars:
@@ -328,26 +315,24 @@ class PyneToJsAstConverter:
     def visit_Call(self, node):
         callee = self.visit(node.func)
         is_input_call = isinstance(node.func, Name) and node.func.id == 'input'
-        is_input_source = isinstance(node.func, Attribute) and isinstance(node.func.value, Name) and node.func.value.id == 'input' and node.func.attr == 'source'
+        
+        transformer = InputFunctionTransformer(estree_node)
+        is_input_with_defval = transformer.is_input_function_with_defval(node)
 
         positional_args_js = []
         named_args_props = []
-        defval_arg = None
 
         for i, arg in enumerate(node.args):
             arg_value_js = self.visit(arg.value)
             if arg.name:
-                if is_input_source and arg.name == 'defval':
-                    defval_arg = arg_value_js
-                else:
-                    prop = estree_node('Property',
-                                       key=estree_node('Identifier', name=arg.name),
-                                       value=arg_value_js,
-                                       kind='init',
-                                       method=False,
-                                       shorthand=False,
-                                       computed=False)
-                    named_args_props.append(prop)
+                prop = estree_node('Property',
+                                   key=estree_node('Identifier', name=arg.name),
+                                   value=arg_value_js,
+                                   kind='init',
+                                   method=False,
+                                   shorthand=False,
+                                   computed=False)
+                named_args_props.append(prop)
             else:
                 positional_args_js.append(arg_value_js)
 
@@ -368,10 +353,12 @@ class PyneToJsAstConverter:
                                              property=estree_node('Identifier', name=input_type_attr),
                                              computed=False)
 
-        final_args_js = positional_args_js
-
-        if is_input_source and defval_arg:
-            final_args_js.insert(0, defval_arg)
+        if is_input_with_defval:
+            final_args_js, named_args_props, _ = transformer.transform_arguments(
+                node, positional_args_js, named_args_props, self.visit
+            )
+        else:
+            final_args_js = positional_args_js
 
         if named_args_props:
             options_object = estree_node('ObjectExpression', properties=named_args_props)

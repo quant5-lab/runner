@@ -1,0 +1,15 @@
+//@version=5
+strategy("Test input.float() defval parameter", overlay=true)
+
+mult1 = input.float(title = "Multiplier 1 (named defval)", defval = 1.4, minval = 0.1, maxval = 10.0, step = 0.1)
+mult2 = input.float(defval = 2.0, title = "Multiplier 2 (defval first)", step = 0.1)
+mult3 = input.float(1.0, "Multiplier 3 (positional)", step = 0.1)
+
+sma1 = ta.sma(close, math.floor(mult1 * 10))
+sma2 = ta.sma(close, math.floor(mult2 * 10))
+sma3 = ta.sma(close, math.floor(mult3 * 10))
+
+plot(sma1, "SMA (named defval)", color=color.blue, linewidth=1)
+plot(sma2, "SMA (defval first)", color=color.red, linewidth=1)
+plot(sma3, "SMA (positional)", color=color.green, linewidth=1)
+
