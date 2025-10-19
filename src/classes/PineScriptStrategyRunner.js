@@ -20,7 +20,12 @@ class PineScriptStrategyRunner {
       const ta = context.ta;
       const math = context.math;
       const request = context.request;
+      const input = context.input;
       const syminfo = context.syminfo;
+      const format = context.format;
+      const scale = context.scale;
+      const timeframe = context.timeframe;
+      const barstate = context.barstate;
       const dayofweek = context.dayofweek;
       
       ${plotAdapterSource}
