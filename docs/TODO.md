@@ -141,21 +141,17 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Implementation**: Duration-based calculation delegates to TimeframeCalculator static method
   - **Result**: Downscaling uses correct baseLimit calculation without unnecessary buffer
 
-- [ ] **Investigate provider limit vs requested bars mismatch**
-  - **Evidence**: Requested 700 W bars, received 500 W bars (MOEX hard limit)
-  - **Question**: Should runner respect provider limits and adjust expectations?
-  - **Analysis Needed**: Check if this causes issues beyond downscaling (strategy assumptions, backtest validity)
+- [x] **Investigate provider limit vs requested bars mismatch**
+  - **Status**: RESOLVED ✅
+  - **Evidence**: MOEX pagination successfully returns 700 W bars (500 + 200)
+  - **Validation**: docker exec runner node src/index.js SBER W 700 strategies/ema-strategy.pine
+  - **Result**: Pagination working correctly, no limit mismatch exists
 
-- [x] **Debug and fix rolling-cagr strategy issues**
-  - **Status**: ROOT CAUSE IDENTIFIED ✅
-  - **Issue**: varip keyword transpiles to 'let' but lacks intra-bar persistence semantics
-  - **Impact**: Variables reset on each script execution within same bar (incorrect behavior)
-  - **Evidence**: Pine Script v5 docs specify varip must persist between executions on same bar
-  - **PineTS Gap**: Zero varip-specific code in runtime (3155 lines searched)
-  - **Handoff**: HANDOFF_VARIP_IMPLEMENTATION.md created for PineTS developer
-  - **Test Case**: Transpiled rolling-cagr.pine AST provided in handoff document
+- [ ] **Debug and fix rolling-cagr strategy issues**
+  - **Status**: VARIP NOT REQUIRED ✅
+  - **Update**: rolling-cagr does not need varip implementation for current use case
   - **Dependencies**: Requires barstate.isfirst, timeframe.ismonthly/isdaily/isweekly implementation
-  - **Priority**: MEDIUM (blocks 1 strategy, not critical path)
+  - **Priority**: MEDIUM (blocks 1 strategy)
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
@@ -164,10 +160,9 @@ source code is volume mapped, and you must examine source code locally in this w
 ## Low Priority 🟢
 
 - [ ] **Implement varip runtime persistence in PineTS**
-  - **Handoff**: HANDOFF_VARIP_IMPLEMENTATION.md
+  - **Status**: LOW PRIORITY - not needed for current strategies
   - **Required**: Context.varipStorage Map, initVarIp/setVarIp methods, parser AST transformation
-  - **Test Case**: rolling-cagr.pine (transpiled AST provided)
-  - **Blocker**: barstate.isfirst, timeframe.is* implementations also required
+  - **Note**: May be needed for future strategies with intra-bar state requirements
 
 - [ ] **Increase test coverage to 80%**
   - Add unit tests for uncovered code paths
