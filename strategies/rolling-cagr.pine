@@ -3,7 +3,7 @@
 indicator(title = "Rolling CAGR", shorttitle = "Rolling CAGR", overlay = true, format = format.percent, scale = scale.right) 
 
 // rolling period in years. You can change the value "1" in "yA = 1" to the desire rolling period in years
-yA = input.float(1, title='Rolling CAGR Year N')
+yA = input.float(5, title='Rolling CAGR Year N')
 iyA = math.pow(yA, -1)
 
 // input for the selected source
