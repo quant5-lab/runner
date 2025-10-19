@@ -328,21 +328,26 @@ class PyneToJsAstConverter:
     def visit_Call(self, node):
         callee = self.visit(node.func)
         is_input_call = isinstance(node.func, Name) and node.func.id == 'input'
+        is_input_source = isinstance(node.func, Attribute) and isinstance(node.func.value, Name) and node.func.value.id == 'input' and node.func.attr == 'source'
 
         positional_args_js = []
         named_args_props = []
+        defval_arg = None
 
         for i, arg in enumerate(node.args):
             arg_value_js = self.visit(arg.value)
             if arg.name:
-                prop = estree_node('Property',
-                                   key=estree_node('Identifier', name=arg.name),
-                                   value=arg_value_js,
-                                   kind='init',
-                                   method=False,
-                                   shorthand=False,
-                                   computed=False)
-                named_args_props.append(prop)
+                if is_input_source and arg.name == 'defval':
+                    defval_arg = arg_value_js
+                else:
+                    prop = estree_node('Property',
+                                       key=estree_node('Identifier', name=arg.name),
+                                       value=arg_value_js,
+                                       kind='init',
+                                       method=False,
+                                       shorthand=False,
+                                       computed=False)
+                    named_args_props.append(prop)
             else:
                 positional_args_js.append(arg_value_js)
 
@@ -364,6 +369,9 @@ class PyneToJsAstConverter:
                                              computed=False)
 
         final_args_js = positional_args_js
+
+        if is_input_source and defval_arg:
+            final_args_js.insert(0, defval_arg)
 
         if named_args_props:
             options_object = estree_node('ObjectExpression', properties=named_args_props)
