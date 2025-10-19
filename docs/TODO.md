@@ -147,11 +147,12 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Validation**: docker exec runner node src/index.js SBER W 700 strategies/ema-strategy.pine
   - **Result**: Pagination working correctly, no limit mismatch exists
 
-- [ ] **Debug and fix rolling-cagr strategy issues**
-  - **Status**: VARIP NOT REQUIRED ✅
-  - **Update**: rolling-cagr does not need varip implementation for current use case
-  - **Dependencies**: Requires barstate.isfirst, timeframe.ismonthly/isdaily/isweekly implementation
-  - **Priority**: MEDIUM (blocks 1 strategy)
+- [x] **Debug and fix rolling-cagr strategy issues**
+  - **Status**: COMPLETED ✅
+  - **Fix**: input.* defval parameter handling - generic fix for all 10 input functions
+  - **Chart Fix**: Whitespace points for null values - plot alignment matches candlestick timerange
+  - **Validation**: CHMF M 24 rolling-cagr.pine executes successfully
+  - **Result**: All input.* functions support defval, chart rendering aligned
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
