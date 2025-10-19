@@ -237,12 +237,14 @@
         },
 
         processPlotData(plotData) {
-          return plotData
-            .filter((item) => item.value !== null && !isNaN(item.value))
-            .map((item) => ({
-              time: Math.floor(item.time / 1000),
-              value: item.value,
-            }));
+          /* Convert all points, use whitespace (no value) for nulls */
+          return plotData.map((item) => {
+            const point = { time: Math.floor(item.time / 1000) };
+            if (item.value !== null && !isNaN(item.value)) {
+              point.value = item.value;
+            }
+            return point;
+          });
         },
 
         processCandlestickArray(candlestickArray) {
