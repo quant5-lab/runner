@@ -82,22 +82,21 @@ source code is volume mapped, and you must examine source code locally in this w
 ## High Priority 🔴
 
 - [x] **Enhance E2E test coverage with deterministic data**
-  - **Status**: COMPLETED ✅ (Streamlined to 75% deterministic)
+  - **Status**: COMPLETED ✅ (100% deterministic)
   - **Completed**: 
-    - ✅ Created test-input-defval-deterministic.mjs with MockProvider
-    - ✅ Created test-reassignment-deterministic.mjs with MockProvider (8/8 tests passing)
-    - ✅ Created test-security-deterministic.mjs with MockProvider (4/4 structural tests passing)
+    - ✅ Created test-input-defval.mjs with MockProvider
+    - ✅ Created test-reassignment.mjs with MockProvider (8/8 tests passing)
+    - ✅ Created test-security.mjs with MockProvider (4/4 structural tests passing)
     - ✅ Updated MockProvider to use current timestamps (fixes data freshness validation)
-    - ✅ Removed redundant live API tests (test-input-defval.mjs, test-reassignment.mjs)
+    - ✅ Removed all redundant live API tests
+    - ✅ Simplified test naming (removed -deterministic suffix)
   - **Validation**: 
     - ✅ Input tests: SMA(14)=17 values, SMA(20)=11 values, SMA(10)=21 values
     - ✅ Reassignment tests: All 8 patterns validated with exact value matching
     - ✅ Security tests: Validates security() executes without crashes, correct structure
-  - **Streamlined Test Suite**:
-    - 3 deterministic tests (75% of production tests)
-    - 1 live API test (test-security.mjs - validates real timeframe conversion)
-    - 1 debug tool (inspect-input-values.mjs)
-  - **Current Tests**: 5/5 E2E tests passing (1 live API + 3 deterministic + 1 debug tool)
+  - **Final Test Suite**:
+    - 3 deterministic tests (100% - zero API dependencies)
+  - **Current Tests**: 3/3 E2E tests passing
 
 - [x] **Understand security() strategy rerun pattern**
   - **Observation**: PineTS security() reruns entire strategy code in nested context via `await pineTS.run(this.context.pineTSCode)` at PineTS/dist/pinets.dev.es.js:1794
