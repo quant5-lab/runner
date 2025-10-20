@@ -30,6 +30,15 @@ class PineScriptStrategyRunner {
       
       ${plotAdapterSource}
       
+      plot.style_line = 'line';
+      plot.style_histogram = 'histogram';
+      plot.style_cross = 'cross';
+      plot.style_area = 'area';
+      plot.style_columns = 'columns';
+      plot.style_circles = 'circles';
+      plot.style_linebr = 'linebr';
+      plot.style_stepline = 'stepline';
+      
       function indicator() {}
       function strategy() {}
       

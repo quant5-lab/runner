@@ -171,6 +171,24 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Result**: 12 non-null CAGR values calculated (bars 61-72), range -3.04% to 10.63%
   - **Tests**: 475 unit + 3 e2e passing
 
+- [ ] **Fix adapter to pass all plot() parameters**
+  - Replace hardcoded {color, style, linewidth} extraction with pass-through of all options
+  - File: src/adapters/PinePlotAdapter.js lines 11-24
+
+- [ ] **Update adapter tests for all plot() parameters**
+  - Update test expectations to pass ALL options
+  - Add test for transp parameter
+  - File: tests/adapters/PinePlotAdapter.test.js
+
+- [ ] **Add E2E test for plot() parameters**
+  - Use test-plot-params.pine
+  - Verify full pipeline output contains transp, offset, histbase
+  - File: e2e/tests/test-plot-params.mjs (new)
+
+- [ ] **Update documentation for plot() parameter support**
+  - Document all 15 Pine v5 plot() parameters
+  - File: docs/PINETS_COMPATIBILITY_v3.md
+
 - [ ] **Design command-line input parameters for rolling CAGR**
   - Design solution for specifying CAGR length (years) via command line
   - Example: `node src/index.js AAPL 1D 300 strategies/rolling-cagr.pine --cagr-years=3`

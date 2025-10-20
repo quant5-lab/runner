@@ -58,11 +58,13 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
       expect(metadata).toEqual({
         'EMA 9': {
           color: 'blue',
+          style: 'line',
           title: 'EMA 9',
           type: 'indicator',
         },
         'EMA 18': {
           color: 'red',
+          style: 'line',
           title: 'EMA 18',
           type: 'indicator',
         },

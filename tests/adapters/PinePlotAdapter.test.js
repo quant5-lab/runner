@@ -25,7 +25,6 @@ describe('PinePlotAdapter', () => {
 
       expect(corePlot).toHaveBeenCalledWith(series, 'EMA 20', {
         color: 'red',
-        style: undefined,
         linewidth: 1,
       });
     });
@@ -41,7 +40,6 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(series, 'Signal', {
         color: 'green',
         style: 'line',
-        linewidth: undefined,
       });
     });
 
@@ -52,11 +50,7 @@ describe('PinePlotAdapter', () => {
 
       plot(series, null);
 
-      expect(corePlot).toHaveBeenCalledWith(series, undefined, {
-        color: undefined,
-        style: undefined,
-        linewidth: undefined,
-      });
+      expect(corePlot).toHaveBeenCalledWith(series, undefined, {});
     });
 
     test('should default to empty options when maybeOptions not provided', () => {
@@ -69,7 +63,7 @@ describe('PinePlotAdapter', () => {
       expect(corePlot).toHaveBeenCalledWith(series, 'Title Only', {});
     });
 
-    test('should extract only plot-related options', () => {
+    test('should pass through all plot-related options', () => {
       const corePlot = vi.fn();
       const plot = createPlotAdapter(corePlot);
       const series = [16, 17, 18];
@@ -87,6 +81,49 @@ describe('PinePlotAdapter', () => {
         color: 'yellow',
         style: 'linebr',
         linewidth: 3,
+        unrelatedProp: 'ignored',
+      });
+    });
+
+    test('should pass transp parameter to corePlot', () => {
+      const corePlot = vi.fn();
+      const plot = createPlotAdapter(corePlot);
+      const series = [19, 20, 21];
+      const options = {
+        title: 'Transparent Line',
+        color: 'blue',
+        linewidth: 2,
+        transp: 50,
+      };
+
+      plot(series, options);
+
+      expect(corePlot).toHaveBeenCalledWith(series, 'Transparent Line', {
+        color: 'blue',
+        linewidth: 2,
+        transp: 50,
+      });
+    });
+
+    test('should pass histbase and offset parameters to corePlot', () => {
+      const corePlot = vi.fn();
+      const plot = createPlotAdapter(corePlot);
+      const series = [22, 23, 24];
+      const options = {
+        title: 'Histogram',
+        color: 'green',
+        style: 'histogram',
+        histbase: 0,
+        offset: 1,
+      };
+
+      plot(series, options);
+
+      expect(corePlot).toHaveBeenCalledWith(series, 'Histogram', {
+        color: 'green',
+        style: 'histogram',
+        histbase: 0,
+        offset: 1,
       });
     });
   });

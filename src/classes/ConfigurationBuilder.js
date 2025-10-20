@@ -68,6 +68,7 @@ class ConfigurationBuilder {
     Object.entries(indicators).forEach(([key, config]) => {
       series[key] = {
         color: config.color,
+        style: config.style || 'line',
         lineWidth: 2,
         title: key,
         chart: this.determineChartType(key),

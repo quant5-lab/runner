@@ -28,10 +28,69 @@
 | `input.symbol()`         | ✅ function           | ✅ PineTS + Generic Parser Fix | (covered by fix)                 | ✅ DONE  |
 | `input.session()`        | ✅ function           | ✅ PineTS + Generic Parser Fix | (covered by fix)                 | ✅ DONE  |
 | `input.timeframe()`      | ✅ function           | ✅ PineTS + Generic Parser Fix | (covered by fix)                 | ✅ DONE  |
+| `plot() parameters`      | ✅ 15 params          | ✅ Adapter Fix                 | test-plot-params.pine            | ✅ DONE  |
 | `barmerge.lookahead_on`  | ✅ const              | ❌ Not Found                   | bb-strategy-7:3 times            | CRITICAL |
 | `barmerge.lookahead_off` | ✅ const              | ❌ Not Found                   | None                             | MEDIUM   |
 | `fixnan()`               | ✅ series function    | ❌ Not Found                   | bb-strategy-7:5+ times           | CRITICAL |
 | `strategy.*` (60+ items) | ✅ namespace          | ❌ Not Found                   | bb-strategy-7/8/9                | CRITICAL |
+
+---
+
+## plot() Parameter Support
+
+### Supported Parameters
+
+All Pine Script v5 plot() parameters are now passed through to PineTS:
+
+| Parameter     | Type         | Description                                      | Status      |
+| ------------- | ------------ | ------------------------------------------------ | ----------- |
+| `title`       | const string | Plot title                                       | ✅ Supported |
+| `color`       | series color | Plot color                                       | ✅ Supported |
+| `linewidth`   | input int    | Line width in pixels                             | ✅ Supported |
+| `style`       | plot_style   | Plot style (line, histogram, etc.)               | ⚠️ Identifier* |
+| `transp`      | input int    | Transparency (0-100)                             | ✅ Supported |
+| `histbase`    | input float  | Histogram baseline value                         | ✅ Supported |
+| `offset`      | series int   | Shift plot horizontally                          | ✅ Supported |
+| `join`        | input bool   | Join gaps in data                                | ✅ Supported |
+| `editable`    | const bool   | Allow editing in chart settings                  | ✅ Supported |
+| `show_last`   | input int    | Show only last N bars                            | ✅ Supported |
+| `display`     | display_type | Display location                                 | ⚠️ Identifier* |
+| `trackprice`  | input bool   | Track price on price scale                       | ✅ Supported |
+| `format`      | const string | Number format (format.price, format.volume, etc.)| ✅ Supported |
+| `precision`   | const int    | Decimal precision                                | ✅ Supported |
+| `force_overlay` | const bool | Force overlay mode                               | ✅ Supported |
+
+*Identifiers like `plot.style_line` and `display.all` are member expressions evaluated by PineTS at runtime.
+
+### Implementation
+
+The plot adapter extracts `title` and passes all other parameters through to PineTS:
+
+```javascript
+function plot(series, titleOrOptions, maybeOptions) {
+  if (typeof titleOrOptions === 'string') {
+    return corePlot(series, titleOrOptions, maybeOptions || {});
+  }
+  return corePlot(
+    series,
+    ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).title,
+    (function(opts) {
+      var result = {};
+      for (var key in opts) {
+        if (key !== 'title') result[key] = opts[key];
+      }
+      return result;
+    })((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {})
+  );
+}
+```
+
+### Validation
+
+E2E test `test-plot-params.mjs` validates:
+- ✅ Basic parameters: `color`, `linewidth`
+- ✅ Transparency: `transp=50`
+- ✅ Histogram parameters: `histbase=0`, `offset=1`
 
 ---
 

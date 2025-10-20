@@ -22,4 +22,4 @@ vf = src[0]
 cagrA = (math.pow(vf / viA, iyA) - 1) * 100
 
 // ploting the CAGR
-plot(cagrA, title="CAGR A", color=color.blue)
+plot(cagrA, title="CAGR A", color=color.blue, style=plot.style_histogram)

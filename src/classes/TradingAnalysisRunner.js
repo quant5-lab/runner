@@ -169,9 +169,11 @@ class TradingAnalysisRunner {
 
     Object.keys(plots).forEach((plotKey) => {
       const color = this.extractPlotColor(plots[plotKey]);
+      const style = this.extractPlotStyle(plots[plotKey]);
 
       metadata[plotKey] = {
         color,
+        style,
         title: plotKey,
         type: 'indicator',
       };
@@ -187,6 +189,15 @@ class TradingAnalysisRunner {
 
     const firstPointWithColor = plotData.data.find((point) => point?.options?.color);
     return firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
+  }
+
+  extractPlotStyle(plotData) {
+    if (!plotData?.data || !Array.isArray(plotData.data)) {
+      return 'line';
+    }
+
+    const firstPointWithStyle = plotData.data.find((point) => point?.options?.style);
+    return firstPointWithStyle?.options?.style || 'line';
   }
 }
 

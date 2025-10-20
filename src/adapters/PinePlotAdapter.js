@@ -15,11 +15,13 @@ export const plotAdapterSource = `function plot(series, titleOrOptions, maybeOpt
   return corePlot(
     series,
     ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).title,
-    {
-      color: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).color,
-      style: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).style,
-      linewidth: ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).linewidth
-    }
+    (function(opts) {
+      var result = {};
+      for (var key in opts) {
+        if (key !== 'title') result[key] = opts[key];
+      }
+      return result;
+    })((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {})
   );
 }`;
 

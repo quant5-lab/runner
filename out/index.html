@@ -187,7 +187,12 @@
 
         Object.entries(CONFIG.seriesConfig.series).forEach(([key, seriesConfig]) => {
           const targetChart = seriesConfig.chart === 'main' ? mainChart : indicatorChart;
-          seriesMap[key] = ChartManager.addLineSeries(targetChart, seriesConfig);
+          const seriesType = seriesConfig.style || 'line';
+          if (seriesType === 'histogram') {
+            seriesMap[key] = ChartManager.addHistogramSeries(targetChart, seriesConfig);
+          } else {
+            seriesMap[key] = ChartManager.addLineSeries(targetChart, seriesConfig);
+          }
         });
 
         window.addEventListener('resize', () => {
@@ -271,6 +276,10 @@
 
         addLineSeries(chart, config) {
           return chart.addLineSeries(config);
+        },
+
+        addHistogramSeries(chart, config) {
+          return chart.addHistogramSeries(config);
         },
 
         fitContent(charts) {

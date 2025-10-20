@@ -143,12 +143,14 @@ describe('ConfigurationBuilder', () => {
       expect(series).toEqual({
         EMA20: {
           color: '#2196F3',
+          style: 'line',
           lineWidth: 2,
           title: 'EMA20',
           chart: 'main',
         },
         RSI: {
           color: '#FF9800',
+          style: 'line',
           lineWidth: 2,
           title: 'RSI',
           chart: 'indicator',

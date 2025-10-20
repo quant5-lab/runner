@@ -1,0 +1,14 @@
+//@version=5
+indicator("Test Plot Parameters", overlay=true)
+
+// Test strategy with multiple plot parameters
+sma20 = ta.sma(close, 20)
+
+// Test 1: Basic params (color, linewidth, style)
+plot(sma20, title="SMA20", color=color.blue, linewidth=2, style=plot.style_line)
+
+// Test 2: With transparency
+plot(close, title="Close", color=color.red, linewidth=1, transp=50)
+
+// Test 3: Histogram with offset and histbase
+plot(volume, title="Volume", color=color.green, style=plot.style_histogram, histbase=0, offset=1)
