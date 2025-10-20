@@ -42,25 +42,25 @@
 
 All Pine Script v5 plot() parameters are now passed through to PineTS:
 
-| Parameter     | Type         | Description                                      | Status      |
-| ------------- | ------------ | ------------------------------------------------ | ----------- |
-| `title`       | const string | Plot title                                       | ✅ Supported |
-| `color`       | series color | Plot color                                       | ✅ Supported |
-| `linewidth`   | input int    | Line width in pixels                             | ✅ Supported |
-| `style`       | plot_style   | Plot style (line, histogram, etc.)               | ⚠️ Identifier* |
-| `transp`      | input int    | Transparency (0-100)                             | ✅ Supported |
-| `histbase`    | input float  | Histogram baseline value                         | ✅ Supported |
-| `offset`      | series int   | Shift plot horizontally                          | ✅ Supported |
-| `join`        | input bool   | Join gaps in data                                | ✅ Supported |
-| `editable`    | const bool   | Allow editing in chart settings                  | ✅ Supported |
-| `show_last`   | input int    | Show only last N bars                            | ✅ Supported |
-| `display`     | display_type | Display location                                 | ⚠️ Identifier* |
-| `trackprice`  | input bool   | Track price on price scale                       | ✅ Supported |
-| `format`      | const string | Number format (format.price, format.volume, etc.)| ✅ Supported |
-| `precision`   | const int    | Decimal precision                                | ✅ Supported |
-| `force_overlay` | const bool | Force overlay mode                               | ✅ Supported |
+| Parameter       | Type         | Description                                       | Status          |
+| --------------- | ------------ | ------------------------------------------------- | --------------- |
+| `title`         | const string | Plot title                                        | ✅ Supported    |
+| `color`         | series color | Plot color                                        | ✅ Supported    |
+| `linewidth`     | input int    | Line width in pixels                              | ✅ Supported    |
+| `style`         | plot_style   | Plot style (line, histogram, etc.)                | ⚠️ Identifier\* |
+| `transp`        | input int    | Transparency (0-100)                              | ✅ Supported    |
+| `histbase`      | input float  | Histogram baseline value                          | ✅ Supported    |
+| `offset`        | series int   | Shift plot horizontally                           | ✅ Supported    |
+| `join`          | input bool   | Join gaps in data                                 | ✅ Supported    |
+| `editable`      | const bool   | Allow editing in chart settings                   | ✅ Supported    |
+| `show_last`     | input int    | Show only last N bars                             | ✅ Supported    |
+| `display`       | display_type | Display location                                  | ⚠️ Identifier\* |
+| `trackprice`    | input bool   | Track price on price scale                        | ✅ Supported    |
+| `format`        | const string | Number format (format.price, format.volume, etc.) | ✅ Supported    |
+| `precision`     | const int    | Decimal precision                                 | ✅ Supported    |
+| `force_overlay` | const bool   | Force overlay mode                                | ✅ Supported    |
 
-*Identifiers like `plot.style_line` and `display.all` are member expressions evaluated by PineTS at runtime.
+\*Identifiers like `plot.style_line` and `display.all` are member expressions evaluated by PineTS at runtime.
 
 ### Implementation
 
@@ -74,13 +74,13 @@ function plot(series, titleOrOptions, maybeOptions) {
   return corePlot(
     series,
     ((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}).title,
-    (function(opts) {
+    (function (opts) {
       var result = {};
       for (var key in opts) {
         if (key !== 'title') result[key] = opts[key];
       }
       return result;
-    })((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {})
+    })((titleOrOptions && titleOrOptions[0]) || titleOrOptions || {}),
   );
 }
 ```
@@ -88,6 +88,7 @@ function plot(series, titleOrOptions, maybeOptions) {
 ### Validation
 
 E2E test `test-plot-params.mjs` validates:
+
 - ✅ Basic parameters: `color`, `linewidth`
 - ✅ Transparency: `transp=50`
 - ✅ Histogram parameters: `histbase=0`, `offset=1`
