@@ -79,6 +79,10 @@ class ConfigurationBuilder {
   }
 
   determineChartType(key) {
+    // Rolling CAGR EMAs go to indicator chart with their CAGR data
+    if (key.includes('CAGR')) {
+      return 'indicator';
+    }
     return key.includes('EMA') || key.includes('SMA') || key.includes('MA') ? 'main' : 'indicator';
   }
 
