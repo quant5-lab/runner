@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TradingAnalysisRunner } from '../../src/classes/TradingAnalysisRunner.js';
-import { CHART_COLORS } from '../../src/constants/chartColors.js';
+import { CHART_COLORS } from '../../src/config.js';
 
 describe('TradingAnalysisRunner - Metadata Extraction', () => {
   let runner;
@@ -44,12 +44,12 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
       const plots = {
         'EMA 9': {
           data: [
-            { time: 1000, value: 100, options: { color: 'blue', linewidth: 2 } },
-            { time: 2000, value: 101, options: { color: 'blue', linewidth: 2 } },
+            { time: 1000, value: 100, options: { color: '#2196F3', linewidth: 2 } },
+            { time: 2000, value: 101, options: { color: '#2196F3', linewidth: 2 } },
           ],
         },
         'EMA 18': {
-          data: [{ time: 1000, value: 99, options: { color: 'red', linewidth: 2 } }],
+          data: [{ time: 1000, value: 99, options: { color: '#F23645', linewidth: 2 } }],
         },
       };
 
@@ -57,13 +57,13 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
 
       expect(metadata).toEqual({
         'EMA 9': {
-          color: 'blue',
+          color: '#2196F3',
           style: 'line',
           title: 'EMA 9',
           type: 'indicator',
         },
         'EMA 18': {
-          color: 'red',
+          color: '#F23645',
           style: 'line',
           title: 'EMA 18',
           type: 'indicator',
@@ -106,7 +106,7 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
     it('should handle multiple plots with mixed color availability', () => {
       const plots = {
         'Plot With Color': {
-          data: [{ time: 1000, value: 50, options: { color: 'green' } }],
+          data: [{ time: 1000, value: 50, options: { color: '#4CAF50' } }],
         },
         'Plot Without Color': {
           data: [{ time: 1000, value: 60 }],
@@ -115,7 +115,7 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
 
       const metadata = runner.extractIndicatorMetadata(plots);
 
-      expect(metadata['Plot With Color'].color).toBe('green');
+      expect(metadata['Plot With Color'].color).toBe('#4CAF50');
       expect(metadata['Plot Without Color'].color).toBe(CHART_COLORS.DEFAULT_PLOT);
     });
   });
@@ -124,14 +124,14 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
     it('should extract color from first data point with color', () => {
       const plotData = {
         data: [
-          { time: 1000, value: 100, options: { color: 'green' } },
-          { time: 2000, value: 101, options: { color: 'blue' } },
+          { time: 1000, value: 100, options: { color: '#4CAF50' } },
+          { time: 2000, value: 101, options: { color: '#2196F3' } },
         ],
       };
 
       const color = runner.extractPlotColor(plotData);
 
-      expect(color).toBe('green');
+      expect(color).toBe('#4CAF50');
     });
 
     it('should return default color when no data points have color', () => {
@@ -152,13 +152,13 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
         data: [
           { time: 1000, value: 100 },
           { time: 2000, value: 101, options: {} },
-          { time: 3000, value: 102, options: { color: 'purple' } },
+          { time: 3000, value: 102, options: { color: '#9C27B0' } },
         ],
       };
 
       const color = runner.extractPlotColor(plotData);
 
-      expect(color).toBe('purple');
+      expect(color).toBe('#9C27B0');
     });
 
     it('should return default color when data is not an array', () => {

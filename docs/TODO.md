@@ -169,36 +169,64 @@ source code is volume mapped, and you must examine source code locally in this w
   - **PineTS Changes**: Applied (format, scale, timeframe helpers, security() fixes)
   - **Validation**: CHMF M 72 rolling-cagr.pine executes successfully
   - **Result**: 12 non-null CAGR values calculated (bars 61-72), range -3.04% to 10.63%
-  - **Tests**: 475 unit + 3 e2e passing
+  - **Tests**: 477 unit + 4 e2e passing
 
-- [ ] **Fix adapter to pass all plot() parameters**
-  - Replace hardcoded {color, style, linewidth} extraction with pass-through of all options
-  - File: src/adapters/PinePlotAdapter.js lines 11-24
+- [x] **Fix adapter to pass all plot() parameters**
+  - **Status**: COMPLETED ✅
+  - **Implementation**: IIFE pattern passes all options through (avoids PineTS transformation)
+  - **Coverage**: All 15 Pine v5 plot() parameters supported
+  - **Tests**: 8 adapter unit tests + test-plot-params.mjs E2E test passing
 
-- [ ] **Update adapter tests for all plot() parameters**
-  - Update test expectations to pass ALL options
-  - Add test for transp parameter
-  - File: tests/adapters/PinePlotAdapter.test.js
+- [x] **Update adapter tests for all plot() parameters**
+  - **Status**: COMPLETED ✅
+  - **Tests**: transp, histbase, offset, linewidth, style validated
+  - **File**: tests/adapters/PinePlotAdapter.test.js (8 tests)
 
-- [ ] **Add E2E test for plot() parameters**
-  - Use test-plot-params.pine
-  - Verify full pipeline output contains transp, offset, histbase
-  - File: e2e/tests/test-plot-params.mjs (new)
+- [x] **Add E2E test for plot() parameters**
+  - **Status**: COMPLETED ✅
+  - **File**: e2e/tests/test-plot-params.mjs
+  - **Validation**: Full pipeline (Pine → Parser → Adapter → PineTS → JSON) verified
 
-- [ ] **Update documentation for plot() parameter support**
-  - Document all 15 Pine v5 plot() parameters
-  - File: docs/PINETS_COMPATIBILITY_v3.md
+- [x] **Update documentation for plot() parameter support**
+  - **Status**: COMPLETED ✅
+  - **File**: docs/PINETS_COMPATIBILITY_v3.md
+  - **Content**: 15 parameters table with status, examples, architecture diagram
+
+- [x] **Fix color test expectations after PineTS update**
+  - **Status**: COMPLETED ✅
+  - **Issue**: PineTS now returns hex color codes instead of color names
+  - **Fix**: Updated TradingAnalysisRunner.extractMetadata.test.js expectations
+  - **Changes**: 'blue'→'#2196F3', 'red'→'#F23645', 'green'→'#4CAF50', 'purple'→'#9C27B0'
+  - **Tests**: 477/477 passing
+
+- [ ] **Implement --settings CLI using PineTS native inputOverrides**
+  - **Status**: READY - PineTS already has inputOverrides support
+  - **Discovery**: PineTS Context constructor accepts inputOverrides parameter (line 2899)
+  - **Implementation**: Parse --settings CLI, pass to PineTS constructor, test with rolling-cagr
+  - **Timeline**: ~30 minutes implementation + 20 minutes E2E test
 
 - [ ] **Design command-line input parameters for rolling CAGR**
-  - Design solution for specifying CAGR length (years) via command line
-  - Example: `node src/index.js AAPL 1D 300 strategies/rolling-cagr.pine --cagr-years=3`
-  - Propose architecture and implementation approach
+  - **Status**: ~~BLOCKED~~ READY - PineTS native support confirmed
+  - **Handoff**: docs/pinets-input-overrides-request.md (marked IMPLEMENTED)
+  - **Architecture**: Input override support already exists in PineTS Context/Input classes
+  - **Timeline**: Unblocked - can implement immediately using native API
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
   - Design and plan necessary code extensions: new indicators, signal logic, parameter handling, strategy-specific features
 
 ## Low Priority 🟢
+
+- [ ] **Design Y-axis scale configuration for plots**
+  - **Status**: NOT STARTED - design phase required
+  - **Goal**: Each plot should be able to specify its Y-axis scale settings
+  - **Considerations**:
+    - How to configure in Pine Script (TradingView-compatible approach)
+    - Mapping to lightweight-charts priceScaleId
+    - Default behavior when not specified
+    - Multi-pane vs single-pane layouts
+  - **Example Use Case**: rolling-cagr-5-10yr.pine with 4 plots needing independent scales
+  - **Next**: Research TradingView Pine Script approach for multi-scale indicators
 
 - [ ] **Implement varip runtime persistence in PineTS**
   - **Status**: LOW PRIORITY - not needed for current strategies
@@ -216,13 +244,15 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Current Status
 
-- **Total Tests**: 475/475 passing ✅
+- **Total Tests**: 477/477 passing ✅
 - **Linting**: 0 errors ✅
-- **E2E Tests**: 3/3 passing ✅
+- **E2E Tests**: 4/4 passing ✅
 - **PineTS Integration**: Format/scale/timeframe context complete ✅
+- **Plot Parameters**: All 15 Pine v5 parameters supported ✅
+- **Color Tests**: Fixed for PineTS hex format (blue→#2196F3, red→#F23645, etc) ✅
 - **rolling-cagr**: Working (requires 5-year history for 5-year CAGR) ✅
-- **Next Task**: Design command-line input parameters 🎯
-- **Next Task**: Debug and fix rolling-cagr strategy 🎯
+- **Input Overrides**: PineTS native support confirmed - ready to implement ✅
+- **Next Task**: Implement --settings CLI using PineTS native inputOverrides API 🎯
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅
 - **API Stats**: Tab-separated ASCII format ✅

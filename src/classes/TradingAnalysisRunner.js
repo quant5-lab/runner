@@ -1,4 +1,4 @@
-import { CHART_COLORS } from '../constants/chartColors.js';
+import { CHART_COLORS } from '../config.js';
 
 class TradingAnalysisRunner {
   constructor(
@@ -17,7 +17,7 @@ class TradingAnalysisRunner {
     this.logger = logger;
   }
 
-  async runPineScriptStrategy(symbol, timeframe, bars, jsCode, strategyPath) {
+  async runPineScriptStrategy(symbol, timeframe, bars, jsCode, strategyPath, settings = null) {
     const runStartTime = performance.now();
     this.logger.log(`Configuration:\tSymbol=${symbol}, Timeframe=${timeframe}, Bars=${bars}`);
 
@@ -47,6 +47,7 @@ class TradingAnalysisRunner {
       symbol,
       bars,
       timeframe,
+      settings,
     );
     const execDuration = (performance.now() - execStartTime).toFixed(2);
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
@@ -188,7 +189,22 @@ class TradingAnalysisRunner {
     }
 
     const firstPointWithColor = plotData.data.find((point) => point?.options?.color);
-    return firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
+    const rawColor = firstPointWithColor?.options?.color || CHART_COLORS.DEFAULT_PLOT;
+    return this.normalizeRgbaAlpha(rawColor);
+  }
+
+  normalizeRgbaAlpha(color) {
+    // PineTS outputs rgba with alpha 0-100, lightweight-charts needs 0-1
+    const rgbaMatch = color.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (rgbaMatch) {
+      const [, r, g, b, a] = rgbaMatch;
+      const alphaValue = parseInt(a);
+      if (alphaValue > 1) {
+        // Convert from 0-100 to 0-1
+        return `rgba(${r}, ${g}, ${b}, ${alphaValue / 100})`;
+      }
+    }
+    return color;
   }
 
   extractPlotStyle(plotData) {

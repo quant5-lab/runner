@@ -1,0 +1,43 @@
+//@version=5
+indicator(title = "Rolling CAGR 5/10Y Study", shorttitle = "CAGR Study", overlay = false, format = format.percent, scale = scale.right)
+
+// 5-year and 10-year rolling CAGR study with EMA smoothing
+
+src = input.source(title = "Data Source", defval = close, tooltip = "Selected data source to find the rolling CAGR on")
+
+interval_multiplier = timeframe.ismonthly ? 12 : timeframe.isdaily ? 252 : timeframe.isweekly ? 52 : na
+
+// 5-year rolling CAGR calculation
+y5 = 5.0
+n5 = interval_multiplier * y5
+vi5 = src[n5]
+vf = src[0]
+cagr5 = (math.pow(vf / vi5, 1/y5) - 1) * 100
+
+// 10-year rolling CAGR calculation
+y10 = 10.0
+n10 = interval_multiplier * y10
+vi10 = src[n10]
+cagr10 = (math.pow(vf / vi10, 1/y10) - 1) * 100
+
+// EMA calculations
+ema60_cagr5 = ta.ema(cagr5, 60)
+ema120_cagr10 = ta.ema(cagr10, 120)
+
+// Custom colors
+yellow_color = color.rgb(253, 216, 53)
+green_color = color.rgb(76, 175, 80)
+grey_translucent = color.new(color.gray, 50)
+light_grey_translucent = color.new(color.gray, 70)
+
+// Plot 1: Rolling CAGR 5yrs bar chart grey
+plot(cagr5, title="Rolling CAGR 5Y", color=grey_translucent, style=plot.style_histogram, linewidth=2)
+
+// Plot 2: EMA 60 of Rolling CAGR 5yrs yellow line
+plot(ema60_cagr5, title="EMA 60 (5Y CAGR)", color=yellow_color, style=plot.style_line, linewidth=2)
+
+// Plot 3: Rolling CAGR 10yrs bar chart light grey
+plot(cagr10, title="Rolling CAGR 10Y", color=light_grey_translucent, style=plot.style_histogram, linewidth=2)
+
+// Plot 4: EMA 120 of Rolling CAGR 10yrs green line
+plot(ema120_cagr10, title="EMA 120 (10Y CAGR)", color=green_color, style=plot.style_line, linewidth=2)

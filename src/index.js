@@ -3,6 +3,23 @@ import { createProviderChain, DEFAULTS } from './config.js';
 import { readFile } from 'fs/promises';
 import PineVersionMigrator from './pine/PineVersionMigrator.js';
 
+/* Parse --settings='{"key":"value"}' from CLI arguments */
+function parseSettingsArg(argv) {
+  const settingsArg = argv.find((arg) => arg.startsWith('--settings='));
+  if (!settingsArg) return null;
+
+  try {
+    const jsonString = settingsArg.substring('--settings='.length);
+    const settings = JSON.parse(jsonString);
+    if (typeof settings !== 'object' || Array.isArray(settings)) {
+      throw new Error('Settings must be an object');
+    }
+    return settings;
+  } catch (error) {
+    throw new Error(`Invalid --settings format: ${error.message}`);
+  }
+}
+
 async function main() {
   const startTime = performance.now();
   try {
@@ -11,6 +28,7 @@ async function main() {
     const envTimeframe = process.argv[3] || process.env.TIMEFRAME || timeframe;
     const envBars = parseInt(process.argv[4]) || parseInt(process.env.BARS) || bars;
     const envStrategy = process.argv[5] || process.env.STRATEGY;
+    const settings = parseSettingsArg(process.argv);
 
     const container = createContainer(createProviderChain, DEFAULTS);
     const logger = container.resolve('logger');
@@ -44,7 +62,18 @@ async function main() {
       const transpileDuration = (performance.now() - transpileStartTime).toFixed(2);
       logger.info(`Transpilation:\ttook ${transpileDuration}ms (${jsCode.length} chars)`);
 
-      await runner.runPineScriptStrategy(envSymbol, envTimeframe, envBars, jsCode, envStrategy);
+      if (settings) {
+        logger.info(`Input overrides: ${JSON.stringify(settings)}`);
+      }
+
+      await runner.runPineScriptStrategy(
+        envSymbol,
+        envTimeframe,
+        envBars,
+        jsCode,
+        envStrategy,
+        settings,
+      );
 
       const runDuration = (performance.now() - strategyStartTime).toFixed(2);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);

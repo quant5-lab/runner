@@ -9,10 +9,19 @@ class PineScriptStrategyRunner {
     this.statsCollector = statsCollector;
   }
 
-  async executeTranspiledStrategy(jsCode, symbol, bars, timeframe) {
+  async executeTranspiledStrategy(jsCode, symbol, bars, timeframe, settings = null) {
     const minutes = TimeframeParser.parseToMinutes(timeframe);
     const pineTSTimeframe = TimeframeConverter.toPineTS(minutes);
-    const pineTS = new PineTS(this.providerManager, symbol, pineTSTimeframe, bars, null, null);
+    const constructorOptions = settings ? { inputOverrides: settings } : undefined;
+    const pineTS = new PineTS(
+      this.providerManager,
+      symbol,
+      pineTSTimeframe,
+      bars,
+      null,
+      null,
+      constructorOptions,
+    );
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;

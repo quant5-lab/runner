@@ -29,13 +29,7 @@ const pineCode = await readFile('e2e/fixtures/strategies/test-plot-params.pine',
 const jsCode = await transpiler.transpile(pineCode);
 
 // Run strategy with deterministic data (30 bars)
-const result = await runner.runPineScriptStrategy(
-  'TEST',
-  'D',
-  30,
-  jsCode,
-  'test-plot-params.pine',
-);
+const result = await runner.runPineScriptStrategy('TEST', 'D', 30, jsCode, 'test-plot-params.pine');
 
 console.log('=== DETERMINISTIC TEST RESULTS ===\n');
 
@@ -50,15 +44,17 @@ if (!sma20Plot) {
 const sma20Options = sma20Plot.data?.[0]?.options || {};
 console.log('  SMA20 options:', JSON.stringify(sma20Options, null, 2));
 
-if (sma20Options.color !== 'blue') {
-  console.error(`❌ FAILED: Expected color='blue', got '${sma20Options.color}'`);
+if (sma20Options.color !== '#2962FF') {
+  console.error(`❌ FAILED: Expected color='#2962FF', got '${sma20Options.color}'`);
   process.exit(1);
 }
 if (sma20Options.linewidth !== 2) {
   console.error(`❌ FAILED: Expected linewidth=2, got ${sma20Options.linewidth}`);
   process.exit(1);
 }
-console.log('✅ PASSED: SMA20 has correct color, linewidth (style is identifier, checked separately)\n');
+console.log(
+  '✅ PASSED: SMA20 has correct color, linewidth (style is identifier, checked separately)\n',
+);
 
 // Test 2: Verify Close plot has transp parameter
 console.log('TEST 2: Close plot transparency parameter');
@@ -71,8 +67,8 @@ if (!closePlot) {
 const closeOptions = closePlot.data?.[0]?.options || {};
 console.log('  Close options:', JSON.stringify(closeOptions, null, 2));
 
-if (closeOptions.color !== 'red') {
-  console.error(`❌ FAILED: Expected color='red', got '${closeOptions.color}'`);
+if (closeOptions.color !== '#FF5252') {
+  console.error(`❌ FAILED: Expected color='#FF5252', got '${closeOptions.color}'`);
   process.exit(1);
 }
 if (closeOptions.linewidth !== 1) {
@@ -96,8 +92,8 @@ if (!volumePlot) {
 const volumeOptions = volumePlot.data?.[0]?.options || {};
 console.log('  Volume options:', JSON.stringify(volumeOptions, null, 2));
 
-if (volumeOptions.color !== 'green') {
-  console.error(`❌ FAILED: Expected color='green', got '${volumeOptions.color}'`);
+if (volumeOptions.color !== '#4CAF50') {
+  console.error(`❌ FAILED: Expected color='#4CAF50', got '${volumeOptions.color}'`);
   process.exit(1);
 }
 if (volumeOptions.histbase !== 0) {
@@ -108,7 +104,9 @@ if (volumeOptions.offset !== 1) {
   console.error(`❌ FAILED: Expected offset=1, got ${volumeOptions.offset}`);
   process.exit(1);
 }
-console.log('✅ PASSED: Volume plot has correct histbase and offset parameters (style is identifier)\n');
+console.log(
+  '✅ PASSED: Volume plot has correct histbase and offset parameters (style is identifier)\n',
+);
 
 console.log('═══════════════════════════════════════════════════════════');
 console.log('✅ ALL TESTS PASSED: plot() parameters correctly passed through');

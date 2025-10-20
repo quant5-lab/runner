@@ -1,4 +1,4 @@
-import { CHART_COLORS } from '../constants/chartColors.js';
+import { CHART_COLORS } from '../config.js';
 
 class ConfigurationBuilder {
   constructor(defaultConfig) {
