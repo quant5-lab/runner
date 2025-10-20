@@ -285,7 +285,15 @@ export class YahooFinanceProvider {
       for (let i = 0; i < timestamps.length; i++) {
         if (open[i] !== null && high[i] !== null && low[i] !== null && close[i] !== null) {
           convertedData.push(
-            this.convertYahooCandle(timestamps[i], open[i], high[i], low[i], close[i], volume[i], timeframe),
+            this.convertYahooCandle(
+              timestamps[i],
+              open[i],
+              high[i],
+              low[i],
+              close[i],
+              volume[i],
+              timeframe,
+            ),
           );
         }
       }

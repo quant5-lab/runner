@@ -83,14 +83,14 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [x] **Enhance E2E test coverage with deterministic data**
   - **Status**: COMPLETED ✅ (100% deterministic)
-  - **Completed**: 
+  - **Completed**:
     - ✅ Created test-input-defval.mjs with MockProvider
     - ✅ Created test-reassignment.mjs with MockProvider (8/8 tests passing)
     - ✅ Created test-security.mjs with MockProvider (4/4 structural tests passing)
     - ✅ Updated MockProvider to use current timestamps (fixes data freshness validation)
     - ✅ Removed all redundant live API tests
     - ✅ Simplified test naming (removed -deterministic suffix)
-  - **Validation**: 
+  - **Validation**:
     - ✅ Input tests: SMA(14)=17 values, SMA(20)=11 values, SMA(10)=21 values
     - ✅ Reassignment tests: All 8 patterns validated with exact value matching
     - ✅ Security tests: Validates security() executes without crashes, correct structure
@@ -132,7 +132,7 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [x] **Fix security() returning identical values**
   - **Status**: COMPLETED ✅
-  - **Root Cause**: _findSecContextIdx() offset bug + paramArray[0] undefined at beginning indices
+  - **Root Cause**: \_findSecContextIdx() offset bug + paramArray[0] undefined at beginning indices
   - **Fix**: (1) Changed return from `i+(lookahead?1:2)` to `i`, (2) Added fallback to cached.data.close[secIdx] when paramArray[secIdx] undefined
   - **Validation**: 3/3 security E2E tests passing, 8/8 reassignment tests passing, 475 unit tests passing
   - **Cleanup**: Deleted 9 debug test files, kept test-security.mjs and test-reassignment.mjs
@@ -142,7 +142,7 @@ source code is volume mapped, and you must examine source code locally in this w
 - [x] Fix pagination issue : add tolerance to overlapping pages returned by MOEX provider
 - [x] **Fix upscaling issue : Yahoo security() sparse points**
   - **Root Cause**: Yahoo hardcoded closeTime = openTime + 60000ms regardless of timeframe
-  - **Fix**: Changed to closeTime = openTime + intervalMinutes * 60 * 1000 - 1
+  - **Fix**: Changed to closeTime = openTime + intervalMinutes _ 60 _ 1000 - 1
   - **Validation**: AMZN 15m + daily security() now shows stepped lines (229.6874992371 repeated)
   - **Result**: Universal timeframe support
 - [x] **Fix upscaling issue : `security()` extra 500 candlesticks for upper timeframes**
@@ -166,10 +166,15 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [x] **Debug and fix rolling-cagr strategy issues**
   - **Status**: COMPLETED ✅
-  - **Fix**: input.* defval parameter handling - generic fix for all 10 input functions
-  - **Chart Fix**: Whitespace points for null values - plot alignment matches candlestick timerange
-  - **Validation**: CHMF M 24 rolling-cagr.pine executes successfully
-  - **Result**: All input.* functions support defval, chart rendering aligned
+  - **PineTS Changes**: Applied (format, scale, timeframe helpers, security() fixes)
+  - **Validation**: CHMF M 72 rolling-cagr.pine executes successfully
+  - **Result**: 12 non-null CAGR values calculated (bars 61-72), range -3.04% to 10.63%
+  - **Tests**: 475 unit + 3 e2e passing
+
+- [ ] **Design command-line input parameters for rolling CAGR**
+  - Design solution for specifying CAGR length (years) via command line
+  - Example: `node src/index.js AAPL 1D 300 strategies/rolling-cagr.pine --cagr-years=3`
+  - Propose architecture and implementation approach
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
@@ -195,11 +200,10 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - **Total Tests**: 475/475 passing ✅
 - **Linting**: 0 errors ✅
-- **PineTS rev3 Migration**: Complete ✅
-- **security() Bug**: RESOLVED ✅
-- **security() Downscaling**: COMPLETE ✅
-- **Reassignment Operator**: FIXED ✅
-- **E2E Tests**: 3/3 security + 8/8 reassignment ✅
+- **E2E Tests**: 3/3 passing ✅
+- **PineTS Integration**: Format/scale/timeframe context complete ✅
+- **rolling-cagr**: Working (requires 5-year history for 5-year CAGR) ✅
+- **Next Task**: Design command-line input parameters 🎯
 - **Next Task**: Debug and fix rolling-cagr strategy 🎯
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅

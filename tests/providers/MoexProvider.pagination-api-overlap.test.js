@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, vi, beforeAll, afterAll } from 'vitest';
 import { MoexProvider } from '../../src/providers/MoexProvider.js';
 import { createServer } from 'http';
 

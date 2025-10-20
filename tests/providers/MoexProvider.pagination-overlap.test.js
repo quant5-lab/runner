@@ -292,7 +292,9 @@ describe('MoexProvider Pagination Overlap Prevention - Mock Provider', () => {
     });
 
     it('Case 31: 16 pages (500×16)', async () => {
-      setupMockFetch([500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]);
+      setupMockFetch([
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+      ]);
       await provider.getMarketData('TEST', '1d', 8000);
       assertNoOverlap();
       expect(capturedRequests).toHaveLength(16);
@@ -306,28 +308,38 @@ describe('MoexProvider Pagination Overlap Prevention - Mock Provider', () => {
     });
 
     it('Case 33: 17 pages (500×17)', async () => {
-      setupMockFetch([500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]);
+      setupMockFetch([
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+      ]);
       await provider.getMarketData('TEST', '1d', 8500);
       assertNoOverlap();
       expect(capturedRequests).toHaveLength(17);
     });
 
     it('Case 34: 18 pages (500×18)', async () => {
-      setupMockFetch([500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]);
+      setupMockFetch([
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+      ]);
       await provider.getMarketData('TEST', '1d', 9000);
       assertNoOverlap();
       expect(capturedRequests).toHaveLength(18);
     });
 
     it('Case 35: 19 pages (500×19)', async () => {
-      setupMockFetch([500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]);
+      setupMockFetch([
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+        500,
+      ]);
       await provider.getMarketData('TEST', '1d', 9500);
       assertNoOverlap();
       expect(capturedRequests).toHaveLength(19);
     });
 
     it('Case 36: 20 pages (500×20)', async () => {
-      setupMockFetch([500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]);
+      setupMockFetch([
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+        500, 500,
+      ]);
       await provider.getMarketData('TEST', '1d', 10000);
       assertNoOverlap();
       expect(capturedRequests).toHaveLength(20);

@@ -37,6 +37,7 @@ docker compose run --rm runner sh -c "for test in e2e/tests/*.mjs; do node \$tes
 **Purpose**: Validates the fix for Pine Script `:=` reassignment operator with historical references
 
 **Coverage**:
+
 - Simple cumulative counters
 - Step counters with different increments
 - Conditional counters (BB strategy pattern)
@@ -74,7 +75,13 @@ const transpiler = container.resolve('pineScriptTranspiler');
 const pineCode = await readFile('e2e/fixtures/strategies/your-strategy.pine', 'utf-8');
 const jsCode = await transpiler.transpile(pineCode);
 
-const result = await runner.runPineScriptStrategy('BTCUSDT', '1h', 10, jsCode, 'your-strategy.pine');
+const result = await runner.runPineScriptStrategy(
+  'BTCUSDT',
+  '1h',
+  10,
+  jsCode,
+  'your-strategy.pine',
+);
 
 // Validate results...
 console.log(result.plots);

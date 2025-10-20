@@ -1,6 +1,6 @@
 /**
  * MockProvider - Deterministic data provider for E2E tests
- * 
+ *
  * Provides 100% predictable candle data for regression testing.
  * Benefits:
  * - No network dependencies (fast, reliable)
@@ -11,7 +11,7 @@
 
 export class MockProvider {
   constructor(config = {}) {
-    this.dataPattern = config.dataPattern || 'linear';  // 'linear', 'constant', 'random', 'edge'
+    this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge'
     this.basePrice = config.basePrice || 1;
     this.supportedTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', 'D', 'W', 'M'];
   }
@@ -30,14 +30,14 @@ export class MockProvider {
 
     for (let i = 0; i < limit; i++) {
       const price = this.generatePrice(i);
-      
+
       candles.push({
-        time: now - ((limit - 1 - i) * timeframeSeconds), // Work backwards from now
+        time: now - (limit - 1 - i) * timeframeSeconds, // Work backwards from now
         open: price,
         high: price + 1,
         low: price - 1,
         close: price,
-        volume: 1000 + i
+        volume: 1000 + i,
       });
     }
 
@@ -52,20 +52,21 @@ export class MockProvider {
       case 'linear':
         // close = [1, 2, 3, 4, 5, ...]
         return this.basePrice + index;
-      
+
       case 'constant':
         // close = [100, 100, 100, ...]
         return this.basePrice;
-      
+
       case 'random':
         // Deterministic "random" using index as seed
-        return this.basePrice + (index * 7 % 50);
-      
-      case 'edge':
+        return this.basePrice + ((index * 7) % 50);
+
+      case 'edge': {
         // Test edge cases: 0, negative, very large
         const patterns = [0, -100, 0.0001, 999999, NaN];
         return patterns[index % patterns.length];
-      
+      }
+
       default:
         return this.basePrice + index;
     }
@@ -82,9 +83,9 @@ export class MockProvider {
       '30m': 1800,
       '1h': 3600,
       '4h': 14400,
-      'D': 86400,
-      'W': 604800,
-      'M': 2592000 // ~30 days
+      D: 86400,
+      W: 604800,
+      M: 2592000, // ~30 days
     };
     return map[timeframe] || 86400;
   }
@@ -108,7 +109,7 @@ export class MockProviderManager {
       totalRequests: 0,
       cacheHits: 0,
       cacheMisses: 0,
-      byProvider: { Mock: { requests: 0, symbols: new Set() } }
+      byProvider: { Mock: { requests: 0, symbols: new Set() } },
     };
   }
 }

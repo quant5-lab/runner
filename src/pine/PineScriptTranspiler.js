@@ -104,20 +104,25 @@ export class PineScriptTranspiler {
     if (!node || typeof node !== 'object') return;
 
     // Wrap MemberExpression with historical index (e.g., counter[1] -> (counter[1] || 0))
-    if (node.type === 'MemberExpression' && node.computed && 
-        node.property && node.property.type === 'Literal' && node.property.value > 0) {
+    if (
+      node.type === 'MemberExpression' &&
+      node.computed &&
+      node.property &&
+      node.property.type === 'Literal' &&
+      node.property.value > 0
+    ) {
       // Return wrapped node
       return {
         type: 'LogicalExpression',
         operator: '||',
         left: node,
-        right: { type: 'Literal', value: 0, raw: '0' }
+        right: { type: 'Literal', value: 0, raw: '0' },
       };
     }
 
     // Recursively process all node properties
     for (const key in node) {
-      if (node.hasOwnProperty(key) && key !== 'loc' && key !== 'range') {
+      if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'loc' && key !== 'range') {
         const value = node[key];
         if (Array.isArray(value)) {
           for (let i = 0; i < value.length; i++) {
@@ -142,7 +147,7 @@ export class PineScriptTranspiler {
     try {
       // Transform AST to wrap historical references with || 0
       this.wrapHistoricalReferences(ast);
-      
+
       return escodegen.generate(ast, {
         format: {
           indent: {

@@ -166,16 +166,7 @@ describe('MoexProvider Pagination', () => {
           const candleDate = new Date(baseDate);
           candleDate.setDate(baseDate.getDate() + batch.start + i);
           const dateStr = candleDate.toISOString().split('T')[0];
-          return [
-            100,
-            105,
-            110,
-            90,
-            1000,
-            1000,
-            `${dateStr} 00:00:00`,
-            `${dateStr} 23:59:59`,
-          ];
+          return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
         });
 
         global.fetch.mockResolvedValueOnce({
@@ -205,32 +196,14 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       const secondBatch = Array.from({ length: 200 }, (_, i) => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + 500 + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          200,
-          205,
-          210,
-          190,
-          2000,
-          2000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [200, 205, 210, 190, 2000, 2000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -258,16 +231,7 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -293,32 +257,14 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       const secondBatch = Array.from({ length: 300 }, (_, i) => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + 500 + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          200,
-          205,
-          210,
-          190,
-          2000,
-          2000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [200, 205, 210, 190, 2000, 2000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -344,16 +290,7 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -379,32 +316,14 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       const secondBatch = Array.from({ length: 500 }, (_, i) => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + 500 + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          200,
-          205,
-          210,
-          190,
-          2000,
-          2000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [200, 205, 210, 190, 2000, 2000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -428,7 +347,7 @@ describe('MoexProvider Pagination', () => {
   describe('Pagination URL construction', () => {
     it('should not add start parameter for first request', async () => {
       const mockCandles = Array.from({ length: 100 }, (_, i) => [
-        `2024-01-01 00:00:00`,
+        '2024-01-01 00:00:00',
         100,
         110,
         90,
@@ -459,16 +378,7 @@ describe('MoexProvider Pagination', () => {
           const candleDate = new Date(baseDate);
           candleDate.setDate(baseDate.getDate() + batchIdx * 500 + i);
           const dateStr = candleDate.toISOString().split('T')[0];
-          return [
-            100,
-            105,
-            110,
-            90,
-            1000,
-            1000,
-            `${dateStr} 00:00:00`,
-            `${dateStr} 23:59:59`,
-          ];
+          return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
         });
 
         global.fetch.mockResolvedValueOnce({
@@ -492,32 +402,14 @@ describe('MoexProvider Pagination', () => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          100,
-          105,
-          110,
-          90,
-          1000,
-          1000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       const secondBatch = Array.from({ length: 300 }, (_, i) => {
         const candleDate = new Date(baseDate);
         candleDate.setDate(baseDate.getDate() + 500 + i);
         const dateStr = candleDate.toISOString().split('T')[0];
-        return [
-          200,
-          205,
-          210,
-          190,
-          2000,
-          2000,
-          `${dateStr} 00:00:00`,
-          `${dateStr} 23:59:59`,
-        ];
+        return [200, 205, 210, 190, 2000, 2000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
       });
 
       global.fetch = vi
@@ -554,7 +446,10 @@ describe('MoexProvider Pagination', () => {
           '1000',
           '1000',
           weekDate.toISOString().slice(0, 19).replace('T', ' '),
-          new Date(weekDate.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+          new Date(weekDate.getTime() + 6 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 19)
+            .replace('T', ' '),
         ];
       });
 
@@ -568,7 +463,10 @@ describe('MoexProvider Pagination', () => {
           '500',
           '500',
           weekDate.toISOString().slice(0, 19).replace('T', ' '),
-          new Date(weekDate.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+          new Date(weekDate.getTime() + 6 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 19)
+            .replace('T', ' '),
         ];
       });
 
@@ -606,16 +504,7 @@ describe('MoexProvider Pagination', () => {
           const candleDate = new Date(baseDate);
           candleDate.setDate(baseDate.getDate() + batch.startIdx + i);
           const dateStr = candleDate.toISOString().split('T')[0];
-          return [
-            100,
-            105,
-            110,
-            90,
-            1000,
-            1000,
-            `${dateStr} 00:00:00`,
-            `${dateStr} 23:59:59`,
-          ];
+          return [100, 105, 110, 90, 1000, 1000, `${dateStr} 00:00:00`, `${dateStr} 23:59:59`];
         });
         return {
           ok: true,
@@ -623,7 +512,8 @@ describe('MoexProvider Pagination', () => {
         };
       });
 
-      global.fetch = vi.fn()
+      global.fetch = vi
+        .fn()
         .mockResolvedValueOnce(mockCalls[0])
         .mockResolvedValueOnce(mockCalls[1])
         .mockResolvedValueOnce(mockCalls[2])

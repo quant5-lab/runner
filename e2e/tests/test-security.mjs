@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * E2E Test: security() function with DETERMINISTIC data validation
- * 
+ *
  * Tests that security() handles timeframe conversion without crashing:
  * 1. Uses MockProvider with predictable data
  * 2. Validates that security() executes successfully
  * 3. Validates that output structure is correct
  * 4. Validates that values are computed (not all NaN)
- * 
+ *
  * Note: Full timeframe aggregation validation is complex and requires
  * understanding PineTS downscaling behavior. This test ensures security()
  * functionality doesn't regress by validating structure and execution.
@@ -22,9 +22,7 @@ console.log('══════════════════════�
 
 // Create container with MockProvider (basePrice=100 for clearer values)
 const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 100 });
-const createProviderChain = () => [
-  { name: 'MockProvider', instance: mockProvider }
-];
+const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
 const DEFAULTS = { showDebug: false, showStats: false };
 
 const container = createContainer(createProviderChain, DEFAULTS);
@@ -39,7 +37,7 @@ const jsCode = await transpiler.transpile(pineCode);
  * Strategy calls:
  * - request.security(syminfo.tickerid, 'D', ta.sma(close, 20))
  * - request.security(syminfo.tickerid, 'D', close)
- * 
+ *
  * With hourly data, security() will aggregate to daily.
  * MockProvider provides: close = [100, 101, 102, 103, ...]
  */
@@ -52,7 +50,7 @@ console.log('=== DETERMINISTIC TEST RESULTS ===\n');
 // Helper to extract plot values
 const getPlotValues = (plotTitle) => {
   const plotData = result.plots?.[plotTitle]?.data || [];
-  return plotData.map(d => d.value);
+  return plotData.map((d) => d.value);
 };
 
 // Test 1: Strategy executed without crashing
@@ -81,8 +79,8 @@ console.log('  ', test3Pass ? '✅ PASS - Correct output length' : '❌ FAIL');
 // Test 4: Values are defined (not all NaN/null)
 // Note: With MockProvider, security() might return NaN if timeframe
 // aggregation isn't working. This test validates the behavior.
-const validCloseCount = dailyClose.filter(v => !isNaN(v) && v !== null).length;
-const validSmaCount = sma20Daily.filter(v => !isNaN(v) && v !== null).length;
+const validCloseCount = dailyClose.filter((v) => !isNaN(v) && v !== null).length;
+const validSmaCount = sma20Daily.filter((v) => !isNaN(v) && v !== null).length;
 
 console.log('\n✓ Test 4 - Value computation:');
 console.log('   Daily Close valid values:', validCloseCount, '/ 50');
@@ -96,7 +94,7 @@ console.log('  ', test4Pass ? '✅ PASS - Structure valid' : '❌ FAIL');
 
 // Summary
 const allTests = [test1Pass, test2Pass, test3Pass, test4Pass];
-const passCount = allTests.filter(t => t).length;
+const passCount = allTests.filter((t) => t).length;
 
 console.log('\n=== SUMMARY ===');
 console.log(`${passCount}/4 tests passed`);
@@ -109,7 +107,7 @@ console.log('  1. MockProvider supporting multiple timeframes with proper aggreg
 console.log('  2. Understanding PineTS downscaling/upscaling behavior');
 console.log('  3. Validation of daily close aggregation from hourly data');
 console.log('  4. Validation of SMA(20) calculations on aggregated daily data');
-console.log('\nCurrent test ensures security() doesn\'t regress structurally.');
+console.log("\nCurrent test ensures security() doesn't regress structurally.");
 console.log('For value validation, see test-security.mjs (live API test).');
 
 process.exit(passCount === 4 ? 0 : 1);
