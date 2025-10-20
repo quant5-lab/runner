@@ -194,28 +194,21 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [x] **Fix color test expectations after PineTS update**
   - **Status**: COMPLETED ✅
-  - **Issue**: PineTS now returns hex color codes instead of color names
-  - **Fix**: Updated TradingAnalysisRunner.extractMetadata.test.js expectations
-  - **Changes**: 'blue'→'#2196F3', 'red'→'#F23645', 'green'→'#4CAF50', 'purple'→'#9C27B0'
-  - **Tests**: 477/477 passing
+  - Updated test expectations: 'blue'→'#2962FF', 'red'→'#FF5252', 'green'→'#4CAF50', 'purple'→'#9C27B0'
+  - Tests: 477/477 unit + 5/5 E2E passing
 
 - [x] **Implement --settings CLI using PineTS native inputOverrides**
   - **Status**: COMPLETED ✅
-  - **Implementation**: 
-    - Added parseSettingsArg() to src/index.js for CLI parsing
-    - Threaded settings through TradingAnalysisRunner.runPineScriptStrategy()
-    - Pass inputOverrides to PineTS constructor in PineScriptStrategyRunner
-  - **E2E Test**: Created test-input-override.mjs with MockProvider validation
-  - **Tests**: 477 unit + 5 E2E passing
-  - **Usage**: `node src/index.js CHMF M 72 strategies/rolling-cagr.pine --settings='{"Rolling CAGR Year N":3}'`
+  - Usage: `node src/index.js CHMF M 72 strategies/rolling-cagr.pine --settings='{"Rolling CAGR Year N":3}'`
+  - E2E test: test-input-override.mjs
 
-- [x] **Remove dead code from chartColors.js**
+- [x] **Remove dead code and consolidate color constants**
   - **Status**: COMPLETED ✅
-  - **Removed**: PINE_COLORS mapping, hexToRgba(), color name handling logic
-  - **Reason**: PineTS returns hex colors directly, color name mappings never used
-  - **Tests**: 477/477 unit + 5/5 E2E passing
+  - Removed: PINE_COLORS mapping, resolvePineColor(), hexToRgba(), entire chartColors.js file
+  - Moved: CHART_COLORS to src/config.js with other shared constants
+  - Tests: 477/477 unit + 5/5 E2E passing
 
-- [ ] **Design command-line input parameters for rolling CAGR**
+- [x] **Design command-line input parameters for rolling CAGR**
   - **Status**: COMPLETED ✅ (implemented with --settings)
 
 - [ ] **Design extension for BB strategies v7, 8, 9**
@@ -223,6 +216,21 @@ source code is volume mapped, and you must examine source code locally in this w
   - Design and plan necessary code extensions: new indicators, signal logic, parameter handling, strategy-specific features
 
 ## Low Priority 🟢
+
+- [ ] **Rework determineChartType() to support multi-pane indicators**
+  - **Status**: NOT STARTED - requires Pine Script multi-pane research
+  - **Current**: Hardcoded logic in ConfigurationBuilder.determineChartType(key)
+  - **Issue**: Uses string matching (CAGR, EMA, SMA, MA) to determine chart assignment
+  - **Goal**: Align with Pine Script's native multi-pane indicator approach
+  - **Research Needed**:
+    - How TradingView Pine Script v5 handles multi-pane indicators
+    - Pine Script syntax for specifying plot pane assignment
+    - Whether to use display parameter, overlay setting, or other mechanism
+  - **Implementation**:
+    - Parse pane assignment from Pine Script indicator/plot metadata
+    - Remove hardcoded string matching logic
+    - Support TradingView-compatible pane configuration
+  - **Example**: rolling-cagr-5-10yr.pine should declare all plots in same pane via Pine Script
 
 - [ ] **Design Y-axis scale configuration for plots**
   - **Status**: NOT STARTED - design phase required
