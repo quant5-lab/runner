@@ -145,10 +145,12 @@ logs
 
 # Temporary files
 tmp/
-temp//coverage/
+temp/
+coverage/
 
 # Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pyc
