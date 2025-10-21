@@ -215,6 +215,18 @@ source code is volume mapped, and you must examine source code locally in this w
   - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
   - Design and plan necessary code extensions: new indicators, signal logic, parameter handling, strategy-specific features
 
+### BB Strategy v7 Requirements
+
+| Feature | Pine v5 Docs | PineTS Status | Usage in bb-strategy-7 | Lines | Priority |
+|---------|--------------|---------------|------------------------|-------|----------|
+| `fixnan()` | ✅ series function | ❌ Not Found | 5 occurrences | 34, 35, 98, 99, 191, 194 | CRITICAL |
+| `pivothigh()` | ✅ series float | ❌ Not Found | 1 occurrence | 34 | CRITICAL |
+| `pivotlow()` | ✅ series float | ❌ Not Found | 1 occurrence | 35 | CRITICAL |
+| `valuewhen()` | ✅ series function | ❌ Not Found | 4 occurrences | 79, 80, 81, 82 | CRITICAL |
+| `barmerge.lookahead_on` | ✅ const | ❌ Not Found | 2 occurrences | 32, 123 | CRITICAL |
+| `time(timeframe, session)` | ✅ series int | ❌ Not Found | 2 occurrences | 42, 45 | CRITICAL |
+| `strategy.*` namespace | ✅ 60+ items | ❌ Not Found | 9 occurrences | 126, 127, 247, 260, 261, 265, 268, 272 | CRITICAL |
+
 ## Low Priority 🟢
 
 - [ ] **Rework determineChartType() to support multi-pane indicators**
@@ -254,6 +266,11 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [ ] **Increase test coverage to 95%**
   - Comprehensive test coverage including integration tests, edge cases, error scenarios across all modules
+
+- [ ] **Support blank candlestick data with plots-only mode**
+  - **Status**: NOT STARTED
+  - **Goal**: Enable strategies with no price data, only plot outputs
+  - **Use Case**: Capital growth modeling driven by cash flows and interest rates
 
 ---
 
