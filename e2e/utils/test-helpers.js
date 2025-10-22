@@ -16,7 +16,7 @@ export const FLOAT_EPSILON = 0.00001;
 export function assertFloatEquals(actual, expected, epsilon = FLOAT_EPSILON, context = '') {
   const diff = Math.abs(actual - expected);
   if (diff > epsilon) {
-    const msg = context 
+    const msg = context
       ? `${context}: Expected ${expected}, got ${actual} (diff: ${diff}, epsilon: ${epsilon})`
       : `Expected ${expected}, got ${actual} (diff: ${diff}, epsilon: ${epsilon})`;
     throw new Error(msg);

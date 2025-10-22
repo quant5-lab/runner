@@ -31,7 +31,7 @@ export class MockProvider {
 
     for (let i = 0; i < limit; i++) {
       const price = this.generatePrice(i);
-      
+
       /* For sawtooth pattern, high/low should match close to create clear pivots */
       const high = this.dataPattern === 'sawtooth' ? price : price + 1;
       const low = this.dataPattern === 'sawtooth' ? price : price - 1;
@@ -39,8 +39,8 @@ export class MockProvider {
       candles.push({
         time: now - (limit - 1 - i) * timeframeSeconds, // Work backwards from now
         open: price,
-        high: high,
-        low: low,
+        high,
+        low,
         close: price,
         volume: 1000 + i,
       });
@@ -66,13 +66,14 @@ export class MockProvider {
         // Deterministic "random" using index as seed
         return this.basePrice + ((index * 7) % 50);
 
-      case 'sawtooth':
+      case 'sawtooth': {
         // Zigzag pattern creates clear pivot highs and lows
         // Pattern: 100, 105, 110, 105, 100, 95, 100, 105, 110...
         // Cycle: [0, 5, 10, 5, 0, -5] repeating
         const cycle = index % 6;
         const offsets = [0, 5, 10, 5, 0, -5];
         return this.basePrice + offsets[cycle];
+      }
 
       case 'edge': {
         // Test edge cases: 0, negative, very large

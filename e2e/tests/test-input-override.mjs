@@ -79,15 +79,7 @@ function calculateExpectedSMA(closes, period) {
 async function runStrategyWithOverrides(pineCode, inputOverrides = null) {
   const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 1 });
   const constructorOptions = inputOverrides ? { inputOverrides } : undefined;
-  const pineTS = new PineTS(
-    mockProvider,
-    'TEST',
-    'D',
-    30,
-    null,
-    null,
-    constructorOptions,
-  );
+  const pineTS = new PineTS(mockProvider, 'TEST', 'D', 30, null, null, constructorOptions);
 
   const jsCode = await transpilePineCode(pineCode);
   const { plotAdapterSource } = await import('../../src/adapters/PinePlotAdapter.js');
