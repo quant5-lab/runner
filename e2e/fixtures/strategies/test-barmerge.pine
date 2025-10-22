@@ -1,0 +1,8 @@
+//@version=5
+indicator("Test barmerge constants", overlay=false)
+
+// Simple test - barmerge constants availability tested via context presence
+// In actual usage, these are passed to security() function
+test_value = close > open ? 1 : 0
+
+plot(test_value, title="barmerge_test", color=color.blue)

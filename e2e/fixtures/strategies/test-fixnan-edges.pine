@@ -1,0 +1,27 @@
+//@version=5
+indicator("fixnan() edge cases test", overlay=false)
+
+// Edge case 2: First value NaN - use na on first bar only
+firstNaN = bar_index == 0 ? na : close
+result_firstNaN = fixnan(firstNaN)
+
+// Edge case 3: Middle values NaN (every 5th bar)
+middleNaN = bar_index % 5 == 0 ? na : close
+result_middleNaN = fixnan(middleNaN)
+
+// Edge case 4: No NaN (normal close passthrough)
+noNaN = close
+result_noNaN = fixnan(noNaN)
+
+// Edge case 5: Mixed pattern - alternating NaN
+mixedNaN = bar_index % 2 == 0 ? na : close
+result_mixedNaN = fixnan(mixedNaN)
+
+// Plot results for validation
+plot(result_firstNaN, title="first_nan_result", color=color.blue)
+plot(result_middleNaN, title="middle_nan_result", color=color.green)
+plot(result_noNaN, title="no_nan_result", color=color.orange)
+plot(result_mixedNaN, title="mixed_nan_result", color=color.purple)
+
+// Plot source data for comparison
+plot(close, title="source_close", color=color.gray)

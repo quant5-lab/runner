@@ -1,0 +1,16 @@
+//@version=5
+indicator("Test time function", overlay=false)
+
+// Test time() function with session filtering
+t_daily = time("D")
+t_weekly = time("W")
+
+// Test session-aware time (market hours only)
+t_session = time("D", "0930-1600")
+
+plot(t_daily, title="time_daily", color=color.red)
+plot(t_weekly, title="time_weekly", color=color.blue)
+plot(t_session, title="time_session", color=color.green)
+
+// Plot current time for reference
+plot(time, title="time_current", color=color.gray)

@@ -1,0 +1,18 @@
+//@version=5
+indicator("Test valuewhen", overlay=false)
+
+// Create condition that triggers on specific bars
+condition = close > open
+
+// Get value when condition was true occurrence times ago
+vw0 = ta.valuewhen(condition, high, 0)  // Most recent
+vw1 = ta.valuewhen(condition, high, 1)  // One before
+vw2 = ta.valuewhen(condition, high, 2)  // Two before
+
+plot(vw0, title="valuewhen_0", color=color.red)
+plot(vw1, title="valuewhen_1", color=color.blue)
+plot(vw2, title="valuewhen_2", color=color.green)
+
+// Plot source data for validation
+plot(high, title="high", color=color.gray)
+plot(condition ? 1 : 0, title="condition", color=color.yellow)

@@ -1,0 +1,13 @@
+//@version=5
+indicator("Test pivothigh", overlay=true)
+
+// Test pivothigh with different parameters
+ph2_2 = ta.pivothigh(high, 2, 2)
+ph5_5 = ta.pivothigh(high, 5, 5)
+
+// Plot pivots without offset for easier validation
+plot(ph2_2, title="pivot2", style=plot.style_cross, linewidth=3, color=color.red)
+plot(ph5_5, title="pivot5", style=plot.style_cross, linewidth=3, color=color.blue)
+
+// Plot high for reference
+plot(high, title="high", color=color.gray)

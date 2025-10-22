@@ -1,0 +1,13 @@
+//@version=5
+indicator("Test pivotlow", overlay=true)
+
+// Test pivotlow with different parameters
+pl2_2 = ta.pivotlow(low, 2, 2)
+pl5_5 = ta.pivotlow(low, 5, 5)
+
+// Plot pivots without offset for easier validation
+plot(pl2_2, title="pivot2", style=plot.style_cross, linewidth=3, color=color.green)
+plot(pl5_5, title="pivot5", style=plot.style_cross, linewidth=3, color=color.orange)
+
+// Plot low for reference
+plot(low, title="low", color=color.gray)

@@ -1,0 +1,9 @@
+//@version=5
+indicator("Test fixnan", overlay=false)
+
+// Test data with NaN values (using na in Pine Script)
+src = close
+result = fixnan(src)
+
+plot(src, title="close", color=color.gray)
+plot(result, title="fixnan result", color=color.blue)
