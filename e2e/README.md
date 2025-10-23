@@ -1,110 +1,101 @@
-# End-to-End Tests
+# E2E Test Suite
 
-This directory contains end-to-end tests for the BorisQuantLab Runner.
+Centralized test runner with automatic test discovery and failure tracking.
 
-## Structure
+## Architecture
 
 ```
 e2e/
-├── fixtures/
-│   └── strategies/          # Pine Script test strategies
-│       └── *.pine
-├── tests/
-│   └── *.mjs                # Test runner scripts
-└── README.md
+├── runner.mjs          # Centralized test orchestrator
+├── run-all.sh          # Shell wrapper (delegates to runner.mjs)
+├── tests/              # Individual test files
+│   ├── test-input-defval.mjs
+│   ├── test-input-override.mjs
+│   ├── test-plot-params.mjs
+│   ├── test-reassignment.mjs
+│   ├── test-security.mjs
+│   └── test-ta-functions.mjs
+├── fixtures/           # Test data and strategies
+│   └── strategies/
+├── mocks/              # Mock providers
+│   └── MockProvider.js
+└── utils/              # Shared test utilities
+    └── test-helpers.js
 ```
 
-## Running Tests
+## Test Runner Features
 
-### Individual Test
+- **Automatic test discovery**: Scans `tests/` directory for `.mjs` files
+- **Failure tracking**: Counts passed/failed tests with detailed reporting
+- **Timeout protection**: 60s timeout per test
+- **Percentage metrics**: Shows pass/fail rates
+- **Duration tracking**: Per-test and total suite timing
+- **Exit code**: Returns non-zero on any failure
+
+## Usage
 
 ```bash
-# From project root
-docker compose run --rm runner node e2e/tests/test-reassignment-operator.mjs
+# Run all e2e tests in Docker
+pnpm e2e
+
+# Run directly (requires environment setup)
+node e2e/runner.mjs
 ```
 
-### All E2E Tests
+## Output Format
 
-```bash
-# From project root
-docker compose run --rm runner sh -c "for test in e2e/tests/*.mjs; do node \$test || exit 1; done"
 ```
+═══════════════════════════════════════════════════════════
+E2E Test Suite
+═══════════════════════════════════════════════════════════
 
-## Tests
+Discovered 6 tests
 
-### test-reassignment-operator.mjs
+Running: test-input-defval.mjs
+✅ PASS (2341ms)
 
-**Purpose**: Validates the fix for Pine Script `:=` reassignment operator with historical references
+Running: test-ta-functions.mjs
+❌ FAIL (1523ms)
+Error output:
+AssertionError: Expected 10.5, got 10.6
 
-**Coverage**:
+═══════════════════════════════════════════════════════════
+Test Summary
+═══════════════════════════════════════════════════════════
+Total:    6
+Passed:   5 (83.3%)
+Failed:   1 (16.7%)
+Duration: 8.45s
 
-- Simple cumulative counters
-- Step counters with different increments
-- Conditional counters (BB strategy pattern)
-- Running max/min (tracking highest/lowest values)
-- Accumulators with conditional reset
-- Multiple reassignments in sequence
-- Trailing stop level patterns (BB v8 strategy)
-- Session counters with `nz()` pattern
-- Multi-historical references ([1], [2], [3])
+Failed Tests:
+  ❌ test-ta-functions.mjs (exit code: 1)
 
-**Expected Results**: All 10 tests should pass
-
-**Strategy File**: `e2e/fixtures/strategies/test-reassignment-operator.pine`
+❌ SOME TESTS FAILED
+```
 
 ## Adding New Tests
 
-1. Create Pine Script strategy in `e2e/fixtures/strategies/`
-2. Create test runner in `e2e/tests/`
-3. Follow naming convention: `test-*.mjs` and `test-*.pine`
-4. Update this README with test description
-
-## Test Patterns
-
-### Basic Structure
+Create a new `.mjs` file in `tests/` directory:
 
 ```javascript
-import { createContainer } from '../../src/container.js';
-import { createProviderChain, DEFAULTS } from '../../src/config.js';
-import { readFile } from 'fs/promises';
+#!/usr/bin/env node
+import { strict as assert } from 'assert';
 
-const container = createContainer(createProviderChain, DEFAULTS);
-const runner = container.resolve('tradingAnalysisRunner');
-const transpiler = container.resolve('pineScriptTranspiler');
+console.log('Test: My New Feature');
 
-const pineCode = await readFile('e2e/fixtures/strategies/your-strategy.pine', 'utf-8');
-const jsCode = await transpiler.transpile(pineCode);
+/* Test logic here */
+assert.strictEqual(actual, expected);
 
-const result = await runner.runPineScriptStrategy(
-  'BTCUSDT',
-  '1h',
-  10,
-  jsCode,
-  'your-strategy.pine',
-);
-
-// Validate results...
-console.log(result.plots);
+console.log('✅ PASS');
+process.exit(0);
 ```
 
-### Validation
+Test runner automatically discovers and executes it.
 
-- Extract plot data: `result.plots?.['Plot Name']?.data?.map(d => d.value)`
-- Check for expected patterns
-- Use `process.exit(0)` for pass, `process.exit(1)` for fail
+## Test Guidelines
 
-## CI Integration
-
-These tests are designed to run in Docker and can be integrated into CI pipelines:
-
-```yaml
-# Example GitHub Actions
-- name: Run E2E Tests
-  run: |
-    docker compose run --rm runner sh -c "
-      for test in e2e/tests/*.mjs; do
-        echo \"Running \$test\"
-        node \$test || exit 1
-      done
-    "
-```
+- Exit with code 0 for success, non-zero for failure
+- Use `console.log()` for test output
+- Keep tests under 60s timeout
+- Use deterministic data from MockProvider
+- Include assertion context in error messages
