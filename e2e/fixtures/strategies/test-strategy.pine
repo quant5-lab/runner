@@ -1,0 +1,27 @@
+//@version=5
+strategy("Minimal Strategy Test", overlay=true, default_qty_type=strategy.cash, commission_type=strategy.commission.percent)
+
+// Simple indicator
+sma20 = ta.sma(close, 20)
+plot(sma20, "SMA 20", color=color.blue)
+
+// Strategy logic
+longCondition = close > sma20
+shortCondition = close < sma20
+
+// Strategy calls
+if longCondition
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", limit=close * 1.01, stop=close * 0.99)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", limit=close * 0.99, stop=close * 1.01)
+
+// Position tracking
+hasPosition = not na(strategy.position_avg_price)
+plot(hasPosition ? strategy.position_avg_price : na, "Avg Price", color=color.orange, linewidth=2)
+
+// Close all at session end (dummy condition)
+if close[1] > close[2]
+    strategy.close_all()

@@ -131,7 +131,7 @@ describe('PineScriptStrategyRunner', () => {
       );
       expect(callArg).toContain('const syminfo = context.syminfo;');
       expect(callArg).toContain('function indicator() {}');
-      expect(callArg).toContain('function strategy() {}');
+      expect(callArg).toContain('const strategy = context.strategy;');
       expect(callArg).toContain(jsCode);
     });
 
@@ -144,7 +144,7 @@ describe('PineScriptStrategyRunner', () => {
 
       const callArg = mockPineTS.run.mock.calls[0][0];
       expect(callArg).toContain('function indicator() {}');
-      expect(callArg).toContain('function strategy() {}');
+      expect(callArg).toContain('const strategy = context.strategy;');
     });
 
     it('should return empty plots array', async () => {

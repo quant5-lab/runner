@@ -30,6 +30,7 @@ class PineScriptStrategyRunner {
       const math = context.math;
       const request = context.request;
       const input = context.input;
+      const strategy = context.strategy;
       const syminfo = context.syminfo;
       const format = context.format;
       const scale = context.scale;
@@ -49,7 +50,6 @@ class PineScriptStrategyRunner {
       plot.style_stepline = 'stepline';
       
       function indicator() {}
-      function strategy() {}
       
       ${jsCode}
     }`;

@@ -224,21 +224,33 @@ source code is volume mapped, and you must examine source code locally in this w
 - [x] **Design command-line input parameters for rolling CAGR**
   - **Status**: COMPLETED ✅ (implemented with --settings)
 
-- [ ] **Design extension for BB strategies v7, 8, 9**
-  - Analyze bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine requirements
-  - Design and plan necessary code extensions: new indicators, signal logic, parameter handling, strategy-specific features
+- [x] **Design extension for BB strategies v7, 8, 9**
+  - **Status**: BLOCKED - Handoff to PineTS team
+  - **Completed**: Analysis of bb-strategy-7-rus.pine requirements
+  - **Evidence**: Error "Cannot read properties of undefined (reading 'percent')" at strategy.commission.percent
+  - **Deliverables**:
+    - ✅ docs/PINETS_STRATEGY_NAMESPACE.md - Complete specification with Pine v5 references
+    - ✅ strategies/test-strategy-minimal.pine - Validation test case
+    - ✅ TODO.md updated with BLOCKER status and evidence
+  - **Required from PineTS**: strategy.* namespace (9 constants/properties/functions)
+  - **Validation Plan**: Phase 1 (minimal test) → Phase 2 (full BB strategy 7)
 
 ### BB Strategy v7 Requirements
 
-| Feature                    | Pine v5 Docs       | PineTS Status | Usage in bb-strategy-7 | Lines                                  | Priority  |
-| -------------------------- | ------------------ | ------------- | ---------------------- | -------------------------------------- | --------- |
-| `fixnan()`                 | ✅ series function | ✅ VALIDATED  | 5 occurrences          | 34, 35, 98, 99, 191, 194               | COMPLETED |
-| `pivothigh()`              | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 34                                     | COMPLETED |
-| `pivotlow()`               | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 35                                     | COMPLETED |
-| `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                         | COMPLETED |
-| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                | COMPLETED |
-| `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                 | COMPLETED |
-| `strategy.*` namespace     | ✅ 60+ items       | ❌ Not Found  | 9 occurrences          | 126, 127, 247, 260, 261, 265, 268, 272 | CRITICAL  |
+| Feature                    | Pine v5 Docs       | PineTS Status | Usage in bb-strategy-7 | Lines                                  | Priority  | Evidence                                                                                            |
+| -------------------------- | ------------------ | ------------- | ---------------------- | -------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
+| `fixnan()`                 | ✅ series function | ✅ VALIDATED  | 5 occurrences          | 34, 35, 98, 99, 191, 194               | COMPLETED | test-ta-functions.mjs 30/30 match                                                                   |
+| `pivothigh()`              | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 34                                     | COMPLETED | test-ta-functions.mjs 60/60 match                                                                   |
+| `pivotlow()`               | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 35                                     | COMPLETED | test-ta-functions.mjs 60/60 match                                                                   |
+| `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                         | COMPLETED | test-ta-functions.mjs 100/100 match                                                                 |
+| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                | COMPLETED | test-ta-functions.mjs barmerge constant available                                                   |
+| `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                 | COMPLETED | test-ta-functions.mjs function executes                                                             |
+| `strategy.*` namespace     | ✅ 60+ items       | ❌ BLOCKED    | 9 occurrences          | 2, 126, 127, 247, 260, 261, 265, 268, 272 | BLOCKER   | Error: Cannot read properties of undefined (reading 'percent') - strategy.commission.percent missing |
+
+**BLOCKER**: BB Strategy v7 execution blocked. `strategy.commission.percent` undefined at line 2. Requires PineTS implementation:
+- **Constants**: strategy.cash, strategy.commission.percent, strategy.long, strategy.short
+- **Properties**: strategy.position_avg_price (runtime state)
+- **Functions**: strategy.entry(), strategy.exit(), strategy.close_all()
 
 **TA Functions E2E Validation**: See docs/TA_FUNCTIONS_TEST_RESULTS.md
 

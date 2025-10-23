@@ -100,6 +100,39 @@ export class PineScriptTranspiler {
     }
   }
 
+  transformStrategyCall(node) {
+    if (!node || typeof node !== 'object') return;
+
+    /* Transform strategy() → strategy.call() for PineTS compatibility */
+    if (
+      node.type === 'CallExpression' &&
+      node.callee &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'strategy'
+    ) {
+      node.callee = {
+        type: 'MemberExpression',
+        object: { type: 'Identifier', name: 'strategy' },
+        property: { type: 'Identifier', name: 'call' },
+        computed: false,
+      };
+    }
+
+    /* Recursively process all node properties */
+    for (const key in node) {
+      if (Object.prototype.hasOwnProperty.call(node, key) && key !== 'loc' && key !== 'range') {
+        const value = node[key];
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i++) {
+            this.transformStrategyCall(value[i]);
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          this.transformStrategyCall(value);
+        }
+      }
+    }
+  }
+
   wrapHistoricalReferences(node) {
     if (!node || typeof node !== 'object') return;
 
@@ -145,6 +178,9 @@ export class PineScriptTranspiler {
 
   generateJavaScript(ast) {
     try {
+      // Transform strategy() → strategy.call() for PineTS compatibility
+      this.transformStrategyCall(ast);
+
       // Transform AST to wrap historical references with || 0
       this.wrapHistoricalReferences(ast);
 
