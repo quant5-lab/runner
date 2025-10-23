@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PineScriptTranspiler } from '../../src/pine/PineScriptTranspiler.js';
+import PineVersionMigrator from '../../src/pine/PineVersionMigrator.js';
 
 describe('PineScriptTranspiler', () => {
   let transpiler;
@@ -89,6 +90,49 @@ describe('PineScriptTranspiler', () => {
     it('should throw error for invalid AST', () => {
       const invalidAst = { invalid: 'structure' };
       expect(() => transpiler.generateJavaScript(invalidAst)).toThrow();
+    });
+  });
+
+  describe('Full Migration + Transpilation Sequence', () => {
+    it('should transform v4 input.integer through full pipeline to input.int()', async () => {
+      // Stage 1: v4 source code with input.integer
+      const v4Code = `//@version=4
+indicator("Test")
+max_trades = input(1, title='Max Trades', type=input.integer)
+sl_factor = input(1.5, title='SL Factor', type=input.float)
+show_trades = input(true, title='Show', type=input.bool)`;
+
+      // Stage 2: Migrate v4 → v5
+      const migratedCode = PineVersionMigrator.migrate(v4Code, 4);
+      expect(migratedCode).toContain('type=input.int)');
+      expect(migratedCode).not.toContain('type=input.integer)');
+
+      // Stage 3: Transpile to JavaScript
+      const jsCode = await transpiler.transpile(migratedCode);
+      expect(jsCode).toBeDefined();
+      expect(typeof jsCode).toBe('string');
+
+      // Stage 4: Verify JavaScript output has specific input functions
+      expect(jsCode).toContain('input.int(');
+      expect(jsCode).toContain('input.float(');
+      expect(jsCode).toContain('input.bool(');
+
+      // Stage 5: Verify type parameter was removed (not passed to specific functions)
+      expect(jsCode).not.toContain('type:');
+    });
+
+    it('should handle mixed input syntax in full pipeline', async () => {
+      const v4Code = `//@version=4
+indicator("Test")
+val1 = input(10, type=input.integer)
+val2 = input(1.5, type=input.float)`;
+
+      const migratedCode = PineVersionMigrator.migrate(v4Code, 4);
+      const jsCode = await transpiler.transpile(migratedCode);
+
+      expect(jsCode).toBeDefined();
+      expect(jsCode).toContain('input.int(');
+      expect(jsCode).toContain('input.float(');
     });
   });
 });

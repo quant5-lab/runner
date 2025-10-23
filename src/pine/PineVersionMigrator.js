@@ -10,6 +10,9 @@ class PineVersionMigrator {
     study: 'indicator',
     'tickerid()': 'ticker.new()',
 
+    // Input type constants (v4 input.integer → v5 input.int)
+    '\\binput\\.integer\\b': 'input.int',
+
     // Color constants in assignments (color=yellow → color=color.yellow)
     '=\\s*yellow\\b': '=color.yellow',
     '=\\s*green\\b': '=color.green',
@@ -175,7 +178,7 @@ class PineVersionMigrator {
 
     /* Process function calls first to avoid partial matches */
     for (const [v4Pattern, v5Replacement] of functionPatterns) {
-      const regex = new RegExp(this.escapeRegex(v4Pattern), 'g');
+      const regex = new RegExp(`\\b${this.escapeRegex(v4Pattern)}`, 'g');
       migrated = migrated.replace(regex, v5Replacement);
     }
 

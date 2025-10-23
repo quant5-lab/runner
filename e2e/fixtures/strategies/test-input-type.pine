@@ -1,0 +1,11 @@
+//@version=5
+indicator("Test input type parameter", overlay=true)
+
+// Test explicit type parameter
+x = input(1.5, title="Float Value", type=input.float)
+y = input(20, title="Int Value", type=input.int)
+z = input(true, title="Bool Value", type=input.bool)
+
+plot(x * 10, "Float x 10")
+plot(y, "Int Value")
+plot(z ? 30 : 0, "Bool Indicator")

@@ -321,9 +321,17 @@ class PyneToJsAstConverter:
 
         positional_args_js = []
         named_args_props = []
+        explicit_type_param = None
 
         for i, arg in enumerate(node.args):
             arg_value_js = self.visit(arg.value)
+            
+            # Extract explicit type parameter (e.g., type=input.float)
+            if arg.name == 'type' and isinstance(arg.value, Attribute):
+                if hasattr(arg.value.value, 'id') and arg.value.value.id == 'input':
+                    explicit_type_param = arg.value.attr
+                continue  # Skip type parameter from named args
+            
             if arg.name:
                 prop = estree_node('Property',
                                    key=estree_node('Identifier', name=arg.name),
@@ -336,22 +344,22 @@ class PyneToJsAstConverter:
             else:
                 positional_args_js.append(arg_value_js)
 
-                if is_input_call and i == 0 and isinstance(arg.value, Constant):
+                # Type inference for input() - only if no explicit type
+                if is_input_call and i == 0 and isinstance(arg.value, Constant) and not explicit_type_param:
                     first_arg_py_value = arg.value.value
-                    input_type_attr = None
-
                     if isinstance(first_arg_py_value, bool):
-                        input_type_attr = 'bool'
+                        explicit_type_param = 'bool'
                     elif isinstance(first_arg_py_value, float):
-                        input_type_attr = 'float'
+                        explicit_type_param = 'float'
                     elif isinstance(first_arg_py_value, int):
-                        input_type_attr = 'int'
+                        explicit_type_param = 'int'
 
-                    if input_type_attr:
-                        callee = estree_node('MemberExpression',
-                                             object=estree_node('Identifier', name='input'),
-                                             property=estree_node('Identifier', name=input_type_attr),
-                                             computed=False)
+        # Transform input() to input.type() if type detected
+        if is_input_call and explicit_type_param:
+            callee = estree_node('MemberExpression',
+                                 object=estree_node('Identifier', name='input'),
+                                 property=estree_node('Identifier', name=explicit_type_param),
+                                 computed=False)
 
         if is_input_with_defval:
             final_args_js, named_args_props, _ = transformer.transform_arguments(

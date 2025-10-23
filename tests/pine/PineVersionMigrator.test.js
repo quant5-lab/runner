@@ -88,6 +88,14 @@ describe('PineVersionMigrator', () => {
       expect(result).toContain('ta.crossover(fast, slow)');
     });
 
+    it('should not migrate user functions with ta names', () => {
+      const pineCode = '//@version=4\nmy_sma(x, n) => sum(x, n) / n\nvalue = my_sma(close, 20)';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('my_sma(x, n)');
+      expect(result).toContain('my_sma(close, 20)');
+      expect(result).not.toContain('my_ta.sma');
+    });
+
     it('should migrate highest to ta.highest', () => {
       const pineCode = '//@version=4\nhi = highest(high, 10)';
       const result = PineVersionMigrator.migrate(pineCode, 4);
@@ -276,6 +284,76 @@ ma20    =    sma(close,    20)`;
       expect(escaped).toContain('\\[');
       expect(escaped).toContain('\\]');
       expect(escaped).toContain('\\*');
+    });
+  });
+
+  describe('migrate - input type constants', () => {
+    it('should migrate input.integer to input.int', () => {
+      const pineCode = '//@version=4\nmax_trades = input(1, title="Max", type=input.integer)';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('type=input.int)');
+      expect(result).not.toContain('input.integer');
+    });
+
+    it('should not change input.int (already v5 syntax)', () => {
+      const pineCode = '//@version=5\nmax_trades = input.int(1, title="Max")';
+      const result = PineVersionMigrator.migrate(pineCode, 5);
+      expect(result).toContain('input.int');
+    });
+
+    it('should not migrate user variable named integer', () => {
+      const pineCode = '//@version=4\ninteger = 42\nvalue = integer * 2';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('integer = 42');
+      expect(result).toContain('value = integer * 2');
+    });
+
+    it('should not migrate variable with .integer property', () => {
+      const pineCode = '//@version=4\nmy_input.integer = 42\nother_var.integer_value = 5';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('my_input.integer = 42');
+      expect(result).toContain('other_var.integer_value = 5');
+    });
+
+    it('should migrate multiple input.integer occurrences', () => {
+      const pineCode =
+        '//@version=4\n' +
+        'max_trades = input(1, type=input.integer)\n' +
+        'min_value = input(0, type=input.integer)\n' +
+        'my_input.integer = 10';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('type=input.int)');
+      expect(result).not.toContain('type=input.integer)');
+      expect(result).toContain('my_input.integer = 10');
+    });
+
+    it('should handle input.integer in comments', () => {
+      const pineCode =
+        '//@version=4\n' +
+        '// Using input.integer for compatibility\n' +
+        'max_trades = input(1, type=input.integer)';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('type=input.int)');
+      expect(result).toContain('// Using input.int for compatibility');
+    });
+
+    it('should not migrate input.integer as prefix', () => {
+      const pineCode = '//@version=4\ninput.integer_old = 42\ntype=input.integer)';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('input.integer_old = 42');
+      expect(result).toContain('type=input.int)');
+    });
+
+    it('should handle input.integer at line boundaries', () => {
+      const pineCode =
+        '//@version=4\n' +
+        'input.integer\n' +
+        ' input.integer \n' +
+        'x=input.integer;';
+      const result = PineVersionMigrator.migrate(pineCode, 4);
+      expect(result).toContain('input.int\n');
+      expect(result).toContain(' input.int \n');
+      expect(result).toContain('x=input.int;');
     });
   });
 });
