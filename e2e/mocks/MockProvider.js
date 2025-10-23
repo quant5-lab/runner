@@ -11,7 +11,7 @@
 
 export class MockProvider {
   constructor(config = {}) {
-    this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge', 'sawtooth'
+    this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge', 'sawtooth', 'bullish', 'bearish'
     this.basePrice = config.basePrice || 1;
     this.amplitude = config.amplitude || 10; // For sawtooth pattern
     this.supportedTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', 'D', 'W', 'M'];
@@ -79,6 +79,24 @@ export class MockProvider {
         // Test edge cases: 0, negative, very large
         const patterns = [0, -100, 0.0001, 999999, NaN];
         return patterns[index % patterns.length];
+      }
+
+      case 'bullish': {
+        // Uptrend with small dips: creates long entries
+        // Pattern oscillates ABOVE baseline, trending up
+        const trend = index * 0.5; // Gradual uptrend
+        const cycle = index % 4;
+        const offsets = [0, 2, 1, 3]; // Small oscillation
+        return this.basePrice + trend + offsets[cycle];
+      }
+
+      case 'bearish': {
+        // Downtrend with small bounces: creates short entries
+        // Pattern oscillates BELOW baseline, trending down
+        const trend = -index * 0.5; // Gradual downtrend
+        const cycle = index % 4;
+        const offsets = [0, -2, -1, -3]; // Small oscillation
+        return this.basePrice + trend + offsets[cycle];
       }
 
       default:

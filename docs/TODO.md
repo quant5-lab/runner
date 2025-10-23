@@ -250,14 +250,14 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Status**: COMPLETED ✅
   - **Solution**: AST transformation in PineScriptTranspiler converts strategy() → strategy.call()
   - **Implementation**: transformStrategyCall() method added to transpiler pipeline
-  - **Wrapper**: Simplified to `const strategy = context.strategy;` (no manual property copying)
+  - **Wrapper**: Simplified to `const strategy = context.strategy;` (direct access)
   - **Tests**: 488/488 unit tests passing, 7/7 E2E tests passing
-  - **Validation**: test-strategy.pine validates all strategy.* features
+  - **Validation**: e2e/tests/test-strategy.mjs validates all strategy.* features with MockProvider
   - **Files**:
     - ✅ src/pine/PineScriptTranspiler.js - transformStrategyCall() method
     - ✅ src/classes/PineScriptStrategyRunner.js - simplified wrapper
     - ✅ e2e/fixtures/strategies/test-strategy.pine - validation test case
-    - ✅ e2e/tests/test-strategy.mjs - E2E test
+    - ✅ e2e/tests/test-strategy.mjs - E2E test with deterministic data
 
 ### BB Strategy v7 Requirements
 

@@ -5,23 +5,32 @@ strategy("Minimal Strategy Test", overlay=true, default_qty_type=strategy.cash, 
 sma20 = ta.sma(close, 20)
 plot(sma20, "SMA 20", color=color.blue)
 
-// Strategy logic
-longCondition = close > sma20
-shortCondition = close < sma20
+// Strategy logic - detect crossovers only (not continuous conditions)
+longCrossover = ta.crossover(close, sma20 * 1.02)  // Price crosses ABOVE SMA+2%
+shortCrossover = ta.crossunder(close, sma20 * 0.98)  // Price crosses BELOW SMA-2%
+neutralZone = close <= sma20 * 1.02 and close >= sma20 * 0.98  // Between SMA ±2%
 
-// Strategy calls
-if longCondition
+// Strategy calls - only enter on crossovers
+if longCrossover and strategy.position_size <= 0
     strategy.entry("Long", strategy.long)
     strategy.exit("Exit Long", "Long", limit=close * 1.01, stop=close * 0.99)
 
-if shortCondition
+if shortCrossover and strategy.position_size >= 0
     strategy.entry("Short", strategy.short)
     strategy.exit("Exit Short", "Short", limit=close * 0.99, stop=close * 1.01)
 
-// Position tracking
+// Close position when entering neutral zone
+if neutralZone
+    strategy.close_all()
+
+// Position tracking with comprehensive validation plots
 hasPosition = not na(strategy.position_avg_price)
 plot(hasPosition ? strategy.position_avg_price : na, "Avg Price", color=color.orange, linewidth=2)
+plot(strategy.position_size, "Position Size", color=color.yellow)
+plot(strategy.equity, "Equity", color=color.purple)
 
-// Close all at session end (dummy condition)
-if close[1] > close[2]
-    strategy.close_all()
+// Additional validation plots
+plot(close, "Close Price", color=color.white)
+plot(longCrossover ? 1 : 0, "Long Signal", color=color.lime)
+plot(shortCrossover ? 1 : 0, "Short Signal", color=color.red)
+plot(neutralZone ? 1 : 0, "Neutral Zone", color=color.gray)
