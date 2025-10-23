@@ -63,6 +63,8 @@ source code is volume mapped, and you must examine source code locally in this w
   - COMPLETED: Fixed 2 test failures - (1) Updated test to expect 'const { plot: corePlot, color }' instead of 'const { plot, color }', (2) Updated test to expect 'function indicator()' instead of 'const indicator = ()'. Tests now match actual implementation
 - [x] Fix timeframeParser.test.js parseToMinutes test
   - COMPLETED: Fixed 1 test failure - Test now expects 1w to return 10080 (valid weekly timeframe) instead of 1440 (invalid fallback to daily). Code correctly parses 1w as weekly format
+- [x] Reorganize E2E test suite with centralized runner
+  - COMPLETED: Created e2e/runner.mjs with automatic test discovery, failure tracking, timeout protection, percentage metrics, duration tracking. Updated e2e/run-all.sh to delegate to runner.mjs. All 6/6 tests passing with proper exit codes
 
 ### Code Quality
 
