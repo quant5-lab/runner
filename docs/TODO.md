@@ -83,6 +83,28 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## High Priority 🔴
 
+- [ ] **Fix BB Strategy 7 execution - input() variable scoping issue**
+  - **Status**: BLOCKER ❌
+  - **Error**: `ReferenceError: LWdilength is not defined` during prefetchSecurityData
+  - **Root Cause**: Input variables declared with capitalized names (LWdilength, LWadxlength) not available during dry run
+  - **Location**: Line 91-92 (input declarations), Line 102 (function parameter), Line 108 (function call)
+  - **Scope**: All input() declarations with non-lowercase names may be affected
+  - **Evidence**: 
+    - `LWdilength = input(18, title="DMI Length #1")` at line 91
+    - `adx(LWdilength, LWadxlength) =>` function parameter at line 102
+    - `[ADX, up, down] = adx(LWdilength, LWadxlength)` call at line 108
+    - Error occurs in prefetchSecurityData (dry run) before main execution
+  - **Investigation Required**:
+    - Check if Python parser preserves input() variable names correctly
+    - Check if transpiler handles capitalized variable declarations
+    - Check if PineTS dry run context initializes input variables
+    - Validate with simplified test case (single capitalized input variable)
+  - **Next Steps**:
+    1. Create minimal test case: `LWtest = input(10)` + function using it
+    2. Inspect transpiled output for variable name preservation
+    3. Check PineTS prefetchSecurityData variable initialization
+    4. Determine if parser, transpiler, or PineTS issue
+
 - [x] **Enhance E2E test coverage with deterministic data**
   - **Status**: COMPLETED ✅ (100% deterministic)
   - **Completed**:
@@ -225,15 +247,17 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Status**: COMPLETED ✅ (implemented with --settings)
 
 - [x] **Design extension for BB strategies v7, 8, 9**
-  - **Status**: BLOCKED - Handoff to PineTS team
-  - **Completed**: Analysis of bb-strategy-7-rus.pine requirements
-  - **Evidence**: Error "Cannot read properties of undefined (reading 'percent')" at strategy.commission.percent
-  - **Deliverables**:
-    - ✅ docs/PINETS_STRATEGY_NAMESPACE.md - Complete specification with Pine v5 references
-    - ✅ strategies/test-strategy-minimal.pine - Validation test case
-    - ✅ TODO.md updated with BLOCKER status and evidence
-  - **Required from PineTS**: strategy.* namespace (9 constants/properties/functions)
-  - **Validation Plan**: Phase 1 (minimal test) → Phase 2 (full BB strategy 7)
+  - **Status**: COMPLETED ✅
+  - **Solution**: AST transformation in PineScriptTranspiler converts strategy() → strategy.call()
+  - **Implementation**: transformStrategyCall() method added to transpiler pipeline
+  - **Wrapper**: Simplified to `const strategy = context.strategy;` (no manual property copying)
+  - **Tests**: 488/488 unit tests passing, 7/7 E2E tests passing
+  - **Validation**: test-strategy.pine validates all strategy.* features
+  - **Files**:
+    - ✅ src/pine/PineScriptTranspiler.js - transformStrategyCall() method
+    - ✅ src/classes/PineScriptStrategyRunner.js - simplified wrapper
+    - ✅ e2e/fixtures/strategies/test-strategy.pine - validation test case
+    - ✅ e2e/tests/test-strategy.mjs - E2E test
 
 ### BB Strategy v7 Requirements
 
@@ -245,12 +269,7 @@ source code is volume mapped, and you must examine source code locally in this w
 | `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                         | COMPLETED | test-ta-functions.mjs 100/100 match                                                                 |
 | `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                | COMPLETED | test-ta-functions.mjs barmerge constant available                                                   |
 | `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                 | COMPLETED | test-ta-functions.mjs function executes                                                             |
-| `strategy.*` namespace     | ✅ 60+ items       | ❌ BLOCKED    | 9 occurrences          | 2, 126, 127, 247, 260, 261, 265, 268, 272 | BLOCKER   | Error: Cannot read properties of undefined (reading 'percent') - strategy.commission.percent missing |
-
-**BLOCKER**: BB Strategy v7 execution blocked. `strategy.commission.percent` undefined at line 2. Requires PineTS implementation:
-- **Constants**: strategy.cash, strategy.commission.percent, strategy.long, strategy.short
-- **Properties**: strategy.position_avg_price (runtime state)
-- **Functions**: strategy.entry(), strategy.exit(), strategy.close_all()
+| `strategy.*` namespace     | ✅ 60+ items       | ✅ COMPLETED  | 9 occurrences          | 2, 126, 127, 247, 260, 261, 265, 268, 272 | COMPLETED | Transpiler transforms strategy() → strategy.call(), all features accessible via context.strategy |
 
 **TA Functions E2E Validation**: See docs/TA_FUNCTIONS_TEST_RESULTS.md
 
@@ -312,21 +331,22 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Current Status
 
-- **Total Tests**: 477/477 passing ✅
+- **Total Tests**: 488/488 passing ✅
 - **Linting**: 0 errors ✅
-- **E2E Tests**: 6/6 passing ✅
+- **E2E Tests**: 7/7 passing ✅
   - test-input-defval.mjs: Input parameter defaults ✅
   - test-input-override.mjs: Input parameter overrides ✅
   - test-plot-params.mjs: Plot parameters ✅
   - test-reassignment.mjs: Reassignment operator ✅
   - test-security.mjs: Security function ✅
+  - test-strategy.mjs: Strategy namespace ✅
   - test-ta-functions.mjs: TA functions (fixnan, pivothigh, pivotlow, valuewhen, barmerge, time) ✅
 - **PineTS Integration**: Format/scale/timeframe context complete ✅
 - **Plot Parameters**: All 15 Pine v5 parameters supported ✅
+- **Strategy Namespace**: strategy() → strategy.call() transpiler transformation ✅
 - **Color Tests**: Fixed for PineTS hex format (blue→#2196F3, red→#F23645, etc) ✅
 - **rolling-cagr**: Working (requires 5-year history for 5-year CAGR) ✅
 - **Input Overrides**: CLI --settings parameter implemented and tested ✅
-- **Next Task**: Design extension for BB strategies v7, 8, 9 🎯
 - **Race Condition Fix**: Duplicate API calls eliminated ✅
 - **Universal Utilities**: deduplicate() with keyGetter pattern ✅
 - **API Stats**: Tab-separated ASCII format ✅
