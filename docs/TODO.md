@@ -89,7 +89,7 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Root Cause**: Input variables declared with capitalized names (LWdilength, LWadxlength) not available during dry run
   - **Location**: Line 91-92 (input declarations), Line 102 (function parameter), Line 108 (function call)
   - **Scope**: All input() declarations with non-lowercase names may be affected
-  - **Evidence**: 
+  - **Evidence**:
     - `LWdilength = input(18, title="DMI Length #1")` at line 91
     - `adx(LWdilength, LWadxlength) =>` function parameter at line 102
     - `[ADX, up, down] = adx(LWdilength, LWadxlength)` call at line 108
@@ -252,23 +252,27 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Implementation**: transformStrategyCall() method added to transpiler pipeline
   - **Wrapper**: Simplified to `const strategy = context.strategy;` (direct access)
   - **Tests**: 488/488 unit tests passing, 7/7 E2E tests passing
-  - **Validation**: e2e/tests/test-strategy.mjs validates all strategy.* features with MockProvider
+  - **Validation**: e2e/tests/test-strategy.mjs validates all strategy.\* features with MockProvider
   - **Files**:
     - ✅ src/pine/PineScriptTranspiler.js - transformStrategyCall() method
     - ✅ src/classes/PineScriptStrategyRunner.js - simplified wrapper
     - ✅ e2e/fixtures/strategies/test-strategy.pine - validation test case
     - ✅ e2e/tests/test-strategy.mjs - E2E test with deterministic data
+  - **ATR Risk Management**: Implemented 80% ATR14 stop loss with 5:1 reward/risk ratio
+  - **Locked Levels**: SL/TP locked to entry using `lockedATR := position_exists ? previous : new` pattern
+  - **Chart Layout**: Stop Level (red) and Take Profit Level (green) on main chart with hidden labels
+  - **Tests Updated**: ConfigurationBuilder.test.js updated for main chart label visibility (lastValueVisible: false, priceLineVisible: false)
 
 ### BB Strategy v7 Requirements
 
-| Feature                    | Pine v5 Docs       | PineTS Status | Usage in bb-strategy-7 | Lines                                  | Priority  | Evidence                                                                                            |
-| -------------------------- | ------------------ | ------------- | ---------------------- | -------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
-| `fixnan()`                 | ✅ series function | ✅ VALIDATED  | 5 occurrences          | 34, 35, 98, 99, 191, 194               | COMPLETED | test-ta-functions.mjs 30/30 match                                                                   |
-| `pivothigh()`              | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 34                                     | COMPLETED | test-ta-functions.mjs 60/60 match                                                                   |
-| `pivotlow()`               | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 35                                     | COMPLETED | test-ta-functions.mjs 60/60 match                                                                   |
-| `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                         | COMPLETED | test-ta-functions.mjs 100/100 match                                                                 |
-| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                | COMPLETED | test-ta-functions.mjs barmerge constant available                                                   |
-| `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                 | COMPLETED | test-ta-functions.mjs function executes                                                             |
+| Feature                    | Pine v5 Docs       | PineTS Status | Usage in bb-strategy-7 | Lines                                     | Priority  | Evidence                                                                                         |
+| -------------------------- | ------------------ | ------------- | ---------------------- | ----------------------------------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| `fixnan()`                 | ✅ series function | ✅ VALIDATED  | 5 occurrences          | 34, 35, 98, 99, 191, 194                  | COMPLETED | test-ta-functions.mjs 30/30 match                                                                |
+| `pivothigh()`              | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 34                                        | COMPLETED | test-ta-functions.mjs 60/60 match                                                                |
+| `pivotlow()`               | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 35                                        | COMPLETED | test-ta-functions.mjs 60/60 match                                                                |
+| `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                            | COMPLETED | test-ta-functions.mjs 100/100 match                                                              |
+| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                   | COMPLETED | test-ta-functions.mjs barmerge constant available                                                |
+| `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                    | COMPLETED | test-ta-functions.mjs function executes                                                          |
 | `strategy.*` namespace     | ✅ 60+ items       | ✅ COMPLETED  | 9 occurrences          | 2, 126, 127, 247, 260, 261, 265, 268, 272 | COMPLETED | Transpiler transforms strategy() → strategy.call(), all features accessible via context.strategy |
 
 **TA Functions E2E Validation**: See docs/TA_FUNCTIONS_TEST_RESULTS.md
@@ -331,7 +335,7 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Current Status
 
-- **Total Tests**: 488/488 passing ✅
+- **Total Tests**: 504/504 passing ✅
 - **Linting**: 0 errors ✅
 - **E2E Tests**: 7/7 passing ✅
   - test-input-defval.mjs: Input parameter defaults ✅
@@ -339,11 +343,13 @@ source code is volume mapped, and you must examine source code locally in this w
   - test-plot-params.mjs: Plot parameters ✅
   - test-reassignment.mjs: Reassignment operator ✅
   - test-security.mjs: Security function ✅
-  - test-strategy.mjs: Strategy namespace ✅
+  - test-strategy.mjs: Strategy namespace with ATR-based risk management ✅
   - test-ta-functions.mjs: TA functions (fixnan, pivothigh, pivotlow, valuewhen, barmerge, time) ✅
 - **PineTS Integration**: Format/scale/timeframe context complete ✅
 - **Plot Parameters**: All 15 Pine v5 parameters supported ✅
 - **Strategy Namespace**: strategy() → strategy.call() transpiler transformation ✅
+- **ATR Risk Management**: 80% ATR14 SL with 5:1 RR ratio, locked levels using assignment pattern ✅
+- **Chart Configuration**: Main chart plots with hidden labels (lastValueVisible/priceLineVisible: false) ✅
 - **Color Tests**: Fixed for PineTS hex format (blue→#2196F3, red→#F23645, etc) ✅
 - **rolling-cagr**: Working (requires 5-year history for 5-year CAGR) ✅
 - **Input Overrides**: CLI --settings parameter implemented and tested ✅
