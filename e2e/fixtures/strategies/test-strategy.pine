@@ -10,25 +10,28 @@ longCrossover = ta.crossover(close, sma20 * 1.02)  // Price crosses ABOVE SMA+2%
 shortCrossover = ta.crossunder(close, sma20 * 0.98)  // Price crosses BELOW SMA-2%
 neutralZone = close <= sma20 * 1.02 and close >= sma20 * 0.98  // Between SMA ±2%
 
-// Strategy calls - only enter on crossovers
+// Lock ATR at entry using assignment with ternary
+lockedATR = 0.0
+lockedATR := strategy.position_size != 0 and nz(lockedATR[1]) > 0 ? nz(lockedATR[1]) : ta.atr(14)
+
+// Strategy calls - ATR-based stops with 5:1 reward/risk (fully inlined)
 if longCrossover and strategy.position_size <= 0
     strategy.entry("Long", strategy.long)
-    strategy.exit("Exit Long", "Long", limit=close * 1.01, stop=close * 0.99)
+    strategy.exit("Exit Long", "Long", limit=close + (ta.atr(14) * 0.8 * 5), stop=close - (ta.atr(14) * 0.8))
 
 if shortCrossover and strategy.position_size >= 0
     strategy.entry("Short", strategy.short)
-    strategy.exit("Exit Short", "Short", limit=close * 0.99, stop=close * 1.01)
+    strategy.exit("Exit Short", "Short", limit=close - (ta.atr(14) * 0.8 * 5), stop=close + (ta.atr(14) * 0.8))
 
 // Close position when entering neutral zone
 if neutralZone
     strategy.close_all()
 
-// Position tracking with comprehensive validation plots
-hasPosition = not na(strategy.position_avg_price)
-plot(hasPosition ? strategy.position_avg_price : na, "Avg Price", color=color.orange, linewidth=2)
-plot(strategy.position_size, "Position Size", color=color.yellow)
-// plot(strategy.equity, "Equity", color=color.purple)
+// Open trade indicators - SL/TP locked to entry ATR
+stopLevel = strategy.position_size != 0 ? (strategy.position_size > 0 ? strategy.position_avg_price - (lockedATR * 0.8) : strategy.position_avg_price + (lockedATR * 0.8)) : na
+takeProfitLevel = strategy.position_size != 0 ? (strategy.position_size > 0 ? strategy.position_avg_price + (lockedATR * 0.8 * 5) : strategy.position_avg_price - (lockedATR * 0.8 * 5)) : na
+plot(stopLevel, "Stop Level", color=color.red, linewidth=2)
+plot(takeProfitLevel, "Take Profit Level", color=color.green, linewidth=2)
 
-// Additional validation plots
-plot(longCrossover ? 1 : 0, "Long Signal", color=color.lime)
-plot(shortCrossover ? 1 : 0, "Short Signal", color=color.red)
+// Equity tracking
+plot(strategy.equity, "Equity", color=color.purple)

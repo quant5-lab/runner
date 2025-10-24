@@ -66,12 +66,17 @@ class ConfigurationBuilder {
     const series = {};
 
     Object.entries(indicators).forEach(([key, config]) => {
+      const isMainChart = this.determineChartType(key) === 'main';
+      
       series[key] = {
         color: config.color,
         style: config.style || 'line',
         lineWidth: 2,
         title: key,
         chart: this.determineChartType(key),
+        /* Hide permanent labels on main chart - show only on hover */
+        lastValueVisible: !isMainChart,
+        priceLineVisible: !isMainChart,
       };
     });
 
@@ -79,14 +84,17 @@ class ConfigurationBuilder {
   }
 
   determineChartType(key) {
-    // Avg Price should overlay on main candlestick chart
-    if (key === 'Avg Price') {
+    /* Main chart: price overlays (Avg Price, Stop/Take Profit levels, Moving Averages) */
+    const mainChartPlots = ['Avg Price', 'Stop Level', 'Take Profit Level'];
+    
+    if (mainChartPlots.includes(key)) {
       return 'main';
     }
-    // Rolling CAGR EMAs go to indicator chart with their CAGR data
+    
     if (key.includes('CAGR')) {
       return 'indicator';
     }
+    
     return key.includes('EMA') || key.includes('SMA') || key.includes('MA') ? 'main' : 'indicator';
   }
 
