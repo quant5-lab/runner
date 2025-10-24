@@ -67,7 +67,7 @@ class ConfigurationBuilder {
 
     Object.entries(indicators).forEach(([key, config]) => {
       const isMainChart = this.determineChartType(key) === 'main';
-      
+
       series[key] = {
         color: config.color,
         style: config.style || 'line',
@@ -86,15 +86,15 @@ class ConfigurationBuilder {
   determineChartType(key) {
     /* Main chart: price overlays (Avg Price, Stop/Take Profit levels, Moving Averages) */
     const mainChartPlots = ['Avg Price', 'Stop Level', 'Take Profit Level'];
-    
+
     if (mainChartPlots.includes(key)) {
       return 'main';
     }
-    
+
     if (key.includes('CAGR')) {
       return 'indicator';
     }
-    
+
     return key.includes('EMA') || key.includes('SMA') || key.includes('MA') ? 'main' : 'indicator';
   }
 

@@ -20,19 +20,19 @@ class TestRunner {
   async discoverTests() {
     const files = await readdir(TESTS_DIR);
     return files
-      .filter(f => f.endsWith('.mjs') && !f.endsWith('.bak'))
+      .filter((f) => f.endsWith('.mjs') && !f.endsWith('.bak'))
       .sort()
-      .map(f => join(TESTS_DIR, f));
+      .map((f) => join(TESTS_DIR, f));
   }
 
   async runTest(testPath) {
     const testName = basename(testPath);
     const startTime = Date.now();
-    
+
     return new Promise((resolve) => {
       const child = spawn('node', [testPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: TIMEOUT_MS
+        timeout: TIMEOUT_MS,
       });
 
       let stdout = '';
@@ -53,7 +53,7 @@ class TestRunner {
       child.on('close', (code) => {
         clearTimeout(timer);
         const duration = Date.now() - startTime;
-        
+
         resolve({
           name: testName,
           path: testPath,
@@ -61,14 +61,14 @@ class TestRunner {
           exitCode: code,
           duration,
           stdout,
-          stderr
+          stderr,
         });
       });
 
       child.on('error', (error) => {
         clearTimeout(timer);
         const duration = Date.now() - startTime;
-        
+
         resolve({
           name: testName,
           path: testPath,
@@ -76,7 +76,7 @@ class TestRunner {
           exitCode: -1,
           duration,
           stdout,
-          stderr: error.message
+          stderr: error.message,
         });
       });
     });
@@ -93,7 +93,7 @@ class TestRunner {
     for (const testPath of tests) {
       const testName = basename(testPath);
       console.log(`Running: ${testName}`);
-      
+
       const result = await this.runTest(testPath);
       this.results.push(result);
 
@@ -112,11 +112,11 @@ class TestRunner {
   }
 
   getFailureCount() {
-    return this.results.filter(r => !r.passed).length;
+    return this.results.filter((r) => !r.passed).length;
   }
 
   getPassCount() {
-    return this.results.filter(r => r.passed).length;
+    return this.results.filter((r) => r.passed).length;
   }
 
   getTotalDuration() {
@@ -133,15 +133,15 @@ class TestRunner {
     console.log('Test Summary');
     console.log('═══════════════════════════════════════════════════════════');
     console.log(`Total:    ${total}`);
-    console.log(`Passed:   ${passed} (${((passed/total)*100).toFixed(1)}%)`);
-    console.log(`Failed:   ${failed} (${((failed/total)*100).toFixed(1)}%)`);
-    console.log(`Duration: ${(duration/1000).toFixed(2)}s\n`);
+    console.log(`Passed:   ${passed} (${((passed / total) * 100).toFixed(1)}%)`);
+    console.log(`Failed:   ${failed} (${((failed / total) * 100).toFixed(1)}%)`);
+    console.log(`Duration: ${(duration / 1000).toFixed(2)}s\n`);
 
     if (failed > 0) {
       console.log('Failed Tests:');
       this.results
-        .filter(r => !r.passed)
-        .forEach(r => {
+        .filter((r) => !r.passed)
+        .forEach((r) => {
           console.log(`  ❌ ${r.name} (exit code: ${r.exitCode})`);
         });
       console.log('');

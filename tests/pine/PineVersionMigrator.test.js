@@ -346,10 +346,7 @@ ma20    =    sma(close,    20)`;
 
     it('should handle input.integer at line boundaries', () => {
       const pineCode =
-        '//@version=4\n' +
-        'input.integer\n' +
-        ' input.integer \n' +
-        'x=input.integer;';
+        '//@version=4\n' + 'input.integer\n' + ' input.integer \n' + 'x=input.integer;';
       const result = PineVersionMigrator.migrate(pineCode, 4);
       expect(result).toContain('input.int\n');
       expect(result).toContain(' input.int \n');

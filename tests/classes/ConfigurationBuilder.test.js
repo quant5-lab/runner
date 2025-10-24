@@ -147,6 +147,8 @@ describe('ConfigurationBuilder', () => {
           lineWidth: 2,
           title: 'EMA20',
           chart: 'main',
+          lastValueVisible: false,
+          priceLineVisible: false,
         },
         RSI: {
           color: '#FF9800',
@@ -154,6 +156,8 @@ describe('ConfigurationBuilder', () => {
           lineWidth: 2,
           title: 'RSI',
           chart: 'indicator',
+          lastValueVisible: true,
+          priceLineVisible: true,
         },
       });
     });

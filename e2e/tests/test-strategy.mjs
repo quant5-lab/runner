@@ -17,7 +17,11 @@ console.log('══════════════════════�
 console.log('E2E Test: Strategy Namespace with Deterministic Data');
 console.log('═══════════════════════════════════════════════════════════\n');
 
-const mockProvider = new MockProviderManager({ dataPattern: 'sawtooth', basePrice: 100, amplitude: 10 });
+const mockProvider = new MockProviderManager({
+  dataPattern: 'sawtooth',
+  basePrice: 100,
+  amplitude: 10,
+});
 const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
 const DEFAULTS = { showDebug: false, showStats: false };
 
@@ -28,13 +32,7 @@ const transpiler = container.resolve('pineScriptTranspiler');
 const pineCode = await readFile('e2e/fixtures/strategies/test-strategy.pine', 'utf-8');
 const jsCode = await transpiler.transpile(pineCode);
 
-const result = await runner.runPineScriptStrategy(
-  'TEST',
-  '1h',
-  50,
-  jsCode,
-  'test-strategy.pine',
-);
+const result = await runner.runPineScriptStrategy('TEST', '1h', 50, jsCode, 'test-strategy.pine');
 
 console.log('=== STRATEGY NAMESPACE VALIDATION ===\n');
 
@@ -45,7 +43,9 @@ const getPlotValues = (plotTitle) => {
 
 const getPlotValuesExcludingNaN = (plotTitle) => {
   const plotData = result.plots?.[plotTitle]?.data || [];
-  return plotData.map((d) => d.value).filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
+  return plotData
+    .map((d) => d.value)
+    .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
 };
 
 const sma20 = getPlotValuesExcludingNaN('SMA 20');
@@ -64,7 +64,10 @@ console.log('   Take profit levels:', takeProfitLevel.length, 'values');
 console.log('   Sample stop:       ', stopLevel.slice(0, 3));
 console.log('   Sample TP:         ', takeProfitLevel.slice(0, 3));
 const test2Pass = stopLevel.length > 0 && takeProfitLevel.length > 0;
-console.log('  ', test2Pass ? '✅ PASS: Open trade indicators present' : '❌ FAIL: Missing indicators');
+console.log(
+  '  ',
+  test2Pass ? '✅ PASS: Open trade indicators present' : '❌ FAIL: Missing indicators',
+);
 
 console.log('\n✓ Test 3 - Stop/TP levels are realistic (5% SL, 25% TP):');
 /* Check that both levels exist and are properly separated */
@@ -87,7 +90,10 @@ console.log('   Stop level count:        ', stopLevel.length);
 console.log('   Take profit level count: ', takeProfitLevel.length);
 console.log('   Equity count:            ', equity.length);
 const test5Pass = stopLevel.length > 0 && takeProfitLevel.length > 0 && equity.length > 0;
-console.log('  ', test5Pass ? '✅ PASS: Strategy properties work' : '❌ FAIL: Missing strategy data');
+console.log(
+  '  ',
+  test5Pass ? '✅ PASS: Strategy properties work' : '❌ FAIL: Missing strategy data',
+);
 
 console.log('\n═══════════════════════════════════════════════════════════');
 console.log('RESULTS');

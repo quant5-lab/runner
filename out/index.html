@@ -338,10 +338,10 @@
           Object.entries(config.seriesConfig.series).forEach(([key, seriesConfig]) => {
             const plotData = this.getNestedProperty(plots, `${key}.data`);
             const series = seriesMap[key];
-            
+
             if (plotData && series) {
               const processedData = DataTransformer.processPlotData(plotData);
-              
+
               if (processedData.length > 0) {
                 series.setData(processedData);
               }
