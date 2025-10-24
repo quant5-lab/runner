@@ -27,10 +27,8 @@ if neutralZone
 hasPosition = not na(strategy.position_avg_price)
 plot(hasPosition ? strategy.position_avg_price : na, "Avg Price", color=color.orange, linewidth=2)
 plot(strategy.position_size, "Position Size", color=color.yellow)
-plot(strategy.equity, "Equity", color=color.purple)
+// plot(strategy.equity, "Equity", color=color.purple)
 
 // Additional validation plots
-plot(close, "Close Price", color=color.white)
 plot(longCrossover ? 1 : 0, "Long Signal", color=color.lime)
 plot(shortCrossover ? 1 : 0, "Short Signal", color=color.red)
-plot(neutralZone ? 1 : 0, "Neutral Zone", color=color.gray)

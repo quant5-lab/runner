@@ -3,6 +3,10 @@
   <head>
     <title>Financial Chart Visualization</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.development.js"></script>
+    <script type="module">
+      import { adaptLineSeriesData } from './lineSeriesAdapter.js';
+      window.adaptLineSeriesData = adaptLineSeriesData;
+    </script>
     <style>
       body {
         background-color: #0f172a;
@@ -241,15 +245,9 @@
           };
         },
 
-        processPlotData(plotData) {
-          /* Convert all points, use whitespace (no value) for nulls */
-          return plotData.map((item) => {
-            const point = { time: Math.floor(item.time / 1000) };
-            if (item.value !== null && !isNaN(item.value)) {
-              point.value = item.value;
-            }
-            return point;
-          });
+        processPlotData(plotData, plotTitle) {
+          /* Uses LineSeries Adapter (Adapter Pattern) */
+          return window.adaptLineSeriesData(plotData);
         },
 
         processCandlestickArray(candlestickArray) {
@@ -340,8 +338,10 @@
           Object.entries(config.seriesConfig.series).forEach(([key, seriesConfig]) => {
             const plotData = this.getNestedProperty(plots, `${key}.data`);
             const series = seriesMap[key];
+            
             if (plotData && series) {
               const processedData = DataTransformer.processPlotData(plotData);
+              
               if (processedData.length > 0) {
                 series.setData(processedData);
               }

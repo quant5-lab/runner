@@ -79,6 +79,10 @@ class ConfigurationBuilder {
   }
 
   determineChartType(key) {
+    // Avg Price should overlay on main candlestick chart
+    if (key === 'Avg Price') {
+      return 'main';
+    }
     // Rolling CAGR EMAs go to indicator chart with their CAGR data
     if (key.includes('CAGR')) {
       return 'indicator';
