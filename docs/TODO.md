@@ -109,24 +109,23 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Documentation**: PROOF-ROOT-CAUSE.md, EVIDENCE-BASED-FIX-RECOMMENDATION.md
 
 - [ ] **Fix BB Strategy 7 - remaining issues**
-  - **Status**: BLOCKED by PineTS limitations
-  - **Issue 1**: `barmerge.lookahead_on` not supported by PineTS
-    - Location: Line 123 `open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)`
-    - Error: `ReferenceError: barmerge is not defined`
-    - Workaround: Removed `lookahead` parameter (line 123)
-    - **TODO**: Add barmerge namespace passthrough to PineTS context
+  - **Status**: BLOCKED by parser limitation
+  - **Issue 1**: ~~`barmerge.lookahead_on` not supported~~ ✅ RESOLVED
+    - **Fix**: Added `const barmerge = context.barmerge` to PineScriptStrategyRunner.js
+    - **PineTS**: Updated to `context.barmerge` (was `context.const.barmerge`)
+    - **Validation**: test-ta-functions.mjs confirms all 4 constants work (lookahead_on/off, gaps_on/off)
   - **Issue 2**: `sr_src1` global variable not wrapped correctly by parser
-    - Location: Line 177 `sr_down1 = ta.rma(-math.min(ta.change(sr_src1), 0), sr_len)`
+    - Location: Line 167 `sr_down1 = rma(-min(change(sr_src1), 0), sr_len)`
     - Error: `ReferenceError: sr_src1 is not defined`
     - Transpiled: Uses bare `sr_src1` instead of `$.let.glb1_sr_src1`
-    - Root Cause: Parser not wrapping global variable reference in ta.change() call
+    - Root Cause: Parser not wrapping global variable reference in nested expressions
     - **TODO**: Fix parser to wrap all global variable references in nested expressions
-  - **Impact**: Strategy too complex, reveals multiple parser edge cases
+  - **Impact**: Strategy too complex, reveals parser edge case with global variable wrapping
   - **Recommendation**: Use simpler strategies until parser global variable wrapping is fixed
   - **Next Steps**:
-    1. Add barmerge namespace to PineTS context (barmerge.lookahead_on, barmerge.lookahead_off)
+    1. ~~Add barmerge namespace to context~~ ✅ COMPLETED
     2. Fix parser to wrap global variables in all nested expression contexts
-    3. Test BB Strategy 7 execution after both fixes applied
+    3. Test BB Strategy 7 execution after parser fix applied
 
 - [x] **Enhance E2E test coverage with deterministic data**
   - **Status**: COMPLETED ✅ (100% deterministic)
@@ -294,7 +293,7 @@ source code is volume mapped, and you must examine source code locally in this w
 | `pivothigh()`              | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 34                                        | COMPLETED | test-ta-functions.mjs 60/60 match                                                                |
 | `pivotlow()`               | ✅ series float    | ✅ VALIDATED  | 1 occurrence           | 35                                        | COMPLETED | test-ta-functions.mjs 60/60 match                                                                |
 | `valuewhen()`              | ✅ series function | ✅ VALIDATED  | 4 occurrences          | 79, 80, 81, 82                            | COMPLETED | test-ta-functions.mjs 100/100 match                                                              |
-| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                   | COMPLETED | test-ta-functions.mjs barmerge constant available                                                |
+| `barmerge.lookahead_on`    | ✅ const           | ✅ VALIDATED  | 2 occurrences          | 32, 123                                   | COMPLETED | test-ta-functions.mjs all 4 constants validated (lookahead_on/off, gaps_on/off)                  |
 | `time(timeframe, session)` | ✅ series int      | ✅ VALIDATED  | 2 occurrences          | 42, 45                                    | COMPLETED | test-ta-functions.mjs function executes                                                          |
 | `strategy.*` namespace     | ✅ 60+ items       | ✅ COMPLETED  | 9 occurrences          | 2, 126, 127, 247, 260, 261, 265, 268, 272 | COMPLETED | Transpiler transforms strategy() → strategy.call(), all features accessible via context.strategy |
 
@@ -304,7 +303,7 @@ source code is volume mapped, and you must examine source code locally in this w
 - ✅ pivothigh: 60/60 match (5 pivot2, 3 pivot5 detected)
 - ✅ pivotlow: 60/60 match (4 pivot2, 4 pivot5 detected)
 - ✅ valuewhen: 100/100 match
-- ✅ barmerge: Constants available
+- ✅ barmerge: All 4 constants validated (lookahead_on/off, gaps_on/off)
 - ✅ time: Function executes
 - ✅ MockProvider sawtooth pattern implemented
 - ✅ All functions validated with independent calculations

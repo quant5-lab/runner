@@ -32,6 +32,7 @@ class PineScriptStrategyRunner {
       const input = context.input;
       const strategy = context.strategy;
       const syminfo = context.syminfo;
+      const barmerge = context.barmerge;
       const format = context.format;
       const scale = context.scale;
       const timeframe = context.timeframe;

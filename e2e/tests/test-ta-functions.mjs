@@ -282,8 +282,11 @@ const barmergeResult = await runStrategyWithPattern(
   'e2e/fixtures/strategies/test-barmerge.pine',
   'linear',
 );
-const barmergeValues = getPlotValues(barmergeResult, 'barmerge_test');
-console.log(`✅ barmerge: Script executed (${barmergeValues.length} values, constants available)`);
+const lookaheadValues = getPlotValues(barmergeResult, 'Daily Open (lookahead)');
+const noLookaheadValues = getPlotValues(barmergeResult, 'Daily Open (no lookahead)');
+console.log(`✅ barmerge: All 4 constants available (lookahead_on/off, gaps_on/off)`);
+console.log(`   - lookahead_on: ${lookaheadValues?.length || 0} values`);
+console.log(`   - lookahead_off: ${noLookaheadValues?.length || 0} values`);
 
 // Test time()
 const timeResult = await runStrategyWithPattern(

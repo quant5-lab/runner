@@ -1,8 +1,17 @@
 //@version=5
 indicator("Test barmerge constants", overlay=false)
 
-// Simple test - barmerge constants availability tested via context presence
-// In actual usage, these are passed to security() function
-test_value = close > open ? 1 : 0
+// Test barmerge.lookahead_on constant with security()
+daily_open_lookahead = request.security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
 
-plot(test_value, title="barmerge_test", color=color.blue)
+// Test barmerge.lookahead_off constant with security()
+daily_open_no_lookahead = request.security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_off)
+
+// Test barmerge.gaps_on constant
+daily_close_gaps = request.security(syminfo.tickerid, "D", close, gaps=barmerge.gaps_on)
+
+// Test barmerge.gaps_off constant
+daily_close_no_gaps = request.security(syminfo.tickerid, "D", close, gaps=barmerge.gaps_off)
+
+plot(daily_open_lookahead, title="Daily Open (lookahead)", color=color.green)
+plot(daily_open_no_lookahead, title="Daily Open (no lookahead)", color=color.red)
