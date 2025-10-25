@@ -83,27 +83,50 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## High Priority 🔴
 
-- [ ] **Fix BB Strategy 7 execution - input() variable scoping issue**
-  - **Status**: BLOCKER ❌
-  - **Error**: `ReferenceError: LWdilength is not defined` during prefetchSecurityData
-  - **Root Cause**: Input variables declared with capitalized names (LWdilength, LWadxlength) not available during dry run
-  - **Location**: Line 91-92 (input declarations), Line 102 (function parameter), Line 108 (function call)
-  - **Scope**: All input() declarations with non-lowercase names may be affected
+- [x] **Fix BB Strategy 7 execution - parameter shadowing issue**
+  - **Status**: COMPLETED ✅
+  - **Root Cause**: PineTS bug - when function parameter name matches global variable name, PineTS marks identifier as context-bound across ALL scopes, causing global references to skip transformation
+  - **Error Chain**:
+    1. ❌ Initial: `ReferenceError: LWdilength is not defined` 
+    2. ✅ Fixed parser scope tracking (function-scoped variable stack)
+    3. ❌ Persisted: Same error after parser fix
+    4. ✅ Root cause: PineTS `transformIdentifier()` skips transformation for shadowing parameters
+  - **Solution**: Parser-based parameter renaming with `_param_` prefix
+  - **Implementation**:
+    - `_is_shadowing_parameter(param_name)` - detects parameters that shadow parent scope variables
+    - `_rename_identifiers_in_ast(node, param_mapping)` - recursively renames identifiers in AST
+    - `visit_FunctionDef()` - builds param_mapping, creates renamed parameters, applies to function body
   - **Evidence**:
-    - `LWdilength = input(18, title="DMI Length #1")` at line 91
-    - `adx(LWdilength, LWadxlength) =>` function parameter at line 102
-    - `[ADX, up, down] = adx(LWdilength, LWadxlength)` call at line 108
-    - Error occurs in prefetchSecurityData (dry run) before main execution
-  - **Investigation Required**:
-    - Check if Python parser preserves input() variable names correctly
-    - Check if transpiler handles capitalized variable declarations
-    - Check if PineTS dry run context initializes input variables
-    - Validate with simplified test case (single capitalized input variable)
+    - Line 91: `LWdilength = input(18, title="DMI Length #1")` - global input variable
+    - Line 102: `adx(LWdilength, LWadxlength) =>` - parameters shadow globals
+    - Line 108: `[ADX, up, down] = adx(LWdilength, LWadxlength)` - call with global variables
+  - **Transpiled Output** (after fix):
+    - Function signature: `const adx = (_param_LWdilength, _param_LWadxlength) => {...}`
+    - Function body: `dirmov(_param_LWdilength)` and `ta.rma(..., _param_LWadxlength)`
+    - Call site: `adx($.param($.let.glb1_LWdilength, undefined, 'p142'), $.param($.let.glb1_LWadxlength, undefined, 'p143'))`
+  - **Validation**: test-strategy.pine executes successfully (no ReferenceError)
+  - **E2E Tests**: 8/9 passing (test-security.mjs has unrelated pre-existing "Invalid timeframe" error)
+  - **Documentation**: PROOF-ROOT-CAUSE.md, EVIDENCE-BASED-FIX-RECOMMENDATION.md
+
+- [ ] **Fix BB Strategy 7 - remaining issues**
+  - **Status**: BLOCKED by PineTS limitations
+  - **Issue 1**: `barmerge.lookahead_on` not supported by PineTS
+    - Location: Line 123 `open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)`
+    - Error: `ReferenceError: barmerge is not defined`
+    - Workaround: Removed `lookahead` parameter (line 123)
+    - **TODO**: Add barmerge namespace passthrough to PineTS context
+  - **Issue 2**: `sr_src1` global variable not wrapped correctly by parser
+    - Location: Line 177 `sr_down1 = ta.rma(-math.min(ta.change(sr_src1), 0), sr_len)`
+    - Error: `ReferenceError: sr_src1 is not defined`
+    - Transpiled: Uses bare `sr_src1` instead of `$.let.glb1_sr_src1`
+    - Root Cause: Parser not wrapping global variable reference in ta.change() call
+    - **TODO**: Fix parser to wrap all global variable references in nested expressions
+  - **Impact**: Strategy too complex, reveals multiple parser edge cases
+  - **Recommendation**: Use simpler strategies until parser global variable wrapping is fixed
   - **Next Steps**:
-    1. Create minimal test case: `LWtest = input(10)` + function using it
-    2. Inspect transpiled output for variable name preservation
-    3. Check PineTS prefetchSecurityData variable initialization
-    4. Determine if parser, transpiler, or PineTS issue
+    1. Add barmerge namespace to PineTS context (barmerge.lookahead_on, barmerge.lookahead_off)
+    2. Fix parser to wrap global variables in all nested expression contexts
+    3. Test BB Strategy 7 execution after both fixes applied
 
 - [x] **Enhance E2E test coverage with deterministic data**
   - **Status**: COMPLETED ✅ (100% deterministic)
