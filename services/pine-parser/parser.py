@@ -174,7 +174,33 @@ class PyneToJsAstConverter:
     """Convert pynescript AST to ESTree JavaScript AST"""
     
     def __init__(self):
-        self._declared_vars = set()
+        self._declared_vars_stack = [set()]
+
+    def _is_shadowing_parameter(self, param_name):
+        """Check if parameter shadows a variable in any parent scope"""
+        for scope_index in range(len(self._declared_vars_stack) - 1):
+            if param_name in self._declared_vars_stack[scope_index]:
+                return True
+        return False
+
+    def _rename_identifiers_in_ast(self, node, param_mapping):
+        """Recursively rename identifiers in AST based on param_mapping"""
+        if not param_mapping or not node:
+            return node
+        
+        if isinstance(node, dict):
+            if node.get('type') == 'Identifier' and node.get('name') in param_mapping:
+                node['name'] = param_mapping[node['name']]
+            
+            for key, value in node.items():
+                if isinstance(value, (dict, list)):
+                    self._rename_identifiers_in_ast(value, param_mapping)
+        
+        elif isinstance(node, list):
+            for item in node:
+                self._rename_identifiers_in_ast(item, param_mapping)
+        
+        return node
 
     def _map_operator(self, op_node):
         if isinstance(op_node, Add): return '+'
@@ -218,11 +244,12 @@ class PyneToJsAstConverter:
         
         if isinstance(node.target, Tuple):
             var_names = [elem.id for elem in node.target.elts]
-            new_vars = [v for v in var_names if v not in self._declared_vars]
+            current_scope = self._declared_vars_stack[-1]
+            new_vars = [v for v in var_names if v not in current_scope]
             
             if new_vars:
                 var_kind = 'let'
-                self._declared_vars.update(new_vars)
+                current_scope.update(new_vars)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
@@ -235,10 +262,11 @@ class PyneToJsAstConverter:
                                                         right=js_value))
         else:
             var_name = node.target.id
+            current_scope = self._declared_vars_stack[-1]
             
-            if var_name not in self._declared_vars:
+            if var_name not in current_scope:
                 var_kind = 'let'
-                self._declared_vars.add(var_name)
+                current_scope.add(var_name)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
@@ -255,10 +283,11 @@ class PyneToJsAstConverter:
         
         if isinstance(node.target, Tuple):
             var_names = [elem.id for elem in node.target.elts]
-            new_vars = [v for v in var_names if v not in self._declared_vars]
+            current_scope = self._declared_vars_stack[-1]
+            new_vars = [v for v in var_names if v not in current_scope]
             
             if new_vars:
-                self._declared_vars.update(new_vars)
+                current_scope.update(new_vars)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
@@ -271,9 +300,10 @@ class PyneToJsAstConverter:
                                                         right=js_value))
         else:
             var_name = node.target.id
+            current_scope = self._declared_vars_stack[-1]
             
-            if var_name not in self._declared_vars:
-                self._declared_vars.add(var_name)
+            if var_name not in current_scope:
+                current_scope.add(var_name)
                 declaration = estree_node('VariableDeclarator',
                                           id=self.visit(node.target),
                                           init=js_value)
@@ -428,14 +458,45 @@ class PyneToJsAstConverter:
 
     def visit_FunctionDef(self, node):
         func_name = node.name
-        params = [self.visit(arg) for arg in node.args]
+        
+        # Push new function scope
+        self._declared_vars_stack.append(set())
+        
+        # Build parameter mapping for shadowing parameters
+        param_mapping = {}
+        renamed_params = []
+        
+        for arg in node.args:
+            original_name = arg.name
+            
+            if self._is_shadowing_parameter(original_name):
+                # Rename shadowing parameter
+                new_name = f"_param_{original_name}"
+                param_mapping[original_name] = new_name
+                renamed_params.append(estree_node('Identifier', name=new_name))
+                self._declared_vars_stack[-1].add(new_name)
+            else:
+                # Keep original parameter name
+                renamed_params.append(self.visit(arg))
+                self._declared_vars_stack[-1].add(original_name)
+        
+        # Visit function body and apply renaming
         body_statements = [self.visit(stmt) for stmt in node.body]
+        
+        # Apply parameter renaming to body
+        if param_mapping:
+            for stmt in body_statements:
+                self._rename_identifiers_in_ast(stmt, param_mapping)
+        
         body_block = estree_node('BlockStatement', body=body_statements)
 
         if body_statements and isinstance(node.body[-1], Expr):
             return_stmt = estree_node('ReturnStatement',
-                                    argument=self.visit(node.body[-1].value))
+                                    argument=body_statements[-1].get('expression'))
             body_block['body'] = body_statements[:-1] + [return_stmt]
+
+        # Pop function scope
+        self._declared_vars_stack.pop()
 
         func_declaration = estree_node(
             'VariableDeclaration',
@@ -446,7 +507,7 @@ class PyneToJsAstConverter:
                     init=estree_node(
                         'ArrowFunctionExpression',
                         id=None,
-                        params=params,
+                        params=renamed_params,
                         body=body_block,
                         expression=False,
                         generator=False,
@@ -457,7 +518,7 @@ class PyneToJsAstConverter:
             kind='const'
         )
 
-        self._declared_vars.add(func_name)
+        self._declared_vars_stack[-1].add(func_name)
         return func_declaration
 
     def visit_Param(self, node):
