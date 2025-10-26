@@ -85,28 +85,28 @@ source code is volume mapped, and you must examine source code locally in this w
 
 - [x] **Fix BB Strategy 7 execution - parameter shadowing issue**
   - **Status**: COMPLETED ✅
-  - **Root Cause**: PineTS bug - when function parameter name matches global variable name, PineTS marks identifier as context-bound across ALL scopes, causing global references to skip transformation
-  - **Error Chain**:
-    1. ❌ Initial: `ReferenceError: LWdilength is not defined` 
-    2. ✅ Fixed parser scope tracking (function-scoped variable stack)
-    3. ❌ Persisted: Same error after parser fix
-    4. ✅ Root cause: PineTS `transformIdentifier()` skips transformation for shadowing parameters
+  - **Root Cause**: PineTS bug - parameter names matching globals skip transformation
   - **Solution**: Parser-based parameter renaming with `_param_` prefix
   - **Implementation**:
-    - `_is_shadowing_parameter(param_name)` - detects parameters that shadow parent scope variables
-    - `_rename_identifiers_in_ast(node, param_mapping)` - recursively renames identifiers in AST
-    - `visit_FunctionDef()` - builds param_mapping, creates renamed parameters, applies to function body
-  - **Evidence**:
-    - Line 91: `LWdilength = input(18, title="DMI Length #1")` - global input variable
-    - Line 102: `adx(LWdilength, LWadxlength) =>` - parameters shadow globals
-    - Line 108: `[ADX, up, down] = adx(LWdilength, LWadxlength)` - call with global variables
-  - **Transpiled Output** (after fix):
-    - Function signature: `const adx = (_param_LWdilength, _param_LWadxlength) => {...}`
-    - Function body: `dirmov(_param_LWdilength)` and `ta.rma(..., _param_LWadxlength)`
-    - Call site: `adx($.param($.let.glb1_LWdilength, undefined, 'p142'), $.param($.let.glb1_LWadxlength, undefined, 'p143'))`
-  - **Validation**: test-strategy.pine executes successfully (no ReferenceError)
-  - **E2E Tests**: 8/9 passing (test-security.mjs has unrelated pre-existing "Invalid timeframe" error)
-  - **Documentation**: PROOF-ROOT-CAUSE.md, EVIDENCE-BASED-FIX-RECOMMENDATION.md
+    - `_is_shadowing_parameter(param_name)` - detects parameters shadowing parent scope
+    - `_rename_identifiers_in_ast(node, param_mapping)` - recursively renames identifiers
+    - `visit_FunctionDef()` - builds param_mapping, creates renamed parameters
+  - **Test Coverage**: 11 comprehensive test cases
+    - Basic shadowing (LWdilength example)
+    - Non-shadowing parameters unchanged
+    - Multiple shadowing parameters
+    - Parameter renaming throughout function body
+    - Nested function scopes
+    - Mixed shadowing/non-shadowing parameters
+    - Complex expressions with ta.* functions
+    - Triple-nested shadowing cascade
+    - Array indexing and conditionals
+    - Multiple ta.rma calls with shadowing params
+    - Tuple destructuring assignment
+  - **Validation**: 515/515 tests passing (27 test files) ✅
+  - **Test File**: tests/pine/PineScriptTranspiler.parameter-shadowing.test.js
+  - **Parser Changes**: services/pine-parser/parser.py (+74/-13 lines)
+  - **BB7 Remaining Issues**: BLOCKED by external PineTS dependency (input() missing in executeDryRun() context)
 
 - [ ] **Fix BB Strategy 7 - remaining issues**
   - **Status**: BLOCKED by parser limitation
@@ -357,7 +357,7 @@ source code is volume mapped, and you must examine source code locally in this w
 
 ## Current Status
 
-- **Total Tests**: 504/504 passing ✅
+- **Total Tests**: 515/515 passing ✅
 - **Linting**: 0 errors ✅
 - **E2E Tests**: 7/7 passing ✅
   - test-input-defval.mjs: Input parameter defaults ✅
