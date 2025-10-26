@@ -363,6 +363,20 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Current**: Only test_scope_chain.py exists (10 tests for ScopeChain class)
   - **Rationale**: Parser is critical infrastructure, needs comprehensive unit tests
 
+- [ ] **TECH DEBT: Remove parser dead code**
+  - **Status**: NOT STARTED
+  - **Goal**: Remove $.let.glb1_ wrapping (zero usage) and _rename_identifiers_in_ast (unused)
+  - **Plan**: docs/REFACTOR_PARSER_MINIMAL.md
+  - **Effort**: 2h
+  - **Impact**: -37 LOC (5.6%), complexity 2/10 → 4/10
+
+- [ ] **TECH DEBT: Full parser SOLID refactoring (DEFERRED)**
+  - **Status**: DEFERRED - minimal plan preferred
+  - **Plan**: docs/REFACTOR_PARSER_SOLID_DEFERRED.md
+  - **Effort**: 18h vs 2h minimal
+  - **Risk**: HIGH vs LOW
+  - **Trigger**: 3rd identifier mode, scope changes, or performance bottleneck
+
 ---
 
 ## Current Status
