@@ -105,8 +105,15 @@ source code is volume mapped, and you must examine source code locally in this w
     - Tuple destructuring assignment
   - **Validation**: 515/515 tests passing (27 test files) ✅
   - **Test File**: tests/pine/PineScriptTranspiler.parameter-shadowing.test.js
-  - **Parser Changes**: services/pine-parser/parser.py (+74/-13 lines)
+  - **Parser Changes**: services/pine-parser/parser.py
+  - **Final Fix**: Added _param_rename_stack to store mappings during function body visit
+  - **Architecture**: visit_Name() checks stack BEFORE scope chain, applies renaming inline
+  - **Key Change**: Removed post-visit _rename_identifiers_in_ast(), now renames during AST traversal
   - **BB7 Remaining Issues**: BLOCKED by external PineTS dependency (input() missing in executeDryRun() context)
+  - **Python Test Suite**: ✅ COMPLETED
+    - Created services/pine-parser/test_parameter_shadowing.py with 11 unit tests
+    - Validates _is_shadowing_parameter() and _rename_identifiers_in_ast() methods
+    - All 11 tests passing
 
 - [ ] **Fix BB Strategy 7 - remaining issues**
   - **Status**: BLOCKED by parser limitation
@@ -114,18 +121,14 @@ source code is volume mapped, and you must examine source code locally in this w
     - **Fix**: Added `const barmerge = context.barmerge` to PineScriptStrategyRunner.js
     - **PineTS**: Updated to `context.barmerge` (was `context.const.barmerge`)
     - **Validation**: test-ta-functions.mjs confirms all 4 constants work (lookahead_on/off, gaps_on/off)
-  - **Issue 2**: `sr_src1` global variable not wrapped correctly by parser
-    - Location: Line 167 `sr_down1 = rma(-min(change(sr_src1), 0), sr_len)`
-    - Error: `ReferenceError: sr_src1 is not defined`
-    - Transpiled: Uses bare `sr_src1` instead of `$.let.glb1_sr_src1`
-    - Root Cause: Parser not wrapping global variable reference in nested expressions
-    - **TODO**: Fix parser to wrap all global variable references in nested expressions
-  - **Impact**: Strategy too complex, reveals parser edge case with global variable wrapping
-  - **Recommendation**: Use simpler strategies until parser global variable wrapping is fixed
+  - **Issue 2**: ~~`sr_src1` global variable not wrapped correctly by parser~~ ✅ RESOLVED
+    - **Root Cause**: Parameter renaming applied AFTER body visit
+    - **Fix**: Added _param_rename_stack to apply renaming DURING AST traversal
+    - **Validation**: 515/515 tests passing
   - **Next Steps**:
     1. ~~Add barmerge namespace to context~~ ✅ COMPLETED
-    2. Fix parser to wrap global variables in all nested expression contexts
-    3. Test BB Strategy 7 execution after parser fix applied
+    2. ~~Fix parser global variable wrapping~~ ✅ COMPLETED (parameter shadowing fix)
+    3. Test BB Strategy 7 execution after all fixes applied
 
 - [x] **Enhance E2E test coverage with deterministic data**
   - **Status**: COMPLETED ✅ (100% deterministic)
@@ -352,6 +355,13 @@ source code is volume mapped, and you must examine source code locally in this w
   - **Status**: NOT STARTED
   - **Goal**: Enable strategies with no price data, only plot outputs
   - **Use Case**: Capital growth modeling driven by cash flows and interest rates
+
+- [ ] **TECH DEBT: Python unit tests for parser.py**
+  - **Status**: NOT STARTED
+  - **Goal**: Achieve 90%+ test coverage for services/pine-parser/parser.py
+  - **Scope**: PyneToJsAstConverter class, all visitor methods, edge cases
+  - **Current**: Only test_scope_chain.py exists (10 tests for ScopeChain class)
+  - **Rationale**: Parser is critical infrastructure, needs comprehensive unit tests
 
 ---
 
