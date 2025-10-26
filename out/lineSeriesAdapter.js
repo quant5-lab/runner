@@ -1,57 +1,59 @@
 /* Lightweight Charts LineSeries Adapter (Adapter Pattern)
  * Adapts raw plot data with gaps to Lightweight Charts LineSeriesData format
- *
- * Lightweight Charts library (v4.1.1) lacks native gap-breaking capability:
- * - No connectGaps/connectWhitespace option exists
- * - Library interpolates across missing data points by default
- * - GitHub Issue #699: Feature request open since Feb 2021
- *
- * Adapter strategy:
- * 1. Filter out null/undefined/NaN values (removes gaps from dataset)
- * 2. Mark transition edges with transparent color (prevents interpolation)
- *
- * When a valid data point is followed by null:
- * - Set color='transparent' on the last valid point
- * - Prevents line drawing to the next segment after the gap
- * - Creates visual appearance of line breaking at position close
+ * Lightweight Charts v4.1.1 lacks native gap-breaking capability (Issue #699)
  */
+
+/* Pure predicate: check if value is valid number */
+const isValidValue = (value) => 
+  value !== null && value !== undefined && !isNaN(value);
+
+/* Pure function: convert milliseconds to seconds */
+const msToSeconds = (ms) => Math.floor(ms / 1000);
+
+/* Pure function: find first valid data point index */
+const findFirstValidIndex = (data) => {
+  for (let i = 0; i < data.length; i++) {
+    if (isValidValue(data[i].value)) return i;
+  }
+  return -1;
+};
+
+/* Pure function: create invisible anchor point for alignment */
+const createAnchorPoint = (time) => ({
+  time: msToSeconds(time),
+  value: 0,
+  color: 'transparent',
+});
+
+/* Pure function: create chart data point with optional gap edge marking */
+const createDataPoint = (time, value, isGapEdge) => {
+  const point = { time: msToSeconds(time), value };
+  if (isGapEdge) point.color = 'transparent';
+  return point;
+};
+
+/* Pure function: check if next point starts a gap */
+const nextIsGap = (data, index) => {
+  const next = data[index + 1];
+  return next && !isValidValue(next.value);
+};
 
 /**
  * Adapt plot data to Lightweight Charts LineSeries format with gap handling
- * @param {Array<{time: number, value: number|null}>} plotData - Raw plot data with timestamps and values
- * @returns {Array<{time: number, value: number, color?: string}>} - Adapted data with transparent edges
+ * Strategy: Insert invisible anchors before first valid point, mark gap edges transparent
  */
 export function adaptLineSeriesData(plotData) {
-  if (!Array.isArray(plotData)) {
-    return [];
-  }
+  if (!Array.isArray(plotData)) return [];
 
-  const filtered = [];
+  const firstValidIndex = findFirstValidIndex(plotData);
+  if (firstValidIndex === -1) return [];
 
-  for (let i = 0; i < plotData.length; i++) {
-    const item = plotData[i];
-    const hasValue = item.value !== null && item.value !== undefined && !isNaN(item.value);
-
-    if (hasValue) {
-      const point = {
-        time: Math.floor(item.time / 1000),
-        value: item.value,
-      };
-
-      /* Check if next point is null - mark edge as transparent */
-      const nextItem = plotData[i + 1];
-      if (nextItem) {
-        const nextHasValue =
-          nextItem.value !== null && nextItem.value !== undefined && !isNaN(nextItem.value);
-
-        if (!nextHasValue) {
-          point.color = 'transparent';
-        }
-      }
-
-      filtered.push(point);
+  return plotData.reduce((acc, item, i) => {
+    if (i < firstValidIndex) {
+      acc.push(createAnchorPoint(item.time));
+    } else if (isValidValue(item.value)) {
+      acc.push(createDataPoint(item.time, item.value, nextIsGap(plotData, i)));
     }
-  }
-
-  return filtered;
+    return acc;
+  }, []);
 }

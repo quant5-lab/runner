@@ -163,9 +163,11 @@ describe('lineSeriesAdapter', () => {
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ time: 2, value: 20 });
-      expect(result[1]).toEqual({ time: 3, value: 30 });
+      /* Anchor point inserted for timestamp alignment */
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ time: 1, value: 0, color: 'transparent' });
+      expect(result[1]).toEqual({ time: 2, value: 20 });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
     });
 
     test('should handle gap at the end', () => {
