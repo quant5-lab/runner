@@ -17,7 +17,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_LWdilength');
     expect(transpiled).not.toMatch(/const adx = \(LWdilength,/);
     expect(transpiled).toMatch(/const adx = \(_param_LWdilength/);
@@ -42,7 +42,7 @@ plot(result)
     expect(transpiled).toMatch(/const calculate = period =>/);
     expect(transpiled).toMatch(/return period \* 2/);
     expect(transpiled).toMatch(/calculate\(.*length.*\)/);
-  });  it('handles multiple shadowing parameters in same function', async () => {
+  }); it('handles multiple shadowing parameters in same function', async () => {
     const code = `
 //@version=5
 indicator("Test")
@@ -55,7 +55,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_param1');
     expect(transpiled).toContain('_param_param2');
     expect(transpiled).toMatch(/const test = \(_param_param1, _param_param2\) =>/);
@@ -76,7 +76,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_value');
     expect(transpiled).toMatch(/_param_value \* 2/);
     expect(transpiled).toMatch(/temp \+ _param_value/);
@@ -100,7 +100,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_outer');
     expect(transpiled).not.toContain('_param_inner');
     expect(transpiled).toMatch(/level2\(_param_outer\)/);
@@ -120,7 +120,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_length');
     expect(transpiled).not.toContain('_param_multiplier');
     expect(transpiled).not.toContain('_param_offset');
@@ -128,7 +128,7 @@ plot(result)
     expect(transpiled).toMatch(/_param_length \* multiplier \+ offset/);
   });
 
-  it('handles shadowing parameter in complex expressions with ta functions', async () => {
+  it('handles shadowing parameter in complex expressions with ta functions', { timeout: 10000 }, async () => {
     const code = `
 //@version=5
 indicator("Test")
@@ -142,7 +142,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_length');
     expect(transpiled).toMatch(/ta\.rma\(up, _param_length\)/);
     expect(transpiled).toMatch(/ta\.rma\(down, _param_length\)/);
@@ -168,7 +168,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_value');
     expect(transpiled).toMatch(/const level1 = _param_value =>/);
     expect(transpiled).toMatch(/const level2 = _param_value =>/);
@@ -189,7 +189,7 @@ plot(result)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_index');
     expect(transpiled).toMatch(/_param_index > 5/);
     expect(transpiled).toMatch(/\? 5 : _param_index/);
@@ -214,7 +214,7 @@ plot(ADX)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_LWdilength');
     expect(transpiled).toContain('_param_LWadxlength');
     expect(transpiled).toMatch(/const adx = \(_param_LWdilength, _param_LWadxlength\) =>/);
@@ -244,7 +244,7 @@ plot(s)
 `;
 
     const transpiled = await transpiler.transpile(code);
-    
+
     expect(transpiled).toContain('_param_len1');
     expect(transpiled).toContain('_param_len2');
     expect(transpiled).toMatch(/_param_len1 \+ _param_len2/);

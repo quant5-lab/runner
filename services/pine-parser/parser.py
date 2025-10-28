@@ -544,7 +544,7 @@ class PyneToJsAstConverter:
             kind='const'
         )
 
-        self._scope_chain.declare(func_name)
+        self._scope_chain.declare(func_name, kind='const')
         return func_declaration
 
     def visit_Param(self, node):

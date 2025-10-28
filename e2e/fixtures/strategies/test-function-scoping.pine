@@ -1,0 +1,23 @@
+//@version=5
+strategy("Function vs Variable Scoping Test", overlay=true)
+
+// === EDGE CASE 1: Global user-defined function called from another function ===
+myHelper(val) =>
+    val * 2
+
+myCalculator(x) =>
+    result = myHelper(x)  // Should use bare 'myHelper', NOT $.let.glb1_myHelper
+    result + 10
+
+// === EDGE CASE 2: Global variable accessed from function (needs wrapping) ===
+globalVar = 100
+
+useGlobalVar() =>
+    globalVar * 2  // SHOULD wrap as $.let.glb1_globalVar
+
+// Execute tests
+test1 = myCalculator(5)
+test2 = useGlobalVar()
+
+plot(test1, "Test1", color=color.red)
+plot(test2, "Test2", color=color.green)

@@ -10,6 +10,7 @@ class ScopeChain:
     def __init__(self):
         """Initialize with global scope"""
         self._scopes = [set()]  # Stack: [{globals}, {func1}, {func2}]
+        self._const_bindings = set()  # Track const declarations (functions)
     
     def push_scope(self):
         """Enter new scope (e.g., function body)"""
@@ -22,9 +23,17 @@ class ScopeChain:
         else:
             raise RuntimeError("Cannot pop global scope")
     
-    def declare(self, var_name):
-        """Declare variable in current scope"""
+    def declare(self, var_name, kind='let'):
+        """
+        Declare variable in current scope.
+        
+        Args:
+            var_name: Variable name to declare
+            kind: 'const' for functions, 'let' for variables (default)
+        """
         self._scopes[-1].add(var_name)
+        if kind == 'const':
+            self._const_bindings.add(var_name)
     
     def is_declared_in_current_scope(self, var_name):
         """Check if variable is declared in current (innermost) scope only"""
@@ -49,14 +58,16 @@ class ScopeChain:
     
     def is_global(self, var_name):
         """
-        Check if variable is global (declared in scope 0, accessed from nested scope).
+        Check if variable is global AND mutable (needs PineTS Context wrapping).
         
         Returns True only when:
         - Variable is declared in global scope (level 0)
         - Currently in a nested scope (depth > 0)
+        - NOT a const binding (functions stay as bare identifiers)
         """
         return (var_name in self._scopes[0] and 
-                len(self._scopes) > 1)
+                len(self._scopes) > 1 and
+                var_name not in self._const_bindings)
     
     def depth(self):
         """
