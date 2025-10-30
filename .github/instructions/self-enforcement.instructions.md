@@ -31,6 +31,22 @@ applyTo: '**'
 - **DECLARE** → "SELF-VIOLATION: [specific breach]"
 - **RESTART** → Begin again with evidence
 
+### 🔴 WHEN USER REQUESTS ROLLBACK:
+
+- **STOP** → Cease all current work immediately
+- **VERIFY** → Re-read original user request before rollback point
+- **CONFIRM** → State understanding: "Rolling back to: [original request]. Will do: [simple plan]"
+- **EXECUTE** → Rollback, then implement ONLY what was originally requested
+- **NO ASSUMPTIONS** → If unclear after rollback, ASK before proceeding
+
+### 🔴 WHEN USER REPEATS REQUEST 2+ TIMES:
+
+- **STOP** → Current approach is wrong
+- **ACKNOWLEDGE** → "Request repeated [N] times. I misunderstood."
+- **CLARIFY** → Ask specific question: "Do you want [A] or [B]?"
+- **WAIT** → Do not proceed until user confirms understanding
+- **NO PERSISTENCE** → Stop trying variations of failed approach
+
 ### 🔴 WHEN 15-MINUTE TIMEBOX EXCEEDED:
 
 - **STOP** → Cease current debugging approach immediately
@@ -58,6 +74,8 @@ applyTo: '**'
 **IF I avoid writing debug logs → VIOLATION**
 **IF I claim completion without double-checking requirements → VIOLATION**
 **IF I boast about achievements instead of focusing on next steps → VIOLATION**
+**IF user says ROLLBACK and I don't verify original request → VIOLATION**
+**IF user repeats request 2+ times and I don't stop to clarify → VIOLATION**
 
 ## 🔒 ZERO TOLERANCE 🔒
 
