@@ -163,9 +163,9 @@ describe('lineSeriesAdapter', () => {
 
       const result = adaptLineSeriesData(input);
 
-      /* Anchor point inserted for timestamp alignment */
+      /* Anchor point inserted for timestamp alignment with NaN to prevent auto-scale */
       expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({ time: 1, value: 0, color: 'transparent' });
+      expect(result[0]).toEqual({ time: 1, value: NaN, color: 'transparent' });
       expect(result[1]).toEqual({ time: 2, value: 20 });
       expect(result[2]).toEqual({ time: 3, value: 30 });
     });

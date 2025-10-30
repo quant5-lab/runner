@@ -19,9 +19,10 @@ const findFirstValidIndex = (data) => {
 };
 
 /* Pure function: create invisible anchor point for alignment */
+/* NaN prevents auto-scale inclusion (Lightweight Charts official pattern) */
 const createAnchorPoint = (time) => ({
   time: msToSeconds(time),
-  value: 0,
+  value: NaN,
   color: 'transparent',
 });
 
