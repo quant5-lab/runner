@@ -30,6 +30,14 @@
 
 ## High Priority 🔴
 
+- [ ] **Chart Y-axis auto-scaling bug with SMA warm-up periods**
+  - **Issue**: Transparent anchor points (value: 0) in lineSeriesAdapter cause vertical axis to scale 0..max instead of min..max
+  - **Impact**: Bitcoin charts (90k-110k) compressed to 0-110k range, making price action invisible
+  - **Root Cause**: `createAnchorPoint()` in `out/lineSeriesAdapter.js:24` sets `value: 0` for pre-warmup alignment
+  - **Evidence**: Price range 111,367-111,650 USDT, but chart axis includes 0 due to invisible anchors at lines 53
+  - **Fix Strategy**: Lightweight Charts library should ignore transparent points in auto-scaling, or use NaN/null instead of 0
+  - **Files**: `out/lineSeriesAdapter.js:22-25` (createAnchorPoint), `out/lineSeriesAdapter.js:53` (usage), `out/index.html` (ChartManager.fitContent)
+
 - [ ] **BB Strategy 7 - full execution validation**
   - ✅ dirmov() function scoping fixed
   - ⏳ End-to-end strategy execution with real data
