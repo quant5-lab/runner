@@ -41,8 +41,9 @@ class Name(Node):
 
 
 class Constant(Node):
-    def __init__(self, value):
+    def __init__(self, value, kind=None):
         self.value = value
+        self.kind = kind
 
 
 class BinOp(Node):
