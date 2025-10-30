@@ -61,12 +61,14 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
           style: 'line',
           title: 'EMA 9',
           type: 'indicator',
+          chartPane: 'main',
         },
         'EMA 18': {
           color: '#F23645',
           style: 'line',
           title: 'EMA 18',
           type: 'indicator',
+          chartPane: 'main',
         },
       });
     });

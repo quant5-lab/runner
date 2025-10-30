@@ -137,12 +137,15 @@ export class PineScriptTranspiler {
     if (!node || typeof node !== 'object') return;
 
     // Wrap MemberExpression with historical index (e.g., counter[1] -> (counter[1] || 0))
+    // BUT: Don't wrap if accessing result of function call (e.g., pivothigh(...)[1])
+    // Function results are arrays and handle their own bounds checking
     if (
       node.type === 'MemberExpression' &&
       node.computed &&
       node.property &&
       node.property.type === 'Literal' &&
-      node.property.value > 0
+      node.property.value > 0 &&
+      node.object.type !== 'CallExpression' // <-- Don't wrap function call results
     ) {
       // Return wrapped node
       return {

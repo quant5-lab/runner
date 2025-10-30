@@ -1,0 +1,10 @@
+//@version = 4
+study(title=" Support and Resistance Levels with Breaks",shorttitle = " Support and Resistance Levels with Breaks", overlay = true ,  max_bars_back=1000)
+
+leftBars  = input(15, title = "SR Left Bars ")
+rightBars  = input(15, title = "SR Right Bars")
+
+highUsePivot = fixnan(pivothigh(leftBars, rightBars)[1])
+lowUsePivot = fixnan(pivotlow(leftBars, rightBars)[1])
+r1 = plot(highUsePivot, color=change(highUsePivot) ? na : #FF0000,  linewidth=1, offset=-(rightBars+1), title="Resistance")
+s1 = plot(lowUsePivot, color=change(lowUsePivot) ? na : #233dee,  linewidth=1, offset=-(rightBars+1), title="Support")

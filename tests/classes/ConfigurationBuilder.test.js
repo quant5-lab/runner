@@ -136,8 +136,8 @@ describe('ConfigurationBuilder', () => {
   describe('buildSeriesConfig()', () => {
     it('should build series config from indicators', () => {
       const indicators = {
-        EMA20: { color: '#2196F3' },
-        RSI: { color: '#FF9800' },
+        EMA20: { color: '#2196F3', chartPane: 'main' },
+        RSI: { color: '#FF9800', chartPane: 'indicator' },
       };
       const series = builder.buildSeriesConfig(indicators);
       expect(series).toEqual({

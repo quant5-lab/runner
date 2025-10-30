@@ -177,10 +177,25 @@ class TradingAnalysisRunner {
         style,
         title: plotKey,
         type: 'indicator',
+        chartPane: this.determineChartPane(plotKey),
       };
     });
 
     return metadata;
+  }
+
+  determineChartPane(plotKey) {
+    const mainChartPlots = ['Avg Price', 'Stop Level', 'Take Profit Level', 'Support', 'Resistance'];
+
+    if (mainChartPlots.includes(plotKey)) {
+      return 'main';
+    }
+
+    if (plotKey.includes('CAGR')) {
+      return 'indicator';
+    }
+
+    return plotKey.includes('EMA') || plotKey.includes('SMA') || plotKey.includes('MA') ? 'main' : 'indicator';
   }
 
   extractPlotColor(plotData) {

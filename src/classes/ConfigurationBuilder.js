@@ -66,15 +66,15 @@ class ConfigurationBuilder {
     const series = {};
 
     Object.entries(indicators).forEach(([key, config]) => {
-      const isMainChart = this.determineChartType(key) === 'main';
+      const chartType = config.chartPane || 'indicator';
+      const isMainChart = chartType === 'main';
 
       series[key] = {
         color: config.color,
         style: config.style || 'line',
         lineWidth: 2,
         title: key,
-        chart: this.determineChartType(key),
-        /* Hide permanent labels on main chart - show only on hover */
+        chart: chartType,
         lastValueVisible: !isMainChart,
         priceLineVisible: !isMainChart,
       };
@@ -84,7 +84,6 @@ class ConfigurationBuilder {
   }
 
   determineChartType(key) {
-    /* Main chart: price overlays (Avg Price, Stop/Take Profit levels, Moving Averages) */
     const mainChartPlots = ['Avg Price', 'Stop Level', 'Take Profit Level'];
 
     if (mainChartPlots.includes(key)) {
