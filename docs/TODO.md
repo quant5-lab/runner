@@ -22,13 +22,17 @@
 - [x] Color hex format tests (PineTS compatibility)
 - [x] Strategy namespace (strategy() → strategy.call() transpiler)
 - [x] ATR risk management (80% ATR14 SL, 5:1 RR, locked levels)
+- [x] **Function vs Variable scoping bug (bb-strategy-7-rus.pine)**
+  - User-defined functions incorrectly wrapped as $.let.glb1_*
+  - Parser fix: track const vs let declarations in ScopeChain
+  - Functions stay bare, variables wrapped for PineTS Context
+  - 4 strategies validated + new E2E test
 
 ## High Priority 🔴
 
-- [ ] **BB Strategy 7 - remaining issues**
-  - ✅ barmerge.lookahead_on (added to context)
-  - ✅ Parameter shadowing (parser fix complete)
-  - ⏳ Full BB7 execution validation pending
+- [ ] **BB Strategy 7 - full execution validation**
+  - ✅ dirmov() function scoping fixed
+  - ⏳ End-to-end strategy execution with real data
 
 ## Medium Priority 🟡
 
@@ -50,7 +54,7 @@
 
 ## Current Status
 
-- **Tests**: 515/515 unit + 9/9 E2E ✅
+- **Tests**: 515/515 unit + 10/10 E2E ✅
 - **Linting**: 0 errors ✅
-- **E2E Suite**: test-input-defval/override, test-plot-params, test-reassignment, test-security, test-strategy (bearish/bullish/base), test-ta-functions
-- **Strategy Validation**: ema-strategy, daily-lines-simple, daily-lines, rolling-cagr, rolling-cagr-5-10yr ✅
+- **E2E Suite**: test-function-vs-variable-scoping, test-input-defval/override, test-plot-params, test-reassignment, test-security, test-strategy (bearish/bullish/base), test-ta-functions
+- **Strategy Validation**: bb-strategy-7/8/9-rus, ema-strategy, daily-lines-simple, daily-lines, rolling-cagr, rolling-cagr-5-10yr ✅
