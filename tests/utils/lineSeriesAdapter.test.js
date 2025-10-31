@@ -5,67 +5,136 @@ describe('lineSeriesAdapter', () => {
   describe('adaptLineSeriesData', () => {
     test('should filter out null values', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: null },
-        { time: 3000, value: 30 },
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: null, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
-      expect(result[1]).toEqual({ time: 3, value: 30 });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
     });
 
     test('should filter out undefined values', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: undefined },
-        { time: 3000, value: 30 },
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: undefined, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
-      expect(result[0].value).toBe(10);
-      expect(result[1].value).toBe(30);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
     });
 
     test('should filter out NaN values', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: NaN },
-        { time: 3000, value: 30 },
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: NaN, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
-      expect(result[0].value).toBe(10);
-      expect(result[1].value).toBe(30);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
+    });
+
+    test('should filter out NaN values', () => {
+      const input = [
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: NaN, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
+      ];
+
+      const result = adaptLineSeriesData(input);
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
+    });
+
+    test('should mark last point before gap as transparent', () => {
     });
 
     test('should mark last point before gap as transparent', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: 20 },
-        { time: 3000, value: null },
-        { time: 4000, value: 40 },
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: 20, options: { color: 'blue' } },
+        { time: 3000, value: null, options: { color: 'blue' } },
+        { time: 4000, value: 40, options: { color: 'blue' } },
+      ];
+
+      const result = adaptLineSeriesData(input);
+
+      expect(result).toHaveLength(4);
+      expect(result[0]).toEqual({ time: 1, value: 10 });
+      expect(result[1]).toEqual({ time: 2, value: 20, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: NaN, color: 'transparent' });
+      expect(result[3]).toEqual({ time: 4, value: 40 });
+    });
+
+    test('should not mark last point as transparent if followed by valid value', () => {
+      const input = [
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: 20, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
       ];
 
       const result = adaptLineSeriesData(input);
 
       expect(result).toHaveLength(3);
       expect(result[0]).toEqual({ time: 1, value: 10 });
+      expect(result[1]).toEqual({ time: 2, value: 20 });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
+    });
+
+    test('should filter out NaN values', () => {
+      const input = [
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: NaN, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
+      ];
+
+      const result = adaptLineSeriesData(input);
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: 30 });
+    });
+
+    test('should mark last point before gap as transparent', () => {
+      const input = [
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: 20, options: { color: 'blue' } },
+        { time: 3000, value: null, options: { color: 'blue' } },
+        { time: 4000, value: 40, options: { color: 'blue' } },
+      ];
+
+      const result = adaptLineSeriesData(input);
+
+      expect(result).toHaveLength(4);
+      expect(result[0]).toEqual({ time: 1, value: 10 });
       expect(result[1]).toEqual({ time: 2, value: 20, color: 'transparent' });
-      expect(result[2]).toEqual({ time: 4, value: 40 });
+      expect(result[2]).toEqual({ time: 3, value: NaN, color: 'transparent' });
+      expect(result[3]).toEqual({ time: 4, value: 40 });
     });
 
     test('should not mark last point as transparent if followed by valid value', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: 20 },
-        { time: 3000, value: 30 },
+        { time: 1000, value: 10, options: { color: 'blue' } },
+        { time: 2000, value: 20, options: { color: 'blue' } },
+        { time: 3000, value: 30, options: { color: 'blue' } },
       ];
 
       const result = adaptLineSeriesData(input);
@@ -78,42 +147,45 @@ describe('lineSeriesAdapter', () => {
 
     test('should handle multiple consecutive gaps', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: null },
-        { time: 3000, value: null },
-        { time: 4000, value: 40 },
+        { time: 1000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 4000, value: 40, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0]).toEqual({ time: 1, value: 10, color: 'transparent' });
-      expect(result[1]).toEqual({ time: 4, value: 40 });
+      expect(result[1]).toEqual({ time: 2, value: NaN, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 4, value: 40 });
     });
 
     test('should handle multiple gaps with transitions', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: 20 },
-        { time: 3000, value: null },
-        { time: 4000, value: 40 },
-        { time: 5000, value: 50 },
-        { time: 6000, value: null },
-        { time: 7000, value: 70 },
+        { time: 1000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: 20, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 4000, value: 40, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 5000, value: 50, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 6000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 7000, value: 70, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(5);
+      expect(result).toHaveLength(7);
       expect(result[0]).toEqual({ time: 1, value: 10 });
       expect(result[1]).toEqual({ time: 2, value: 20, color: 'transparent' });
-      expect(result[2]).toEqual({ time: 4, value: 40 });
-      expect(result[3]).toEqual({ time: 5, value: 50, color: 'transparent' });
-      expect(result[4]).toEqual({ time: 7, value: 70 });
+      expect(result[2]).toEqual({ time: 3, value: NaN, color: 'transparent' });
+      expect(result[3]).toEqual({ time: 4, value: 40 });
+      expect(result[4]).toEqual({ time: 5, value: 50, color: 'transparent' });
+      expect(result[5]).toEqual({ time: 6, value: NaN, color: 'transparent' });
+      expect(result[6]).toEqual({ time: 7, value: 70 });
     });
 
     test('should convert millisecond timestamps to seconds', () => {
-      const input = [{ time: 1609459200000, value: 100 }];
+      const input = [{ time: 1609459200000, value: 100, options: { color: 'blue', options: { color: 'blue' } } }];
 
       const result = adaptLineSeriesData(input);
 
@@ -135,9 +207,9 @@ describe('lineSeriesAdapter', () => {
 
     test('should handle all null values', () => {
       const input = [
-        { time: 1000, value: null },
-        { time: 2000, value: null },
-        { time: 3000, value: null },
+        { time: 1000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
@@ -146,7 +218,7 @@ describe('lineSeriesAdapter', () => {
     });
 
     test('should handle single valid value', () => {
-      const input = [{ time: 1000, value: 42 }];
+      const input = [{ time: 1000, value: 42, options: { color: 'blue', options: { color: 'blue' } } }];
 
       const result = adaptLineSeriesData(input);
 
@@ -156,14 +228,13 @@ describe('lineSeriesAdapter', () => {
 
     test('should handle gap at the beginning', () => {
       const input = [
-        { time: 1000, value: null },
-        { time: 2000, value: 20 },
-        { time: 3000, value: 30 },
+        { time: 1000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: 20, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: 30, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      /* Anchor point inserted for timestamp alignment with NaN to prevent auto-scale */
       expect(result).toHaveLength(3);
       expect(result[0]).toEqual({ time: 1, value: NaN, color: 'transparent' });
       expect(result[1]).toEqual({ time: 2, value: 20 });
@@ -172,23 +243,24 @@ describe('lineSeriesAdapter', () => {
 
     test('should handle gap at the end', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: 20 },
-        { time: 3000, value: null },
+        { time: 1000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: 20, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: null, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0]).toEqual({ time: 1, value: 10 });
       expect(result[1]).toEqual({ time: 2, value: 20, color: 'transparent' });
+      expect(result[2]).toEqual({ time: 3, value: NaN, color: 'transparent' });
     });
 
     test('should preserve zero values as valid data', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: 0 },
-        { time: 3000, value: 10 },
+        { time: 1000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: 0, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
@@ -201,9 +273,9 @@ describe('lineSeriesAdapter', () => {
 
     test('should preserve negative values as valid data', () => {
       const input = [
-        { time: 1000, value: 10 },
-        { time: 2000, value: -5 },
-        { time: 3000, value: 10 },
+        { time: 1000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 2000, value: -5, options: { color: 'blue', options: { color: 'blue' } } },
+        { time: 3000, value: 10, options: { color: 'blue', options: { color: 'blue' } } },
       ];
 
       const result = adaptLineSeriesData(input);
