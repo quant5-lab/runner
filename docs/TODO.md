@@ -41,9 +41,14 @@
 
 ## High Priority 🔴
 
-- [ ] **BB Strategy 7 - full execution validation**
+- [ ] **BB Strategy 7 - Invalid timeframe error**
   - ✅ dirmov() function scoping fixed
-  - ⏳ End-to-end strategy execution with real data
+  - ✅ Transpilation successful (12789 chars)
+  - ✅ All variable transformations working
+  - ❌ Runtime error: `request.security(syminfo.tickerid, '1D', ...)` throws "Invalid timeframe"
+  - PineRequest.security() at line 2155 rejects "1D" format
+  - Strategy uses both "1D" and "D" timeframe strings
+  - Need to investigate PineTS timeframe validation logic
 
 ## Medium Priority 🟡
 
