@@ -27,16 +27,19 @@
   - Parser fix: track const vs let declarations in ScopeChain
   - Functions stay bare, variables wrapped for PineTS Context
   - 4 strategies validated + new E2E test
+- [x] **Chart Y-axis auto-scaling bug with SMA warm-up periods**
+  - **Fixed**: Changed anchor point `value: 0` → `value: NaN` in lineSeriesAdapter
+  - NaN prevents auto-scale inclusion (Lightweight Charts official pattern)
+  - Charts now scale to actual data range (min..max) instead of 0..max
+- [x] **PineTS sma_cache optimization removed**
+  - Cache removed from TechnicalAnalysis.ts sma() method
+  - Direct calculation: `sma(reversedSource, period)` without caching
+- [x] **Null handling in averaging functions (PineTS)**
+  - **Fixed**: If ANY value in window is NaN/null/undefined, result is NaN
+  - Matches Pine Script v5 behavior: NaN propagation, not zero substitution
+  - Applied to: ta.sma and other averaging functions
 
 ## High Priority 🔴
-
-- [ ] **Chart Y-axis auto-scaling bug with SMA warm-up periods**
-  - **Issue**: Transparent anchor points (value: 0) in lineSeriesAdapter cause vertical axis to scale 0..max instead of min..max
-  - **Impact**: Bitcoin charts (90k-110k) compressed to 0-110k range, making price action invisible
-  - **Root Cause**: `createAnchorPoint()` in `out/lineSeriesAdapter.js:24` sets `value: 0` for pre-warmup alignment
-  - **Evidence**: Price range 111,367-111,650 USDT, but chart axis includes 0 due to invisible anchors at lines 53
-  - **Fix Strategy**: Lightweight Charts library should ignore transparent points in auto-scaling, or use NaN/null instead of 0
-  - **Files**: `out/lineSeriesAdapter.js:22-25` (createAnchorPoint), `out/lineSeriesAdapter.js:53` (usage), `out/index.html` (ChartManager.fitContent)
 
 - [ ] **BB Strategy 7 - full execution validation**
   - ✅ dirmov() function scoping fixed
@@ -44,11 +47,13 @@
 
 ## Medium Priority 🟡
 
-- [ ] Remove sma_cache optimization from PineTS
-- [ ] Fix null handling in averaging functions (treat as average propagation, not zero)
-- [ ] Rework determineChartType() for multi-pane indicators (research Pine Script native approach)
-- [ ] Design Y-axis scale configuration (priceScaleId mapping)
-- [ ] Implement varip runtime persistence (Context.varipStorage, initVarIp/setVarIp)
+- [ ] **Common PineScript plot parameters (line width, etc.) must be configurable**
+  - Most plot parameters currently not configurable
+  - Need user control over visual properties (linewidth, transparency, style, etc.)
+- [ ] **Strategy trade consistency and math correctness unvalidated**
+  - **Tech Debt**: No strict deterministic tests asserting correctness for each trade
+  - Need deep validation: entry/exit prices, position sizes, P&L calculations, stop-loss/take-profit levels
+  - Current E2E tests verify execution completes, but don't validate trade logic accuracy
 
 ## Low Priority 🟢
 
@@ -57,6 +62,9 @@
 - [ ] Support blank candlestick mode (plots-only for capital growth modeling)
 - [ ] Python unit tests for parser.py (90%+ coverage goal)
 - [ ] Remove parser dead code ($.let.glb1_ wrapping, unused _rename_identifiers_in_ast)
+- [ ] Implement varip runtime persistence (Context.varipStorage, initVarIp/setVarIp)
+- [ ] Design Y-axis scale configuration (priceScaleId mapping)
+- [ ] Rework determineChartType() for multi-pane indicators (research Pine Script native approach)
 
 ---
 
