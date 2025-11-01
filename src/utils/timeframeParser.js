@@ -24,6 +24,15 @@ export const SUPPORTED_TIMEFRAMES = {
   YAHOO: ['1m', '2m', '5m', '15m', '30m', '1h', '90m', 'D', 'W', 'M'],
 };
 
+/* All valid input timeframes (union of provider formats + legacy aliases) */
+export const VALID_INPUT_TIMEFRAMES = [
+  '1m', '2m', '3m', '5m', '10m', '15m', '30m', '90m',
+  '1h', '2h', '4h', '6h', '8h', '12h',
+  'D', '1d', '3d',
+  'W', '1w', '1wk',
+  'M', '1mo'
+];
+
 /**
  * Utility to parse timeframe strings into standardized formats
  */
