@@ -62,6 +62,7 @@
 
 ## Low Priority 🟢
 
+- [ ] Replace or fork/optimize pynescript (26s parse time bottleneck)
 - [ ] Increase test coverage to 80%
 - [ ] Increase test coverage to 95%
 - [ ] Support blank candlestick mode (plots-only for capital growth modeling)
