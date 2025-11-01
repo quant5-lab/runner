@@ -136,8 +136,8 @@ describe('ConfigurationBuilder', () => {
   describe('buildSeriesConfig()', () => {
     it('should build series config from indicators', () => {
       const indicators = {
-        EMA20: { color: '#2196F3', chartPane: 'main' },
-        RSI: { color: '#FF9800', chartPane: 'indicator' },
+        EMA20: { color: '#2196F3', chartPane: 'main', linewidth: 2, transp: 0 },
+        RSI: { color: '#FF9800', chartPane: 'indicator', linewidth: 2, transp: 0 },
       };
       const series = builder.buildSeriesConfig(indicators);
       expect(series).toEqual({
@@ -162,9 +162,57 @@ describe('ConfigurationBuilder', () => {
       });
     });
 
+    it('should use linewidth from config', () => {
+      const indicators = {
+        EMA20: { color: '#2196F3', chartPane: 'main', linewidth: 5, transp: 0 },
+      };
+      const series = builder.buildSeriesConfig(indicators);
+      expect(series.EMA20.lineWidth).toBe(5);
+    });
+
+    it('should apply transparency when transp > 0', () => {
+      const indicators = {
+        EMA20: { color: '#FF5252', chartPane: 'main', linewidth: 2, transp: 50 },
+      };
+      const series = builder.buildSeriesConfig(indicators);
+      expect(series.EMA20.color).toBe('rgba(255, 82, 82, 0.5)');
+    });
+
     it('should handle empty indicators', () => {
       const series = builder.buildSeriesConfig({});
       expect(series).toEqual({});
+    });
+  });
+
+  describe('applyTransparency()', () => {
+    it('should return color unchanged when transp is 0', () => {
+      const color = builder.applyTransparency('#FF5252', 0);
+      expect(color).toBe('#FF5252');
+    });
+
+    it('should return color unchanged when transp is not provided', () => {
+      const color = builder.applyTransparency('#FF5252', null);
+      expect(color).toBe('#FF5252');
+    });
+
+    it('should convert hex color with transp=50 to rgba with alpha=0.5', () => {
+      const color = builder.applyTransparency('#FF5252', 50);
+      expect(color).toBe('rgba(255, 82, 82, 0.5)');
+    });
+
+    it('should convert hex color with transp=100 to rgba with alpha=0', () => {
+      const color = builder.applyTransparency('#2962FF', 100);
+      expect(color).toBe('rgba(41, 98, 255, 0)');
+    });
+
+    it('should convert hex color with transp=25 to rgba with alpha=0.75', () => {
+      const color = builder.applyTransparency('#4CAF50', 25);
+      expect(color).toBe('rgba(76, 175, 80, 0.75)');
+    });
+
+    it('should return color unchanged for non-hex format', () => {
+      const color = builder.applyTransparency('rgb(255, 82, 82)', 50);
+      expect(color).toBe('rgb(255, 82, 82)');
     });
   });
 

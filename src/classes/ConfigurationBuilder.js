@@ -69,10 +69,14 @@ class ConfigurationBuilder {
       const chartType = config.chartPane || 'indicator';
       const isMainChart = chartType === 'main';
 
+      const finalColor = config.transp && config.transp > 0
+        ? this.applyTransparency(config.color, config.transp)
+        : config.color;
+
       series[key] = {
-        color: config.color,
+        color: finalColor,
         style: config.style || 'line',
-        lineWidth: 2,
+        lineWidth: config.linewidth || 2,
         title: key,
         chart: chartType,
         lastValueVisible: !isMainChart,
@@ -111,6 +115,23 @@ class ConfigurationBuilder {
       M: 'Monthly',
     };
     return timeframes[timeframe] || timeframe;
+  }
+
+  applyTransparency(color, transp) {
+    if (!transp || transp === 0) {
+      return color;
+    }
+
+    const hexMatch = color.match(/^#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})$/);
+    if (hexMatch) {
+      const r = parseInt(hexMatch[1], 16);
+      const g = parseInt(hexMatch[2], 16);
+      const b = parseInt(hexMatch[3], 16);
+      const alpha = 1 - (transp / 100);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    return color;
   }
 }
 

@@ -171,10 +171,14 @@ class TradingAnalysisRunner {
     Object.keys(plots).forEach((plotKey) => {
       const color = this.extractPlotColor(plots[plotKey]);
       const style = this.extractPlotStyle(plots[plotKey]);
+      const linewidth = this.extractPlotLineWidth(plots[plotKey]);
+      const transp = this.extractPlotTransp(plots[plotKey]);
 
       metadata[plotKey] = {
         color,
         style,
+        linewidth,
+        transp,
         title: plotKey,
         type: 'indicator',
         chartPane: this.determineChartPane(plotKey),
@@ -229,6 +233,24 @@ class TradingAnalysisRunner {
 
     const firstPointWithStyle = plotData.data.find((point) => point?.options?.style);
     return firstPointWithStyle?.options?.style || 'line';
+  }
+
+  extractPlotLineWidth(plotData) {
+    if (!plotData?.data || !Array.isArray(plotData.data)) {
+      return 2;
+    }
+
+    const firstPointWithWidth = plotData.data.find((point) => point?.options?.linewidth);
+    return firstPointWithWidth?.options?.linewidth || 2;
+  }
+
+  extractPlotTransp(plotData) {
+    if (!plotData?.data || !Array.isArray(plotData.data)) {
+      return 0;
+    }
+
+    const firstPointWithTransp = plotData.data.find((point) => point?.options?.transp !== undefined);
+    return firstPointWithTransp?.options?.transp ?? 0;
   }
 }
 

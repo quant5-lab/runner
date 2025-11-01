@@ -59,6 +59,8 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
         'EMA 9': {
           color: '#2196F3',
           style: 'line',
+          linewidth: 2,
+          transp: 0,
           title: 'EMA 9',
           type: 'indicator',
           chartPane: 'main',
@@ -66,6 +68,8 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
         'EMA 18': {
           color: '#F23645',
           style: 'line',
+          linewidth: 2,
+          transp: 0,
           title: 'EMA 18',
           type: 'indicator',
           chartPane: 'main',
@@ -83,6 +87,8 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
       const metadata = runner.extractIndicatorMetadata(plots);
 
       expect(metadata['Custom Indicator'].color).toBe(CHART_COLORS.DEFAULT_PLOT);
+      expect(metadata['Custom Indicator'].linewidth).toBe(2);
+      expect(metadata['Custom Indicator'].transp).toBe(0);
     });
 
     it('should handle empty plots object', () => {
@@ -101,6 +107,8 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
       const metadata = runner.extractIndicatorMetadata(plots);
 
       expect(metadata['Broken Plot'].color).toBe(CHART_COLORS.DEFAULT_PLOT);
+      expect(metadata['Broken Plot'].linewidth).toBe(2);
+      expect(metadata['Broken Plot'].transp).toBe(0);
       expect(metadata['Broken Plot'].title).toBe('Broken Plot');
       expect(metadata['Broken Plot'].type).toBe('indicator');
     });
@@ -118,7 +126,125 @@ describe('TradingAnalysisRunner - Metadata Extraction', () => {
       const metadata = runner.extractIndicatorMetadata(plots);
 
       expect(metadata['Plot With Color'].color).toBe('#4CAF50');
+      expect(metadata['Plot With Color'].linewidth).toBe(2);
+      expect(metadata['Plot With Color'].transp).toBe(0);
       expect(metadata['Plot Without Color'].color).toBe(CHART_COLORS.DEFAULT_PLOT);
+      expect(metadata['Plot Without Color'].linewidth).toBe(2);
+      expect(metadata['Plot Without Color'].transp).toBe(0);
+    });
+  });
+
+  describe('extractPlotLineWidth', () => {
+    it('should extract linewidth from first data point with linewidth', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100, options: { linewidth: 3 } },
+          { time: 2000, value: 101, options: { linewidth: 2 } },
+        ],
+      };
+
+      const linewidth = runner.extractPlotLineWidth(plotData);
+
+      expect(linewidth).toBe(3);
+    });
+
+    it('should return default linewidth when no data points have linewidth', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100 },
+          { time: 2000, value: 101 },
+        ],
+      };
+
+      const linewidth = runner.extractPlotLineWidth(plotData);
+
+      expect(linewidth).toBe(2);
+    });
+
+    it('should skip data points without linewidth options', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100 },
+          { time: 2000, value: 101, options: {} },
+          { time: 3000, value: 102, options: { linewidth: 5 } },
+        ],
+      };
+
+      const linewidth = runner.extractPlotLineWidth(plotData);
+
+      expect(linewidth).toBe(5);
+    });
+
+    it('should return default when data is not an array', () => {
+      const plotData = {
+        data: 'invalid',
+      };
+
+      const linewidth = runner.extractPlotLineWidth(plotData);
+
+      expect(linewidth).toBe(2);
+    });
+
+    it('should return default when plotData is null', () => {
+      const linewidth = runner.extractPlotLineWidth(null);
+
+      expect(linewidth).toBe(2);
+    });
+  });
+
+  describe('extractPlotTransp', () => {
+    it('should extract transp from first data point with transp', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100, options: { transp: 50 } },
+          { time: 2000, value: 101, options: { transp: 75 } },
+        ],
+      };
+
+      const transp = runner.extractPlotTransp(plotData);
+
+      expect(transp).toBe(50);
+    });
+
+    it('should return 0 when no data points have transp', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100 },
+          { time: 2000, value: 101 },
+        ],
+      };
+
+      const transp = runner.extractPlotTransp(plotData);
+
+      expect(transp).toBe(0);
+    });
+
+    it('should handle transp=0 explicitly', () => {
+      const plotData = {
+        data: [
+          { time: 1000, value: 100, options: { transp: 0 } },
+        ],
+      };
+
+      const transp = runner.extractPlotTransp(plotData);
+
+      expect(transp).toBe(0);
+    });
+
+    it('should return default when data is not an array', () => {
+      const plotData = {
+        data: 'invalid',
+      };
+
+      const transp = runner.extractPlotTransp(plotData);
+
+      expect(transp).toBe(0);
+    });
+
+    it('should return default when plotData is null', () => {
+      const transp = runner.extractPlotTransp(null);
+
+      expect(transp).toBe(0);
     });
   });
 

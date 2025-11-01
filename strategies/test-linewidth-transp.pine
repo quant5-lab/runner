@@ -1,0 +1,10 @@
+//@version=5
+indicator("Line Test", overlay=true)
+
+fastEMA = ta.ema(close, 10)
+slowEMA = ta.ema(close, 20)
+verySlowEMA = ta.ema(close, 50)
+
+plot(verySlowEMA, "Thick Transparent", color=#4CAF50, linewidth=5, transp=70)
+plot(slowEMA, "Medium Opaque", color=#2962FF, linewidth=3, transp=0)
+plot(fastEMA, "Thin Opaque", color=#FF5252, linewidth=1, transp=0)
