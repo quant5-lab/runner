@@ -84,7 +84,7 @@ async function main() {
       const runDuration = (performance.now() - strategyStartTime).toFixed(2);
       logger.info(`Strategy total:\ttook ${runDuration}ms`);
     } else {
-      await runner.runDefaultStrategy(envSymbol, envTimeframe, envBars);
+      throw new Error('No strategy file provided');
     }
 
     const totalDuration = (performance.now() - startTime).toFixed(2);

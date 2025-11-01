@@ -25,7 +25,7 @@ export class ArgumentValidator {
 
   static validateBarsArgument(barsArg) {
     if (barsArg && !/^\d+$/.test(barsArg)) {
-      throw new Error(`Argument 4 (bars) must be a number, got: "${barsArg}". Usage: node src/index.js SYMBOL TIMEFRAME BARS STRATEGY`);
+      throw new Error(`Bars must be a number, got: "${barsArg}"`);
     }
   }
 
