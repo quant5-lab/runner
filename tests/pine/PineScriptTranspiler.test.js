@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PineScriptTranspiler } from '../../src/pine/PineScriptTranspiler.js';
 import PineVersionMigrator from '../../src/pine/PineVersionMigrator.js';
 
+/* Tests in "Full Migration + Transpilation Sequence" call real Python parser subprocess */
+const TRANSPILER_TIMEOUT = 10000;
+
 describe('PineScriptTranspiler', () => {
   let transpiler;
   let mockLogger;
@@ -119,7 +122,7 @@ show_trades = input(true, title='Show', type=input.bool)`;
 
       // Stage 5: Verify type parameter was removed (not passed to specific functions)
       expect(jsCode).not.toContain('type:');
-    });
+    }, TRANSPILER_TIMEOUT);
 
     it('should handle mixed input syntax in full pipeline', async () => {
       const v4Code = `//@version=4
@@ -133,6 +136,6 @@ val2 = input(1.5, type=input.float)`;
       expect(jsCode).toBeDefined();
       expect(jsCode).toContain('input.int(');
       expect(jsCode).toContain('input.float(');
-    });
+    }, TRANSPILER_TIMEOUT);
   });
 });

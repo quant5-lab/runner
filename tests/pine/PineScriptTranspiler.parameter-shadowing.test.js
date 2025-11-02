@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { PineScriptTranspiler } from '../../src/pine/PineScriptTranspiler.js';
 
+/* These tests call real Python parser subprocess - they are integration tests */
+const TRANSPILER_TIMEOUT = 10000;
+
 describe('PineScriptTranspiler - Parameter Shadowing Fix', () => {
   const transpiler = new PineScriptTranspiler();
 
@@ -24,7 +27,7 @@ plot(result)
     expect(transpiled).toMatch(/const adx = \(_param_LWdilength, LWadxlength\) =>/);
     expect(transpiled).toMatch(/let value = _param_LWdilength \* 2/);
     expect(transpiled).toMatch(/adx\(.*LWdilength.*\)/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('keeps non-shadowing parameters unchanged', async () => {
     const code = `
@@ -42,7 +45,8 @@ plot(result)
     expect(transpiled).toMatch(/const calculate = period =>/);
     expect(transpiled).toMatch(/return period \* 2/);
     expect(transpiled).toMatch(/calculate\(.*length.*\)/);
-  }); it('handles multiple shadowing parameters in same function', async () => {
+  }, TRANSPILER_TIMEOUT);
+  it('handles multiple shadowing parameters in same function', async () => {
     const code = `
 //@version=5
 indicator("Test")
@@ -61,7 +65,7 @@ plot(result)
     expect(transpiled).toMatch(/const test = \(_param_param1, _param_param2\) =>/);
     expect(transpiled).toMatch(/_param_param1 \+ _param_param2/);
     expect(transpiled).toMatch(/test\(.*param1.*param2.*\)/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('renames shadowing parameter throughout function body', async () => {
     const code = `
@@ -84,7 +88,7 @@ plot(result)
     expect(transpiled).toMatch(/return temp \+ _param_value/);
     expect(transpiled).toMatch(/process\(.*value.*\)/);
     expect(transpiled).not.toMatch(/process\(.*_param_value.*\)/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles nested function scopes correctly', async () => {
     const code = `
@@ -106,7 +110,7 @@ plot(result)
     expect(transpiled).toMatch(/level2\(_param_outer\)/);
     expect(transpiled).toMatch(/const level2 = inner =>/);
     expect(transpiled).toMatch(/return inner \* 2/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles mixed shadowing and non-shadowing parameters', async () => {
     const code = `
@@ -126,7 +130,7 @@ plot(result)
     expect(transpiled).not.toContain('_param_offset');
     expect(transpiled).toMatch(/const calculate = \(_param_length, multiplier, offset\) =>/);
     expect(transpiled).toMatch(/_param_length \* multiplier \+ offset/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles shadowing parameter in complex expressions with ta functions', { timeout: 10000 }, async () => {
     const code = `
@@ -150,7 +154,7 @@ plot(result)
     expect(transpiled).toMatch(/let down =/);
     expect(transpiled).not.toMatch(/_param_up/);
     expect(transpiled).not.toMatch(/_param_down/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles triple-nested shadowing cascade', async () => {
     const code = `
@@ -174,7 +178,7 @@ plot(result)
     expect(transpiled).toMatch(/const level2 = _param_value =>/);
     expect(transpiled).toMatch(/const level3 = _param_value =>/);
     expect(transpiled).toMatch(/return _param_value \* 3/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles shadowing parameter used in array indexing and conditionals', async () => {
     const code = `
@@ -194,7 +198,7 @@ plot(result)
     expect(transpiled).toMatch(/_param_index > 5/);
     expect(transpiled).toMatch(/\? 5 : _param_index/);
     expect(transpiled).toMatch(/array\.get\(values, _param_index > 5 \? 5 : _param_index\)/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles function with multiple shadowing parameters and ta.rma calls', async () => {
     const code = `
@@ -227,7 +231,7 @@ plot(ADX)
     expect(transpiled).not.toMatch(/_param_down/);
     expect(transpiled).not.toMatch(/_param_plusDM/);
     expect(transpiled).not.toMatch(/_param_minusDM/);
-  });
+  }, TRANSPILER_TIMEOUT);
 
   it('handles shadowing parameter in tuple destructuring assignment', async () => {
     const code = `
@@ -251,5 +255,5 @@ plot(s)
     expect(transpiled).toMatch(/_param_len1 - _param_len2/);
     expect(transpiled).toMatch(/let sum = _param_len1 \+ _param_len2/);
     expect(transpiled).toMatch(/let diff = _param_len1 - _param_len2/);
-  });
+  }, TRANSPILER_TIMEOUT);
 });
