@@ -71,6 +71,7 @@
 - [ ] Implement varip runtime persistence (Context.varipStorage, initVarIp/setVarIp)
 - [ ] Design Y-axis scale configuration (priceScaleId mapping)
 - [ ] Rework determineChartType() for multi-pane indicators (research Pine Script native approach)
+- [ ] **PineTS: Refactor src/transpiler/index.ts** - Decouple monolithic transpiler for maintainability and extensibility
 
 ---
 
