@@ -61,7 +61,7 @@ sma200_1d_bullish = sma_1d_20 > sma_1d_50
 sma200_1d_bearish = sma_1d_20 < sma_1d_50
 
 // 1D RVI
-vix_1d = security('RVI', 'D', close)
+//vix_1d = security('RVI', 'D', close)
 
 // BB
 bblenght = input(46, minval=1, title="Bollinger Bars Lenght")
@@ -233,7 +233,7 @@ sma_growing = abs(sma(close, 20) - sma(close, 50)) + abs(sma(close, 50) - sma(cl
    abs(sma(close[4], 50) - sma(close[4], 200))
 moderate_volatility = volatility_below_sl and sma_above_atr and sma_growing
 
-high_volatility_of_wide_market = vix_1d > min_vix
+high_volatility_of_wide_market = true //vix_1d > min_vix
 
 // Potential
 atr_1d_potential_buy = atr_1d
