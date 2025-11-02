@@ -1,4 +1,4 @@
-import { CHART_COLORS } from '../config.js';
+import { CHART_COLORS, PLOT_COLOR_NAMES } from '../config.js';
 
 class TradingAnalysisRunner {
   constructor(
@@ -49,14 +49,15 @@ class TradingAnalysisRunner {
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
 
     const plots = executionResult.plots || {};
-    const indicatorMetadata = this.extractIndicatorMetadata(plots);
+    const restructuredPlots = this.restructurePlots(plots);
+    const indicatorMetadata = this.extractIndicatorMetadata(restructuredPlots);
 
     if (!data?.length) {
       throw new Error(`No valid market data available for ${symbol}`);
     }
 
     const candlestickData = this.candlestickDataSanitizer.processCandlestickData(data);
-    this.jsonFileWriter.exportChartData(candlestickData, plots);
+    this.jsonFileWriter.exportChartData(candlestickData, restructuredPlots);
 
     const chartConfig = this.configurationBuilder.generateChartConfig(
       tradingConfig,
@@ -68,6 +69,95 @@ class TradingAnalysisRunner {
     this.logger.log(`Processing:\t${candlestickData.length} candles (took ${runDuration}ms)`);
 
     return executionResult;
+  }
+
+  /* Restructure PineTS plot output from single "Plot" array to named plots */
+  restructurePlots(plots) {
+    if (!plots || typeof plots !== 'object') {
+      return {};
+    }
+
+    /* If already structured with multiple named plots, return as-is */
+    if (Object.keys(plots).length > 1 || !plots.Plot) {
+      return plots;
+    }
+
+    const plotData = plots.Plot?.data;
+    if (!Array.isArray(plotData) || plotData.length === 0) {
+      return {};
+    }
+
+    /* Group by timestamp to find how many plots per candle */
+    const timeMap = new Map();
+    plotData.forEach((point) => {
+      const timeKey = Math.floor(point.time / 1000);
+      if (!timeMap.has(timeKey)) {
+        timeMap.set(timeKey, []);
+      }
+      timeMap.get(timeKey).push(point);
+    });
+
+    /* Detect plot count per candle */
+    const plotsPerCandle = timeMap.values().next().value?.length || 0;
+    
+    /* Create plot groups by position index (0, 1, 2, ...) */
+    const plotGroups = [];
+    for (let i = 0; i < plotsPerCandle; i++) {
+      plotGroups.push({
+        name: null,
+        data: [],
+        options: null,
+      });
+    }
+
+    /* Assign data points to correct plot group by position */
+    timeMap.forEach((pointsAtTime, timeKey) => {
+      pointsAtTime.forEach((point, index) => {
+        if (index < plotGroups.length) {
+          plotGroups[index].data.push({
+            time: timeKey,
+            value: point.value,
+            options: point.options,
+          });
+          
+          /* Capture first non-null options for naming */
+          if (!plotGroups[index].options && point.options) {
+            plotGroups[index].options = point.options;
+          }
+        }
+      });
+    });
+
+    /* Generate names based on options */
+    const restructured = {};
+    plotGroups.forEach((group, index) => {
+      const plotName = this.generatePlotName(group.options || {}, index + 1);
+      restructured[plotName] = {
+        data: group.data,
+      };
+    });
+
+    return restructured;
+  }
+
+  /* Generate plot name from options */
+  generatePlotName(options, counter) {
+    const color = options.color || '#000000';
+    const style = options.style || 'line';
+    const linewidth = options.linewidth || 1;
+    
+    const colorName = PLOT_COLOR_NAMES[color] || `Color${counter}`;
+    
+    /* Always include counter for uniqueness when no title */
+    if (style === 'linebr' && linewidth === 2) {
+      return `${colorName} Level ${counter}`;
+    }
+    
+    if (style === 'linebr') {
+      return `${colorName} Line ${counter}`;
+    }
+    
+    return `${colorName} Plot ${counter}`;
   }
 
   extractIndicatorMetadata(plots) {

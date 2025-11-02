@@ -25,3 +25,12 @@ export const CHART_COLORS = {
   CANDLESTICK_UP: '#26a69a',
   CANDLESTICK_DOWN: '#ef5350',
 };
+
+/* Plot color to name mapping for auto-generated plot names */
+export const PLOT_COLOR_NAMES = {
+  '#FF5252': 'Red',
+  '#363A45': 'Black',
+  '#00E676': 'Lime',
+  '#787B86': 'Gray',
+  '#FFFFFF': 'White',
+};
