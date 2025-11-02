@@ -82,17 +82,14 @@ async function runStrategyWithOverrides(pineCode, inputOverrides = null) {
   const pineTS = new PineTS(mockProvider, 'TEST', 'D', 30, null, null, constructorOptions);
 
   const jsCode = await transpilePineCode(pineCode);
-  const { plotAdapterSource } = await import('../../src/adapters/PinePlotAdapter.js');
 
   const wrappedCode = `(context) => {
     const { close, open, high, low, volume } = context.data;
-    const { plot: corePlot, color, na, nz } = context.core;
+    const { plot, color, na, nz } = context.core;
     const ta = context.ta;
     const math = context.math;
     const input = context.input;
     const syminfo = context.syminfo;
-    
-    ${plotAdapterSource}
     
     function indicator() {}
     function strategy() {}

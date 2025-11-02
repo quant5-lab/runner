@@ -11,11 +11,13 @@ describe('PineScriptStrategyRunner', () => {
   let mockPineTS;
   let mockProviderManager;
   let mockStatsCollector;
+  let mockLogger;
 
   beforeEach(async () => {
     mockProviderManager = { getMarketData: vi.fn() };
     mockStatsCollector = { recordApiCall: vi.fn() };
-    runner = new PineScriptStrategyRunner(mockProviderManager, mockStatsCollector);
+    mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    runner = new PineScriptStrategyRunner(mockProviderManager, mockStatsCollector, mockLogger);
 
     /* Create mock PineTS instance */
     mockPineTS = {
@@ -67,7 +69,7 @@ describe('PineScriptStrategyRunner', () => {
       expect(callArg).toContain('(context) => {');
       expect(callArg).toContain('const ta = context.ta;');
       expect(callArg).toContain(
-        'const { plot: corePlot, color, na, nz, fixnan, time } = context.core;',
+        'const { plot, color, na, nz, fixnan, time } = context.core;',
       );
       expect(callArg).toContain('const syminfo = context.syminfo;');
       expect(callArg).toContain('function indicator() {}');

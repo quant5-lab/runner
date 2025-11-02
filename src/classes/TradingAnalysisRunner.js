@@ -38,10 +38,6 @@ class TradingAnalysisRunner {
 
     const execStartTime = performance.now();
 
-    this.logger.debug('=== TRANSPILED JAVASCRIPT CODE START ===');
-    this.logger.debug(jsCode);
-    this.logger.debug('=== TRANSPILED JAVASCRIPT CODE END ===');
-
     const executionResult = await this.pineScriptStrategyRunner.executeTranspiledStrategy(
       jsCode,
       symbol,

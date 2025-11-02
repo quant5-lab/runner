@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createContainer } from '../../src/container.js';
 import { readFile } from 'fs/promises';
-import { createProviderChain, DEFAULTS } from '../../src/config.js';
+import { DEFAULTS } from '../../src/config.js';
+import { MockProviderManager } from '../../e2e/mocks/MockProvider.js';
 
 /* Integration test: ema-strategy.pine produces valid plots with correct EMA calculations */
 describe('EMA Strategy Integration', () => {
   it('should produce EMA 1, EMA 2, and Bull Signal plots', async () => {
+    const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 100 });
+    const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
     const container = createContainer(createProviderChain, DEFAULTS);
     const runner = container.resolve('tradingAnalysisRunner');
     const transpiler = container.resolve('pineScriptTranspiler');
@@ -49,6 +52,8 @@ describe('EMA Strategy Integration', () => {
   });
 
   it('should calculate Bull Signal correctly (1 when EMA1 > EMA2, 0 otherwise)', async () => {
+    const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 100 });
+    const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
     const container = createContainer(createProviderChain, DEFAULTS);
     const runner = container.resolve('tradingAnalysisRunner');
     const transpiler = container.resolve('pineScriptTranspiler');
@@ -82,6 +87,8 @@ describe('EMA Strategy Integration', () => {
   });
 
   it('should calculate EMA 1 (20-period) correctly', async () => {
+    const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 100 });
+    const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
     const container = createContainer(createProviderChain, DEFAULTS);
     const runner = container.resolve('tradingAnalysisRunner');
     const transpiler = container.resolve('pineScriptTranspiler');

@@ -95,19 +95,14 @@ async function testInputIntDeterministic() {
   const pineCode = await readFile('e2e/fixtures/strategies/test-input-int.pine', 'utf-8');
   const jsCode = await transpilePineCode(pineCode);
 
-  // Import plot adapter
-  const { plotAdapterSource } = await import('../../src/adapters/PinePlotAdapter.js');
-
   // Wrap code for PineTS execution
   const wrappedCode = `(context) => {
     const { close, open, high, low, volume } = context.data;
-    const { plot: corePlot, color, na, nz } = context.core;
+    const { plot, color, na, nz } = context.core;
     const ta = context.ta;
     const math = context.math;
     const input = context.input;
     const syminfo = context.syminfo;
-    
-    ${plotAdapterSource}
     
     function indicator() {}
     function strategy() {}
@@ -192,19 +187,14 @@ async function testInputFloatDeterministic() {
   const pineCode = await readFile('e2e/fixtures/strategies/test-input-float.pine', 'utf-8');
   const jsCode = await transpilePineCode(pineCode);
 
-  // Import plot adapter
-  const { plotAdapterSource } = await import('../../src/adapters/PinePlotAdapter.js');
-
   // Wrap code
   const wrappedCode = `(context) => {
     const { close, open, high, low, volume } = context.data;
-    const { plot: corePlot, color, na, nz } = context.core;
+    const { plot, color, na, nz } = context.core;
     const ta = context.ta;
     const math = context.math;
     const input = context.input;
     const syminfo = context.syminfo;
-    
-    ${plotAdapterSource}
     
     function indicator() {}
     function strategy() {}

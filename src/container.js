@@ -55,7 +55,11 @@ function createContainer(providerChain, defaults) {
     .register(
       'pineScriptStrategyRunner',
       (c) =>
-        new PineScriptStrategyRunner(c.resolve('providerManager'), c.resolve('apiStatsCollector')),
+        new PineScriptStrategyRunner(
+          c.resolve('providerManager'),
+          c.resolve('apiStatsCollector'),
+          c.resolve('logger'),
+        ),
       true,
     )
     .register('pineScriptTranspiler', (c) => new PineScriptTranspiler(c.resolve('logger')), true)

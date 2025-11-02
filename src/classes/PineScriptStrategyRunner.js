@@ -1,12 +1,12 @@
 import { PineTS } from '../../../PineTS/dist/pinets.dev.es.js';
 import TimeframeConverter from '../utils/timeframeConverter.js';
 import { TimeframeParser } from '../utils/timeframeParser.js';
-import { plotAdapterSource } from '../adapters/PinePlotAdapter.js';
 
 class PineScriptStrategyRunner {
-  constructor(providerManager, statsCollector) {
+  constructor(providerManager, statsCollector, logger) {
     this.providerManager = providerManager;
     this.statsCollector = statsCollector;
+    this.logger = logger;
   }
 
   async executeTranspiledStrategy(jsCode, symbol, bars, timeframe, settings = null) {
@@ -25,7 +25,7 @@ class PineScriptStrategyRunner {
 
     const wrappedCode = `(context) => {
       const { close, open, high, low, volume } = context.data;
-      const { plot: corePlot, color, na, nz, fixnan, time } = context.core;
+      const { plot, color, na, nz, fixnan, time } = context.core;
       const ta = context.ta;
       const math = context.math;
       const request = context.request;
@@ -38,8 +38,6 @@ class PineScriptStrategyRunner {
       const timeframe = context.timeframe;
       const barstate = context.barstate;
       const dayofweek = context.dayofweek;
-      
-      ${plotAdapterSource}
       
       plot.style_line = 'line';
       plot.style_histogram = 'histogram';
@@ -54,6 +52,10 @@ class PineScriptStrategyRunner {
       
       ${jsCode}
     }`;
+
+    this.logger.debug('=== WRAPPED CODE FOR PINETS START ===');
+    this.logger.debug(wrappedCode);
+    this.logger.debug('=== WRAPPED CODE FOR PINETS END ===');
 
     await pineTS.prefetchSecurityData(wrappedCode);
 

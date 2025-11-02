@@ -77,9 +77,9 @@ describe('ArgumentValidator', () => {
     });
 
     it('should reject non-numeric string', () => {
-      expect(() => ArgumentValidator.validateBarsArgument('strategies/test.pine')).toThrow('Argument 4 (bars) must be a number');
-      expect(() => ArgumentValidator.validateBarsArgument('abc')).toThrow('Argument 4 (bars) must be a number');
-      expect(() => ArgumentValidator.validateBarsArgument('100.5')).toThrow('Argument 4 (bars) must be a number');
+      expect(() => ArgumentValidator.validateBarsArgument('strategies/test.pine')).toThrow('Bars must be a number');
+      expect(() => ArgumentValidator.validateBarsArgument('abc')).toThrow('Bars must be a number');
+      expect(() => ArgumentValidator.validateBarsArgument('100.5')).toThrow('Bars must be a number');
     });
   });
 
