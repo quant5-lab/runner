@@ -31,11 +31,11 @@ export class ArgumentValidator {
 
   static async validateStrategyFile(strategyPath) {
     if (!strategyPath) return;
-    
+
     if (!strategyPath.endsWith('.pine')) {
       throw new Error('Strategy file must have .pine extension');
     }
-    
+
     try {
       await access(strategyPath, constants.R_OK);
     } catch {

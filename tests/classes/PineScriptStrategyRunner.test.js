@@ -49,7 +49,7 @@ describe('PineScriptStrategyRunner', () => {
         bars,
         null,
         null,
-        undefined // constructorOptions
+        undefined, // constructorOptions
       );
       expect(mockPineTS.run).toHaveBeenCalledTimes(1);
       expect(mockPineTS.run).toHaveBeenCalledWith(expect.stringContaining(jsCode));

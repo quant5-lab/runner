@@ -50,7 +50,7 @@ class TradingAnalysisRunner {
 
     const plots = executionResult.plots || {};
     const restructuredPlots = this.restructurePlots(plots);
-    
+
     /* Debug: Check plot timestamps */
     const indicatorMetadata = this.extractIndicatorMetadata(restructuredPlots);
 
@@ -111,7 +111,7 @@ class TradingAnalysisRunner {
 
     /* Detect plot count per candle */
     const plotsPerCandle = timeMap.values().next().value?.length || 0;
-    
+
     /* Create plot groups by position index (0, 1, 2, ...) */
     const plotGroups = [];
     for (let i = 0; i < plotsPerCandle; i++) {
@@ -131,7 +131,7 @@ class TradingAnalysisRunner {
             value: point.value,
             options: point.options,
           });
-          
+
           /* Capture first non-null options for naming */
           if (!plotGroups[index].options && point.options) {
             plotGroups[index].options = point.options;
@@ -157,18 +157,18 @@ class TradingAnalysisRunner {
     const color = options.color || '#000000';
     const style = options.style || 'line';
     const linewidth = options.linewidth || 1;
-    
+
     const colorName = PLOT_COLOR_NAMES[color] || `Color${counter}`;
-    
+
     /* Always include counter for uniqueness when no title */
     if (style === 'linebr' && linewidth === 2) {
       return `${colorName} Level ${counter}`;
     }
-    
+
     if (style === 'linebr') {
       return `${colorName} Line ${counter}`;
     }
-    
+
     return `${colorName} Plot ${counter}`;
   }
 
@@ -180,6 +180,7 @@ class TradingAnalysisRunner {
       const style = this.extractPlotStyle(plots[plotKey]);
       const linewidth = this.extractPlotLineWidth(plots[plotKey]);
       const transp = this.extractPlotTransp(plots[plotKey]);
+      const dataPane = this.extractPlotPane(plots[plotKey]);
 
       metadata[plotKey] = {
         color,
@@ -188,7 +189,7 @@ class TradingAnalysisRunner {
         transp,
         title: plotKey,
         type: 'indicator',
-        chartPane: this.determineChartPane(plotKey),
+        chartPane: dataPane || this.determineChartPane(plotKey),
       };
     });
 
@@ -258,6 +259,15 @@ class TradingAnalysisRunner {
 
     const firstPointWithTransp = plotData.data.find((point) => point?.options?.transp !== undefined);
     return firstPointWithTransp?.options?.transp ?? 0;
+  }
+
+  extractPlotPane(plotData) {
+    if (!plotData?.data || !Array.isArray(plotData.data)) {
+      return null;
+    }
+
+    const firstPointWithPane = plotData.data.find((point) => point?.options?.pane || point?.pane);
+    return firstPointWithPane?.options?.pane || firstPointWithPane?.pane || null;
   }
 }
 

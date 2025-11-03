@@ -124,10 +124,36 @@ describe('ConfigurationBuilder', () => {
   });
 
   describe('buildLayoutConfig()', () => {
-    it('should return layout configuration', () => {
+    it('should return layout configuration with fixed main pane', () => {
       const config = builder.buildLayoutConfig();
       expect(config).toEqual({
-        main: { height: 400 },
+        main: { height: 400, fixed: true },
+        indicator: { height: 200 },
+      });
+    });
+
+    it('should generate dynamic panes from metadata', () => {
+      const metadata = {
+        'Strategy Equity': { chartPane: 'equity' },
+        RSI: { chartPane: 'oscillators' },
+        MACD: { chartPane: 'oscillators' },
+        'SMA 20': { chartPane: 'main' },
+      };
+      const config = builder.buildLayoutConfig(metadata);
+      expect(config).toEqual({
+        main: { height: 400, fixed: true },
+        equity: { height: 200 },
+        oscillators: { height: 200 },
+      });
+    });
+
+    it('should ensure indicator pane exists if no dynamic panes', () => {
+      const metadata = {
+        'SMA 20': { chartPane: 'main' },
+      };
+      const config = builder.buildLayoutConfig(metadata);
+      expect(config).toEqual({
+        main: { height: 400, fixed: true },
         indicator: { height: 200 },
       });
     });

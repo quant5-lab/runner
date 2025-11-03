@@ -277,7 +277,7 @@ plot(smart_take_level, color=has_active_trade and show_trades ? color.green : co
 
 // Equity plot in indicator pane
 equity_value = strategy.equity
-plot(equity_value, color=color.blue, linewidth=2, pane='indicator', title='Strategy Equity')
+plot(equity_value, color=color.blue, linewidth=2, pane='equity', title='Strategy Equity')
 
 // Active trade indicator - shows 1 when trade is active, 0 otherwise
 active_trade_indicator = has_active_trade ? 1 : 0

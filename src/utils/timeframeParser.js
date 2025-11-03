@@ -30,7 +30,7 @@ export const VALID_INPUT_TIMEFRAMES = [
   '1h', '2h', '4h', '6h', '8h', '12h',
   'D', '1d', '3d',
   'W', '1w', '1wk',
-  'M', '1mo'
+  'M', '1mo',
 ];
 
 /**

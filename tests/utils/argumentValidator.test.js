@@ -95,7 +95,9 @@ describe('ArgumentValidator', () => {
     afterEach(async () => {
       try {
         await unlink(testFile);
-      } catch {}
+      } catch {
+        /* Ignore cleanup errors */
+      }
     });
 
     it('should accept undefined strategy', async () => {
@@ -127,7 +129,9 @@ describe('ArgumentValidator', () => {
     afterEach(async () => {
       try {
         await unlink(testFile);
-      } catch {}
+      } catch {
+        /* Ignore cleanup errors */
+      }
     });
 
     it('should accept valid arguments', async () => {

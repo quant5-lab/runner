@@ -2,12 +2,17 @@
 
 ## High Priority 🔴
 
-- [ ] **/anti-delusion-v2.1**
-  - In the index.html create ability to add unlimited number of indicator panes by specifying any arbitrary name in `pane` property. These plots are to be grouped by name and separate indicator pane are to be rendered for each group (pane name).
-  - Equity of bb7 must go into this separate pane.
-
 ## Completed ✅
 
+- [x] **Multi-pane chart architecture (unlimited dynamic panes)**
+  - Node.js: extractPlotPane() extracts pane from plot data (priority: data > fallback)
+  - Node.js: buildLayoutConfig() generates dynamic panes from metadata (main + N dynamic)
+  - index.html: PaneManager class (createMainPane, createDynamicPane, synchronizeTimeScales)
+  - index.html: SeriesRouter class (routeSeries, rerouteSeries)
+  - index.html: Dynamic pane rendering (main fixed at 400px, dynamic at 200px each)
+  - Tests: 554/554 unit tests pass, 12/12 E2E tests pass (including test-multi-pane.mjs)
+  - Tests: bb7 equity plot renders in separate 'equity' pane (3 panes: main, equity, indicator)
+  - Validation: 4-pane test (main, equity, oscillators, volume) passes
 - [x] Pine v3/v4→v5 migration (100+ function mappings, 37 tests)
 - [x] Unified timeframe format (D/W/M, TimeframeParser/Converter refactor)
 - [x] E2E test suite reorganization (centralized runner, timeout protection)

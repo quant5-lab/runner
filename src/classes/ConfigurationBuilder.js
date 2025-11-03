@@ -23,7 +23,7 @@ class ConfigurationBuilder {
     return {
       ui: this.buildUIConfig(tradingConfig),
       dataSource: this.buildDataSourceConfig(),
-      chartLayout: this.buildLayoutConfig(),
+      chartLayout: this.buildLayoutConfig(indicatorMetadata),
       seriesConfig: {
         candlestick: {
           upColor: CHART_COLORS.CANDLESTICK_UP,
@@ -55,11 +55,29 @@ class ConfigurationBuilder {
     };
   }
 
-  buildLayoutConfig() {
-    return {
-      main: { height: 400 },
-      indicator: { height: 200 },
-    };
+  buildLayoutConfig(indicatorMetadata) {
+    const panes = { main: { height: 400, fixed: true } };
+
+    if (indicatorMetadata) {
+      const uniquePanes = new Set();
+      Object.values(indicatorMetadata).forEach((metadata) => {
+        const pane = metadata.chartPane;
+        if (pane && pane !== 'main') {
+          uniquePanes.add(pane);
+        }
+      });
+
+      uniquePanes.forEach((paneName) => {
+        panes[paneName] = { height: 200 };
+      });
+    }
+
+    /* Backward compatibility: ensure 'indicator' pane exists if no dynamic panes */
+    if (Object.keys(panes).length === 1) {
+      panes.indicator = { height: 200 };
+    }
+
+    return panes;
   }
 
   buildSeriesConfig(indicators) {

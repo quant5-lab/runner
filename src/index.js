@@ -25,9 +25,9 @@ async function main() {
   const startTime = performance.now();
   try {
     const { symbol, timeframe, bars } = DEFAULTS;
-    
+
     ArgumentValidator.validateBarsArgument(process.argv[4]);
-    
+
     const envSymbol = process.argv[2] || process.env.SYMBOL || symbol;
     const envTimeframe = process.argv[3] || process.env.TIMEFRAME || timeframe;
     const envBars = parseInt(process.argv[4]) || parseInt(process.env.BARS) || bars;

@@ -111,18 +111,144 @@
 
       <div class="chart-container">
         <div id="main-chart"></div>
-        <div id="indicator-chart"></div>
       </div>
 
       <div class="timestamp" id="timestamp"></div>
     </div>
 
     <script>
+      /* PaneManager: Manages chart pane lifecycle */
+      class PaneManager {
+        constructor(chartOptions) {
+          this.chartOptions = chartOptions;
+          this.mainPane = null;
+          this.dynamicPanes = new Map();
+        }
+
+        createMainPane(container, config) {
+          this.mainPane = {
+            container,
+            chart: LightweightCharts.createChart(container, {
+              ...this.chartOptions,
+              height: config.height,
+              width: container.clientWidth,
+            }),
+          };
+          return this.mainPane;
+        }
+
+        createDynamicPane(paneName, config) {
+          const containerDiv = document.createElement('div');
+          containerDiv.id = `${paneName}-chart`;
+          containerDiv.style.position = 'relative';
+          containerDiv.style.zIndex = '1';
+
+          const chartContainerDiv = document.querySelector('.chart-container');
+          chartContainerDiv.appendChild(containerDiv);
+
+          const chart = LightweightCharts.createChart(containerDiv, {
+            ...this.chartOptions,
+            height: config.height,
+            width: containerDiv.clientWidth,
+          });
+
+          this.dynamicPanes.set(paneName, { container: containerDiv, chart });
+          return { container: containerDiv, chart };
+        }
+
+        getPane(paneName) {
+          return paneName === 'main' ? this.mainPane : this.dynamicPanes.get(paneName);
+        }
+
+        getAllCharts() {
+          const charts = [this.mainPane.chart];
+          this.dynamicPanes.forEach(({ chart }) => charts.push(chart));
+          return charts;
+        }
+
+        getAllContainers() {
+          const containers = [this.mainPane.container];
+          this.dynamicPanes.forEach(({ container }) => containers.push(container));
+          return containers;
+        }
+
+        synchronizeTimeScales() {
+          const charts = this.getAllCharts();
+          let isUpdating = false;
+
+          charts.forEach((sourceChart, sourceIndex) => {
+            sourceChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+              if (isUpdating || !logicalRange) return;
+
+              isUpdating = true;
+              requestAnimationFrame(() => {
+                charts.forEach((targetChart, targetIndex) => {
+                  if (sourceIndex !== targetIndex) {
+                    try {
+                      targetChart.timeScale().setVisibleLogicalRange(logicalRange);
+                    } catch (error) {
+                      console.warn('Failed to sync logical range:', error);
+                    }
+                  }
+                });
+                isUpdating = false;
+              });
+            });
+          });
+        }
+      }
+
       /* Global chart variables */
       let mainChart,
         indicatorChart,
         seriesMap = {};
       let CONFIG = null;
+      let paneManager = null;
+
+      /* SeriesRouter: Routes series to correct pane */
+      class SeriesRouter {
+        constructor(paneManager, seriesMap) {
+          this.paneManager = paneManager;
+          this.seriesMap = seriesMap;
+        }
+
+        routeSeries(seriesKey, seriesConfig, chartManager) {
+          const paneName = seriesConfig.chart || 'indicator';
+          const pane = this.paneManager.getPane(paneName);
+
+          if (!pane) {
+            console.warn(`Pane '${paneName}' not found for series '${seriesKey}'`);
+            return null;
+          }
+
+          const seriesType = seriesConfig.style || 'line';
+          let series;
+
+          if (seriesType === 'histogram') {
+            series = chartManager.addHistogramSeries(pane.chart, seriesConfig);
+          } else {
+            series = chartManager.addLineSeries(pane.chart, seriesConfig);
+          }
+
+          this.seriesMap[seriesKey] = series;
+          return series;
+        }
+
+        rerouteSeries(seriesKey, newPaneName, seriesConfig, chartManager) {
+          const oldSeries = this.seriesMap[seriesKey];
+          if (!oldSeries) return null;
+
+          const oldPaneName = seriesConfig.chart;
+          const oldPane = this.paneManager.getPane(oldPaneName);
+
+          if (oldPane && oldPane.chart) {
+            oldPane.chart.removeSeries(oldSeries);
+          }
+
+          seriesConfig.chart = newPaneName;
+          return this.routeSeries(seriesKey, seriesConfig, chartManager);
+        }
+      }
 
       /* Configuration loader */
       const ConfigLoader = {
@@ -178,34 +304,49 @@
       async function initializeCharts() {
         CONFIG = await ConfigLoader.loadConfig();
 
+        /* Initialize PaneManager */
+        paneManager = new PaneManager(chartOptions);
+
+        /* Create main pane (fixed) */
         const mainContainer = document.getElementById('main-chart');
-        const indicatorContainer = document.getElementById('indicator-chart');
+        paneManager.createMainPane(mainContainer, CONFIG.chartLayout.main);
+        mainChart = paneManager.mainPane.chart;
 
-        mainChart = ChartManager.createChart(mainContainer, CONFIG.chartLayout.main);
-        indicatorChart = ChartManager.createChart(indicatorContainer, CONFIG.chartLayout.indicator);
+        /* Create dynamic panes from chartLayout config */
+        Object.entries(CONFIG.chartLayout).forEach(([paneName, paneConfig]) => {
+          if (paneName !== 'main') {
+            const pane = paneManager.createDynamicPane(paneName, paneConfig);
+            if (paneName === 'indicator') {
+              indicatorChart = pane.chart;
+            }
+          }
+        });
 
+        /* Initialize SeriesRouter */
+        const seriesRouter = new SeriesRouter(paneManager, seriesMap);
+
+        /* Add candlestick series to main pane */
         seriesMap.candlestick = ChartManager.addCandlestickSeries(
           mainChart,
           CONFIG.seriesConfig.candlestick,
         );
 
+        /* Route all series to correct panes */
         Object.entries(CONFIG.seriesConfig.series).forEach(([key, seriesConfig]) => {
-          const targetChart = seriesConfig.chart === 'main' ? mainChart : indicatorChart;
-          const seriesType = seriesConfig.style || 'line';
-          if (seriesType === 'histogram') {
-            seriesMap[key] = ChartManager.addHistogramSeries(targetChart, seriesConfig);
-          } else {
-            seriesMap[key] = ChartManager.addLineSeries(targetChart, seriesConfig);
-          }
+          seriesRouter.routeSeries(key, seriesConfig, ChartManager);
         });
 
+        /* Window resize handler */
         window.addEventListener('resize', () => {
-          ChartManager.handleResize([mainChart, indicatorChart], [mainContainer]);
+          const containers = paneManager.getAllContainers();
+          const charts = paneManager.getAllCharts();
+          const width = containers[0].clientWidth;
+          charts.forEach((chart) => chart.applyOptions({ width }));
         });
 
-        /* Initialize sync after charts are fully loaded */
+        /* Initialize time scale sync */
         setTimeout(() => {
-          ChartManager.synchronizeTimeScales([mainChart, indicatorChart]);
+          paneManager.synchronizeTimeScales();
         }, 50);
       }
 
@@ -331,7 +472,7 @@
           }
         },
 
-        loadPlotData(data, config) {
+        loadPlotData(data, config, seriesRouter) {
           const plots = this.getNestedProperty(data, config.dataSource.plotsPath);
           if (!plots) return;
 
@@ -344,22 +485,9 @@
               const firstPoint = Array.isArray(plotData) ? plotData[0] : null;
               const dataPane = firstPoint?.options?.pane || firstPoint?.pane;
               
-              /* If pane differs from config, recreate series on correct chart */
+              /* If pane differs from config, reroute series to correct pane */
               if (dataPane && dataPane !== seriesConfig.chart) {
-                /* Remove old series */
-                const oldChart = seriesConfig.chart === 'main' ? mainChart : indicatorChart;
-                if (seriesMap[key]) {
-                  oldChart.removeSeries(seriesMap[key]);
-                }
-                
-                /* Add series to correct chart */
-                const targetChart = dataPane === 'main' ? mainChart : indicatorChart;
-                const seriesType = seriesConfig.style || 'line';
-                if (seriesType === 'histogram') {
-                  seriesMap[key] = ChartManager.addHistogramSeries(targetChart, seriesConfig);
-                } else {
-                  seriesMap[key] = ChartManager.addLineSeries(targetChart, seriesConfig);
-                }
+                seriesRouter.rerouteSeries(key, dataPane, seriesConfig, ChartManager);
               }
               
               /* Process and set data */
@@ -387,17 +515,19 @@
       async function loadChartData() {
         try {
           const data = await DataLoader.fetchChartData(CONFIG);
+          const seriesRouter = new SeriesRouter(paneManager, seriesMap);
 
           DataLoader.loadCandlestickData(data, seriesMap.candlestick, CONFIG);
-          DataLoader.loadPlotData(data, CONFIG);
+          DataLoader.loadPlotData(data, CONFIG, seriesRouter);
 
-          ChartManager.fitContent([mainChart, indicatorChart]);
+          const charts = paneManager.getAllCharts();
+          ChartManager.fitContent(charts);
           DataLoader.updateTimestamp(data, CONFIG);
           UIManager.updateDisplay(CONFIG);
 
           /* Ensure sync is active after data load */
           setTimeout(() => {
-            ChartManager.synchronizeTimeScales([mainChart, indicatorChart]);
+            paneManager.synchronizeTimeScales();
           }, 50);
         } catch (error) {
           console.error('Error loading chart data:', error);
