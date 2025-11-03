@@ -346,8 +346,6 @@
               
               /* If pane differs from config, recreate series on correct chart */
               if (dataPane && dataPane !== seriesConfig.chart) {
-                console.log(`Moving ${key} to ${dataPane} chart based on pane property`);
-                
                 /* Remove old series */
                 const oldChart = seriesConfig.chart === 'main' ? mainChart : indicatorChart;
                 if (seriesMap[key]) {
