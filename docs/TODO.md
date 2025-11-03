@@ -1,5 +1,11 @@
 # TODO List - BorisQuantLab Runner
 
+## High Priority 🔴
+
+- [ ] **/anti-delusion-v2.1**
+  - In the index.html create ability to add unlimited number of indicator panes by specifying any arbitrary name in `pane` property. These plots are to be grouped by name and separate indicator pane are to be rendered for each group (pane name).
+  - Equity of bb7 must go into this separate pane.
+
 ## Completed ✅
 
 - [x] Pine v3/v4→v5 migration (100+ function mappings, 37 tests)
