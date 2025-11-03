@@ -50,6 +50,8 @@ class TradingAnalysisRunner {
 
     const plots = executionResult.plots || {};
     const restructuredPlots = this.restructurePlots(plots);
+    
+    /* Debug: Check plot timestamps */
     const indicatorMetadata = this.extractIndicatorMetadata(restructuredPlots);
 
     if (!data?.length) {
@@ -77,9 +79,19 @@ class TradingAnalysisRunner {
       return {};
     }
 
-    /* If already structured with multiple named plots, return as-is */
+    /* If already structured with multiple named plots, normalize timestamps */
     if (Object.keys(plots).length > 1 || !plots.Plot) {
-      return plots;
+      const normalized = {};
+      Object.keys(plots).forEach((plotKey) => {
+        normalized[plotKey] = {
+          data: plots[plotKey].data?.map((point) => ({
+            time: Math.floor(point.time / 1000),
+            value: point.value,
+            options: point.options,
+          })) || [],
+        };
+      });
+      return normalized;
     }
 
     const plotData = plots.Plot?.data;
@@ -90,7 +102,7 @@ class TradingAnalysisRunner {
     /* Group by timestamp to find how many plots per candle */
     const timeMap = new Map();
     plotData.forEach((point) => {
-      const timeKey = Math.floor(point.time / 1000);
+      const timeKey = point.time;
       if (!timeMap.has(timeKey)) {
         timeMap.set(timeKey, []);
       }
@@ -115,7 +127,7 @@ class TradingAnalysisRunner {
       pointsAtTime.forEach((point, index) => {
         if (index < plotGroups.length) {
           plotGroups[index].data.push({
-            time: timeKey,
+            time: Math.floor(timeKey / 1000),
             value: point.value,
             options: point.options,
           });

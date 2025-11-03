@@ -11,8 +11,8 @@ const isValidValue = (value) =>
 const hasColor = (item) => 
   item.options && item.options.color !== undefined && item.options.color !== null;
 
-/* Pure function: convert milliseconds to seconds */
-const msToSeconds = (ms) => Math.floor(ms / 1000);
+/* Normalize timestamp to seconds (handles both seconds and milliseconds) */
+const toSeconds = (time) => time > 10000000000 ? Math.floor(time / 1000) : time;
 
 /* Pure function: find first valid data point index */
 const findFirstValidIndex = (data) => {
@@ -25,14 +25,14 @@ const findFirstValidIndex = (data) => {
 /* Pure function: create invisible anchor point for alignment */
 /* NaN prevents auto-scale inclusion (Lightweight Charts official pattern) */
 const createAnchorPoint = (time) => ({
-  time: msToSeconds(time),
+  time: toSeconds(time),
   value: NaN,
   color: 'transparent',
 });
 
 /* Pure function: create chart data point with optional gap edge marking */
 const createDataPoint = (time, value, isGapEdge) => {
-  const point = { time: msToSeconds(time), value };
+  const point = { time: toSeconds(time), value };
   if (isGapEdge) point.color = 'transparent';
   return point;
 };

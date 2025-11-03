@@ -26,21 +26,26 @@ describe('TradingAnalysisRunner.restructurePlots', () => {
       expect(result).toEqual({});
     });
 
-    it('should return as-is for plots with multiple named keys', () => {
+    it('should normalize timestamps for plots with multiple named keys', () => {
       const input = {
-        SMA20: { data: [{ time: 1000, value: 100 }] },
-        EMA50: { data: [{ time: 1000, value: 105 }] },
+        SMA20: { data: [{ time: 1000000, value: 100 }] },
+        EMA50: { data: [{ time: 1000000, value: 105 }] },
       };
       const result = runner.restructurePlots(input);
-      expect(result).toEqual(input);
+      expect(result).toEqual({
+        SMA20: { data: [{ time: 1000, value: 100, options: undefined }] },
+        EMA50: { data: [{ time: 1000, value: 105, options: undefined }] },
+      });
     });
 
-    it('should return as-is when Plot key does not exist', () => {
+    it('should normalize timestamps when Plot key does not exist', () => {
       const input = {
-        CustomPlot: { data: [{ time: 1000, value: 100 }] },
+        CustomPlot: { data: [{ time: 2000000, value: 100 }] },
       };
       const result = runner.restructurePlots(input);
-      expect(result).toEqual(input);
+      expect(result).toEqual({
+        CustomPlot: { data: [{ time: 2000, value: 100, options: undefined }] },
+      });
     });
 
     it('should return empty object when Plot.data is not array', () => {
