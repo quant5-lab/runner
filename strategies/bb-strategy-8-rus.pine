@@ -43,9 +43,9 @@ session_open = na(time(timeframe.period, trading_session)) ? false : true
 is_entry_time = na(time(timeframe.period, entry_time)) ? false : true
 
 // SMA
-plot(sma(close, 20), linewidth=1, color=color.red, transp=0)
-plot(sma(close, 50), linewidth=1, color=color.black, transp=0)
-plot(sma(close, 200), linewidth=1, color=color.lime, transp=0)
+plot(sma(close, 20), linewidth=1, color=color.red, transp=0, pane='main')
+plot(sma(close, 50), linewidth=1, color=color.black, transp=0, pane='main')
+plot(sma(close, 200), linewidth=1, color=color.lime, transp=0, pane='main')
 
 // 1D SMA
 sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
@@ -251,11 +251,11 @@ potential_buy = min(closest_level_1_buy, closest_level_2_buy)
 potential_sell = short_trades_by_atr_1d
                   ? min(closest_level_1_sell, min(closest_level_2_sell, min(atr_1d_potential_sell, min(sma_1d_20_potential_sell, min(sma_1d_50_potential_sell, sma_1d_200_potential_sell)))))
                   : min(closest_level_1_sell, closest_level_2_sell)
-plot(short_trades_by_atr_1d ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, color=color.gray, style=plot.style_linebr)
-plot(short_trades_by_atr_1d ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, color=color.gray, style=plot.style_linebr)
 enough_potential = sma_bullish ? 
    take_level <= open_1d + potential_buy * (1 + lack_of_potential_tolerance / 100) : 
    take_level >= open_1d - potential_sell * (1 + lack_of_potential_tolerance / 100)
+plot(short_trades_by_atr_1d ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, color=color.gray, style=plot.style_linebr, pane='main')
+plot(short_trades_by_atr_1d ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, color=color.gray, style=plot.style_linebr, pane='main')
 
 // // Closing all by RSI 1W
 // rsi_len = input(28, minval=1, title="Close RSI Length")
@@ -296,8 +296,8 @@ bb_1d_bb_sell = bb_1d_isUnderBBBottom ? bb_1d_low_range == bb_1d_low_range[1] ? 
 
 bb_1w_close_long = bb_1d_bb_sell
 bb_1w_close_short = bb_1d_bb_sell
-plot(long_trades and bb_1w_close_long ? close : na, style = plot.style_circles, transp = 30, color = color.lime, linewidth = 8)
-plot(short_trades and bb_1w_close_short ? close : na, style = plot.style_circles, transp = 20, color = color.purple, linewidth = 8)
+plot(long_trades and bb_1w_close_long ? close : na, style = plot.style_circles, transp = 30, color = color.lime, linewidth = 8, pane='main')
+plot(short_trades and bb_1w_close_short ? close : na, style = plot.style_circles, transp = 20, color = color.purple, linewidth = 8, pane='main')
 
 // close_all_avg = sma_1d_close_long or sma_1d_close_short
 close_all_avg = bb_1w_close_short or bb_1w_close_long
@@ -339,5 +339,5 @@ if close_all_avg
     strategy.close_all()
     has_active_trade := false
 
-plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2)
-plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2)
+plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main')
+plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main')
