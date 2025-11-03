@@ -5,50 +5,6 @@
 ## Completed ✅
 
 - [x] **Multi-pane chart architecture (unlimited dynamic panes)**
-  - Node.js: extractPlotPane() extracts pane from plot data (priority: data > fallback)
-  - Node.js: buildLayoutConfig() generates dynamic panes from metadata (main + N dynamic)
-  - index.html: PaneManager class (createMainPane, createDynamicPane, synchronizeTimeScales)
-  - index.html: SeriesRouter class (routeSeries, rerouteSeries)
-  - index.html: Dynamic pane rendering (main fixed at 400px, dynamic at 200px each)
-  - Tests: 554/554 unit tests pass, 12/12 E2E tests pass (including test-multi-pane.mjs)
-  - Tests: bb7 equity plot renders in separate 'equity' pane (3 panes: main, equity, indicator)
-  - Validation: 4-pane test (main, equity, oscillators, volume) passes
-- [x] Pine v3/v4→v5 migration (100+ function mappings, 37 tests)
-- [x] Unified timeframe format (D/W/M, TimeframeParser/Converter refactor)
-- [x] E2E test suite reorganization (centralized runner, timeout protection)
-- [x] Plot adapter refactored (PinePlotAdapter module, 6 tests)
-- [x] ESLint compliance (0 errors)
-- [x] API flooding fix (79→3 requests via TickeridMigrator)
-- [x] Parameter shadowing fix (_param_rename_stack, 11 tests)
-- [x] Chart alignment fix (lineSeriesAdapter refactored to pure functions)
-- [x] E2E deterministic tests (MockProvider, 100% coverage)
-- [x] PineTS rev3 API migration (prefetchSecurityData)
-- [x] security() downscaling (6 strategies: first/last/high/low/avg/mean)
-- [x] Reassignment operator (:=) AST transformation
-- [x] security() identical values bug (offset + fallback fix)
-- [x] Provider pagination (MOEX 700W bars)
-- [x] Rolling CAGR strategy (5Y/10Y support)
-- [x] Plot parameters (all 15 Pine v5 params, test-plot-params.mjs)
-- [x] Input overrides CLI (--settings parameter)
-- [x] Color hex format tests (PineTS compatibility)
-- [x] Strategy namespace (strategy() → strategy.call() transpiler)
-- [x] ATR risk management (80% ATR14 SL, 5:1 RR, locked levels)
-- [x] **Function vs Variable scoping bug (bb-strategy-7-rus.pine)**
-  - User-defined functions incorrectly wrapped as $.let.glb1_*
-  - Parser fix: track const vs let declarations in ScopeChain
-  - Functions stay bare, variables wrapped for PineTS Context
-  - 4 strategies validated + new E2E test
-- [x] **Chart Y-axis auto-scaling bug with SMA warm-up periods**
-  - **Fixed**: Changed anchor point `value: 0` → `value: NaN` in lineSeriesAdapter
-  - NaN prevents auto-scale inclusion (Lightweight Charts official pattern)
-  - Charts now scale to actual data range (min..max) instead of 0..max
-- [x] **PineTS sma_cache optimization removed**
-  - Cache removed from TechnicalAnalysis.ts sma() method
-  - Direct calculation: `sma(reversedSource, period)` without caching
-- [x] **Null handling in averaging functions (PineTS)**
-  - **Fixed**: If ANY value in window is NaN/null/undefined, result is NaN
-  - Matches Pine Script v5 behavior: NaN propagation, not zero substitution
-  - Applied to: ta.sma and other averaging functions
 
 ## High Priority 🔴
 
@@ -64,9 +20,9 @@
     - [x] Session/Time Filters - ✅ Works
     - [x] SMAs (current + 1D via security()) - ✅ Works
     - [x] Bollinger Bands (bb_buy/bb_sell signals) - ✅ Works
-    - [x] ADX/DMI (dirmov() → adx() → buy/sell signals) - ⚠️ SUSPICIOUS
-    - [x] Stop Loss (fixed + trailing) - ⚠️ SUSPICIOUS (never enters trades)
-    - [x] Take Profit (fixed + smart S&R detection) - ⚠️ SUSPICIOUS (TP not locked on entry, S&R always at 0)
+    - [ ] ADX/DMI (dirmov() → adx() → buy/sell signals) - ⚠️ SUSPICIOUS
+    - [ ] Stop Loss (fixed + trailing) - ⚠️ SUSPICIOUS (never enters trades)
+    - [ ] Take Profit (fixed + smart S&R detection) - ⚠️ SUSPICIOUS (TP not locked on entry, S&R always at 0)
     - [x] Volatility Check (atr vs sl) - ✅ Works
     - [x] Potential Check (distance to targets) - ✅ Works
   - **All mechanisms dissected - Ready for pair debugging to isolate calculation bugs**
