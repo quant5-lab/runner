@@ -1,0 +1,49 @@
+//@version=4
+study(title="BB7 Dissect: ADX/DMI", shorttitle="BB7-ADX", overlay=false)
+
+// Isolate ADX/DMI calculation mechanism
+LWadxlength = input(16, title="ADX period #1")
+LWdilength = input(18, title="DMI Length #1")
+LWadxlength2 = input(16, title="ADX period #2")
+LWdilength2 = input(18, title="DMI Length #2")
+
+// Core dirmov function
+dirmov(len) =>
+    up = change(high)
+    down = -change(low)
+    truerange = rma(tr, len)
+    plus = fixnan(100 * rma(up > down and up > 0 ? up : 0, len) / truerange)
+    minus = fixnan(100 * rma(down > up and down > 0 ? down : 0, len) / truerange)
+    [plus, minus]
+
+// Core adx function
+adx(LWdilength, LWadxlength) =>
+    [plus, minus] = dirmov(LWdilength)
+    sum = plus + minus
+    adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), LWadxlength)
+    [adx, plus, minus]
+
+// ADX #1
+[ADX, up, down] = adx(LWdilength, LWadxlength)
+adx_buy = ADX >= 20 and up > down
+adx_sell = ADX >= 20 and up < down
+
+// ADX #2
+[ADX2, up2, down2] = adx(LWdilength2, LWadxlength2)
+adx_buy2 = ADX2 >= 20 and up2 > down2
+adx_sell2 = ADX2 >= 20 and up2 < down2
+
+// Visual output
+plot(ADX, title="ADX #1", color=color.orange, linewidth=2)
+plot(up, title="DI+ #1", color=color.green, linewidth=1)
+plot(down, title="DI- #1", color=color.red, linewidth=1)
+
+plot(ADX2, title="ADX #2", color=color.purple, linewidth=2)
+plot(up2, title="DI+ #2", color=color.lime, linewidth=1)
+plot(down2, title="DI- #2", color=color.maroon, linewidth=1)
+
+plot(20, title="Threshold", color=color.gray, linewidth=1)
+
+// Signal plots
+plot(adx_buy and adx_buy2 ? 100 : 0, title="Buy Signal", color=color.green, linewidth=3, style=plot.style_histogram)
+plot(adx_sell and adx_sell2 ? -100 : 0, title="Sell Signal", color=color.red, linewidth=3, style=plot.style_histogram)

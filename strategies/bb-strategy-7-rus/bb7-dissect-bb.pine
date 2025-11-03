@@ -1,0 +1,38 @@
+//@version=4
+study(title="BB7 Dissect: Bollinger Bands", shorttitle="BB7-BB", overlay=true)
+
+// Isolate Bollinger Bands calculation and signal generation
+bblenght = input(46, minval=1, title="Bollinger Bars Lenght")
+bbstdev = input(0.35, minval=0.1, step=0.05, title="Bollinger Bars Standard Deviation")
+source = close
+
+// BB calculation
+basis = sma(source, bblenght)
+dev = bbstdev * stdev(source, bblenght)
+upperBB = basis + dev
+lowerBB = basis - dev
+midBB = (upperBB + lowerBB) / 2
+
+// BB breakout detection
+isOverBBTop = low > upperBB ? true : false
+isUnderBBBottom = high < lowerBB ? true : false
+newisOverBBTop = isOverBBTop != isOverBBTop[1]
+newisUnderBBBottom = isUnderBBBottom != isUnderBBBottom[1]
+
+// Signal levels
+high_range = valuewhen(newisOverBBTop, high, 0)
+low_range = valuewhen(newisUnderBBBottom, low, 0)
+bblow = valuewhen(newisOverBBTop, lowerBB / 0.00005 * 0.00005, 0)
+bbhigh = valuewhen(newisUnderBBBottom, (upperBB * 1000 / 5 + 5) * 5 / 1000, 0)
+
+// Entry signals
+bb_buy = isOverBBTop ? high_range == high_range[1] ? high_range + 0.001 : na : na
+bb_sell = isUnderBBBottom ? low_range == low_range[1] ? low_range - 0.001 : na : na
+
+// Visual output
+plot(upperBB, title="BB Upper", color=color.red, linewidth=1, pane='main')
+plot(lowerBB, title="BB Lower", color=color.blue, linewidth=1, pane='main')
+plot(midBB, title="BB Mid", color=color.gray, linewidth=1, pane='main')
+
+plot(bb_buy, title="Buy Signal", color=color.green, linewidth=3, style=plot.style_cross, pane='main')
+plot(bb_sell, title="Sell Signal", color=color.red, linewidth=3, style=plot.style_cross, pane='main')

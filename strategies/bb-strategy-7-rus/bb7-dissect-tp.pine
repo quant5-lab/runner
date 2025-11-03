@@ -1,0 +1,86 @@
+//@version=4
+strategy(title="BB7 Dissect: Take Profit", shorttitle="BB7-TP", overlay=true, default_qty_type=strategy.cash, default_qty_value=1000000, initial_capital=1000000)
+
+// Original Take Profit inputs
+reward_risk_ratio = input(5, title='Reward / Risk ratio', type=input.float)
+smart_take_profit_enable = input(true, title='Smart Take Profit', type=input.bool)
+smart_take_profit_offset = input(0.0, step=0.05, title='Smart TP Offset, %', type=input.float)
+smart_tp_immediate_lock_in = input(true, title='Smart TP Immediate Lock-In', type=input.bool)
+sl_factor = input(1, step=0.1, title='SL Factor', type=input.float)
+
+// Dependencies
+sma_bullish = sma(close, 50) > sma(close, 200)
+atr_1d = security(syminfo.tickerid, "1D", atr(14))
+has_active_trade = not na(strategy.position_avg_price)
+position_avg_price_or_close = has_active_trade ? strategy.position_avg_price : close
+sl_inp = sl_factor * atr_1d / close
+
+// Original Take Profit calculation
+tp_inp = reward_risk_ratio * sl_inp
+take_level = sma_bullish ? position_avg_price_or_close * (1 + tp_inp) : 
+   position_avg_price_or_close * (1 - tp_inp)
+
+// Original Smart Take Profit S&R Detection
+sr_src1 = close
+sr_len = 9
+sr_up1 = rma(max(change(sr_src1), 0), sr_len)
+sr_down1 = rma(-min(change(sr_src1), 0), sr_len)
+sr_rsi = sr_down1 == 0 ? 100 : sr_up1 == 0 ? 0 : 100 - 100 / (1 + sr_up1 / sr_down1)
+
+sr_n = 12
+sr_n2ma = 2 * wma(close, round(sr_n / 2))
+sr_nma = wma(close, sr_n)
+sr_diff = sr_n2ma - sr_nma
+sr_sqn = round(sqrt(sr_n))
+sr_c = 5
+sr_n2ma6 = 2 * wma(open, round(sr_c / 2))
+sr_nma6 = wma(open, sr_c)
+sr_diff6 = sr_n2ma6 - sr_nma6
+sr_sqn6 = round(sqrt(sr_c))
+sr_a1 = wma(sr_diff6, sr_sqn6)
+sr_a = wma(sr_diff, sr_sqn)
+
+sr_len2 = 1
+sr_gains = sum(sr_a1 > sr_a ? 1 : 0, sr_len2)
+sr_losses = sum(sr_a1 < sr_a ? 1 : 0, sr_len2)
+sr_cmo = 100 * (sr_gains - sr_losses) / (sr_gains + sr_losses)
+
+sr_len5 = 2
+sr_h = highest(sr_len5)
+sr_h1 = dev(sr_h, sr_len5) ? na : sr_h
+sr_hpivot = fixnan(sr_h1)
+sr_l = lowest(sr_len5)
+sr_l1 = dev(sr_l, sr_len5) ? na : sr_l
+sr_lpivot = fixnan(sr_l1)
+
+sr_sup = sr_rsi < 25 and sr_cmo > 50 and sr_lpivot
+sr_res = sr_rsi > 75 and sr_cmo < -50 and sr_hpivot
+sr_xup = 0.0
+sr_xup := sr_sup ? low : sr_xup[1]
+sr_xdown = 0.0
+sr_xdown := sr_res ? high : sr_xdown[1]
+
+smart_take_level_within_range = sma_bullish ? 
+   take_level - sr_xdown <= take_level * (sl_inp + smart_take_profit_offset / 100) : 
+   sr_xup - take_level <= take_level * (sl_inp + smart_take_profit_offset / 100)
+smart_take_level = smart_take_profit_enable and smart_take_level_within_range ? 
+   sma_bullish ? sr_xdown : sr_xup : take_level
+
+// Simple entry for testing
+buy_signal = crossover(sma(close, 20), sma(close, 50)) and sma_bullish
+
+if not has_active_trade and buy_signal
+    strategy.entry("Buy", strategy.long)
+    strategy.exit("Exit", "Buy", limit=smart_take_level)
+
+if has_active_trade and smart_tp_immediate_lock_in and smart_take_profit_enable and smart_take_level_within_range
+    strategy.close_all()
+
+// Visual output
+plot(sma(close, 20), title="SMA 20", color=color.red, linewidth=1, pane='main')
+plot(sma(close, 50), title="SMA 50", color=color.blue, linewidth=1, pane='main')
+plot(take_level, title="Fixed TP", color=color.orange, linewidth=1, pane='main')
+plot(smart_take_level, title="Smart TP", color=color.green, linewidth=2, pane='main')
+plot(sr_xdown, title="Resistance", color=color.red, linewidth=1, pane='main')
+plot(sr_xup, title="Support", color=color.blue, linewidth=1, pane='main')
+plot(strategy.equity, title="Equity", color=color.purple, linewidth=2, pane='equity')

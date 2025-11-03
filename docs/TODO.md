@@ -41,14 +41,24 @@
 
 ## High Priority 🔴
 
-- [ ] **BB Strategy 7 - Invalid timeframe error**
+- [ ] **BB Strategy 7 - Calculation bugs investigation**
   - ✅ dirmov() function scoping fixed
-  - ✅ Transpilation successful (12789 chars)
+  - ✅ Transpilation successful
   - ✅ All variable transformations working
-  - ❌ Runtime error: `request.security(syminfo.tickerid, '1D', ...)` throws "Invalid timeframe"
-  - PineRequest.security() at line 2155 rejects "1D" format
-  - Strategy uses both "1D" and "D" timeframe strings
-  - Need to investigate PineTS timeframe validation logic
+  - ✅ Timeframe validation working
+  - ✅ bb-strategy-7-debug.pine cloned for dissection
+  - ❌ Complex interrelated calculation bugs present
+  - **Dissection checklist:**
+    - [x] 1D S&R Detection (pivothigh/pivotlow + security()) - ✅ Works
+    - [x] Session/Time Filters - ✅ Works
+    - [x] SMAs (current + 1D via security()) - ✅ Works
+    - [x] Bollinger Bands (bb_buy/bb_sell signals) - ✅ Works
+    - [x] ADX/DMI (dirmov() → adx() → buy/sell signals) - ⚠️ SUSPICIOUS
+    - [x] Stop Loss (fixed + trailing) - ⚠️ SUSPICIOUS (never enters trades)
+    - [x] Take Profit (fixed + smart S&R detection) - ⚠️ SUSPICIOUS (TP not locked on entry, S&R always at 0)
+    - [x] Volatility Check (atr vs sl) - ✅ Works
+    - [x] Potential Check (distance to targets) - ✅ Works
+  - **All mechanisms dissected - Ready for pair debugging to isolate calculation bugs**
 
 ## Medium Priority 🟡
 

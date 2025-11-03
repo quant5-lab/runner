@@ -1,0 +1,87 @@
+//@version=4
+strategy(title="BB7 Dissect: Stop Loss", shorttitle="BB7-SL", overlay=true, default_qty_type=strategy.cash, default_qty_value=1000000, initial_capital=1000000)
+
+// Isolate Stop Loss calculation (fixed + trailing)
+sl_factor = input(1, step=0.1, title='Long SL Calculation Factor', type=input.float)
+sl_factor_short = input(0.13, step=0.01, title='Short SL Calculation Factor', type=input.float)
+min_volatility_sl_factor = input(0.8, step=0.05, title='Minimum volatility vs SL factor', type=input.float)
+trail_stop_enable = input(true, title='Trailing SL', type=input.bool)
+trail_stop_factor = input(2, step=0.1, title='Trailing SL factor', type=input.float)
+
+// Mock trade conditions
+long_trades_by_1d_sma = input(true, title='∟ Long Trades limited to SMA 20/50 on 1D', type=input.bool)
+sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
+sma_1d_50 = security(syminfo.tickerid, 'D', sma(close, 50))
+sma200_1d_bullish = sma_1d_20 > sma_1d_50
+sma200_1d_bearish = sma_1d_20 < sma_1d_50
+sma200_bullish = sma(close, 50) > sma(close, 200)
+sma200_bearish = sma(close, 50) < sma(close, 200)
+sma_bullish = long_trades_by_1d_sma ? sma200_1d_bullish : sma200_bullish
+sma_bearish = long_trades_by_1d_sma ? sma200_1d_bearish : sma200_bearish
+
+// 1D ATR
+open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
+atr_1d = security(syminfo.tickerid, "1D", atr(14))
+
+has_active_trade = not na(strategy.position_avg_price)
+position_avg_price_or_close = has_active_trade ? strategy.position_avg_price : close
+
+// Core Stop Loss calculation
+sl_inp = 0.0
+sl_inp := has_active_trade and nz(sl_inp[1]) > 0 ? nz(sl_inp[1]) : nz((sma_bullish ? sl_factor : sl_factor_short) * atr_1d/close)
+
+fixed_stop_level = sma_bullish ? position_avg_price_or_close * (1 - sl_inp) : position_avg_price_or_close * (1 + sl_inp)
+
+// Trailing Stop Loss
+trailing_stop_level = fixed_stop_level
+trailing_stop_step = position_avg_price_or_close * sl_inp * trail_stop_factor
+trailing_stop_level := has_active_trade ?
+   sma_bullish 
+   ? (low > trailing_stop_level[1] + 2 * trailing_stop_step ? trailing_stop_level[1] + trailing_stop_step : trailing_stop_level[1])
+   : (low < trailing_stop_level[1] - 2 * trailing_stop_step ? trailing_stop_level[1] - trailing_stop_step : trailing_stop_level[1])
+   : fixed_stop_level
+
+stop_level = trail_stop_enable and nz(trailing_stop_level) > 0 ? trailing_stop_level : fixed_stop_level
+
+trailing_stop_lock_in = sma_bullish ? low < stop_level : high > stop_level
+
+// Volatility check
+volatility_below_sl = atr(2) <= min_volatility_sl_factor * abs(stop_level - close)
+
+// Mock entry condition - Use confirmed BB breakout signals
+bblenght = input(46, minval=1, title="Bollinger Bars Lenght")
+bbstdev = input(0.35, minval=0.1, step=0.05, title="Bollinger Bars Standard Deviation")
+source = close
+basis = sma(source, bblenght)
+dev = bbstdev * stdev(source, bblenght)
+upperBB = basis + dev
+lowerBB = basis - dev
+isOverBBTop = low > upperBB ? true : false
+isUnderBBBottom = high < lowerBB ? true : false
+newisOverBBTop = isOverBBTop != isOverBBTop[1]
+newisUnderBBBottom = isUnderBBBottom != isUnderBBBottom[1]
+high_range = valuewhen(newisOverBBTop, high, 0)
+low_range = valuewhen(newisUnderBBBottom, low, 0)
+bb_buy = isOverBBTop ? high_range == high_range[1] ? high_range + 0.001 : na : na
+bb_sell = isUnderBBBottom ? low_range == low_range[1] ? low_range - 0.001 : na : na
+
+// Entry using confirmed BB signals
+buy_entry = not na(bb_buy) and sma_bullish
+sell_entry = not na(bb_sell) and sma_bearish
+
+if not has_active_trade and buy_entry
+    strategy.entry("Test Buy", strategy.long)
+    strategy.exit("Exit Buy", "Test Buy", stop=stop_level)
+
+if not has_active_trade and sell_entry
+    strategy.entry("Test Sell", strategy.short)
+    strategy.exit("Exit Sell", "Test Sell", stop=stop_level)
+
+if has_active_trade and trailing_stop_lock_in
+    strategy.close_all()
+
+// Visual output
+plot(fixed_stop_level, title="Fixed SL", color=color.orange, linewidth=1, pane='main')
+plot(stop_level, title="Stop Level", color=color.red, linewidth=2, pane='main')
+plot(sma_bullish ? fixed_stop_level + trailing_stop_step : fixed_stop_level - trailing_stop_step, title="Trail Step", color=color.purple, linewidth=1, pane='main')
+plot(volatility_below_sl ? close : na, title="Low Vol", color=color.yellow, style=plot.style_circles, pane='main')

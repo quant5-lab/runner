@@ -1,0 +1,14 @@
+//@version=4
+study(title="BB7 Dissect: Session/Time Filters", shorttitle="BB7-Session", overlay=true)
+
+// Isolate session and time filtering mechanism
+entry_time = input("0950-1345", title="Entry Time", type=input.session)
+trading_session = input("0950-1645", title="Trading Session", type=input.session)
+
+// Core session detection
+session_open = na(time(timeframe.period, trading_session)) ? false : true
+is_entry_time = na(time(timeframe.period, entry_time)) ? false : true
+
+// Debug plots
+plot(session_open ? 1 : 0, color=color.green, linewidth=2, title="Session Open")
+plot(is_entry_time ? 1 : 0, color=color.blue, linewidth=2, title="Entry Time")

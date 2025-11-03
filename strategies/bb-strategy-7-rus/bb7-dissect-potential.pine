@@ -1,0 +1,63 @@
+//@version=4
+study(title="BB7 Dissect: Potential Check", shorttitle="BB7-Potential", overlay=true)
+
+// Isolate potential check mechanism
+lack_of_potential_tolerance = input(15, title='Tolerance to a lack of Potential, %', type=input.float)
+reward_risk_ratio = input(5, title='Reward / Risk ratio', type=input.float)
+sl_factor = input(1, step=0.1, title='SL Factor', type=input.float)
+short_trades_by_atr_1d = input(false, title='∟ Short Trades limited to ATR on 1D', type=input.bool)
+use_1d_sr = input(true, title='Auto detection of S&R', type=input.bool)
+leftBars = input(15, title="SR Left Bars")
+rightBars = input(15, title="SR Right Bars")
+
+// Dependencies
+sma_bullish = sma(close, 50) > sma(close, 200)
+atr_1d = security(syminfo.tickerid, "1D", atr(14))
+open_1d = security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
+sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
+sma_1d_50 = security(syminfo.tickerid, 'D', sma(close, 50))
+sma_1d_200 = security(syminfo.tickerid, 'D', sma(close, 200))
+highUsePivot = security(syminfo.tickerid, "1D", fixnan(pivothigh(leftBars, rightBars)[1]))
+lowUsePivot = security(syminfo.tickerid, "1D", fixnan(pivotlow(leftBars, rightBars)[1]))
+closest_level_1 = use_1d_sr ? highUsePivot : na
+closest_level_2 = use_1d_sr ? lowUsePivot : na
+
+sl_inp = sl_factor * atr_1d / close
+tp_inp = reward_risk_ratio * sl_inp
+take_level = sma_bullish ? close * (1 + tp_inp) : close * (1 - tp_inp)
+
+// Core Potential calculation
+atr_1d_potential_buy = atr_1d
+atr_1d_potential_sell = atr_1d
+sma_1d_20_potential_buy = open_1d < sma_1d_20 ? sma_1d_20 - open_1d : 999999
+sma_1d_50_potential_buy = open_1d < sma_1d_50 ? sma_1d_50 - open_1d : 999999
+sma_1d_200_potential_buy = open_1d < sma_1d_200 ? sma_1d_200 - open_1d : 999999
+sma_1d_20_potential_sell = open_1d > sma_1d_20 ? open_1d - sma_1d_20 : 999999
+sma_1d_50_potential_sell = open_1d > sma_1d_50 ? open_1d - sma_1d_50 : 999999
+sma_1d_200_potential_sell = open_1d > sma_1d_200 ? open_1d - sma_1d_200 : 999999
+closest_level_1_buy = open_1d < closest_level_1 ? closest_level_1 - open_1d : 999999
+closest_level_2_buy = open_1d < closest_level_2 ? closest_level_2 - open_1d : 999999
+closest_level_1_sell = open_1d > closest_level_1 ? open_1d - closest_level_1 : 999999
+closest_level_2_sell = open_1d > closest_level_2 ? open_1d - closest_level_2 : 999999
+
+potential_buy = min(closest_level_1_buy, closest_level_2_buy)
+potential_sell = short_trades_by_atr_1d
+                  ? min(closest_level_1_sell, min(closest_level_2_sell, min(atr_1d_potential_sell, min(sma_1d_20_potential_sell, min(sma_1d_50_potential_sell, sma_1d_200_potential_sell)))))
+                  : min(closest_level_1_sell, closest_level_2_sell)
+
+enough_potential = sma_bullish ? 
+   take_level <= open_1d + potential_buy * (1 + lack_of_potential_tolerance / 100) : 
+   take_level >= open_1d - potential_sell * (1 + lack_of_potential_tolerance / 100)
+
+// Visual output
+plot(open_1d, title="1D Open", color=color.orange, linewidth=2, pane='main')
+plot(take_level, title="TP Level", color=color.green, linewidth=2, pane='main')
+plot(closest_level_1, title="S/R Level 1", color=color.gray, linewidth=1, pane='main')
+plot(closest_level_2, title="S/R Level 2", color=color.gray, linewidth=1, pane='main')
+plot(sma_1d_20, title="1D SMA 20", color=color.red, linewidth=1, pane='main')
+plot(sma_1d_50, title="1D SMA 50", color=color.blue, linewidth=1, pane='main')
+plot(sma_1d_200, title="1D SMA 200", color=color.purple, linewidth=1, pane='main')
+plot(sma_bullish ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, title="Buy Potential", color=color.lime, linewidth=2, pane='main')
+plot(not sma_bullish ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, title="Sell Potential", color=color.red, linewidth=2, pane='main')
+
+plot(enough_potential ? 1 : 0, title="Enough Potential", color=color.lime, linewidth=4, pane='check')

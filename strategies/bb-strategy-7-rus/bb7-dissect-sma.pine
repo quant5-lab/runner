@@ -1,0 +1,29 @@
+//@version=4
+study(title="BB7 Dissect: SMAs", shorttitle="BB7-SMAs", overlay=true)
+
+// Isolate SMA calculation mechanism (current + 1D via security())
+
+// Current timeframe SMAs
+plot(sma(close, 20), linewidth=1, color=color.red, title="SMA 20")
+plot(sma(close, 50), linewidth=1, color=color.black, title="SMA 50")
+plot(sma(close, 200), linewidth=1, color=color.lime, title="SMA 200")
+
+// 1D SMAs via security()
+sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
+sma_1d_50 = security(syminfo.tickerid, 'D', sma(close, 50))
+sma_1d_200 = security(syminfo.tickerid, 'D', sma(close, 200))
+
+plot(sma_1d_20, color=color.yellow, linewidth=1, title="1D SMA20")
+plot(sma_1d_50, color=color.green, linewidth=1, title="1D SMA50")
+plot(sma_1d_200, color=color.red, linewidth=1, title="1D SMA200")
+
+// Trend detection
+sma200_1d_bullish = sma_1d_20 > sma_1d_50
+sma200_1d_bearish = sma_1d_20 < sma_1d_50
+
+sma200_bullish = sma(close, 50) > sma(close, 200)
+sma200_bearish = sma(close, 50) < sma(close, 200)
+
+// Debug plots
+plot(sma200_1d_bullish ? 1 : 0, color=color.orange, linewidth=2, title="1D Bullish")
+plot(sma200_bullish ? 1 : 0, color=color.blue, linewidth=2, title="Current Bullish")
