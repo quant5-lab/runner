@@ -333,19 +333,24 @@
 
         loadPlotData(data, config) {
           const plots = this.getNestedProperty(data, config.dataSource.plotsPath);
+          console.log('🔍 DEBUG: plots object keys:', plots ? Object.keys(plots) : 'null');
           if (!plots) return;
 
           Object.entries(config.seriesConfig.series).forEach(([key, seriesConfig]) => {
-            const plotData = this.getNestedProperty(plots, `${key}.data`);
+            console.log(`🔍 DEBUG: Processing plot "${key}", config.chart="${seriesConfig.chart}"`);
+            const plotData = plots[key]?.data;
             const series = seriesMap[key];
+            console.log(`🔍 DEBUG: "${key}" - plotData exists:${!!plotData}, series exists:${!!series}, plotData length:${plotData?.length}`);
 
             if (plotData && series) {
               /* Check first point for pane property */
               const firstPoint = Array.isArray(plotData) ? plotData[0] : null;
               const dataPane = firstPoint?.options?.pane || firstPoint?.pane;
+              console.log(`🔍 DEBUG: "${key}" - dataPane:${dataPane}, seriesConfig.chart:${seriesConfig.chart}`);
               
               /* If pane differs from config, recreate series on correct chart */
               if (dataPane && dataPane !== seriesConfig.chart) {
+                console.log(`⚠️ DEBUG: "${key}" - Pane mismatch! Recreating series from ${seriesConfig.chart} to ${dataPane}`);
                 /* Remove old series */
                 const oldChart = seriesConfig.chart === 'main' ? mainChart : indicatorChart;
                 if (seriesMap[key]) {
@@ -364,9 +369,15 @@
               
               /* Process and set data */
               const processedData = DataTransformer.processPlotData(plotData);
+              console.log(`🔍 DEBUG: "${key}" - processedData length:${processedData.length}, first point:`, processedData[0]);
               if (processedData.length > 0) {
                 seriesMap[key].setData(processedData);
+                console.log(`✅ DEBUG: "${key}" - Data set successfully`);
+              } else {
+                console.warn(`⚠️ DEBUG: "${key}" - processedData is empty!`);
               }
+            } else {
+              console.warn(`⚠️ DEBUG: "${key}" - Missing plotData:${!plotData} or series:${!series}`);
             }
           });
         },
