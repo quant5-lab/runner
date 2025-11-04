@@ -14,13 +14,17 @@ class JsonFileWriter {
     }
   }
 
-  exportChartData(candlestickData, plots) {
+  exportChartData(candlestickData, plots, strategy = null) {
     this.ensureOutDirectory();
     const chartData = {
       candlestick: candlestickData,
       plots,
       timestamp: new Date().toISOString(),
     };
+    
+    if (strategy && (strategy.trades?.length > 0 || strategy.openTrades?.length > 0)) {
+      chartData.strategy = strategy;
+    }
 
     writeFileSync(join('out', 'chart-data.json'), JSON.stringify(chartData, null, 2));
   }

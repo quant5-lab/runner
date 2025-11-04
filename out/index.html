@@ -94,6 +94,88 @@
         text-align: center;
         margin-top: 1rem;
       }
+
+      /* Trade table styles */
+      .trades-section {
+        margin-top: 2rem;
+        background-color: #1a2035;
+        border: 1px solid #2d3748;
+        border-radius: 6px;
+        padding: 1rem;
+      }
+
+      .trades-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #2d3748;
+      }
+
+      .trades-header h2 {
+        color: #5eead4;
+        font-size: 1.5rem;
+        margin: 0;
+      }
+
+      .trades-summary {
+        font-size: 0.875rem;
+        color: #94a3b8;
+      }
+
+      .trades-table-container {
+        overflow-x: auto;
+      }
+
+      .trades-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+
+      .trades-table th {
+        background-color: #0f172a;
+        color: #94a3b8;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #334155;
+      }
+
+      .trades-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #2d3748;
+      }
+
+      .trades-table tbody tr:hover {
+        background-color: #1e293b;
+      }
+
+      .trade-long {
+        color: #10b981;
+      }
+
+      .trade-short {
+        color: #ef4444;
+      }
+
+      .trade-profit-positive {
+        color: #10b981;
+        font-weight: 600;
+      }
+
+      .trade-profit-negative {
+        color: #ef4444;
+        font-weight: 600;
+      }
+
+      .no-trades {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+        font-style: italic;
+      }
     </style>
   </head>
 
@@ -114,6 +196,33 @@
       </div>
 
       <div class="timestamp" id="timestamp"></div>
+
+      <div class="trades-section" id="trades-section">
+        <div class="trades-header">
+          <h2>Trade History</h2>
+          <div class="trades-summary" id="trades-summary">No trades</div>
+        </div>
+        <div class="trades-table-container">
+          <table class="trades-table" id="trades-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Direction</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Size</th>
+                <th>Profit/Loss</th>
+              </tr>
+            </thead>
+            <tbody id="trades-tbody">
+              <tr>
+                <td colspan="7" class="no-trades">No trades to display</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -299,7 +408,109 @@
               config.ui.strategy || 'Unknown';
           }
         },
+
+        updateTradeTable(trades, candlestickData, strategyMetrics) {
+          const tbody = document.getElementById('trades-tbody');
+          const summary = document.getElementById('trades-summary');
+
+          if (!trades || trades.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="7" class="no-trades">No trades to display</td></tr>';
+            summary.textContent = 'No trades';
+            return;
+          }
+
+          const formatter = new TradeDataFormatter(candlestickData);
+          const renderer = new TradeTableRenderer(formatter);
+          tbody.innerHTML = renderer.renderRows(trades);
+
+          const netProfit = strategyMetrics?.netProfit || 0;
+          const profitClass = netProfit >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
+          summary.innerHTML = `${trades.length} trades | Net P/L: <span class="${profitClass}">$${netProfit.toFixed(2)}</span>`;
+        },
       };
+
+      /* TradeDataFormatter: Formats trade data for display (SRP, DRY) */
+      class TradeDataFormatter {
+        constructor(candlestickData) {
+          this.candlestickData = candlestickData || [];
+        }
+
+        formatDate(timestamp) {
+          const date = new Date(timestamp);
+          return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        }
+
+        formatPrice(price) {
+          return `$${price.toFixed(2)}`;
+        }
+
+        formatProfit(profit) {
+          const formatted = `$${Math.abs(profit).toFixed(2)}`;
+          return profit >= 0 ? `+${formatted}` : `-${formatted}`;
+        }
+
+        getTradeDate(trade) {
+          if (trade.entryTime) {
+            return this.formatDate(trade.entryTime);
+          }
+          if (trade.entryBar < this.candlestickData.length) {
+            const timestamp = this.candlestickData[trade.entryBar].time * 1000;
+            return this.formatDate(timestamp);
+          }
+          return 'N/A';
+        }
+
+        formatTrade(trade, index) {
+          return {
+            number: index + 1,
+            date: this.getTradeDate(trade),
+            direction: trade.direction,
+            entryPrice: this.formatPrice(trade.entryPrice),
+            exitPrice: this.formatPrice(trade.exitPrice),
+            size: trade.size.toFixed(2),
+            profit: this.formatProfit(trade.profit),
+            profitRaw: trade.profit,
+          };
+        }
+      }
+
+      /* TradeTableRenderer: Renders trade table HTML (SRP, KISS) */
+      class TradeTableRenderer {
+        constructor(formatter) {
+          this.formatter = formatter;
+        }
+
+        renderRows(trades) {
+          return trades
+            .map((trade, index) => {
+              const formatted = this.formatter.formatTrade(trade, index);
+              const directionClass =
+                formatted.direction === 'long' ? 'trade-long' : 'trade-short';
+              const profitClass =
+                formatted.profitRaw >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
+
+              return `
+              <tr>
+                <td>${formatted.number}</td>
+                <td>${formatted.date}</td>
+                <td class="${directionClass}">${formatted.direction.toUpperCase()}</td>
+                <td>${formatted.entryPrice}</td>
+                <td>${formatted.exitPrice}</td>
+                <td>${formatted.size}</td>
+                <td class="${profitClass}">${formatted.profit}</td>
+              </tr>
+            `;
+            })
+            .join('');
+        }
+      }
 
       async function initializeCharts() {
         CONFIG = await ConfigLoader.loadConfig();
@@ -499,6 +710,21 @@
           });
         },
 
+        loadStrategyData(data, candlestickData) {
+          const strategy = this.getNestedProperty(data, 'strategy');
+          if (!strategy) return null;
+
+          return {
+            trades: strategy.trades || [],
+            openTrades: strategy.openTrades || [],
+            metrics: {
+              equity: strategy.equity,
+              netProfit: strategy.netProfit,
+            },
+            candlestickData,
+          };
+        },
+
         updateTimestamp(data, config, elementId = 'timestamp') {
           const timestamp = this.getNestedProperty(data, config.dataSource.timestampPath);
           if (timestamp) {
@@ -517,8 +743,22 @@
           const data = await DataLoader.fetchChartData(CONFIG);
           const seriesRouter = new SeriesRouter(paneManager, seriesMap);
 
+          const rawCandlestickData = DataLoader.getNestedProperty(
+            data,
+            CONFIG.dataSource.candlestickPath,
+          );
+
           DataLoader.loadCandlestickData(data, seriesMap.candlestick, CONFIG);
           DataLoader.loadPlotData(data, CONFIG, seriesRouter);
+
+          const strategyData = DataLoader.loadStrategyData(data, rawCandlestickData);
+          if (strategyData) {
+            UIManager.updateTradeTable(
+              strategyData.trades,
+              strategyData.candlestickData,
+              strategyData.metrics,
+            );
+          }
 
           const charts = paneManager.getAllCharts();
           ChartManager.fitContent(charts);

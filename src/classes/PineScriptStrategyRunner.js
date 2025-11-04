@@ -60,7 +60,20 @@ class PineScriptStrategyRunner {
     await pineTS.prefetchSecurityData(wrappedCode);
 
     const result = await pineTS.run(wrappedCode);
-    return { plots: result?.plots || [] };
+    
+    /* Extract strategy data if available */
+    const strategyData = {};
+    if (result?.strategy) {
+      strategyData.trades = result.strategy.tradeHistory?.getClosedTrades() || [];
+      strategyData.openTrades = result.strategy.tradeHistory?.getOpenTrades() || [];
+      strategyData.equity = result.strategy.equityCalculator?.getEquity() || 0;
+      strategyData.netProfit = result.strategy.equityCalculator?.getNetProfit() || 0;
+    }
+    
+    return { 
+      plots: result?.plots || [],
+      strategy: strategyData
+    };
   }
 }
 

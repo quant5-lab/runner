@@ -49,7 +49,13 @@ class TradingAnalysisRunner {
     this.logger.log(`Execution:\ttook ${execDuration}ms`);
 
     const plots = executionResult.plots || {};
+    const strategy = executionResult.strategy || {};
     const restructuredPlots = this.restructurePlots(plots);
+
+    /* Log strategy execution summary */
+    if (strategy.trades?.length > 0 || strategy.openTrades?.length > 0) {
+      this.logger.log(`Strategy:\t${strategy.trades.length} closed trades, ${strategy.openTrades.length} open trades`);
+    }
 
     /* Debug: Check plot timestamps */
     const indicatorMetadata = this.extractIndicatorMetadata(restructuredPlots);
@@ -59,7 +65,7 @@ class TradingAnalysisRunner {
     }
 
     const candlestickData = this.candlestickDataSanitizer.processCandlestickData(data);
-    this.jsonFileWriter.exportChartData(candlestickData, restructuredPlots);
+    this.jsonFileWriter.exportChartData(candlestickData, restructuredPlots, strategy);
 
     const chartConfig = this.configurationBuilder.generateChartConfig(
       tradingConfig,
