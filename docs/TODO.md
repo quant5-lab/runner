@@ -4,35 +4,32 @@
 
 - [x] **Multi-pane chart architecture (unlimited dynamic panes)**
 - [x] **PineTS `na()` function bug - returns array instead of scalar**
-  - ✅ Bug identified: `na()` returned `[false, false, ..., true]` instead of scalar boolean
-  - ✅ Caused `!na(variable)` conditions to fail in strategy entry logic
-  - ✅ Fixed by PineTS team
-  - ✅ Validated on GDYN 1h 500 bars: 73 trades executing correctly, 18 in October 2025
 - [x] **Strategy trade data capture and output**
-  - ✅ Strategy trades now captured from PineTS context
-  - ✅ Trade data (entry/exit prices, P&L, direction) exported to chart-data.json
-  - ✅ Trade summary logging added to runner output
-  - ✅ Validated on GDYN 1h 500 bars: 73 trades captured, 18 in October 2025
+- [x] **PineTS timezone-aware session filtering**
+  - ✅ time() function now uses exchange timezone (was ignoring timezone parameter)
+  - ✅ SYMBOL_TIMEZONES registry provides timezone mapping (GDYN → America/New_York)
+  - ✅ SessionMask with bitmask optimization for O(1) session checks
+  - ✅ E2E test added: test-timezone-session.mjs
+- [x] **MockProvider milliseconds convention**
+  - ✅ Fixed openTime to return milliseconds (was returning seconds)
+  - ✅ Now matches real providers (YahooFinance, MOEX, Binance)
 
 ## High Priority 🔴
 
-- [ ] **BB Strategy 7 - Calculation bugs investigation**
-  - ✅ dirmov() function scoping fixed
-  - ✅ Transpilation successful
-  - ✅ All variable transformations working
-  - ✅ Timeframe validation working
-  - ✅ bb-strategy-7-debug.pine cloned for dissection
-  - ❌ Complex interrelated calculation bugs present
-  - **Dissection checklist:**
-    - [x] 1D S&R Detection (pivothigh/pivotlow + security()) - ✅ Works
-    - [ ] Session/Time Filters -  Suspicious, time filter always 0
-    - [x] SMAs (current + 1D via security()) - ✅ Works
-    - [x] Bollinger Bands (bb_buy/bb_sell signals) - ✅ Works
-    - [x] Stop Loss (fixed + trailing) - ✅ Works (trades executing with exits)
-    - [ ] ADX/DMI (dirmov() → adx() → buy/sell signals) - ⚠️ SUSPICIOUS
-    - [ ] Take Profit (fixed + smart S&R detection) - ⚠️ SUSPICIOUS (TP not locked on entry, S&R always at 0)
-    - [x] Volatility Check (atr vs sl) - ✅ Works
-    - [x] Potential Check (distance to targets) - ✅ Works
+- [ ] **BB Strategy 7 - Session time filter BROKEN**
+  - ✅ Timezone fix verified (GDYN uses America/New_York)
+  - ✅ Session filtering mechanism working correctly (E2E test passes)
+  - ❌ Session detection completely broken in BB7 strategy: all 500 bars marked as IN
+  - ❌ Session plots show all 1s (should show 0s for pre-market/after-hours)
+  - **Root cause**: time() function with session parameter returns non-na for ALL bars
+  - **Impact**: HIGH - Strategy cannot filter by session, trades executing outside intended hours
+  - **Test case**: BB7 session=0950-1645 on 1m GDYN data shows 500/500 IN (impossible)
+  - **Dissection checklist**:
+    - [ ] Verify time() transpiled code in BB7 output
+    - [ ] Compare BB7 transpilation vs E2E test transpilation
+    - [ ] Check if session input parameter handled differently than hardcoded session
+    - [ ] Validate timezone parameter passed correctly to time() in BB7
+    - [ ] Test minimal BB7 subset with only session detection
 - [ ] **Strategy trade timestamp accuracy**
   - Current: trades use `Date.now()` for entryTime/exitTime (all same timestamp)
   - Need: Use actual bar timestamp from candlestick data
@@ -65,9 +62,11 @@
 
 ## Current Status
 
-- **Tests**: 515/515 unit + 10/10 E2E ✅
+- **Tests**: 554/554 unit + 13/13 E2E ✅ (100% pass rate)
 - **Linting**: 0 errors ✅
-- **E2E Suite**: test-function-vs-variable-scoping, test-input-defval/override, test-plot-params, test-reassignment, test-security, test-strategy (bearish/bullish/base), test-ta-functions
-- **Strategy Validation**: bb-strategy-7/8/9-rus, ema-strategy, daily-lines-simple, daily-lines, rolling-cagr, rolling-cagr-5-10yr ✅
-- **Strategy Execution**: bb7-dissect-sl.pine on GDYN 1h 500 bars - 73 trades, 18 in October 2025, Net P/L: $-0.83 ✅
+- **E2E Suite**: test-timezone-session, test-function-vs-variable-scoping, test-input-defval/override, test-multi-pane, test-plot-color-variables, test-plot-params, test-reassignment, test-security, test-strategy (bearish/bullish/base), test-ta-functions
+- **Time Units**: Milliseconds convention enforced (PineTS + all providers)
+
+
+```
 
