@@ -26,8 +26,8 @@ export class MockProvider {
    */
   async getMarketData(symbol, timeframe, limit = 100) {
     const candles = [];
-    const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
-    const timeframeSeconds = this.getTimeframeSeconds(timeframe);
+    const now = Date.now(); // Current Unix timestamp in milliseconds
+    const timeframeMs = this.getTimeframeSeconds(timeframe) * 1000; // Convert to milliseconds
 
     for (let i = 0; i < limit; i++) {
       const price = this.generatePrice(i);
@@ -37,7 +37,7 @@ export class MockProvider {
       const low = this.dataPattern === 'sawtooth' ? price : price - 1;
 
       candles.push({
-        time: now - (limit - 1 - i) * timeframeSeconds, // Work backwards from now
+        openTime: now - (limit - 1 - i) * timeframeMs, // Unix milliseconds (PineTS convention)
         open: price,
         high,
         low,

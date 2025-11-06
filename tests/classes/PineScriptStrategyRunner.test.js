@@ -53,7 +53,7 @@ describe('PineScriptStrategyRunner', () => {
       );
       expect(mockPineTS.run).toHaveBeenCalledTimes(1);
       expect(mockPineTS.run).toHaveBeenCalledWith(expect.stringContaining(jsCode));
-      expect(result).toEqual({ plots: [] });
+      expect(result).toEqual({ plots: [], strategy: {} });
     });
 
     it('should wrap jsCode in arrow function string', async () => {
