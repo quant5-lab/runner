@@ -1,0 +1,19 @@
+//@version=5
+indicator("Built-in Variables - Multiple Usages", overlay=false)
+
+// Multiple usages of same variables in one script
+close_direct = close
+close_sma = ta.sma(close, 10)
+
+hl2_direct = hl2
+hl2_ema = ta.ema(hl2, 10)
+
+tr_direct = tr
+tr_atr = ta.atr(14)
+
+plot(close_direct, "close_direct", color=color.blue)
+plot(close_sma, "close_sma", color=color.navy)
+plot(hl2_direct, "hl2_direct", color=color.orange)
+plot(hl2_ema, "hl2_ema", color=color.red)
+plot(tr_direct, "tr_direct", color=color.green)
+plot(tr_atr, "tr_atr", color=color.lime)

@@ -1,0 +1,11 @@
+//@version=5
+indicator("Built-in Variables - Derived", overlay=true)
+
+// Plot all derived built-in variables
+plot(hl2, "hl2", color=color.blue)
+plot(hlc3, "hlc3", color=color.green)
+plot(ohlc4, "ohlc4", color=color.orange)
+plot(tr, "tr", color=color.red)
+plot(high, "high", color=color.gray)
+plot(low, "low", color=color.gray)
+plot(close, "close", color=color.gray)

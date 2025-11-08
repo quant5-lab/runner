@@ -1,0 +1,22 @@
+//@version=5
+strategy("TR Strategy", overlay=true)
+
+// Test: TR in strategy entry/exit logic
+atr_value = ta.atr(14)
+tr_high = tr > atr_value * 1.5
+
+// Enter long when TR expands significantly (high volatility breakout)
+if tr_high and close > open
+    strategy.entry("Long", strategy.long)
+
+// Exit when TR contracts (volatility decreases)
+if tr < atr_value * 0.7
+    strategy.close("Long")
+
+// Enter short when TR expands with bearish bar
+if tr_high and close < open
+    strategy.entry("Short", strategy.short)
+
+// Exit short when TR contracts
+if tr < atr_value * 0.7
+    strategy.close("Short")

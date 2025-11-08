@@ -1,0 +1,10 @@
+//@version=5
+indicator("TR Calculations", overlay=false)
+
+// Test: TR in calculations - SMA, EMA
+tr_sma = ta.sma(tr, 14)
+tr_ema = ta.ema(tr, 14)
+
+plot(tr, "TR", color=color.blue)
+plot(tr_sma, "TR SMA", color=color.green)
+plot(tr_ema, "TR EMA", color=color.orange)

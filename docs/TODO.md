@@ -2,11 +2,6 @@
 
 ## High Priority 🔴
 
-- [ ] **PineTS: TR (True Range) variable not exposed to transpiled code** 🚨 CRITICAL
-  - Bug report: `/Users/boris/proj/internal/borisquantlab/PineTS/BUG-TR-INCOMPLETE-FIX.md`
-  - Status: TR calculated correctly, added to BUILT_IN_DATA_VARIABLES, but transpiled code throws `ReferenceError: tr is not defined`
-  - Impact: All strategies using `tr`, ATR, ADX, DMI fail
-  - Handoff: PineTS team to fix variable exposure in transpiler
 - [ ] **Strategy trade timestamp accuracy**
   - Current: trades use `Date.now()` for entryTime/exitTime (all same timestamp)
   - Need: Use actual bar timestamp from candlestick data
@@ -37,10 +32,28 @@
 
 ---
 
+## Recently Completed ✅
+
+- [x] **E2E Test Suite Generalization** (2025-11-08)
+  - Refactored TR-specific tests into parametric built-in variable tests
+  - Created: test-built-in-variables.mjs (6 scenarios, 9 variables)
+  - Created: test-edge-cases.mjs (3 scenarios)
+  - Created: test-indicators.mjs (3 scenarios)
+  - Documentation: `E2E-GENERALIZATION-COMPLETE.md`
+  - Impact: Future-proof tests for all built-in variables, not just TR
+
+- [x] **PineTS: TR (True Range) variable not exposed to transpiled code** 🚨 FIXED (2025-11-08)
+  - Bug reports: `BUG-TR-INCOMPLETE-FIX.md`, `TRANSPILER-MYSTERY-EVIDENCE.md`
+  - Fixed: Build 20:16 - AST reference mismatch resolved
+  - Validation: `VALIDATION-SUCCESS-BUILD-20-16.md` (4/4 tests passed)
+  - Impact: All strategies using `tr`, ATR, ADX, DMI now work
+
+---
+
 ## Current Status
 
-- **Tests**: 554/554 unit + 14/14 E2E ✅ (100% pass rate)
+- **Tests**: 554/554 unit + 18/18 E2E ✅ (100% pass rate, 202.90s duration)
 - **Linting**: 0 errors ✅
-- **Open Issues**: 1 critical (TR variable exposure in PineTS transpiler)
+- **Open Issues**: 0 critical ✅
 ```
 

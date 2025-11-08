@@ -1,0 +1,9 @@
+//@version=5
+indicator("Edge Cases - First Bar", overlay=false)
+
+// First bar: no history available
+plot(close, "close", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)
+plot(hl2, "hl2", color=color.orange)
+plot(tr, "tr", color=color.purple)

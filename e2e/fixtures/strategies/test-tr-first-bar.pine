@@ -1,0 +1,10 @@
+//@version=5
+indicator("TR First Bar", overlay=false)
+
+// Test: Edge case - first bar TR (no previous close)
+// First bar: TR = high - low
+// Subsequent bars: TR = max(high-low, abs(high-close[1]), abs(low-close[1]))
+
+plot(tr, "TR", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)

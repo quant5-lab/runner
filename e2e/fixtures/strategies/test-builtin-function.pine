@@ -1,0 +1,21 @@
+//@version=5
+indicator("Built-in Variables - Function Scope", overlay=false)
+
+// Variables accessible in function scope
+getClose() => close
+
+getVolume() => volume
+
+getHl2() => hl2
+
+getTr() => tr
+
+close_func = getClose()
+volume_func = getVolume()
+hl2_func = getHl2()
+tr_func = getTr()
+
+plot(close_func, "close_func", color=color.blue)
+plot(volume_func, "volume_func", color=color.green)
+plot(hl2_func, "hl2_func", color=color.orange)
+plot(tr_func, "tr_func", color=color.red)

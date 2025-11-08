@@ -1,0 +1,10 @@
+//@version=5
+indicator("TR Gaps", overlay=false)
+
+// Test: Edge case - gaps (close[1] outside current bar range)
+// TR should capture gap via abs(high-close[1]) or abs(low-close[1])
+
+plot(tr, "TR", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)
+plot(close, "close", color=color.orange)

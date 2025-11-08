@@ -1,0 +1,12 @@
+//@version=5
+indicator("TR Conditions", overlay=false)
+
+// Test: TR in conditional logic
+tr_avg = ta.sma(tr, 20)
+tr_high = tr > tr_avg * 1.5
+tr_low = tr < tr_avg * 0.5
+
+plot(tr, "TR", color=color.blue)
+plot(tr_avg, "TR Average", color=color.gray)
+plot(tr_high ? 1 : 0, "TR High Signal", color=color.green)
+plot(tr_low ? 1 : 0, "TR Low Signal", color=color.red)

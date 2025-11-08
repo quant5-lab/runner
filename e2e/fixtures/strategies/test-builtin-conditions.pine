@@ -1,0 +1,20 @@
+//@version=5
+indicator("Built-in Variables - Conditionals", overlay=false)
+
+// Variables in conditional logic
+close_avg = ta.sma(close, 20)
+close_signal = close > close_avg ? 1 : 0
+
+volume_avg = ta.sma(volume, 20)
+volume_signal = volume > volume_avg * 1.5 ? 1 : 0
+
+hl2_avg = ta.sma(hl2, 20)
+hl2_signal = hl2 > hl2_avg ? 1 : 0
+
+tr_avg = ta.sma(tr, 20)
+tr_signal = tr > tr_avg * 1.5 ? 1 : 0
+
+plot(close_signal, "close_signal", color=color.blue)
+plot(volume_signal, "volume_signal", color=color.green)
+plot(hl2_signal, "hl2_signal", color=color.orange)
+plot(tr_signal, "tr_signal", color=color.red)

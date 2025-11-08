@@ -1,0 +1,7 @@
+//@version=5
+indicator("Edge Cases - Values", overlay=false)
+
+// Edge value handling
+plot(close, "close", color=color.blue)
+plot(volume, "volume", color=color.green)
+plot(tr, "tr", color=color.red)

@@ -1,0 +1,9 @@
+//@version=5
+indicator("Built-in Variables - Direct Access", overlay=true)
+
+// Plot all base built-in variables
+plot(open, "open", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)
+plot(close, "close", color=color.orange)
+plot(volume, "volume", color=color.purple)

@@ -1,0 +1,13 @@
+//@version=5
+indicator("Edge Cases - Gaps", overlay=false)
+
+// Gap detection: close[1] outside current bar range
+gap_up = close[1] < low ? 1 : 0
+gap_down = close[1] > high ? 1 : 0
+gap_detected = gap_up + gap_down
+
+plot(close, "close", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)
+plot(tr, "tr", color=color.orange)
+plot(gap_detected, "gap_detected", color=color.yellow)

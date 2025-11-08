@@ -1,0 +1,13 @@
+//@version=5
+indicator("Built-in Variables - Calculations", overlay=false)
+
+// Variables in SMA calculations
+close_sma = ta.sma(close, 10)
+volume_sma = ta.sma(volume, 10)
+hl2_sma = ta.sma(hl2, 10)
+tr_sma = ta.sma(tr, 10)
+
+plot(close_sma, "close_sma", color=color.blue)
+plot(volume_sma, "volume_sma", color=color.green)
+plot(hl2_sma, "hl2_sma", color=color.orange)
+plot(tr_sma, "tr_sma", color=color.red)

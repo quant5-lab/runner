@@ -1,0 +1,12 @@
+//@version=5
+indicator("TR Function Scope", overlay=false)
+
+// Test: TR accessible in function scope
+calculate_tr_ratio() =>
+    atr_value = ta.atr(14)
+    tr / atr_value
+
+tr_ratio = calculate_tr_ratio()
+
+plot(tr, "Function TR", color=color.blue)
+plot(tr_ratio, "TR/ATR Ratio", color=color.green)

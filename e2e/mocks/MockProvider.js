@@ -11,9 +11,9 @@
 
 export class MockProvider {
   constructor(config = {}) {
-    this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge', 'sawtooth', 'bullish', 'bearish'
+    this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge', 'sawtooth', 'bullish', 'bearish', 'volatile', 'gaps', 'trending'
     this.basePrice = config.basePrice || 1;
-    this.amplitude = config.amplitude || 10; // For sawtooth pattern
+    this.amplitude = config.amplitude || 10; // For sawtooth, volatile, gaps patterns
     this.supportedTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', 'D', 'W', 'M'];
   }
 
@@ -33,8 +33,21 @@ export class MockProvider {
       const price = this.generatePrice(i);
 
       /* For sawtooth pattern, high/low should match close to create clear pivots */
-      const high = this.dataPattern === 'sawtooth' ? price : price + 1;
-      const low = this.dataPattern === 'sawtooth' ? price : price - 1;
+      /* For volatile/gaps patterns, create wide ranges */
+      let high, low;
+      if (this.dataPattern === 'sawtooth') {
+        high = price;
+        low = price;
+      } else if (this.dataPattern === 'volatile') {
+        high = price + this.amplitude * 0.3;
+        low = price - this.amplitude * 0.3;
+      } else if (this.dataPattern === 'gaps') {
+        high = price + this.amplitude * 0.2;
+        low = price - this.amplitude * 0.2;
+      } else {
+        high = price + 1;
+        low = price - 1;
+      }
 
       candles.push({
         openTime: now - (limit - 1 - i) * timeframeMs, // Unix milliseconds (PineTS convention)
@@ -97,6 +110,32 @@ export class MockProvider {
         const cycle = index % 4;
         const offsets = [0, -2, -1, -3]; // Small oscillation
         return this.basePrice + trend + offsets[cycle];
+      }
+
+      case 'volatile': {
+        // High volatility with large swings
+        // Uses sine wave multiplied by amplitude
+        const wave = Math.sin(index * 0.5) * this.amplitude;
+        return this.basePrice + wave;
+      }
+
+      case 'gaps': {
+        // Creates price gaps (jumps up/down between bars)
+        // Every 5th bar creates a gap
+        if (index % 5 === 0 && index > 0) {
+          // Jump up or down
+          const gapDirection = (index / 5) % 2 === 0 ? 1 : -1;
+          return this.basePrice + index + gapDirection * this.amplitude;
+        }
+        return this.basePrice + index;
+      }
+
+      case 'trending': {
+        // Strong uptrend with small oscillations
+        // Good for trend-following indicators like ADX
+        const trend = index * 0.8; // Strong uptrend
+        const noise = Math.sin(index * 0.3) * 2; // Small noise
+        return this.basePrice + trend + noise;
       }
 
       default:

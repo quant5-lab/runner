@@ -1,0 +1,23 @@
+//@version=5
+indicator("BB7 ADX Regression Test", overlay=false)
+
+// Test: Regression test for BB7 ADX bug (original issue)
+// ADX uses DMI which requires TR internally
+
+dirmov(len) =>
+    up = ta.change(high)
+    down = -ta.change(low)
+    trur = ta.rma(tr, len)  // Uses TR - this was throwing ReferenceError
+    plus = 100 * ta.rma(up > down and up > 0 ? up : 0, len) / trur
+    minus = 100 * ta.rma(down > up and down > 0 ? down : 0, len) / trur
+    [plus, minus]
+
+adx(dilen, adxlen) =>
+    [plus, minus] = dirmov(dilen)
+    sum = plus + minus
+    adx_value = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+    adx_value
+
+adx_value = adx(14, 14)
+
+plot(adx_value, "ADX", color=color.blue)

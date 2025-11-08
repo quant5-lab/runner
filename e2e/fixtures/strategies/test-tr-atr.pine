@@ -1,0 +1,11 @@
+//@version=5
+indicator("TR ATR", overlay=false)
+
+// Test: ATR calculation (uses TR internally)
+atr_value = ta.atr(14)
+
+plot(tr, "TR", color=color.blue)
+plot(atr_value, "ATR", color=color.green)
+plot(high, "high", color=color.gray)
+plot(low, "low", color=color.gray)
+plot(close, "close", color=color.gray)

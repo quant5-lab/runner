@@ -1,0 +1,8 @@
+//@version=5
+indicator("TR Direct", overlay=false)
+
+// Test: Direct TR access - verify TR variable is exposed to transpiled code
+plot(tr, "TR", color=color.blue)
+plot(high, "high", color=color.green)
+plot(low, "low", color=color.red)
+plot(close, "close", color=color.orange)

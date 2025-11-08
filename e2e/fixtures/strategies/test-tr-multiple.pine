@@ -1,0 +1,13 @@
+//@version=5
+indicator("TR Multiple Usages", overlay=false)
+
+// Test: Multiple TR usages in same script
+tr_direct = tr
+tr_doubled = tr * 2
+atr14 = ta.atr(14)
+tr_sma = ta.sma(tr, 10)
+
+plot(tr_direct, "TR Direct", color=color.blue)
+plot(tr_doubled, "TR * 2", color=color.green)
+plot(atr14, "ATR14", color=color.orange)
+plot(tr_sma, "TR SMA", color=color.red)
