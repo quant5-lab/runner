@@ -275,23 +275,36 @@ if has_active_trade and not hold_overnight and not session_open
 plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='Stop Loss')
 plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='Take Profit')
 
-// Equity plot in indicator pane
-equity_value = strategy.equity
-plot(equity_value, color=color.blue, linewidth=2, pane='equity', title='Strategy Equity')
+// ============================================================================
+// PANE 1: TREND & MARKET STRUCTURE
+// ============================================================================
+plot(sma_bullish ? 1 : 0, color=color.new(color.lime, 0), linewidth=2, pane='trend', title='SMA Bullish Alignment', style=plot.style_stepline)
+plot(sma_bearish ? 1 : 0, color=color.new(color.red, 0), linewidth=2, pane='trend', title='SMA Bearish Alignment', style=plot.style_stepline)
+plot(session_open ? 0.5 : 0, color=color.new(color.purple, 30), linewidth=1, pane='trend', title='Trading Session Active', style=plot.style_stepline)
+plot(is_entry_time ? 0.75 : 0, color=color.new(color.aqua, 30), linewidth=1, pane='trend', title='Entry Time Window', style=plot.style_stepline)
 
-// Active trade indicator - shows 1 when trade is active, 0 otherwise
+// ============================================================================
+// PANE 2: ENTRY SIGNAL COMPONENTS
+// ============================================================================
+plot(not na(buy_limit_entry) ? 1 : 0, color=color.new(color.green, 0), linewidth=2, pane='signals', title='BB + ADX Buy Signal', style=plot.style_stepline)
+plot(not na(sell_limit_entry) ? 1 : 0, color=color.new(color.maroon, 0), linewidth=2, pane='signals', title='BB + ADX Sell Signal', style=plot.style_stepline)
+plot(adx_buy ? 0.8 : 0, color=color.new(color.lime, 50), linewidth=1, pane='signals', title='ADX #1 Bullish', style=plot.style_stepline)
+plot(adx_sell ? 0.8 : 0, color=color.new(color.red, 50), linewidth=1, pane='signals', title='ADX #1 Bearish', style=plot.style_stepline)
+plot(adx_buy2 ? 0.6 : 0, color=color.new(color.green, 60), linewidth=1, pane='signals', title='ADX #2 Bullish', style=plot.style_stepline)
+plot(adx_sell2 ? 0.6 : 0, color=color.new(color.orange, 60), linewidth=1, pane='signals', title='ADX #2 Bearish', style=plot.style_stepline)
+plot(moderate_volatility ? 0.4 : 0, color=color.new(color.yellow, 40), linewidth=1, pane='signals', title='Moderate Volatility OK', style=plot.style_stepline)
+plot(enough_potential ? 0.2 : 0, color=color.new(color.fuchsia, 40), linewidth=1, pane='signals', title='Enough Profit Potential', style=plot.style_stepline)
+
+// ============================================================================
+// PANE 3: TRADE EXECUTION STATUS
+// ============================================================================
 active_trade_indicator = has_active_trade ? 1 : 0
-plot(active_trade_indicator, color=color.orange, linewidth=2, pane='indicator', title='Active Trade Status', style=plot.style_stepline)
+plot(active_trade_indicator, color=color.new(color.orange, 0), linewidth=3, pane='execution', title='Active Trade Status', style=plot.style_stepline)
+plot(entry_condition ? 1 : 0, color=color.new(color.white, 0), linewidth=2, pane='execution', title='FINAL Entry Condition Met', style=plot.style_stepline)
+plot(num_trades <= max_trades ? 0.75 : 0, color=color.new(color.navy, 20), linewidth=1, pane='execution', title='Trade Count Below Max', style=plot.style_stepline)
+plot(make_trades ? 0.5 : 0, color=color.new(color.gray, 20), linewidth=1, pane='execution', title='Trading Enabled', style=plot.style_stepline)
+plot(trailing_stop_lock_in and has_active_trade ? 0.25 : 0, color=color.new(color.purple, 0), linewidth=2, pane='execution', title='Trailing Stop Triggered', style=plot.style_stepline)
 
-// Entry condition diagnostic plots - track why trades don't enter
-plot(make_trades ? 1 : 0, color=color.gray, linewidth=1, pane='indicator', title='1. Make Trades Enabled', style=plot.style_stepline)
-plot(session_open ? 1 : 0, color=color.purple, linewidth=1, pane='indicator', title='2. Session Open', style=plot.style_stepline)
-plot(is_entry_time ? 1 : 0, color=color.aqua, linewidth=1, pane='indicator', title='3. Entry Time Window', style=plot.style_stepline)
-plot(sma_bullish ? 1 : 0, color=color.lime, linewidth=1, pane='indicator', title='4. SMA Bullish', style=plot.style_stepline)
-plot(sma_bearish ? 1 : 0, color=color.red, linewidth=1, pane='indicator', title='5. SMA Bearish', style=plot.style_stepline)
-plot(not na(buy_limit_entry) ? 1 : 0, color=color.green, linewidth=1, pane='indicator', title='6. Buy Limit Entry Signal', style=plot.style_stepline)
-plot(not na(sell_limit_entry) ? 1 : 0, color=color.maroon, linewidth=1, pane='indicator', title='7. Sell Limit Entry Signal', style=plot.style_stepline)
-plot(moderate_volatility ? 1 : 0, color=color.yellow, linewidth=1, pane='indicator', title='8. Moderate Volatility', style=plot.style_stepline)
-plot(enough_potential ? 1 : 0, color=color.fuchsia, linewidth=1, pane='indicator', title='9. Enough Potential', style=plot.style_stepline)
-plot(entry_condition ? 1 : 0, color=color.white, linewidth=2, pane='indicator', title='10. FINAL Entry Condition', style=plot.style_stepline)
-plot(num_trades <= max_trades ? 1 : 0, color=color.navy, linewidth=1, pane='indicator', title='11. Trades Below Max', style=plot.style_stepline)
+// Equity plot
+equity_value = strategy.equity
+plot(equity_value, color=color.new(color.blue, 0), linewidth=2, pane='equity', title='Strategy Equity')
