@@ -172,8 +172,8 @@ const pivot5Values = getPlotValues(pivotResult, 'pivot5');
 const jsPivot2 = calcPivotHigh(pivotHighValues, 2, 2);
 const jsPivot5 = calcPivotHigh(pivotHighValues, 5, 5);
 
-let pivotMatched = 0,
-  pivotTotal = 0;
+let pivotMatched = 0;
+let pivotTotal = 0;
 for (let i = 0; i < pivot2Values.length; i++) {
   if (isNaN(pivot2Values[i]) && isNaN(jsPivot2[i])) {
     pivotMatched++;
@@ -214,8 +214,8 @@ const pivotlow5Values = getPlotValues(pivotlowResult, 'pivot5');
 const jsPivotLow2 = calcPivotLow(lowValues, 2, 2);
 const jsPivotLow5 = calcPivotLow(lowValues, 5, 5);
 
-let pivotlowMatched = 0,
-  pivotlowTotal = 0;
+let pivotlowMatched = 0;
+let pivotlowTotal = 0;
 for (let i = 0; i < pivotlow2Values.length; i++) {
   if (isNaN(pivotlow2Values[i]) && isNaN(jsPivotLow2[i])) {
     pivotlowMatched++;
@@ -284,7 +284,7 @@ const barmergeResult = await runStrategyWithPattern(
 );
 const lookaheadValues = getPlotValues(barmergeResult, 'Daily Open (lookahead)');
 const noLookaheadValues = getPlotValues(barmergeResult, 'Daily Open (no lookahead)');
-console.log(`✅ barmerge: All 4 constants available (lookahead_on/off, gaps_on/off)`);
+console.log('✅ barmerge: All 4 constants available (lookahead_on/off, gaps_on/off)');
 console.log(`   - lookahead_on: ${lookaheadValues?.length || 0} values`);
 console.log(`   - lookahead_off: ${noLookaheadValues?.length || 0} values`);
 

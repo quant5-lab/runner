@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * E2E Test: Session Filtering - Comprehensive Behavior Validation
- * 
+ *
  * Tests session filtering algorithm correctness across multiple dimensions:
  * 1. Input methods: Direct string vs input.session() consistency
  * 2. Expression patterns: Intermediate variable vs inline na() call
  * 3. Session types: Regular hours, overnight, 24-hour, split sessions
  * 4. Timeframes: 1m, 1h validation across different granularities
  * 5. Edge cases: Empty bars, boundary conditions, timezone handling
- * 
+ *
  * Validates: Timezone-aware session filtering with bitmask optimization
  */
 
@@ -67,9 +67,9 @@ plot(hour, "Hour", color=color.gray)
 `;
 
   /* Use MockProvider for deterministic data */
-  const mockProvider = new MockProviderManager({ 
-    dataPattern: 'linear', 
-    basePrice: 100 
+  const mockProvider = new MockProviderManager({
+    dataPattern: 'linear',
+    basePrice: 100,
   });
   const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
   const DEFAULTS = { showDebug: false, showStats: false };
@@ -84,7 +84,7 @@ plot(hour, "Hour", color=color.gray)
     testCase.timeframe,
     testCase.bars,
     jsCode,
-    `test-session-${testCase.name.toLowerCase().replace(/\s+/g, '-')}`
+    `test-session-${testCase.name.toLowerCase().replace(/\s+/g, '-')}`,
   );
 
   const plots = result?.plots;
@@ -111,7 +111,7 @@ plot(hour, "Hour", color=color.gray)
   /* Validation 1: All methods must produce identical results */
   if (directIN !== inputIN || directIN !== inlineIN) {
     throw new Error(
-      `❌ Method inconsistency: Direct=${directIN}, Input=${inputIN}, Inline=${inlineIN}`
+      `❌ Method inconsistency: Direct=${directIN}, Input=${inputIN}, Inline=${inlineIN}`,
     );
   }
 
@@ -119,7 +119,7 @@ plot(hour, "Hour", color=color.gray)
   if (testCase.expectMixed) {
     if (directIN === 0 || directOUT === 0) {
       throw new Error(
-        `❌ Session filtering broken: ${directIN} IN / ${directOUT} OUT (expected mixed)`
+        `❌ Session filtering broken: ${directIN} IN / ${directOUT} OUT (expected mixed)`,
       );
     }
   }
@@ -127,7 +127,7 @@ plot(hour, "Hour", color=color.gray)
   /* Validation 3: 24-hour sessions must mark all bars as IN */
   if (testCase.expectAllIn && directOUT !== 0) {
     throw new Error(
-      `❌ 24-hour session should have all bars IN, got ${directOUT} OUT bars`
+      `❌ 24-hour session should have all bars IN, got ${directOUT} OUT bars`,
     );
   }
 
@@ -139,7 +139,7 @@ plot(hour, "Hour", color=color.gray)
     console.log(`   ⚠️  Warning: Unusual session coverage (${sessionPercent.toFixed(1)}%)`);
   }
 
-  console.log(`   ✅ Pass`);
+  console.log('   ✅ Pass');
 }
 
 async function testSessionFiltering() {

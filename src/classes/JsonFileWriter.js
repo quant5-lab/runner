@@ -21,7 +21,7 @@ class JsonFileWriter {
       plots,
       timestamp: new Date().toISOString(),
     };
-    
+
     if (strategy && (strategy.trades?.length > 0 || strategy.openTrades?.length > 0)) {
       chartData.strategy = strategy;
     }

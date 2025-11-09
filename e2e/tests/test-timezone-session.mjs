@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * E2E Test: Timezone-aware session filtering
- * 
+ *
  * Verifies that time() function correctly uses exchange timezone when filtering sessions.
- * 
+ *
  * Bug Context:
  * - Previously: time() timezone parameter was accepted but ignored (always used UTC)
  * - Fixed in PineTS v0.1.34: timezone parameter now properly applied
@@ -51,22 +51,22 @@ async function testTimezoneSession() {
   const insideCount = sessionPlot.filter(v => v === 1).length;
   const outsideCount = sessionPlot.filter(v => v === 0).length;
 
-  console.log(`📊 Results:`);
+  console.log('📊 Results:');
   console.log(`   Total bars: ${sessionPlot.length}`);
   console.log(`   Inside session (0930-1600 ET): ${insideCount}`);
   console.log(`   Outside session: ${outsideCount}`);
 
   /* Validate that timezone filtering is working */
   if (insideCount > 0 && outsideCount > 0) {
-    console.log(`   ✅ Timezone filtering working: detected both in/out session bars`);
+    console.log('   ✅ Timezone filtering working: detected both in/out session bars');
   } else if (insideCount === 0) {
-    console.log(`   ⚠️  All bars outside session (data may be after-hours only)`);
+    console.log('   ⚠️  All bars outside session (data may be after-hours only)');
   } else if (outsideCount === 0) {
-    console.log(`   ⚠️  All bars inside session (data may be market-hours only)`);
+    console.log('   ⚠️  All bars inside session (data may be market-hours only)');
   }
 
   /* Sample bar analysis */
-  console.log(`\n📍 Sample bars (first 5):`);
+  console.log('\n📍 Sample bars (first 5):');
   for (let i = 0; i < Math.min(5, sessionPlot.length); i++) {
     const hour = hourPlot[i];
     const inSession = sessionPlot[i] === 1 ? 'IN ' : 'OUT';

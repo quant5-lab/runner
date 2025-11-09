@@ -58,7 +58,7 @@ assertFloatEquals(firstTr[0], expectedFirstTR, FLOAT_EPSILON, 'first bar TR');
 const expectedFirstHl2 = (firstHigh[0] + firstLow[0]) / 2;
 assertFloatEquals(firstHl2[0], expectedFirstHl2, FLOAT_EPSILON, 'first bar hl2');
 
-console.log(`✅ PASSED: First bar edge case handled correctly\n`);
+console.log('✅ PASSED: First bar edge case handled correctly\n');
 
 // Test 2: Gap detection - discontinuities in price
 console.log('Test 2: Gap detection - discontinuities in price');

@@ -60,7 +60,7 @@ class PineScriptStrategyRunner {
     await pineTS.prefetchSecurityData(wrappedCode);
 
     const result = await pineTS.run(wrappedCode);
-    
+
     /* Extract strategy data if available */
     const strategyData = {};
     if (result?.strategy) {
@@ -69,10 +69,10 @@ class PineScriptStrategyRunner {
       strategyData.equity = result.strategy.equityCalculator?.getEquity() || 0;
       strategyData.netProfit = result.strategy.equityCalculator?.getNetProfit() || 0;
     }
-    
-    return { 
+
+    return {
       plots: result?.plots || [],
-      strategy: strategyData
+      strategy: strategyData,
     };
   }
 }

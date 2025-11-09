@@ -112,7 +112,7 @@ for (const varName of derivedVariables) {
     console.error(`❌ FAILED: ${varName} not accessible`);
     process.exit(1);
   }
-  
+
   const expected = calcDerivedVariable(highValues, lowValues, closeValues, varName);
   let matched = 0;
   for (let i = 0; i < values.length; i++) {
@@ -214,7 +214,7 @@ if (!multi1 || !multi2 || !multi3 || !multi4) {
   process.exit(1);
 }
 
-console.log(`✅ PASSED: Multiple simultaneous variable usages work correctly\n`);
+console.log('✅ PASSED: Multiple simultaneous variable usages work correctly\n');
 
 console.log('=== All built-in variable tests passed ✅ ===');
 console.log(`Total: 6 test scenarios covering:

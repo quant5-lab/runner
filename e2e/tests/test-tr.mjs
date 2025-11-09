@@ -315,7 +315,7 @@ for (let i = 0; i < tr1.length; i++) {
   assertFloatEquals(tr2[i], tr1[i] * 2, FLOAT_EPSILON, `tr*2[${i}]`);
 }
 
-console.log(`✅ PASSED: Multiple TR usages work correctly\n`);
+console.log('✅ PASSED: Multiple TR usages work correctly\n');
 
 // Test 11: Regression test - BB7 ADX strategy
 console.log('Test 11: Regression test - BB7 ADX strategy');

@@ -48,7 +48,7 @@ if (firstEquityPoint?.options?.pane !== 'equity') {
   console.error(`❌ FAIL: Expected equity pane, got: ${firstEquityPoint?.options?.pane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Equity plot has pane='equity'`);
+console.log('✅ PASS: Equity plot has pane=\'equity\'');
 
 if (!rsiPlot || !rsiPlot.data || rsiPlot.data.length === 0) {
   console.error('❌ FAIL: RSI plot missing or empty');
@@ -60,7 +60,7 @@ if (firstRsiPoint?.options?.pane !== 'oscillators') {
   console.error(`❌ FAIL: Expected oscillators pane, got: ${firstRsiPoint?.options?.pane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: RSI plot has pane='oscillators'`);
+console.log('✅ PASS: RSI plot has pane=\'oscillators\'');
 
 if (!volumePlot || !volumePlot.data || volumePlot.data.length === 0) {
   console.error('❌ FAIL: Volume plot missing or empty');
@@ -72,7 +72,7 @@ if (firstVolumePoint?.options?.pane !== 'volume') {
   console.error(`❌ FAIL: Expected volume pane, got: ${firstVolumePoint?.options?.pane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Volume plot has pane='volume'\n`);
+console.log('✅ PASS: Volume plot has pane=\'volume\'\n');
 
 console.log('=== TEST 2: Metadata extraction captures pane property ===');
 const metadata = runner.extractIndicatorMetadata(result.plots);
@@ -81,19 +81,19 @@ if (metadata['Strategy Equity']?.chartPane !== 'equity') {
   console.error(`❌ FAIL: Metadata chartPane should be 'equity', got: ${metadata['Strategy Equity']?.chartPane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Equity metadata has chartPane='equity'`);
+console.log('✅ PASS: Equity metadata has chartPane=\'equity\'');
 
 if (metadata['RSI']?.chartPane !== 'oscillators') {
   console.error(`❌ FAIL: Metadata chartPane should be 'oscillators', got: ${metadata['RSI']?.chartPane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: RSI metadata has chartPane='oscillators'`);
+console.log('✅ PASS: RSI metadata has chartPane=\'oscillators\'');
 
 if (metadata['Volume']?.chartPane !== 'volume') {
   console.error(`❌ FAIL: Metadata chartPane should be 'volume', got: ${metadata['Volume']?.chartPane}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Volume metadata has chartPane='volume'\n`);
+console.log('✅ PASS: Volume metadata has chartPane=\'volume\'\n');
 
 console.log('=== TEST 3: ConfigurationBuilder generates 4 panes ===');
 const tradingConfig = configBuilder.createTradingConfig('TEST', 'D', 30, 'test-multi-pane.pine');
@@ -115,50 +115,50 @@ if (chartConfig.chartLayout.main.height !== 400 || !chartConfig.chartLayout.main
   console.error('❌ FAIL: Main pane should be height 400 with fixed: true');
   process.exit(1);
 }
-console.log(`✅ PASS: Main pane: height=400, fixed=true`);
+console.log('✅ PASS: Main pane: height=400, fixed=true');
 
 if (chartConfig.chartLayout.equity.height !== 200) {
   console.error('❌ FAIL: Equity pane should be height 200');
   process.exit(1);
 }
-console.log(`✅ PASS: Equity pane: height=200`);
+console.log('✅ PASS: Equity pane: height=200');
 
 if (chartConfig.chartLayout.oscillators.height !== 200) {
   console.error('❌ FAIL: Oscillators pane should be height 200');
   process.exit(1);
 }
-console.log(`✅ PASS: Oscillators pane: height=200`);
+console.log('✅ PASS: Oscillators pane: height=200');
 
 if (chartConfig.chartLayout.volume.height !== 200) {
   console.error('❌ FAIL: Volume pane should be height 200');
   process.exit(1);
 }
-console.log(`✅ PASS: Volume pane: height=200\n`);
+console.log('✅ PASS: Volume pane: height=200\n');
 
 console.log('=== TEST 4: Series config routes to correct panes ===');
 if (chartConfig.seriesConfig.series['SMA 20']?.chart !== 'main') {
   console.error(`❌ FAIL: SMA 20 should route to 'main', got: ${chartConfig.seriesConfig.series['SMA 20']?.chart}`);
   process.exit(1);
 }
-console.log(`✅ PASS: SMA 20 routed to 'main' pane`);
+console.log('✅ PASS: SMA 20 routed to \'main\' pane');
 
 if (chartConfig.seriesConfig.series['Strategy Equity']?.chart !== 'equity') {
   console.error(`❌ FAIL: Strategy Equity should route to 'equity', got: ${chartConfig.seriesConfig.series['Strategy Equity']?.chart}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Strategy Equity routed to 'equity' pane`);
+console.log('✅ PASS: Strategy Equity routed to \'equity\' pane');
 
 if (chartConfig.seriesConfig.series['RSI']?.chart !== 'oscillators') {
   console.error(`❌ FAIL: RSI should route to 'oscillators', got: ${chartConfig.seriesConfig.series['RSI']?.chart}`);
   process.exit(1);
 }
-console.log(`✅ PASS: RSI routed to 'oscillators' pane`);
+console.log('✅ PASS: RSI routed to \'oscillators\' pane');
 
 if (chartConfig.seriesConfig.series['Volume']?.chart !== 'volume') {
   console.error(`❌ FAIL: Volume should route to 'volume', got: ${chartConfig.seriesConfig.series['Volume']?.chart}`);
   process.exit(1);
 }
-console.log(`✅ PASS: Volume routed to 'volume' pane\n`);
+console.log('✅ PASS: Volume routed to \'volume\' pane\n');
 
 console.log('═══════════════════════════════════════════════════════════');
 console.log('✅ ALL TESTS PASSED: Multi-pane architecture working correctly');
