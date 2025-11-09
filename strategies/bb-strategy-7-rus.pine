@@ -45,9 +45,9 @@ session_open = na(time(timeframe.period, trading_session)) ? false : true
 is_entry_time = na(time(timeframe.period, entry_time)) ? false : true
 
 // SMA
-plot(sma(close, 20), linewidth=1, color=color.red, transp=0, pane='main')
-plot(sma(close, 50), linewidth=1, color=color.black, transp=0, pane='main')
-plot(sma(close, 200), linewidth=1, color=color.lime, transp=0, pane='main')
+plot(sma(close, 20), linewidth=1, color=color.red, transp=0, pane='main', title='SMA20')
+plot(sma(close, 50), linewidth=1, color=color.black, transp=0, pane='main', title='SMA50')
+plot(sma(close, 200), linewidth=1, color=color.lime, transp=0, pane='main', title='SMA200')
 
 // 1D SMA
 sma_1d_20 = security(syminfo.tickerid, 'D', sma(close, 20))
@@ -238,8 +238,8 @@ potential_buy = min(closest_level_1_buy, closest_level_2_buy)
 potential_sell = short_trades_by_atr_1d
                   ? min(closest_level_1_sell, min(closest_level_2_sell, min(atr_1d_potential_sell, min(sma_1d_20_potential_sell, min(sma_1d_50_potential_sell, sma_1d_200_potential_sell)))))
                   : min(closest_level_1_sell, closest_level_2_sell)
-plot(short_trades_by_atr_1d ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, color=color.gray, style=plot.style_linebr, pane='main')
-plot(short_trades_by_atr_1d ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, color=color.gray, style=plot.style_linebr, pane='main')
+plot(short_trades_by_atr_1d ? (open_1d + (potential_buy == 999999 ? na : potential_buy)) : na, color=color.gray, style=plot.style_linebr, pane='main', title='Potential+')
+plot(short_trades_by_atr_1d ? (open_1d - (potential_sell == 999999 ? na : potential_sell)) : na, color=color.gray, style=plot.style_linebr, pane='main', title='Potential-')
 enough_potential = sma_bullish ? 
    take_level <= open_1d + potential_buy * (1 + lack_of_potential_tolerance / 100) : 
    take_level >= open_1d - potential_sell * (1 + lack_of_potential_tolerance / 100)
@@ -272,5 +272,5 @@ if has_active_trade and not hold_overnight and not session_open
     strategy.close_all()
     // TODO: call API or notify manual trader
 
-plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main')
-plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main')
+plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='SL')
+plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='TP')
