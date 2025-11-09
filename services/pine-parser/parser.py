@@ -372,12 +372,21 @@ class PyneToJsAstConverter:
         callee = self.visit(node.func)
         is_input_call = isinstance(node.func, Name) and node.func.id == 'input'
         
+        # Check if this is a strategy function call
+        is_strategy_call = False
+        callee_name = None
+        if isinstance(node.func, Attribute):
+            if hasattr(node.func.value, 'id') and node.func.value.id == 'strategy':
+                callee_name = f"strategy.{node.func.attr}"
+                is_strategy_call = callee_name in ['strategy.entry', 'strategy.exit', 'strategy.order', 'strategy.close']
+        
         transformer = InputFunctionTransformer(estree_node)
         is_input_with_defval = transformer.is_input_function_with_defval(node)
 
         positional_args_js = []
         named_args_props = []
         explicit_type_param = None
+        when_condition = None
 
         for i, arg in enumerate(node.args):
             arg_value_js = self.visit(arg.value)
@@ -389,6 +398,16 @@ class PyneToJsAstConverter:
                 continue  # Skip type parameter from named args
             
             if arg.name:
+                # For strategy functions, handle 'when' and 'qty' specially
+                if is_strategy_call:
+                    if arg.name == 'when':
+                        when_condition = arg_value_js
+                        continue  # Don't add 'when' to arguments
+                    elif arg.name == 'qty':
+                        # 'qty' is 3rd positional arg (index 2) for strategy.entry
+                        positional_args_js.append(arg_value_js)
+                        continue
+                
                 prop = estree_node('Property',
                                    key=estree_node('Identifier', name=arg.name),
                                    value=arg_value_js,
@@ -428,7 +447,17 @@ class PyneToJsAstConverter:
             options_object = estree_node('ObjectExpression', properties=named_args_props)
             final_args_js.append(options_object)
 
-        return estree_node('CallExpression', callee=callee, arguments=final_args_js)
+        call_expr = estree_node('CallExpression', callee=callee, arguments=final_args_js)
+        
+        # Wrap strategy calls with 'when' condition in if statement
+        if is_strategy_call and when_condition:
+            return estree_node('IfStatement',
+                             test=when_condition,
+                             consequent=estree_node('BlockStatement', 
+                                                  body=[estree_node('ExpressionStatement', expression=call_expr)]),
+                             alternate=None)
+        
+        return call_expr
 
     def visit_Attribute(self, node):
         return estree_node('MemberExpression',
