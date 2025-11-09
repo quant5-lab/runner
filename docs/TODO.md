@@ -3,6 +3,12 @@
 
 ## High Priority 🔴
 
+- [ ] **PineTS: `:=` operator not fixing TP/SL levels on trade entry**
+  - Issue: TP and SL should lock values when trade entered, but recalculate every bar
+  - Expected: `stop_level := X` fixes value for trade duration
+  - Actual: Values change during trade lifetime
+  - Impact: Stop-loss and take-profit levels drift, breaking strategy logic
+
 - [ ] **Strategy trade timestamp accuracy**
   - Current: trades use `Date.now()` for entryTime/exitTime (all same timestamp)
   - Need: Use actual bar timestamp from candlestick data
