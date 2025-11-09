@@ -134,6 +134,10 @@ sma_bearish = long_trades_by_1d_sma ? sma200_1d_bearish : sma200_bearish
 sl_inp = 0.0
 sl_inp := has_active_trade and nz(sl_inp[1]) > 0 ? nz(sl_inp[1]) :  nz((sma_bullish ? sl_factor : sl_factor_short) * atr_1d/close)
 
+// DEBUG sl_inp calculation
+plot(sl_inp * 1000, title="DEBUG_sl_inp_x1000", color=color.yellow, linewidth=1, pane='debug3')
+plot((1 - sl_inp) * 100, title="DEBUG_1_minus_sl_inp_x100", color=color.lime, linewidth=1, pane='debug3')
+
 fixed_stop_level = sma_bullish ? position_avg_price_or_close * (1 - sl_inp) : position_avg_price_or_close * (1 + sl_inp)
 
 // Trailing Stop Loss
@@ -146,6 +150,11 @@ trailing_stop_level := has_active_trade ?
    : fixed_stop_level
 
 stop_level = trail_stop_enable and nz(trailing_stop_level) > 0 ? trailing_stop_level : fixed_stop_level
+
+// DEBUG: Plot components
+plot(fixed_stop_level, title="DEBUG_fixed_stop_level", color=color.orange, linewidth=1, pane='debug2')
+plot(trailing_stop_level, title="DEBUG_trailing_stop_level", color=color.purple, linewidth=1, pane='debug2')
+plot(nz(trailing_stop_level) > 0 ? 1 : 0, title="DEBUG_trailing_check", color=color.aqua, linewidth=1, pane='debug2')
 
 trailing_stop_lock_in = sma_bullish ? low < stop_level : high > stop_level
 
@@ -217,6 +226,11 @@ sma_growing = abs(sma(close, 20) - sma(close, 50)) + abs(sma(close, 50) - sma(cl
    abs(sma(close[4], 20) - sma(close[4], 50)) + 
    abs(sma(close[4], 50) - sma(close[4], 200))
 moderate_volatility = volatility_below_sl and sma_above_atr and sma_growing
+
+// DEBUG: Plot individual components
+plot(volatility_below_sl ? 1 : 0, title="DEBUG_volatility_below_sl", color=color.red, linewidth=1, pane='debug')
+plot(sma_above_atr ? 1 : 0, title="DEBUG_sma_above_atr", color=color.blue, linewidth=1, pane='debug')
+plot(sma_growing ? 1 : 0, title="DEBUG_sma_growing", color=color.green, linewidth=1, pane='debug')
 
 high_volatility_of_wide_market = true //vix_1d > min_vix
 
