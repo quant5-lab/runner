@@ -13,7 +13,7 @@
  */
 
 import { createContainer } from '../../src/container.js';
-import { createProviderChain, DEFAULTS } from '../../src/config.js';
+import { MockProviderManager } from '../mocks/MockProvider.js';
 
 /* Test configuration matrix */
 const TEST_CASES = [
@@ -65,6 +65,14 @@ plot(in_input, "Input", color=color.blue)
 plot(in_inline, "Inline", color=color.red)
 plot(hour, "Hour", color=color.gray)
 `;
+
+  /* Use MockProvider for deterministic data */
+  const mockProvider = new MockProviderManager({ 
+    dataPattern: 'linear', 
+    basePrice: 100 
+  });
+  const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
+  const DEFAULTS = { showDebug: false, showStats: false };
 
   const container = createContainer(createProviderChain, DEFAULTS);
   const runner = container.resolve('tradingAnalysisRunner');
