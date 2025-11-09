@@ -111,9 +111,14 @@ const edgeTr = getPlotValues(edgeValResult, 'tr');
 /* All variables should have valid values (no undefined, null) */
 let validCount = 0;
 for (let i = 0; i < edgeClose.length; i++) {
-  if (edgeClose[i] !== null && edgeClose[i] !== undefined &&
-      edgeVolume[i] !== null && edgeVolume[i] !== undefined &&
-      edgeTr[i] !== null && edgeTr[i] !== undefined) {
+  if (
+    edgeClose[i] !== null &&
+    edgeClose[i] !== undefined &&
+    edgeVolume[i] !== null &&
+    edgeVolume[i] !== undefined &&
+    edgeTr[i] !== null &&
+    edgeTr[i] !== undefined
+  ) {
     validCount++;
   }
 }

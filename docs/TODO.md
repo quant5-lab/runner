@@ -39,7 +39,7 @@
 - [ ] Increase test coverage to 95%
 - [ ] Support blank candlestick mode (plots-only for capital growth modeling)
 - [ ] Python unit tests for parser.py (90%+ coverage goal)
-- [ ] Remove parser dead code ($.let.glb1_ wrapping, unused _rename_identifiers_in_ast)
+- [ ] Remove parser dead code ($.let.glb1\_ wrapping, unused \_rename_identifiers_in_ast)
 - [ ] Implement varip runtime persistence (Context.varipStorage, initVarIp/setVarIp)
 - [ ] Design Y-axis scale configuration (priceScaleId mapping)
 - [ ] Rework determineChartType() for multi-pane indicators (research Pine Script native approach)
@@ -82,4 +82,4 @@
 │  Status:  ✅ All systems nominal     │
 └─────────────────────────────────────┘
 ```
-
+````

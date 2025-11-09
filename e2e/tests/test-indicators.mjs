@@ -147,7 +147,9 @@ if (nullADX > bb7ADX.length * 0.5) {
   process.exit(1);
 }
 
-console.log(`✅ PASSED: BB7 ADX calculated correctly (${bb7ADX.length - nullADX}/${bb7ADX.length} valid)\n`);
+console.log(
+  `✅ PASSED: BB7 ADX calculated correctly (${bb7ADX.length - nullADX}/${bb7ADX.length} valid)\n`,
+);
 
 console.log('=== All indicator tests passed ✅ ===');
 console.log(`Total: 3 test scenarios covering:

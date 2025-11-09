@@ -5,6 +5,7 @@
 ### 1. PERFORMANCE BOTTLENECK ANALYSIS
 
 **Measured bottlenecks:**
+
 ```
 Transpilation (Pynescript):  2432ms  ← 98.5% of total time
 JS Parse (@swc/core):          0.04ms  ← 0.002% of total time
@@ -42,12 +43,14 @@ Execution (PineTS):           ~150ms  ← 6% of total time
 ### 3. DEPENDENCY MATURITY STATUS
 
 **Pynescript:**
+
 - Version: 0.2.0 (Feb 28, 2024)
 - Status: Beta-ish (has basic features, not production-hardened)
 - License: LGPL 3.0 (VIRAL - forces your code to be LGPL)
 - Performance: Spawns Python process + IPC overhead
 
 **PineTS:**
+
 - Version: 0.1.34 (active development)
 - Status: **ALPHA** (user claim CONFIRMED)
 - Evidence:
@@ -58,6 +61,7 @@ Execution (PineTS):           ~150ms  ← 6% of total time
 - Completeness: Partial PineScript v5 support
 
 **@swc/core:**
+
 - Version: Latest stable
 - Status: Production-ready (32.9k stars)
 - License: Apache 2.0 (permissive)
@@ -90,6 +94,7 @@ Execution (PineTS):           ~150ms  ← 6% of total time
 ```
 
 **Pros:**
+
 - Eliminates Python spawn overhead
 - No IPC/tmp file overhead
 - Full control over PineScript semantics
@@ -98,9 +103,10 @@ Execution (PineTS):           ~150ms  ← 6% of total time
 - Multi-threaded processing possible
 
 **Cons:**
+
 - Full rewrite (~3-6 months work)
 - Need PineScript grammar implementation
-- Need runtime function library (ta.*, strategy.*)
+- Need runtime function library (ta._, strategy._)
 
 #### Option B: GO ENGINE
 
@@ -109,11 +115,13 @@ Same as Option A but in Go
 ```
 
 **Pros:**
+
 - Easier concurrency than Rust
 - Faster development than Rust
 - Good parsing libraries (participle, goyacc)
 
 **Cons:**
+
 - Slower than Rust (still 10x faster than Python)
 - Larger binaries
 - No WASM target quality
@@ -139,29 +147,35 @@ Same as Option A but in Go
 ```
 
 **Pros:**
+
 - Removes main bottleneck (Python parser)
 - Keeps PineTS runtime (working code)
 - ~80% performance gain
 - 2-4 weeks work
 
 **Cons:**
+
 - Still depends on PineTS alpha code
 - Eventual PineTS completion required
 
 ## RECOMMENDATION
 
 ### Phase 1: Hybrid Approach (IMMEDIATE - 2-4 weeks)
+
 Replace Python parser with Rust parser outputting JS directly
 
 **Why:**
+
 - Eliminates 98.5% of bottleneck
 - Minimal risk (PineTS runtime works)
 - Fast ROI
 
 ### Phase 2: Custom Runtime (6-12 months)
+
 Replace PineTS with custom Rust runtime
 
 **Why:**
+
 - Full control over features
 - LGPL license elimination
 - Production-grade reliability
@@ -188,20 +202,24 @@ Replace PineTS with custom Rust runtime
 ## TECHNICAL RISKS
 
 ### Low Risk:
+
 - Parser replacement (well-defined input/output)
 - @swc/core integration (mature API)
 
 ### Medium Risk:
+
 - PineScript semantics edge cases
 - Runtime function library completeness
 
 ### High Risk:
+
 - Multi-timeframe execution (security() function)
 - Strategy backtesting state management
 
 ## LICENSE CONSIDERATIONS
 
 **CRITICAL:** Pynescript LGPL 3.0 is VIRAL
+
 - Current usage: Dynamic linking via subprocess (OK)
 - If embedded: Forces project to LGPL (BAD)
 
@@ -210,12 +228,15 @@ Replace PineTS with custom Rust runtime
 ## PERFORMANCE TARGETS
 
 Current:
+
 - 2500ms total (500 bars)
 
 Hybrid:
+
 - ~250ms total (500 bars) - 10x improvement
 
 Pure Rust:
+
 - ~50ms total (500 bars) - 50x improvement
 - Multi-threaded: 10-20ms (100-250x improvement)
 
@@ -230,6 +251,7 @@ Pure Rust:
    - State machine pattern for tokenization
    - Byte-level optimizations
    - Token buffer with lookahead
+
    ```rust
    pub struct Lexer<'a> {
        input: StringInput<'a>,
@@ -244,6 +266,7 @@ Pure Rust:
    - Error recovery mechanisms
    - Span tracking for error messages
    - Context-sensitive parsing
+
    ```rust
    pub struct Parser<I: Tokens> {
        input: Buffer<I>,
@@ -266,6 +289,7 @@ Pure Rust:
 ### 📋 ARCHITECTURE STRATEGY:
 
 **Option A: Copy SWC Patterns (Recommended)**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Custom PineScript Lexer                 │  ← Copy lexer PATTERN
@@ -297,6 +321,7 @@ Pure Rust:
 **License**: Your code, Apache 2.0 compatible
 
 **Option B: Use tree-sitter**
+
 ```
 ┌─────────────────────────────────────────┐
 │ tree-sitter PineScript grammar          │  ← Write .grammar file
@@ -324,12 +349,14 @@ Pure Rust:
 
 **Don't use @swc/core parser directly** - it WILL parse PineScript but produces WRONG AST (treats as JS)
 
-**Use @swc/core for:** 
+**Use @swc/core for:**
+
 - Architectural patterns (lexer/parser design)
 - AST visitor patterns
 - Optional: JS execution if needed
 
 **Build custom PineScript parser using:**
+
 1. Copy SWC's hand-written lexer/parser ARCHITECTURE
 2. OR use tree-sitter for grammar-based parsing
 3. Direct Pine → JS codegen with custom runtime
@@ -367,12 +394,12 @@ impl Parser {
 
 ## REPLACEABILITY REVISED
 
-| Component | Replace With | Copy from SWC | Effort |
-|-----------|-------------|---------------|--------|
-| Python parser | Rust lexer/parser | Lexer + Parser patterns | 8-12 weeks |
-| Pynescript lib | Custom PineScript grammar | None (custom) | 4-6 weeks |
-| AST transform | Visitor pattern codegen | Visitor trait | 2-3 weeks |
-| PineTS runtime | Custom Rust runtime | None (custom) | 12-16 weeks |
+| Component      | Replace With              | Copy from SWC           | Effort      |
+| -------------- | ------------------------- | ----------------------- | ----------- |
+| Python parser  | Rust lexer/parser         | Lexer + Parser patterns | 8-12 weeks  |
+| Pynescript lib | Custom PineScript grammar | None (custom)           | 4-6 weeks   |
+| AST transform  | Visitor pattern codegen   | Visitor trait           | 2-3 weeks   |
+| PineTS runtime | Custom Rust runtime       | None (custom)           | 12-16 weeks |
 
 **Total for hybrid (parser only):** 14-21 weeks
 **Total for full rewrite:** 26-37 weeks

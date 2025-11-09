@@ -29,7 +29,11 @@ async function runTest(testName, pineCode) {
   console.log('='.repeat(80));
 
   try {
-    const mockProvider = new MockProviderManager({ dataPattern: 'linear', basePrice: 100, amplitude: 10 });
+    const mockProvider = new MockProviderManager({
+      dataPattern: 'linear',
+      basePrice: 100,
+      amplitude: 10,
+    });
     const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
     const DEFAULTS = { showDebug: false, showStats: false };
 

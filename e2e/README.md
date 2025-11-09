@@ -72,26 +72,26 @@ node e2e/runner.mjs
 8. **test-security.mjs** - Security function behavior
 9. **test-session-filtering.mjs** - Session filtering logic
 10. **test-strategy.mjs** - Basic strategy execution
-1. **test-barmerge.mjs** - Barmerge function testing
-2. **test-fixnan.mjs** - NaN handling and fixnan function
-3. **test-function-vs-variable-scoping.mjs** - Variable scope rules
-4. **test-input-defval.mjs** - Input default value handling
-5. **test-input-override.mjs** - Input parameter overrides
-6. **test-multi-pane.mjs** - Multi-pane indicator rendering
-7. **test-plot-color-variables.mjs** - Plot color with variables
-8. **test-plot-params.mjs** - Plot parameter validation
-9. **test-reassignment.mjs** - Variable reassignment rules
-10. **test-security.mjs** - Security function testing
-11. **test-session-filtering.mjs** - Session filtering logic
-12. **test-strategy.mjs** - Strategy execution
-13. **test-strategy-bearish.mjs** - Bearish strategy patterns
-14. **test-strategy-bullish.mjs** - Bullish strategy patterns
-15. **test-ta-functions.mjs** - Technical analysis functions
-16. **test-timezone-session.mjs** - Timezone/session handling
-17. **test-built-in-variables.mjs** - Parametric tests for all built-in variables (6 scenarios)
-18. **test-edge-cases.mjs** - Edge cases for all variables (3 scenarios)
-19. **test-indicators.mjs** - Technical indicators (ATR, ADX, DMI) (3 scenarios)
-20. **test-tr.mjs** - True Range bug regression (legacy, 11 scenarios)
+11. **test-barmerge.mjs** - Barmerge function testing
+12. **test-fixnan.mjs** - NaN handling and fixnan function
+13. **test-function-vs-variable-scoping.mjs** - Variable scope rules
+14. **test-input-defval.mjs** - Input default value handling
+15. **test-input-override.mjs** - Input parameter overrides
+16. **test-multi-pane.mjs** - Multi-pane indicator rendering
+17. **test-plot-color-variables.mjs** - Plot color with variables
+18. **test-plot-params.mjs** - Plot parameter validation
+19. **test-reassignment.mjs** - Variable reassignment rules
+20. **test-security.mjs** - Security function testing
+21. **test-session-filtering.mjs** - Session filtering logic
+22. **test-strategy.mjs** - Strategy execution
+23. **test-strategy-bearish.mjs** - Bearish strategy patterns
+24. **test-strategy-bullish.mjs** - Bullish strategy patterns
+25. **test-ta-functions.mjs** - Technical analysis functions
+26. **test-timezone-session.mjs** - Timezone/session handling
+27. **test-built-in-variables.mjs** - Parametric tests for all built-in variables (6 scenarios)
+28. **test-edge-cases.mjs** - Edge cases for all variables (3 scenarios)
+29. **test-indicators.mjs** - Technical indicators (ATR, ADX, DMI) (3 scenarios)
+30. **test-tr.mjs** - True Range bug regression (legacy, 11 scenarios)
 
 ### Built-in Variables Test Coverage (test-built-in-variables.mjs)
 

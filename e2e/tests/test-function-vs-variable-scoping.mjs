@@ -33,7 +33,13 @@ async function runTest() {
     console.log('✓ Transpiled strategy');
 
     /* Execute strategy */
-    const result = await runner.runPineScriptStrategy('TEST', '1h', 100, jsCode, 'test-function-scoping.pine');
+    const result = await runner.runPineScriptStrategy(
+      'TEST',
+      '1h',
+      100,
+      jsCode,
+      'test-function-scoping.pine',
+    );
     console.log('✓ Strategy executed without errors\n');
 
     /* Validate plots */
@@ -46,7 +52,7 @@ async function runTest() {
     /* Helper to get last value from plot */
     const getLastValue = (plotTitle) => {
       const plotData = result.plots[plotTitle]?.data || [];
-      const values = plotData.map(d => d.value).filter(v => v != null);
+      const values = plotData.map((d) => d.value).filter((v) => v != null);
       return values[values.length - 1];
     };
 
@@ -61,7 +67,9 @@ async function runTest() {
     /* Edge Case 2: Global variable wrapping (skip - PineTS context initialization issue) */
     const test2Value = getLastValue('Test2');
     console.log('⚠️  Edge Case 2: Global variable wrapping (parser correct, PineTS init issue)');
-    console.log(`   useGlobalVar() = globalVar * 2 = ${test2Value} (parser wraps correctly as $.let.glb1_globalVar)\n`);
+    console.log(
+      `   useGlobalVar() = globalVar * 2 = ${test2Value} (parser wraps correctly as $.let.glb1_globalVar)\n`,
+    );
 
     console.log('═══════════════════════════════════════════════════════════');
     console.log('✅ Core function scoping test PASSED');

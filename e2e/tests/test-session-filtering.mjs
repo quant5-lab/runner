@@ -92,16 +92,16 @@ plot(hour, "Hour", color=color.gray)
     throw new Error('❌ Required plots not found');
   }
 
-  const directPlot = plots['Direct'].data.map(d => d.value);
-  const inputPlot = plots['Input'].data.map(d => d.value);
-  const inlinePlot = plots['Inline'].data.map(d => d.value);
-  const hourPlot = plots['Hour'].data.map(d => d.value);
+  const directPlot = plots['Direct'].data.map((d) => d.value);
+  const inputPlot = plots['Input'].data.map((d) => d.value);
+  const inlinePlot = plots['Inline'].data.map((d) => d.value);
+  const hourPlot = plots['Hour'].data.map((d) => d.value);
 
   /* Count IN/OUT bars for each method */
-  const directIN = directPlot.filter(v => v === 1).length;
-  const inputIN = inputPlot.filter(v => v === 1).length;
-  const inlineIN = inlinePlot.filter(v => v === 1).length;
-  const directOUT = directPlot.filter(v => v === 0).length;
+  const directIN = directPlot.filter((v) => v === 1).length;
+  const inputIN = inputPlot.filter((v) => v === 1).length;
+  const inlineIN = inlinePlot.filter((v) => v === 1).length;
+  const directOUT = directPlot.filter((v) => v === 0).length;
 
   console.log('   Results:');
   console.log(`     Direct:  ${directIN} IN / ${directOUT} OUT`);
@@ -126,9 +126,7 @@ plot(hour, "Hour", color=color.gray)
 
   /* Validation 3: 24-hour sessions must mark all bars as IN */
   if (testCase.expectAllIn && directOUT !== 0) {
-    throw new Error(
-      `❌ 24-hour session should have all bars IN, got ${directOUT} OUT bars`,
-    );
+    throw new Error(`❌ 24-hour session should have all bars IN, got ${directOUT} OUT bars`);
   }
 
   /* Validation 4: Reasonable session coverage (sanity check) */
@@ -158,7 +156,7 @@ async function testSessionFiltering() {
   console.log('\n✅ All session filtering tests passed');
 }
 
-testSessionFiltering().catch(err => {
+testSessionFiltering().catch((err) => {
   console.error('\n❌ Test failed:', err.message);
   process.exit(1);
 });
