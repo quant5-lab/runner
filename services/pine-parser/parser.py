@@ -184,6 +184,43 @@ class PyneToJsAstConverter:
         level = self._scope_chain.get_declaration_scope_level(param_name)
         return level is not None and level < self._scope_chain.depth()
 
+    def _contains_history_access(self, node, var_name):
+        """Check if AST node contains history access to var_name (e.g., var_name[1])"""
+        if node is None:
+            return False
+        
+        # Check if this is a Subscript accessing var_name
+        if isinstance(node, Subscript):
+            if isinstance(node.value, Name) and node.value.id == var_name:
+                # This is var_name[index] - history access detected
+                return True
+        
+        # Recursively check common node types
+        if isinstance(node, (BinOp, UnaryOp)):
+            return (self._contains_history_access(node.left if hasattr(node, 'left') else None, var_name) or
+                    self._contains_history_access(node.right if hasattr(node, 'right') else None, var_name) or
+                    self._contains_history_access(node.operand if hasattr(node, 'operand') else None, var_name))
+        
+        if isinstance(node, Conditional):
+            return (self._contains_history_access(node.test, var_name) or
+                    self._contains_history_access(node.body, var_name) or
+                    self._contains_history_access(node.orelse, var_name))
+        
+        if isinstance(node, Call):
+            for arg in node.args:
+                if hasattr(arg, 'value') and self._contains_history_access(arg.value, var_name):
+                    return True
+        
+        if hasattr(node, '__class__') and node.__class__.__name__ == 'Compare':
+            if hasattr(node, 'left') and self._contains_history_access(node.left, var_name):
+                return True
+            if hasattr(node, 'comparators'):
+                for comp in node.comparators:
+                    if self._contains_history_access(comp, var_name):
+                        return True
+        
+        return False
+
     def _rename_identifiers_in_ast(self, node, param_mapping):
         """Recursively rename identifiers in AST based on param_mapping"""
         if not param_mapping or not node:
@@ -237,7 +274,14 @@ class PyneToJsAstConverter:
     def visit_Script(self, node):
         body = [self.visit(stmt) for stmt in node.body]
         body = [stmt for stmt in body if stmt]
-        return estree_node('Program', body=body, sourceType='module')
+        # Flatten BlockStatements to support multi-statement returns
+        flattened = []
+        for stmt in body:
+            if stmt and stmt.get('type') == 'BlockStatement':
+                flattened.extend(stmt.get('body', []))
+            else:
+                flattened.append(stmt)
+        return estree_node('Program', body=flattened, sourceType='module')
 
     def visit_Assign(self, node):
         js_value = self.visit(node.value)
@@ -305,10 +349,35 @@ class PyneToJsAstConverter:
             
             if not self._scope_chain.is_declared_in_any_scope(var_name):
                 self._scope_chain.declare(var_name)
-                declaration = estree_node('VariableDeclarator',
-                                          id=self.visit(node.target),
-                                          init=js_value)
-                return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
+                
+                # Check if right-hand side accesses variable history (e.g., var[1])
+                has_history_access = self._contains_history_access(node.value, var_name)
+                
+                if has_history_access:
+                    # Initialize with 0 first, then assign the expression
+                    # This prevents "Cannot read properties of undefined" error
+                    init_declaration = estree_node('VariableDeclarator',
+                                                    id=estree_node('Identifier', name=var_name),
+                                                    init=estree_node('Literal', value=0, raw='0'))
+                    init_stmt = estree_node('VariableDeclaration', 
+                                           declarations=[init_declaration], 
+                                           kind='let')
+                    
+                    assign_stmt = estree_node('ExpressionStatement',
+                                             expression=estree_node('AssignmentExpression',
+                                                                  operator='=',
+                                                                  left=estree_node('Identifier', name=var_name),
+                                                                  right=js_value))
+                    
+                    # Return a sequence of statements
+                    return estree_node('BlockStatement', 
+                                      body=[init_stmt, assign_stmt])
+                else:
+                    # Standard declaration with initialization
+                    declaration = estree_node('VariableDeclarator',
+                                              id=self.visit(node.target),
+                                              init=js_value)
+                    return estree_node('VariableDeclaration', declarations=[declaration], kind='let')
             else:
                 return estree_node('ExpressionStatement',
                                    expression=estree_node('AssignmentExpression',
