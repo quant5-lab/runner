@@ -3,6 +3,13 @@
 
 ## High Priority 🔴
 
+- [ ] **Python parser: Named parameters generate ObjectExpression instead of positional args**
+  - Bug: `strategy.entry("id", strategy.long, qty=1.5, when=close > 0)` → `{qty: 1.5, when: close > 0}` object
+  - Expected: `when` → `if` wrapper, `qty` → 3rd positional arg
+  - Location: `services/pine-parser/parser.py` line 428 creates ObjectExpression
+  - Fix: Extract `when` parameter, convert named params to positional per PineScript v4 spec
+  - Validation: `e2e/tests/test-trade-size-unwrap.mjs` (147 trades must have numeric size)
+
 - [ ] **PineTS: `:=` operator not fixing TP/SL levels on trade entry**
   - Issue: TP and SL should lock values when trade entered, but recalculate every bar
   - Expected: `stop_level := X` fixes value for trade duration
@@ -44,6 +51,7 @@
 - [ ] Design Y-axis scale configuration (priceScaleId mapping)
 - [ ] Rework determineChartType() for multi-pane indicators (research Pine Script native approach)
 - [ ] **PineTS: Refactor src/transpiler/index.ts** - Decouple monolithic transpiler for maintainability and extensibility
+- [ ] Add visual markers for trades on candlestick chart
 
 ---
 
