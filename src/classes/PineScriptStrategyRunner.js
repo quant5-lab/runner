@@ -24,7 +24,7 @@ class PineScriptStrategyRunner {
     );
 
     const wrappedCode = `(context) => {
-      const { close, open, high, low, volume } = context.data;
+      const { close, open, high, low, volume, bar_index, last_bar_index } = context.data;
       const { plot, color, na, nz, fixnan, time } = context.core;
       const ta = context.ta;
       const math = context.math;

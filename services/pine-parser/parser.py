@@ -178,6 +178,7 @@ class PyneToJsAstConverter:
     def __init__(self):
         self._scope_chain = ScopeChain()
         self._param_rename_stack = []
+        self._in_call_func = False  # Track if visiting function name in Call
 
     def _is_shadowing_parameter(self, param_name):
         """Check if parameter shadows a variable in any parent scope"""
@@ -355,7 +356,8 @@ class PyneToJsAstConverter:
                 
                 if has_history_access:
                     # Initialize with 0 first, then assign the expression
-                    # This prevents "Cannot read properties of undefined" error
+                    # PineTS will wrap scalar in array for history tracking
+                    # See: PineTS commit 41b7324 - transpiler detects history access and wraps init
                     init_declaration = estree_node('VariableDeclarator',
                                                     id=estree_node('Identifier', name=var_name),
                                                     init=estree_node('Literal', value=0, raw='0'))
@@ -393,6 +395,22 @@ class PyneToJsAstConverter:
             current_mapping = self._param_rename_stack[-1]
             if var_name in current_mapping:
                 return estree_node('Identifier', name=current_mapping[var_name])
+        
+        # Built-in variables that are arrays in PineTS runtime
+        ARRAY_BUILTINS = [
+            'bar_index', 'last_bar_index',
+            'close', 'open', 'high', 'low', 'volume', 'time',
+            'hl2', 'hlc3', 'ohlc4'
+        ]
+        
+        # Wrap array built-in variables with [0] access for current value
+        # BUT NOT when it's a function call (e.g., time(timeframe, session))
+        if var_name in ARRAY_BUILTINS and not self._in_call_func:
+            return estree_node('MemberExpression',
+                object=estree_node('Identifier', name=var_name),
+                property=estree_node('Literal', value=0, raw='0'),
+                computed=True
+            )
         
         # Global wrapping logic: wrap globals accessed from nested scopes
         if self._scope_chain.depth() > 0:  # Inside function
@@ -438,7 +456,11 @@ class PyneToJsAstConverter:
                            argument=self.visit(node.operand))
 
     def visit_Call(self, node):
+        # Set flag before visiting function name to prevent wrapping
+        self._in_call_func = True
         callee = self.visit(node.func)
+        self._in_call_func = False
+        
         is_input_call = isinstance(node.func, Name) and node.func.id == 'input'
         
         # Check if this is a strategy function call
@@ -568,7 +590,21 @@ class PyneToJsAstConverter:
                            right=self.visit(node.right))
 
     def visit_Subscript(self, node):
-        obj = self.visit(node.value)
+        # Built-in variables that are arrays in PineTS runtime
+        ARRAY_BUILTINS = [
+            'bar_index', 'last_bar_index',
+            'close', 'open', 'high', 'low', 'volume', 'time',
+            'hl2', 'hlc3', 'ohlc4'
+        ]
+        
+        # For subscript access (e.g., close[1]), keep bare identifier
+        # PineTS arrays already support history: close[1] accesses previous bar
+        if isinstance(node.value, Name) and node.value.id in ARRAY_BUILTINS:
+            # Use bare identifier for subscript base
+            obj = estree_node('Identifier', name=node.value.id)
+        else:
+            obj = self.visit(node.value)
+        
         prop = self.visit(node.slice)
         return estree_node('MemberExpression',
                            object=obj,
