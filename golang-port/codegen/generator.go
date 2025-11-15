@@ -38,11 +38,23 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		return g.generatePlaceholder(), nil
 	}
 
-	// First pass: collect variables
+	// First pass: collect variables and determine types
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				g.variables[declarator.ID.Name] = "float64"
+				varName := declarator.ID.Name
+				varType := "float64" // Default type
+				
+				// Check init expression for type hints
+				if declarator.Init != nil {
+					if call, ok := declarator.Init.(*ast.CallExpression); ok {
+						funcName := g.extractFunctionName(call.Callee)
+						if funcName == "ta.crossover" || funcName == "ta.crossunder" {
+							varType = "bool"
+						}
+					}
+				}
+				g.variables[varName] = varType
 			}
 		}
 	}
@@ -55,8 +67,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Declare series variables (will be updated per bar)
 	if len(g.variables) > 0 {
 		code += g.ind() + "// Series variables\n"
-		for varName := range g.variables {
-			code += g.ind() + fmt.Sprintf("var %s float64\n", varName)
+		for varName, varType := range g.variables {
+			code += g.ind() + fmt.Sprintf("var %s %s\n", varName, varType)
 		}
 		code += "\n"
 	}
@@ -312,7 +324,18 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	code := ""
 	for _, declarator := range decl.Declarations {
 		varName := declarator.ID.Name
-		g.variables[varName] = "float64" // Assume float64 for now
+		
+		// Determine variable type based on init expression
+		varType := "float64" // Default type
+		if declarator.Init != nil {
+			if call, ok := declarator.Init.(*ast.CallExpression); ok {
+				funcName := g.extractFunctionName(call.Callee)
+				if funcName == "ta.crossover" || funcName == "ta.crossunder" {
+					varType = "bool"
+				}
+			}
+		}
+		g.variables[varName] = varType
 		
 		// Generate initialization from init expression
 		if declarator.Init != nil {
@@ -379,6 +402,58 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		
 		return code, nil
 		
+	case "ta.crossover":
+		// ta.crossover(series1, series2) - series1 crosses ABOVE series2
+		if len(call.Arguments) < 2 {
+			return "", fmt.Errorf("ta.crossover requires 2 arguments")
+		}
+		
+		series1 := g.extractSeriesExpression(call.Arguments[0])
+		series2 := g.extractSeriesExpression(call.Arguments[1])
+		
+		// Need previous values for both series
+		prev1Var := varName + "_prev1"
+		prev2Var := varName + "_prev2"
+		
+		code := g.ind() + fmt.Sprintf("// Crossover: %s crosses above %s\n", series1, series2)
+		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
+		code += g.ind() + "if i > 0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
+		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
+		code += g.ind() + fmt.Sprintf("%s = %s > %s && %s <= %s\n", 
+			varName, series1, series2, prev1Var, prev2Var)
+		g.indent--
+		code += g.ind() + "}\n"
+		
+		return code, nil
+		
+	case "ta.crossunder":
+		// ta.crossunder(series1, series2) - series1 crosses BELOW series2
+		if len(call.Arguments) < 2 {
+			return "", fmt.Errorf("ta.crossunder requires 2 arguments")
+		}
+		
+		series1 := g.extractSeriesExpression(call.Arguments[0])
+		series2 := g.extractSeriesExpression(call.Arguments[1])
+		
+		// Need previous values for both series
+		prev1Var := varName + "_prev1"
+		prev2Var := varName + "_prev2"
+		
+		code := g.ind() + fmt.Sprintf("// Crossunder: %s crosses below %s\n", series1, series2)
+		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
+		code += g.ind() + "if i > 0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
+		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
+		code += g.ind() + fmt.Sprintf("%s = %s < %s && %s >= %s\n", 
+			varName, series1, series2, prev1Var, prev2Var)
+		g.indent--
+		code += g.ind() + "}\n"
+		
+		return code, nil
+		
 	default:
 		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
 	}
@@ -404,6 +479,27 @@ func (g *generator) extractFunctionName(callee ast.Expression) string {
 }
 
 func (g *generator) extractArgIdentifier(expr ast.Expression) string {
+	// Handle MemberExpression like close[0]
+	if mem, ok := expr.(*ast.MemberExpression); ok {
+		if id, ok := mem.Object.(*ast.Identifier); ok {
+			// Map Pine builtins to OHLCV fields
+			switch id.Name {
+			case "close":
+				return "Close"
+			case "open":
+				return "Open"
+			case "high":
+				return "High"
+			case "low":
+				return "Low"
+			case "volume":
+				return "Volume"
+			default:
+				return id.Name
+			}
+		}
+	}
+	// Handle direct Identifier (legacy support)
 	if id, ok := expr.(*ast.Identifier); ok {
 		// Map Pine builtins to OHLCV fields
 		switch id.Name {
@@ -487,6 +583,76 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 	}
 	
 	return obj + "." + prop
+}
+
+func (g *generator) extractSeriesExpression(expr ast.Expression) string {
+	switch e := expr.(type) {
+	case *ast.MemberExpression:
+		// Handle series subscript like close[0] or sma20[0]
+		if obj, ok := e.Object.(*ast.Identifier); ok {
+			// Check if it's a Pine built-in series
+			switch obj.Name {
+			case "close":
+				return "bar.Close"
+			case "open":
+				return "bar.Open"
+			case "high":
+				return "bar.High"
+			case "low":
+				return "bar.Low"
+			case "volume":
+				return "bar.Volume"
+			default:
+				// User-defined variable like sma20[0] -> sma20
+				return obj.Name
+			}
+		}
+		return g.extractMemberName(e)
+	case *ast.Identifier:
+		// User-defined variable like sma20
+		return e.Name
+	case *ast.Literal:
+		// Numeric literal
+		switch v := e.Value.(type) {
+		case float64:
+			return fmt.Sprintf("%.2f", v)
+		case int:
+			return fmt.Sprintf("%d", v)
+		}
+	case *ast.BinaryExpression:
+		// Arithmetic expression like sma20 * 1.02
+		left := g.extractSeriesExpression(e.Left)
+		right := g.extractSeriesExpression(e.Right)
+		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right)
+	}
+	return "0.0"
+}
+
+func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
+	// Convert current bar access to previous bar access
+	// bar.Close → ctx.Data[i-1].Close
+	// User variables need history tracking (store at end of bar loop)
+	
+	if seriesCode == "bar.Close" {
+		return "ctx.Data[i-1].Close"
+	}
+	if seriesCode == "bar.Open" {
+		return "ctx.Data[i-1].Open"
+	}
+	if seriesCode == "bar.High" {
+		return "ctx.Data[i-1].High"
+	}
+	if seriesCode == "bar.Low" {
+		return "ctx.Data[i-1].Low"
+	}
+	if seriesCode == "bar.Volume" {
+		return "ctx.Data[i-1].Volume"
+	}
+	
+	// For user variables like sma20, we need to recalculate at i-1
+	// This is a simplification - full implementation would store history
+	// For now, use 0.0 as placeholder (crossover won't work correctly with expressions)
+	return "0.0"
 }
 
 
