@@ -1,94 +1,83 @@
-````markdown
-# TODO List - BorisQuantLab Runner
+# Golang Port PoC
 
-## High Priority 🔴
+## Current Performance (Measured)
+- Total: 2792ms
+- Python parser: 2108ms (75%)
+- Runtime execution: 18ms (0.6%)
+- Data fetch: 662ms (23.7%)
 
-- [x] **Python parser: Named parameters generate ObjectExpression instead of positional args**
-  - Bug: `strategy.entry("id", strategy.long, qty=1.5, when=close > 0)` → `{qty: 1.5, when: close > 0}` object
-  - Expected: `when` → `if` wrapper, `qty` → 3rd positional arg
-  - Location: `services/pine-parser/parser.py` line 472-498 handles strategy.entry
-  - Fix: Extract `when` parameter, convert named params to positional per PineScript v4 spec
-  - Validation: `e2e/tests/test-trade-size-unwrap.mjs` ✅ 147 trades with numeric size
+## Target Performance
+- Total: <50ms (excl. data fetch)
+- Go parser: 5-10ms
+- Go runtime: <10ms
 
-- [ ] **PineTS: `:=` operator not fixing TP/SL levels on trade entry**
-  - Issue: TP and SL should lock values when trade entered, but recalculate every bar
-  - Expected: `stop_level := X` fixes value for trade duration
-  - Actual: Values change during trade lifetime
-  - Impact: Stop-loss and take-profit levels drift, breaking strategy logic
+## License Safety
+- Current: pynescript v0.2.0 (LGPL 3.0 - VIRAL if embedded)
+- Current: escodegen v2.1.0 (BSD-2-Clause - safe)
+- Current: pinets local (unknown - assume MIT)
+- Target: Go stdlib only (BSD-3-Clause - safe)
+- Target: github.com/alecthomas/participle/v2 (MIT - safe)
+- Target: github.com/markcheno/go-talib (MIT - safe)
 
-- [ ] **Strategy trade timestamp accuracy**
-  - Current: trades use `Date.now()` for entryTime/exitTime (all same timestamp)
-  - Need: Use actual bar timestamp from candlestick data
-  - Impact: Trade timing analysis currently requires mapping via entryBar/exitBar indices
+## Phase 1: Go Parser + Transpiler (8 weeks)
+- [ ] `mkdir -p golang-port/{lexer,parser,codegen,ast}`
+- [ ] `go mod init github.com/borisquantlab/pinescript-go`
+- [ ] Study `services/pine-parser/parser.py` lines 1-795 AST output
+- [ ] Install `github.com/alecthomas/participle/v2` (MIT license)
+- [ ] Define PineScript v5 grammar in `parser/grammar.go`
+- [ ] Implement lexer using participle.Lexer
+- [ ] Implement parser using participle.Parser
+- [ ] Map pynescript AST nodes to Go structs in `ast/nodes.go`
+- [ ] Implement `codegen/generator.go` AST → Go source
+- [ ] Test parse `strategies/test-simple.pine` → AST
+- [ ] Compare AST output vs `services/pine-parser/parser.py`
+- [ ] Generate Go code matching PineTS execution semantics
+- [ ] Test generated code compiles with `go build`
 
-- [ ] **Strategy trade consistency and math correctness validation**
-  - Trades executing but need deep validation of trade logic accuracy
-  - Verify: entry/exit prices, position sizes, P&L calculations, stop-loss/take-profit levels
-  - Current: Basic execution verified, detailed correctness unvalidated
+## Phase 2: Go Runtime (12 weeks)
+- [ ] `mkdir -p golang-port/runtime/{context,core,math,input,ta,strategy,request}`
+- [ ] Install `github.com/markcheno/go-talib` (MIT license)
+- [ ] `runtime/context/context.go` OHLCV structs, bar_index, time
+- [ ] `runtime/core/core.go` plot(), color, na, nz(), fixnan()
+- [ ] `runtime/math/math.go` abs(), max(), min() wrappers
+- [ ] `runtime/input/input.go` Int(), Float(), String() with JSON overrides
+- [ ] `runtime/ta/sma.go` using go-talib.Sma()
+- [ ] `runtime/ta/ema.go` using go-talib.Ema()
+- [ ] `runtime/ta/rsi.go` using go-talib.Rsi()
+- [ ] `runtime/ta/atr.go` using go-talib.Atr()
+- [ ] `runtime/ta/bbands.go` using go-talib.BBands()
+- [ ] `runtime/ta/macd.go` using go-talib.Macd()
+- [ ] `runtime/ta/stoch.go` using go-talib.Stoch()
+- [ ] `runtime/strategy/entry.go` Entry(), Close(), Exit()
+- [ ] `runtime/strategy/trades.go` trade tracking slice
+- [ ] `runtime/strategy/equity.go` equity calculation
+- [ ] `runtime/request/security.go` multi-timeframe data fetching
+- [ ] `runtime/output/chart.go` ChartData struct
+- [ ] `runtime/output/chart.go` Candlestick []OHLCV field
+- [ ] `runtime/output/chart.go` Plots []Plot field
+- [ ] `runtime/output/chart.go` Strategy struct (Trades, OpenTrades, Equity, NetProfit)
+- [ ] `runtime/output/chart.go` Timestamp time.Time field
+- [ ] `runtime/output/json.go` json.Marshal(chartData)
 
-## Medium Priority 🟡
+## Phase 3: Binary Template (4 weeks)
+- [ ] `mkdir -p golang-port/template`
+- [ ] `template/main.go.tmpl` package main + imports
+- [ ] `template/main.go.tmpl` flag.String("symbol", "", "")
+- [ ] `template/main.go.tmpl` flag.String("timeframe", "", "")
+- [ ] `template/main.go.tmpl` flag.Int("bars", 0, "")
+- [ ] `template/main.go.tmpl` flag.String("strategy", "", "")
+- [ ] `template/main.go.tmpl` context.LoadData() integration
+- [ ] `codegen/inject.go` insert generated strategy code into template
+- [ ] `cmd/pinescript-go/main.go` CLI entry point
+- [ ] `go build -o bin/strategy cmd/pinescript-go/main.go`
+- [ ] Test `./bin/strategy -symbol=SBER -timeframe=1h -bars=100 -strategy=test-simple.pine`
+- [ ] Write JSON to stdout using json.NewEncoder(os.Stdout)
+- [ ] Write JSON to `out/chart-data.json` using os.WriteFile()
 
-- [x] **Common PineScript plot parameters (line width, etc.) must be configurable**
-  - Implementation: `src/classes/TradingAnalysisRunner.js` extractPlotLineWidth()
-  - Implementation: `src/classes/ConfigurationBuilder.js` applyTransparency()
-  - Supported: linewidth, transp (transparency), color, style
-
-- [ ] **PineTS: Integration test for reassignment operator blocked by transpiler**
-  - Issue: Reassignment `:=` triggers "Cannot read properties of undefined (reading '0')" in test context
-  - Root cause: Series variable handling works in production runtime, fails in isolated tests
-  - Impact: Cannot create automated tests for nested ternary + reassignment patterns
-  - Workaround: Production validation confirms BB7 strategy works (9 closed + 1 open trades)
-  - Status: Low priority - production works, test infrastructure limitation
-
-## Low Priority 🟢
-
-- [x] Increase test coverage to 80% (✅ 86.62%)
-- [ ] Increase test coverage to 95%
-- [ ] Support blank candlestick mode (plots-only for capital growth modeling)
-- [ ] Python unit tests for parser.py (90%+ coverage goal)
-- [x] Remove parser dead code ($.let.glb1\_ wrapping present but unused, \_rename_identifiers_in_ast has tests)
-- [ ] Implement varip runtime persistence (Context.varipStorage, initVarIp/setVarIp)
-- [ ] Design Y-axis scale configuration (priceScaleId mapping)
-- [x] Rework determineChartType() for multi-pane indicators (✅ implemented in ConfigurationBuilder.js:108)
-- [ ] **PineTS: Refactor src/transpiler/index.ts** - Decouple monolithic transpiler for maintainability and extensibility
-- [ ] Add visual markers for trades on candlestick chart
-
----
-
-## Recently Completed ✅
-
-- [x] **PineTS: sl_inp reassignment operator bug** 🚨 FIXED (2025-11-09)
-  - Bug: Nested ternary + nz() in reassignment returned 0 (99% of bars)
-  - Fixed: PineTS commit 8c166f8 - ParentTrackingWalker resolves nested ternary
-  - Validation: BB7 strategy now enters 10 trades (9 closed + 1 open) on GDYN 1h 500
-  - Evidence: sl_inp 100% non-zero (was 0%), volatility_below_sl 27.8% (was 0%)
-  - Documentation: `docs/pinets-fix-validation-summary.md`
-
-- [x] **E2E Test Suite Generalization** (2025-11-08)
-  - Refactored TR-specific tests into parametric built-in variable tests
-  - Created: test-built-in-variables.mjs (6 scenarios, 9 variables)
-  - Created: test-edge-cases.mjs (3 scenarios)
-  - Created: test-indicators.mjs (3 scenarios)
-  - Documentation: `E2E-GENERALIZATION-COMPLETE.md`
-  - Impact: Future-proof tests for all built-in variables, not just TR
-
-- [x] **PineTS: TR (True Range) variable not exposed to transpiled code** 🚨 FIXED (2025-11-08)
-  - Bug reports: `BUG-TR-INCOMPLETE-FIX.md`, `TRANSPILER-MYSTERY-EVIDENCE.md`
-  - Fixed: Build 20:16 - AST reference mismatch resolved
-  - Validation: `VALIDATION-SUCCESS-BUILD-20-16.md` (4/4 tests passed)
-  - Impact: All strategies using `tr`, ATR, ADX, DMI now work
-
----
-
-## Current Status
-
-```
-┌─────────────────────────────────────┐
-│  Tests:   588/588 unit + 26/26 E2E │
-│  Coverage: 86.62%                   │
-│  Linting: 0 errors                  │
-│  Network: 0% (100% deterministic)   │
-│  Status:  ✅ All systems nominal     │
-└─────────────────────────────────────┘
-```
-````
+## Validation
+- [ ] `./bin/strategy` on BB7 produces 9 trades
+- [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
+- [ ] `time ./bin/strategy` execution <50ms (excl. data fetch)
+- [ ] `ldd ./bin/strategy` shows no external deps (static binary)
+- [ ] E2E: replace `node src/index.js` with `./bin/strategy` in tests
+- [ ] E2E: 26/26 tests pass with Go binary
