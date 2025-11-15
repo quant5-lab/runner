@@ -114,6 +114,10 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 		return g.generateCallExpression(e)
 	case *ast.BinaryExpression:
 		return g.generateBinaryExpression(e)
+	case *ast.LogicalExpression:
+		return g.generateLogicalExpression(e)
+	case *ast.ConditionalExpression:
+		return g.generateConditionalExpression(e)
 	case *ast.Identifier:
 		return g.ind() + "// " + e.Name + "\n", nil
 	case *ast.Literal:
@@ -253,8 +257,94 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 	return "", fmt.Errorf("binary expression should be used in condition context")
 }
 
+func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (string, error) {
+	// Generate left expression
+	leftCode, err := g.generateConditionExpression(logExpr.Left)
+	if err != nil {
+		return "", err
+	}
+	
+	// Generate right expression
+	rightCode, err := g.generateConditionExpression(logExpr.Right)
+	if err != nil {
+		return "", err
+	}
+	
+	// Map Pine logical operators to Go operators
+	op := logExpr.Operator
+	switch op {
+	case "and":
+		op = "&&"
+	case "or":
+		op = "||"
+	}
+	
+	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
+}
+
+func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpression) (string, error) {
+	// Generate test condition
+	testCode, err := g.generateConditionExpression(condExpr.Test)
+	if err != nil {
+		return "", err
+	}
+	
+	// Generate consequent (true branch)
+	consequentCode, err := g.generateConditionExpression(condExpr.Consequent)
+	if err != nil {
+		return "", err
+	}
+	
+	// Generate alternate (false branch)
+	alternateCode, err := g.generateConditionExpression(condExpr.Alternate)
+	if err != nil {
+		return "", err
+	}
+	
+	// Generate Go ternary-style code using if-else expression
+	// Go doesn't have ternary operator, so we use a function-like pattern
+	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()", 
+		testCode, consequentCode, alternateCode), nil
+}
+
 func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
+	case *ast.ConditionalExpression:
+		// Handle ternary expressions in condition context
+		testCode, err := g.generateConditionExpression(e.Test)
+		if err != nil {
+			return "", err
+		}
+		consequentCode, err := g.generateConditionExpression(e.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateConditionExpression(e.Alternate)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()", 
+			testCode, consequentCode, alternateCode), nil
+			
+	case *ast.LogicalExpression:
+		// Handle logical expressions (and, or)
+		leftCode, err := g.generateConditionExpression(e.Left)
+		if err != nil {
+			return "", err
+		}
+		rightCode, err := g.generateConditionExpression(e.Right)
+		if err != nil {
+			return "", err
+		}
+		op := e.Operator
+		switch op {
+		case "and":
+			op = "&&"
+		case "or":
+			op = "||"
+		}
+		return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
+		
 	case *ast.BinaryExpression:
 		left, err := g.generateConditionExpression(e.Left)
 		if err != nil {
@@ -354,6 +444,23 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.CallExpression:
 		// Handle function calls like ta.sma(close, 20)
 		return g.generateVariableFromCall(varName, expr)
+	case *ast.ConditionalExpression:
+		// Handle ternary: test ? consequent : alternate
+		condCode, err := g.generateConditionExpression(expr.Test)
+		if err != nil {
+			return "", err
+		}
+		consequentCode, err := g.generateConditionExpression(expr.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateConditionExpression(expr.Alternate)
+		if err != nil {
+			return "", err
+		}
+		// Generate inline conditional function
+		return g.ind() + fmt.Sprintf("%s = func() float64 { if %s { return %s } else { return %s } }()\n", 
+			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.Literal:
 		// Simple literal assignment
 		return g.ind() + fmt.Sprintf("%s = %.2f\n", varName, expr.Value), nil
