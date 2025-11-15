@@ -10,6 +10,7 @@ import (
 /* StrategyCode holds generated Go code for strategy execution */
 type StrategyCode struct {
 	FunctionBody string // executeStrategy() function body
+	StrategyName string // Pine Script strategy name
 }
 
 /* InjectStrategy reads template, injects strategy code, writes output */
@@ -32,8 +33,9 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 	return collector, strat
 }`, code.FunctionBody)
 
-	// Replace placeholder
+	// Replace placeholders
 	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)
+	output = strings.Replace(output, "{{STRATEGY_NAME}}", code.StrategyName, 1)
 
 	// Write output file
 	err = os.WriteFile(outputPath, []byte(output), 0644)

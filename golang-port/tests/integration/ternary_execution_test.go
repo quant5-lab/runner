@@ -96,15 +96,15 @@ func TestTernaryExecution(t *testing.T) {
 		t.Fatalf("Parse output failed: %v\nOutput: %s", err, resultData)
 	}
 
-	// Verify signal values
-	plots, ok := result["plots"].(map[string]interface{})
+	// Verify signal values from indicators
+	indicators, ok := result["indicators"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("Missing plots in output")
+		t.Fatalf("Missing indicators in output")
 	}
 
-	signalPlotObj, ok := plots["signal"].(map[string]interface{})
+	signalPlotObj, ok := indicators["signal"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("Missing signal plot object")
+		t.Fatalf("Missing signal indicator object")
 	}
 
 	signalPlot, ok := signalPlotObj["data"].([]interface{})

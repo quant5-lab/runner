@@ -9,6 +9,40 @@ import (
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
 )
 
+/* Metadata contains chart metadata */
+type Metadata struct {
+	Symbol     string `json:"symbol"`
+	Timeframe  string `json:"timeframe"`
+	Strategy   string `json:"strategy,omitempty"`
+	Title      string `json:"title"`
+	Timestamp  string `json:"timestamp"`
+}
+
+/* StyleConfig contains plot styling */
+type StyleConfig struct {
+	Color     string `json:"color,omitempty"`
+	LineWidth int    `json:"lineWidth,omitempty"`
+}
+
+/* IndicatorSeries represents a plot indicator with metadata */
+type IndicatorSeries struct {
+	Title string       `json:"title"`
+	Pane  string       `json:"pane,omitempty"`
+	Style StyleConfig  `json:"style"`
+	Data  []PlotPoint  `json:"data"`
+}
+
+/* PaneConfig contains pane layout configuration */
+type PaneConfig struct {
+	Height int  `json:"height"`
+	Fixed  bool `json:"fixed,omitempty"`
+}
+
+/* UIConfig contains UI hints for visualization */
+type UIConfig struct {
+	Panes map[string]PaneConfig `json:"panes"`
+}
+
 /* Trade represents a closed trade in chart data */
 type Trade struct {
 	EntryID    string  `json:"entryId"`
@@ -48,45 +82,74 @@ type PlotPoint struct {
 	Options map[string]interface{} `json:"options,omitempty"`
 }
 
-/* PlotSeries represents a plot series */
+/* PlotSeries represents a plot series (deprecated - use IndicatorSeries) */
 type PlotSeries struct {
 	Title string      `json:"title"`
 	Data  []PlotPoint `json:"data"`
 	Pane  string      `json:"pane,omitempty"`
 }
 
-/* ChartData represents complete chart output */
+/* ChartData represents complete unified chart output */
 type ChartData struct {
-	Candlestick []context.OHLCV       `json:"candlestick"`
-	Plots       map[string]PlotSeries `json:"plots"`
-	Strategy    *StrategyData         `json:"strategy,omitempty"`
-	Timestamp   string                `json:"timestamp"`
+	Metadata    Metadata                   `json:"metadata"`
+	Candlestick []context.OHLCV            `json:"candlestick"`
+	Indicators  map[string]IndicatorSeries `json:"indicators"`
+	Strategy    *StrategyData              `json:"strategy,omitempty"`
+	UI          UIConfig                   `json:"ui"`
 }
 
 /* NewChartData creates a new chart data structure */
-func NewChartData(ctx *context.Context) *ChartData {
+func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) *ChartData {
+	title := symbol
+	if strategyName != "" {
+		title = strategyName + " - " + symbol
+	}
+	
 	return &ChartData{
+		Metadata: Metadata{
+			Symbol:    symbol,
+			Timeframe: timeframe,
+			Strategy:  strategyName,
+			Title:     title,
+			Timestamp: time.Now().Format(time.RFC3339),
+		},
 		Candlestick: ctx.Data,
-		Plots:       make(map[string]PlotSeries),
-		Timestamp:   time.Now().Format(time.RFC3339),
+		Indicators:  make(map[string]IndicatorSeries),
+		UI: UIConfig{
+			Panes: map[string]PaneConfig{
+				"main": {Height: 400, Fixed: true},
+				"indicator": {Height: 200, Fixed: false},
+			},
+		},
 	}
 }
 
-/* AddPlots adds plot data to chart */
+/* AddPlots adds plot data to chart as indicators */
 func (cd *ChartData) AddPlots(collector *output.Collector) {
 	series := collector.GetSeries()
-	for _, s := range series {
+	colors := []string{"#2196F3", "#4CAF50", "#FF9800", "#F44336", "#9C27B0", "#00BCD4"}
+	
+	for i, s := range series {
 		plotPoints := make([]PlotPoint, len(s.Data))
-		for i, p := range s.Data {
-			plotPoints[i] = PlotPoint{
+		for j, p := range s.Data {
+			plotPoints[j] = PlotPoint{
 				Time:    p.Time,
 				Value:   p.Value,
 				Options: p.Options,
 			}
 		}
-		cd.Plots[s.Title] = PlotSeries{
+		
+		/* Backend emits raw data without presentation concerns */
+		color := colors[i%len(colors)]
+		
+		cd.Indicators[s.Title] = IndicatorSeries{
 			Title: s.Title,
-			Data:  plotPoints,
+			Pane:  "", /* Presentation layer assigns pane based on range analysis */
+			Style: StyleConfig{
+				Color:     color,
+				LineWidth: 2,
+			},
+			Data: plotPoints,
 		}
 	}
 }

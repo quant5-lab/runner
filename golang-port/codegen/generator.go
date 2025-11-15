@@ -14,6 +14,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		imports:         make(map[string]bool),
 		variables:       make(map[string]string),
 		seriesVariables: make(map[string]bool),
+		strategyName:    "Generated Strategy",
 	}
 
 	body, err := gen.generateProgram(program)
@@ -23,6 +24,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 
 	code := &StrategyCode{
 		FunctionBody: body,
+		StrategyName: gen.strategyName,
 	}
 
 	return code, nil
@@ -33,6 +35,7 @@ type generator struct {
 	variables       map[string]string
 	seriesVariables map[string]bool // Variables requiring Series storage (accessed with [offset > 0])
 	plots           []string        // Track plot variables
+	strategyName    string          // Strategy name from indicator() or strategy()
 	indent          int
 }
 
@@ -41,8 +44,37 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		return g.generatePlaceholder(), nil
 	}
 
-	// First pass: collect variables and analyze Series requirements
+	// First pass: collect variables, analyze Series requirements, extract strategy name
 	for _, stmt := range program.Body {
+		// Extract strategy name from indicator() or strategy() calls
+		if exprStmt, ok := stmt.(*ast.ExpressionStatement); ok {
+			if call, ok := exprStmt.Expression.(*ast.CallExpression); ok {
+				if member, ok := call.Callee.(*ast.MemberExpression); ok {
+					// Extract function name from ta.sma or strategy.entry
+					obj := ""
+					if id, ok := member.Object.(*ast.Identifier); ok {
+						obj = id.Name
+					}
+					prop := ""
+					if id, ok := member.Property.(*ast.Identifier); ok {
+						prop = id.Name
+					}
+					funcName := obj + "." + prop
+					
+					if funcName == "indicator" || funcName == "strategy" {
+						if len(call.Arguments) > 0 {
+							if lit, ok := call.Arguments[0].(*ast.Literal); ok {
+								if name, ok := lit.Value.(string); ok {
+									g.strategyName = name
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		// Collect variable declarations
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
 				varName := declarator.ID.Name

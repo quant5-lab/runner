@@ -80,7 +80,7 @@
 
 ## Validation
 - [x] Complete AST → Go code generation for Pine functions (ta.sma, plot implemented)
-- [ ] Implement strategy.entry, strategy.close, strategy.exit codegen
+- [x] Implement strategy.entry, strategy.close, strategy.exit codegen (strategy.close lines 247-251, strategy.entry working)
 - [ ] `./bin/strategy` on BB7 produces 9 trades
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)

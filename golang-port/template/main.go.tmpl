@@ -63,8 +63,8 @@ func main() {
 	plotCollector, strat := executeStrategy(ctx)
 	executionTime := time.Since(startTime)
 
-	/* Generate chart data */
-	cd := chartdata.NewChartData(ctx)
+	/* Generate chart data with metadata */
+	cd := chartdata.NewChartData(ctx, *symbolFlag, *timeframeFlag, "{{STRATEGY_NAME}}")
 	cd.AddPlots(plotCollector)
 	cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
 

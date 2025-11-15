@@ -56,7 +56,7 @@ const prevIsValid = (data, index) => {
  * and convert mid-series gaps to transparent points to break line continuity
  * Treats points without color (PineScript color=na) as gaps
  */
-export function adaptLineSeriesData(plotData) {
+function adaptLineSeriesData(plotData) {
   if (!Array.isArray(plotData)) return [];
 
   const firstValidIndex = findFirstValidIndex(plotData);
@@ -80,3 +80,6 @@ export function adaptLineSeriesData(plotData) {
     return acc;
   }, []);
 }
+
+/* Export to window for compatibility */
+window.adaptLineSeriesData = adaptLineSeriesData;

@@ -113,8 +113,8 @@ func TestChartDataGeneration(t *testing.T) {
 		})
 	}
 
-	// Create chart data
-	cd := chartdata.NewChartData(ctx)
+	// Create chart data with metadata
+	cd := chartdata.NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	// Add mock plots
 	collector := output.NewCollector()
@@ -148,14 +148,17 @@ func TestChartDataGeneration(t *testing.T) {
 	if _, ok := parsed["candlestick"]; !ok {
 		t.Error("Missing candlestick field")
 	}
-	if _, ok := parsed["plots"]; !ok {
-		t.Error("Missing plots field")
+	if _, ok := parsed["indicators"]; !ok {
+		t.Error("Missing indicators field")
 	}
 	if _, ok := parsed["strategy"]; !ok {
 		t.Error("Missing strategy field")
 	}
-	if _, ok := parsed["timestamp"]; !ok {
-		t.Error("Missing timestamp field")
+	if _, ok := parsed["metadata"]; !ok {
+		t.Error("Missing metadata field")
+	}
+	if _, ok := parsed["ui"]; !ok {
+		t.Error("Missing ui field")
 	}
 
 	t.Logf("Generated chart data: %d bytes", len(jsonBytes))

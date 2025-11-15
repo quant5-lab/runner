@@ -67,19 +67,22 @@ func TestSeriesStrategyExecution(t *testing.T) {
 			OpenTrades []struct {
 				EntryID    string  `json:"entryId"`
 				EntryPrice float64 `json:"entryPrice"`
-				EntryBar   int     `json:"entryBar"`
-				Direction  string  `json:"direction"`
-			} `json:"openTrades"`
-			Equity    float64 `json:"equity"`
-			NetProfit float64 `json:"netProfit"`
-		} `json:"strategy"`
-		Indicators map[string][]struct {
-			Time  string  `json:"time"`
+			EntryBar   int     `json:"entryBar"`
+			Direction  string  `json:"direction"`
+		} `json:"openTrades"`
+		Equity    float64 `json:"equity"`
+		NetProfit float64 `json:"netProfit"`
+	} `json:"strategy"`
+	Indicators map[string]struct {
+		Title string `json:"title"`
+		Data  []struct {
+			Time  int64   `json:"time"`
 			Value float64 `json:"value"`
-		} `json:"indicators"`
-	}
+		} `json:"data"`
+	} `json:"indicators"`
+}
 
-	err = json.Unmarshal(resultData, &result)
+err = json.Unmarshal(resultData, &result)
 	if err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}

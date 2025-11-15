@@ -251,6 +251,27 @@ run: build ## Build and run binary
 	@echo "Running $(BINARY_NAME)..."
 	@./$(BUILD_DIR)/$(BINARY_NAME) $(ARGS)
 
+run-strategy: ## Run strategy and generate chart-data.json (usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json)
+	@if [ -z "$(STRATEGY)" ]; then echo "Error: STRATEGY not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
+	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
+	@echo "Running strategy: $(STRATEGY)"
+	@mkdir -p out
+	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run cmd/pinescript-builder/main.go \
+		-input ../$(STRATEGY) \
+		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	cd $(GOLANG_PORT) && $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
+	@/tmp/pinescript-strategy -symbol TEST -data $(DATA) -output out/chart-data.json
+	@echo "✓ Strategy executed: out/chart-data.json"
+	@ls -lh out/chart-data.json
+
+serve: ## Serve ./out directory with Python HTTP server on port 8000
+	@echo "Starting web server on http://localhost:8000"
+	@echo "Chart data available at: http://localhost:8000/chart-data.json"
+	@echo "Press Ctrl+C to stop server"
+	@cd out && python3 -m http.server 8000
+
+test-manual: run-strategy serve ## Run strategy and start web server for manual testing
+
 watch: ## Watch for changes and run tests (requires entr)
 	@echo "Watching for changes..."
 	@find $(GOLANG_PORT) -name "*.go" | entr -c make test

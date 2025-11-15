@@ -25,22 +25,28 @@ func TestNewChartData(t *testing.T) {
 		})
 	}
 
-	cd := NewChartData(ctx)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	if len(cd.Candlestick) != 5 {
 		t.Errorf("Expected 5 candlesticks, got %d", len(cd.Candlestick))
 	}
-	if cd.Timestamp == "" {
+	if cd.Metadata.Timestamp == "" {
 		t.Error("Timestamp should not be empty")
 	}
-	if cd.Plots == nil {
-		t.Error("Plots map should be initialized")
+	if cd.Indicators == nil {
+		t.Error("Indicators map should be initialized")
+	}
+	if cd.Metadata.Symbol != "TEST" {
+		t.Errorf("Expected symbol TEST, got %s", cd.Metadata.Symbol)
+	}
+	if cd.Metadata.Title != "Test Strategy - TEST" {
+		t.Errorf("Expected title 'Test Strategy - TEST', got '%s'", cd.Metadata.Title)
 	}
 }
 
 func TestAddPlots(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
-	cd := NewChartData(ctx)
+	cd := NewChartData(ctx, "TEST", "1h", "")
 
 	collector := output.NewCollector()
 	now := time.Now().Unix()
@@ -51,11 +57,11 @@ func TestAddPlots(t *testing.T) {
 
 	cd.AddPlots(collector)
 
-	if len(cd.Plots) != 2 {
-		t.Errorf("Expected 2 plot series, got %d", len(cd.Plots))
+	if len(cd.Indicators) != 2 {
+		t.Errorf("Expected 2 indicator series, got %d", len(cd.Indicators))
 	}
 
-	smaSeries, ok := cd.Plots["SMA 20"]
+	smaSeries, ok := cd.Indicators["SMA 20"]
 	if !ok {
 		t.Fatal("SMA 20 series not found")
 	}
@@ -69,7 +75,7 @@ func TestAddPlots(t *testing.T) {
 
 func TestAddStrategy(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
-	cd := NewChartData(ctx)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
 	strat.Call("Test Strategy", 10000)
@@ -102,7 +108,7 @@ func TestToJSON(t *testing.T) {
 		Time: now, Open: 100, High: 105, Low: 95, Close: 102, Volume: 1000,
 	})
 
-	cd := NewChartData(ctx)
+	cd := NewChartData(ctx, "TEST", "1h", "")
 
 	collector := output.NewCollector()
 	collector.Add("SMA", now, 100.0, nil)
@@ -123,17 +129,20 @@ func TestToJSON(t *testing.T) {
 	if _, ok := parsed["candlestick"]; !ok {
 		t.Error("JSON should have 'candlestick' field")
 	}
-	if _, ok := parsed["plots"]; !ok {
-		t.Error("JSON should have 'plots' field")
+	if _, ok := parsed["indicators"]; !ok {
+		t.Error("JSON should have 'indicators' field")
 	}
-	if _, ok := parsed["timestamp"]; !ok {
-		t.Error("JSON should have 'timestamp' field")
+	if _, ok := parsed["metadata"]; !ok {
+		t.Error("JSON should have 'metadata' field")
+	}
+	if _, ok := parsed["ui"]; !ok {
+		t.Error("JSON should have 'ui' field")
 	}
 }
 
 func TestStrategyDataStructure(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
-	cd := NewChartData(ctx)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
 	strat.Call("Test Strategy", 10000)
