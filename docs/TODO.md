@@ -17,7 +17,7 @@
 - Current: pinets local (unknown - assume MIT)
 - Target: Go stdlib only (BSD-3-Clause - safe)
 - Target: github.com/alecthomas/participle/v2 (MIT - safe)
-- Target: github.com/markcheno/go-talib (MIT - safe)
+- Target: Pure Go TA implementation (no external dependencies)
 
 ## Phase 1: Go Parser + Transpiler (8 weeks)
 - [x] `mkdir -p golang-port/{lexer,parser,codegen,ast}`
@@ -36,20 +36,19 @@
 
 ## Phase 2: Go Runtime (12 weeks)
 - [x] `mkdir -p golang-port/runtime/{context,core,math,input,ta,strategy,request}`
-- [ ] Install `github.com/markcheno/go-talib` (MIT license)
+- [x] Pure Go TA implementation (no external library - PineTS compatible)
 - [x] `runtime/context/context.go` OHLCV structs, bar_index, time
 - [x] `runtime/value/na.go` na, nz(), fixnan() (SOLID: separated from visual)
 - [x] `runtime/visual/color.go` color constants as hex strings (PineTS compatible)
 - [x] `runtime/output/plot.go` PlotCollector interface (SOLID: testable, mockable)
 - [x] `runtime/math/math.go` abs(), max(), min(), pow(), sqrt(), floor(), ceil(), round(), log(), exp(), sum(), avg()
 - [x] `runtime/input/input.go` Int(), Float(), String(), Bool() with title-based overrides
-- [ ] `runtime/ta/sma.go` using go-talib.Sma()
-- [ ] `runtime/ta/ema.go` using go-talib.Ema()
-- [ ] `runtime/ta/rsi.go` using go-talib.Rsi()
-- [ ] `runtime/ta/atr.go` using go-talib.Atr()
-- [ ] `runtime/ta/bbands.go` using go-talib.BBands()
-- [ ] `runtime/ta/macd.go` using go-talib.Macd()
-- [ ] `runtime/ta/stoch.go` using go-talib.Stoch()
+- [x] `runtime/ta/ta.go` Sma, Ema, Rma with NaN warmup period
+- [x] `runtime/ta/ta.go` Rsi using Rma smoothing (PineTS semantics)
+- [x] `runtime/ta/ta.go` Tr, Atr with correct high-low-close calculation
+- [x] `runtime/ta/ta.go` BBands (upper, middle, lower bands)
+- [x] `runtime/ta/ta.go` Macd (macd, signal, histogram with NaN-aware EMA)
+- [x] `runtime/ta/ta.go` Stoch (%K, %D oscillator)
 - [ ] `runtime/strategy/entry.go` Entry(), Close(), Exit()
 - [ ] `runtime/strategy/trades.go` trade tracking slice
 - [ ] `runtime/strategy/equity.go` equity calculation
