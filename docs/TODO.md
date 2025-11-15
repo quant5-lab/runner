@@ -41,7 +41,7 @@
 - [x] `runtime/value/na.go` na, nz(), fixnan() (SOLID: separated from visual)
 - [x] `runtime/visual/color.go` color constants as hex strings (PineTS compatible)
 - [x] `runtime/output/plot.go` PlotCollector interface (SOLID: testable, mockable)
-- [ ] `runtime/math/math.go` abs(), max(), min() wrappers
+- [x] `runtime/math/math.go` abs(), max(), min(), pow(), sqrt(), floor(), ceil(), round(), log(), exp(), sum(), avg()
 - [ ] `runtime/input/input.go` Int(), Float(), String() with JSON overrides
 - [ ] `runtime/ta/sma.go` using go-talib.Sma()
 - [ ] `runtime/ta/ema.go` using go-talib.Ema()
