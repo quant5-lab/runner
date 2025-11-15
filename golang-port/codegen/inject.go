@@ -1,0 +1,64 @@
+package codegen
+
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
+/* StrategyCode holds generated Go code for strategy execution */
+type StrategyCode struct {
+	FunctionBody string // executeStrategy() function body
+}
+
+/* InjectStrategy reads template, injects strategy code, writes output */
+func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
+	// Read template
+	templateBytes, err := os.ReadFile(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to read template: %w", err)
+	}
+
+	template := string(templateBytes)
+
+	// Generate function with strategy code
+	strategyFunc := fmt.Sprintf(`func executeStrategy(ctx *context.Context) (*output.Collector, *strategy.Strategy) {
+	collector := output.NewCollector()
+	strat := strategy.NewStrategy()
+
+%s
+
+	return collector, strat
+}`, code.FunctionBody)
+
+	// Replace placeholder
+	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)
+
+	// Write output file
+	err = os.WriteFile(outputPath, []byte(output), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+
+	return nil
+}
+
+/* GenerateStrategyCode converts parsed Pine AST to Go code */
+func GenerateStrategyCode(astJSON []byte) (*StrategyCode, error) {
+	// TODO: Implement AST → Go code generation
+	// For now, return placeholder code
+	code := &StrategyCode{
+		FunctionBody: `	// Strategy code will be generated here
+	strat.Call("Generated Strategy", 10000)
+	
+	for i := 0; i < len(ctx.Data); i++ {
+		ctx.BarIndex = i
+		strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)
+		
+		// Strategy logic placeholder
+		// TODO: Generate from Pine AST
+	}`,
+	}
+
+	return code, nil
+}

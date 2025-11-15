@@ -1,0 +1,96 @@
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
+	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/borisquantlab/pinescript-go/runtime/output"
+	"github.com/borisquantlab/pinescript-go/runtime/strategy"
+)
+
+/* CLI flags */
+var (
+	symbolFlag    = flag.String("symbol", "", "Trading symbol (e.g., BTCUSDT)")
+	timeframeFlag = flag.String("timeframe", "1h", "Timeframe (e.g., 1m, 5m, 1h, 1D)")
+	dataFlag      = flag.String("data", "", "Path to OHLCV data JSON file")
+	outputFlag    = flag.String("output", "chart-data.json", "Output file path")
+)
+
+/* Strategy execution function - INJECTED BY CODEGEN */
+{{STRATEGY_FUNC}}
+
+func main() {
+	flag.Parse()
+
+	if *symbolFlag == "" || *dataFlag == "" {
+		fmt.Fprintf(os.Stderr, "Usage: %s -symbol SYMBOL -data DATA.json [-timeframe 1h] [-output chart-data.json]\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	/* Load OHLCV data */
+	dataBytes, err := os.ReadFile(*dataFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to read data file: %v\n", err)
+		os.Exit(1)
+	}
+
+	var bars []context.OHLCV
+	err = json.Unmarshal(dataBytes, &bars)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse data JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(bars) == 0 {
+		fmt.Fprintf(os.Stderr, "No bars in data file\n")
+		os.Exit(1)
+	}
+
+	/* Create runtime context */
+	ctx := context.New(*symbolFlag, *timeframeFlag, len(bars))
+	for _, bar := range bars {
+		ctx.AddBar(bar)
+	}
+
+	/* Execute strategy */
+	startTime := time.Now()
+	plotCollector, strat := executeStrategy(ctx)
+	executionTime := time.Since(startTime)
+
+	/* Generate chart data */
+	cd := chartdata.NewChartData(ctx)
+	cd.AddPlots(plotCollector)
+	cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
+
+	/* Write output */
+	jsonBytes, err := cd.ToJSON()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to generate JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = os.WriteFile(*outputFlag, jsonBytes, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write output: %v\n", err)
+		os.Exit(1)
+	}
+
+	/* Print summary */
+	fmt.Printf("Symbol: %s\n", *symbolFlag)
+	fmt.Printf("Timeframe: %s\n", *timeframeFlag)
+	fmt.Printf("Bars: %d\n", len(bars))
+	fmt.Printf("Execution time: %v\n", executionTime)
+	fmt.Printf("Output: %s (%d bytes)\n", *outputFlag, len(jsonBytes))
+
+	if strat != nil {
+		th := strat.GetTradeHistory()
+		closedTrades := th.GetClosedTrades()
+		fmt.Printf("Closed trades: %d\n", len(closedTrades))
+		fmt.Printf("Final equity: %.2f\n", strat.GetEquity(ctx.Data[len(ctx.Data)-1].Close))
+	}
+}
