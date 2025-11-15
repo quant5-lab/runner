@@ -88,7 +88,7 @@
 - [ ] E2E: replace `node src/index.js` with `./bin/strategy` in tests
 - [ ] E2E: 26/26 tests pass with Go binary
 
-## Current Status (as of commit 1809fec)
+## Current Status (as of commit cea50a7)
 - **Parser**: 18/37 Pine fixtures parse successfully
 - **Runtime**: 10 packages with 80 passing tests
 - **Codegen**: ta.sma() and plot() generation working
