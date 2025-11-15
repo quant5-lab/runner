@@ -1,0 +1,10 @@
+//@version=5
+strategy("Simple Entry Test", overlay=true)
+
+// Simple SMA
+sma20 = ta.sma(close, 20)
+
+// Enter long on bar 25 (hardcoded for testing)
+// Note: Real strategy would use ta.crossover() but skipping for PoC
+
+plot(sma20, "SMA 20", color=color.blue)

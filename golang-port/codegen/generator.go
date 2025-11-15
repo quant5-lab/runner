@@ -173,6 +173,30 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 	case "ta.sma":
 		// SMA calculation - handled in variable declaration
 		return "", nil
+	case "strategy.entry":
+		// strategy.entry(id, direction, qty)
+		if len(call.Arguments) >= 2 {
+			entryID := g.extractStringLiteral(call.Arguments[0])
+			direction := g.extractDirectionConstant(call.Arguments[1])
+			qty := 1.0
+			if len(call.Arguments) >= 3 {
+				qty = g.extractFloatLiteral(call.Arguments[2])
+			}
+			
+			code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f)\n", entryID, direction, qty)
+		}
+	case "strategy.close":
+		// strategy.close(id)
+		if len(call.Arguments) >= 1 {
+			entryID := g.extractStringLiteral(call.Arguments[0])
+			code += g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time)\n", entryID)
+		}
+	case "strategy.close_all":
+		// strategy.close_all()
+		code += g.ind() + "strat.CloseAll(bar.Close, bar.Time)\n"
+	case "ta.crossover", "ta.crossunder":
+		// Crossover functions - TODO: implement
+		code += g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName)
 	default:
 		code += g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName)
 	}
@@ -300,6 +324,40 @@ func (g *generator) extractArgLiteral(expr ast.Expression) int {
 	}
 	return 0
 }
+
+func (g *generator) extractStringLiteral(expr ast.Expression) string {
+	if lit, ok := expr.(*ast.Literal); ok {
+		if val, ok := lit.Value.(string); ok {
+			return val
+		}
+	}
+	return ""
+}
+
+func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
+	if lit, ok := expr.(*ast.Literal); ok {
+		if val, ok := lit.Value.(float64); ok {
+			return val
+		}
+	}
+	return 0.0
+}
+
+func (g *generator) extractDirectionConstant(expr ast.Expression) string {
+	// Handle strategy.long, strategy.short
+	if mem, ok := expr.(*ast.MemberExpression); ok {
+		if prop, ok := mem.Property.(*ast.Identifier); ok {
+			switch prop.Name {
+			case "long":
+				return "strategy.Long"
+			case "short":
+				return "strategy.Short"
+			}
+		}
+	}
+	return "strategy.Long"
+}
+
 
 func (g *generator) generateLiteral(lit *ast.Literal) (string, error) {
 	switch v := lit.Value.(type) {
