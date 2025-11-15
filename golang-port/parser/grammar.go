@@ -21,8 +21,8 @@ type Statement struct {
 }
 
 type IfStatement struct {
-	Condition *Comparison  `parser:"'if' @@"`
-	Body      []*Statement `parser:"@@+"`
+	Condition *Comparison `parser:"'if' ( '(' @@ ')' | @@ )"`
+	Body      *Statement  `parser:"@@"`
 }
 
 type Assignment struct {

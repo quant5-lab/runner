@@ -62,8 +62,8 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 		}
 
 		consequent := []ast.Node{}
-		for _, bodyStmt := range stmt.If.Body {
-			node, err := c.convertStatement(bodyStmt)
+		if stmt.If.Body != nil {
+			node, err := c.convertStatement(stmt.If.Body)
 			if err != nil {
 				return nil, err
 			}
