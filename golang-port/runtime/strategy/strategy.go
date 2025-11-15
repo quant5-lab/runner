@@ -377,6 +377,11 @@ func (s *Strategy) GetNetProfit() float64 {
 	return s.equityCalculator.GetNetProfit()
 }
 
+/* GetTradeHistory returns trade history (for chart data export) */
+func (s *Strategy) GetTradeHistory() *TradeHistory {
+	return s.tradeHistory
+}
+
 /* Helper function */
 func abs(x float64) float64 {
 	if x < 0 {
