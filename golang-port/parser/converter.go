@@ -55,6 +55,31 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 		}, nil
 	}
 
+	if stmt.If != nil {
+		test, err := c.convertComparison(stmt.If.Condition)
+		if err != nil {
+			return nil, err
+		}
+		
+		consequent := []ast.Node{}
+		for _, bodyStmt := range stmt.If.Body {
+			node, err := c.convertStatement(bodyStmt)
+			if err != nil {
+				return nil, err
+			}
+			if node != nil {
+				consequent = append(consequent, node)
+			}
+		}
+		
+		return &ast.IfStatement{
+			NodeType:   ast.TypeIfStatement,
+			Test:       test,
+			Consequent: consequent,
+			Alternate:  []ast.Node{},
+		}, nil
+	}
+
 	if stmt.Expression != nil {
 		expr, err := c.convertExpression(stmt.Expression.Expr)
 		if err != nil {
@@ -70,9 +95,6 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
-	if expr.Call != nil {
-		return c.convertCallExpr(expr.Call)
-	}
 	if expr.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -86,6 +108,9 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 			},
 			Computed: false,
 		}, nil
+	}
+	if expr.Call != nil {
+		return c.convertCallExpr(expr.Call)
 	}
 	if expr.Ident != nil {
 		return &ast.MemberExpression{
@@ -120,15 +145,113 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 	return nil, fmt.Errorf("empty expression")
 }
 
-func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
-	fullName := call.Function
-	if call.Namespace != nil {
-		fullName = *call.Namespace + "." + call.Function
-	}
-	
-	callee, err := c.parseCallee(fullName)
+func (c *Converter) convertComparison(comp *Comparison) (ast.Expression, error) {
+	left, err := c.convertComparisonTerm(comp.Left)
 	if err != nil {
 		return nil, err
+	}
+	
+	// No operator means just a simple expression
+	if comp.Op == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertComparisonTerm(comp.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.BinaryExpression{
+		NodeType: ast.TypeBinaryExpression,
+		Operator: *comp.Op,
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression, error) {
+	if term.MemberAccess != nil {
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     term.MemberAccess.Object,
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     term.MemberAccess.Property,
+			},
+			Computed: false,
+		}, nil
+	}
+	if term.Call != nil {
+		return c.convertCallExpr(term.Call)
+	}
+	if term.Boolean != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *term.Boolean,
+			Raw:      fmt.Sprintf("%v", *term.Boolean),
+		}, nil
+	}
+	if term.Ident != nil {
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     *term.Ident,
+			},
+			Property: &ast.Literal{
+				NodeType: ast.TypeLiteral,
+				Value:    0,
+				Raw:      "0",
+			},
+			Computed: true,
+		}, nil
+	}
+	if term.Number != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *term.Number,
+			Raw:      fmt.Sprintf("%v", *term.Number),
+		}, nil
+	}
+	if term.String != nil {
+		cleaned := strings.Trim(*term.String, `"`)
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    cleaned,
+			Raw:      fmt.Sprintf("'%s'", cleaned),
+		}, nil
+	}
+	return nil, fmt.Errorf("empty comparison term")
+}
+
+func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
+	var callee ast.Expression
+	
+	if call.Callee.MemberAccess != nil {
+		// ta.sma(...) -> MemberExpression as callee
+		callee = &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     call.Callee.MemberAccess.Object,
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     call.Callee.MemberAccess.Property,
+			},
+			Computed: false,
+		}
+	} else if call.Callee.Ident != nil {
+		// plot(...) -> Identifier as callee
+		callee = &ast.Identifier{
+			NodeType: ast.TypeIdentifier,
+			Name:     *call.Callee.Ident,
+		}
+	} else {
+		return nil, fmt.Errorf("empty callee")
 	}
 
 	args := []ast.Expression{}
@@ -177,26 +300,25 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 }
 
 func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
-	if val.Member != nil {
+	if val.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
 			Object: &ast.Identifier{
 				NodeType: ast.TypeIdentifier,
-				Name:     val.Member.Object,
+				Name:     val.MemberAccess.Object,
 			},
 			Property: &ast.Identifier{
 				NodeType: ast.TypeIdentifier,
-				Name:     val.Member.Property,
+				Name:     val.MemberAccess.Property,
 			},
 			Computed: false,
 		}, nil
 	}
 	if val.Boolean != nil {
-		boolVal := *val.Boolean == "true"
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
-			Value:    boolVal,
-			Raw:      *val.Boolean,
+			Value:    *val.Boolean,
+			Raw:      fmt.Sprintf("%v", *val.Boolean),
 		}, nil
 	}
 	if val.Ident != nil {

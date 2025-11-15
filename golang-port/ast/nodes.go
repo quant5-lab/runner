@@ -13,6 +13,8 @@ const (
 	TypeLiteral             NodeType = "Literal"
 	TypeObjectExpression    NodeType = "ObjectExpression"
 	TypeProperty            NodeType = "Property"
+	TypeBinaryExpression    NodeType = "BinaryExpression"
+	TypeIfStatement         NodeType = "IfStatement"
 )
 
 type Node interface {
@@ -109,3 +111,22 @@ type Property struct {
 }
 
 func (p *Property) Type() NodeType { return TypeProperty }
+
+type BinaryExpression struct {
+	NodeType NodeType   `json:"type"`
+	Operator string     `json:"operator"`
+	Left     Expression `json:"left"`
+	Right    Expression `json:"right"`
+}
+
+func (b *BinaryExpression) Type() NodeType  { return TypeBinaryExpression }
+func (b *BinaryExpression) expressionNode() {}
+
+type IfStatement struct {
+	NodeType   NodeType   `json:"type"`
+	Test       Expression `json:"test"`
+	Consequent []Node     `json:"consequent"`
+	Alternate  []Node     `json:"alternate,omitempty"`
+}
+
+func (i *IfStatement) Type() NodeType { return TypeIfStatement }

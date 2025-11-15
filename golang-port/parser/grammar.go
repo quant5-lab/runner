@@ -16,7 +16,13 @@ type VersionDirective struct {
 
 type Statement struct {
 	Assignment *Assignment     `parser:"@@"`
+	If         *IfStatement    `parser:"| @@"`
 	Expression *ExpressionStmt `parser:"| @@"`
+}
+
+type IfStatement struct {
+	Condition *Comparison `parser:"'if' @@"`
+	Body      []*Statement `parser:"@@+"`
 }
 
 type Assignment struct {
@@ -36,15 +42,34 @@ type Expression struct {
 	String       *string       `parser:"| @String"`
 }
 
+type Comparison struct {
+	Left  *ComparisonTerm `parser:"@@"`
+	Op    *string         `parser:"( @( '>' | '<' | '>=' | '<=' | '==' | '!=' | 'and' | 'or' )"`
+	Right *ComparisonTerm `parser:"@@ )?"`
+}
+
+type ComparisonTerm struct {
+	Call         *CallExpr     `parser:"@@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
+	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	Ident        *string       `parser:"| @Ident"`
+	Number       *float64      `parser:"| ( @Float | @Int )"`
+	String       *string       `parser:"| @String"`
+}
+
 type MemberAccess struct {
-	Object   string `parser:"@Ident '.'"`
-	Property string `parser:"@Ident"`
+	Object   string `parser:"@Ident"`
+	Property string `parser:"'.' @Ident"`  
 }
 
 type CallExpr struct {
-	Namespace *string     `parser:"( @Ident '.' )?"`
-	Function  string      `parser:"@Ident"`
-	Args      []*Argument `parser:"'(' ( @@ ( ',' @@ )* )? ')'"`
+	Callee *CallCallee `parser:"@@"`
+	Args   []*Argument `parser:"'(' ( @@ ( ',' @@ )* )? ')'"`
+}
+
+type CallCallee struct {
+	MemberAccess *MemberAccess `parser:"@@"`
+	Ident        *string       `parser:"| @Ident"`
 }
 
 type Argument struct {
@@ -53,11 +78,11 @@ type Argument struct {
 }
 
 type Value struct {
-	Member  *MemberAccess `parser:"@@"`
-	Boolean *string       `parser:"| ( @'true' | @'false' )"`
-	Ident   *string       `parser:"| @Ident"`
-	Number  *float64      `parser:"| ( @Float | @Int )"`
-	String  *string       `parser:"| @String"`
+	MemberAccess *MemberAccess `parser:"@@"`
+	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	Ident        *string       `parser:"| @Ident"`
+	Number       *float64      `parser:"| ( @Float | @Int )"`
+	String       *string       `parser:"| @String"`
 }
 
 var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
@@ -67,12 +92,13 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `[(),=@/.]`},
+	{Name: "Punct", Pattern: `[(),=@/.><!]+`},
 })
 
 func NewParser() (*participle.Parser[Script], error) {
 	return participle.Build[Script](
 		participle.Lexer(pineLexer),
 		participle.Elide("Comment", "Whitespace"),
+		participle.UseLookahead(2),
 	)
 }

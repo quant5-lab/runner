@@ -1,0 +1,7 @@
+//@version=5
+strategy("Conditional Entry Exit Test", overlay=true)
+
+sma20 = ta.sma(close, 20)
+
+if close > sma20
+    strategy.entry("long", strategy.long)

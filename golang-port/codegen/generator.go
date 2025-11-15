@@ -89,6 +89,8 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateExpression(n.Expression)
 	case *ast.VariableDeclaration:
 		return g.generateVariableDeclaration(n)
+	case *ast.IfStatement:
+		return g.generateIfStatement(n)
 	default:
 		return "", fmt.Errorf("unsupported statement type: %T", node)
 	}
@@ -98,6 +100,8 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.CallExpression:
 		return g.generateCallExpression(e)
+	case *ast.BinaryExpression:
+		return g.generateBinaryExpression(e)
 	case *ast.Identifier:
 		return g.ind() + "// " + e.Name + "\n", nil
 	case *ast.Literal:
@@ -204,6 +208,106 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 	return code, nil
 }
 
+func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error) {
+	// Generate condition expression
+	condition, err := g.generateConditionExpression(ifStmt.Test)
+	if err != nil {
+		return "", err
+	}
+	
+	code := g.ind() + fmt.Sprintf("if %s {\n", condition)
+	g.indent++
+	
+	// Generate consequent (body) statements
+	for _, stmt := range ifStmt.Consequent {
+		stmtCode, err := g.generateStatement(stmt)
+		if err != nil {
+			return "", err
+		}
+		code += stmtCode
+	}
+	
+	g.indent--
+	code += g.ind() + "}\n"
+	
+	// TODO: Handle alternate (else) if needed
+	
+	return code, nil
+}
+
+func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
+	// Binary expressions should be handled in condition context
+	// This is just a fallback - shouldn't be called directly
+	return "", fmt.Errorf("binary expression should be used in condition context")
+}
+
+func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
+	switch e := expr.(type) {
+	case *ast.BinaryExpression:
+		left, err := g.generateConditionExpression(e.Left)
+		if err != nil {
+			return "", err
+		}
+		
+		right, err := g.generateConditionExpression(e.Right)
+		if err != nil {
+			return "", err
+		}
+		
+		// Map Pine operators to Go operators
+		op := e.Operator
+		switch op {
+		case "and":
+			op = "&&"
+		case "or":
+			op = "||"
+		}
+		
+		return fmt.Sprintf("%s %s %s", left, op, right), nil
+		
+	case *ast.MemberExpression:
+		// Extract variable name
+		// MemberExpression can be: close[0], sma20[0], bar.Close, etc.
+		if obj, ok := e.Object.(*ast.Identifier); ok {
+			// Check if it's a Pine built-in series variable
+			switch obj.Name {
+			case "close":
+				return "bar.Close", nil
+			case "open":
+				return "bar.Open", nil
+			case "high":
+				return "bar.High", nil
+			case "low":
+				return "bar.Low", nil
+			case "volume":
+				return "bar.Volume", nil
+			default:
+				// It's a user-defined variable like sma20
+				return obj.Name, nil
+			}
+		}
+		return "bar.Close", nil
+		
+	case *ast.Identifier:
+		return e.Name, nil
+		
+	case *ast.Literal:
+		switch v := e.Value.(type) {
+		case float64:
+			return fmt.Sprintf("%.2f", v), nil
+		case bool:
+			return fmt.Sprintf("%t", v), nil
+		case string:
+			return fmt.Sprintf("%q", v), nil
+		default:
+			return fmt.Sprintf("%v", v), nil
+		}
+		
+	default:
+		return "", fmt.Errorf("unsupported condition expression: %T", expr)
+	}
+}
+
 func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (string, error) {
 	code := ""
 	for _, declarator := range decl.Declarations {
@@ -233,6 +337,10 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.Identifier:
 		// Reference to another variable
 		return g.ind() + fmt.Sprintf("%s = %s\n", varName, expr.Name), nil
+	case *ast.MemberExpression:
+		// Member access like strategy.long
+		memberName := g.extractMemberName(expr)
+		return g.ind() + fmt.Sprintf("%s = %s\n", varName, memberName), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
 	}
@@ -356,6 +464,29 @@ func (g *generator) extractDirectionConstant(expr ast.Expression) string {
 		}
 	}
 	return "strategy.Long"
+}
+
+func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
+	obj := ""
+	if id, ok := expr.Object.(*ast.Identifier); ok {
+		obj = id.Name
+	}
+	prop := ""
+	if id, ok := expr.Property.(*ast.Identifier); ok {
+		prop = id.Name
+	}
+	
+	// Map Pine constants to Go runtime constants
+	if obj == "strategy" {
+		switch prop {
+		case "long":
+			return "strategy.Long"
+		case "short":
+			return "strategy.Short"
+		}
+	}
+	
+	return obj + "." + prop
 }
 
 
