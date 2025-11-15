@@ -35,14 +35,58 @@ type ExpressionStmt struct {
 }
 
 type Expression struct {
-	Call         *CallExpr     `parser:"@@"`
+	Ternary      *TernaryExpr  `parser:"@@"`
+	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
 }
 
-type Comparison struct {
+type TernaryExpr struct {
+	Condition *OrExpr     `parser:"@@"`
+	TrueVal   *Expression `parser:"( '?' @@"`
+	FalseVal  *Expression `parser:"':' @@ )?"`
+}
+
+type OrExpr struct {
+	Left  *AndExpr `parser:"@@"`
+	Right *OrExpr  `parser:"( ( 'or' | '||' ) @@ )?"`
+}
+
+type AndExpr struct {
+	Left  *CompExpr `parser:"@@"`
+	Right *AndExpr  `parser:"( ( 'and' | '&&' ) @@ )?"`
+}
+
+type CompExpr struct {
+	Left  *ArithExpr `parser:"@@"`
+	Op    *string    `parser:"( @( '>' | '<' | '>=' | '<=' | '==' | '!=' )"`
+	Right *CompExpr  `parser:"@@ )?"`
+}
+
+type ArithExpr struct {
+	Left  *Term      `parser:"@@"`
+	Op    *string    `parser:"( @( '+' | '-' )"`
+	Right *ArithExpr `parser:"@@ )?"`
+}
+
+type Term struct {
+	Left  *Factor `parser:"@@"`
+	Op    *string `parser:"( @( '*' | '/' | '%' )"`
+	Right *Term   `parser:"@@ )?"`
+}
+
+type Factor struct {
+	Call         *CallExpr     `parser:"@@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
+	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	Ident        *string       `parser:"| @Ident"`
+	Number       *float64      `parser:"| ( @Float | @Int )"`
+	String       *string       `parser:"| @String"`
+}
+
+type Comparison struct{
 	Left  *ComparisonTerm `parser:"@@"`
 	Op    *string         `parser:"( @( '>' | '<' | '>=' | '<=' | '==' | '!=' | 'and' | 'or' )"`
 	Right *ComparisonTerm `parser:"@@ )?"`
@@ -92,7 +136,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `[(),=@/.><!]+`},
+	{Name: "Punct", Pattern: `[(),=@/.><!?:+\-*%]+`},
 })
 
 func NewParser() (*participle.Parser[Script], error) {

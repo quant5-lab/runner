@@ -3,18 +3,20 @@ package ast
 type NodeType string
 
 const (
-	TypeProgram             NodeType = "Program"
-	TypeExpressionStatement NodeType = "ExpressionStatement"
-	TypeCallExpression      NodeType = "CallExpression"
-	TypeVariableDeclaration NodeType = "VariableDeclaration"
-	TypeVariableDeclarator  NodeType = "VariableDeclarator"
-	TypeMemberExpression    NodeType = "MemberExpression"
-	TypeIdentifier          NodeType = "Identifier"
-	TypeLiteral             NodeType = "Literal"
-	TypeObjectExpression    NodeType = "ObjectExpression"
-	TypeProperty            NodeType = "Property"
-	TypeBinaryExpression    NodeType = "BinaryExpression"
-	TypeIfStatement         NodeType = "IfStatement"
+	TypeProgram              NodeType = "Program"
+	TypeExpressionStatement  NodeType = "ExpressionStatement"
+	TypeCallExpression       NodeType = "CallExpression"
+	TypeVariableDeclaration  NodeType = "VariableDeclaration"
+	TypeVariableDeclarator   NodeType = "VariableDeclarator"
+	TypeMemberExpression     NodeType = "MemberExpression"
+	TypeIdentifier           NodeType = "Identifier"
+	TypeLiteral              NodeType = "Literal"
+	TypeObjectExpression     NodeType = "ObjectExpression"
+	TypeProperty             NodeType = "Property"
+	TypeBinaryExpression     NodeType = "BinaryExpression"
+	TypeIfStatement          NodeType = "IfStatement"
+	TypeConditionalExpression NodeType = "ConditionalExpression"
+	TypeLogicalExpression    NodeType = "LogicalExpression"
 )
 
 type Node interface {
@@ -130,3 +132,23 @@ type IfStatement struct {
 }
 
 func (i *IfStatement) Type() NodeType { return TypeIfStatement }
+
+type ConditionalExpression struct {
+	NodeType   NodeType   `json:"type"`
+	Test       Expression `json:"test"`
+	Consequent Expression `json:"consequent"`
+	Alternate  Expression `json:"alternate"`
+}
+
+func (c *ConditionalExpression) Type() NodeType  { return TypeConditionalExpression }
+func (c *ConditionalExpression) expressionNode() {}
+
+type LogicalExpression struct {
+	NodeType NodeType   `json:"type"`
+	Operator string     `json:"operator"`
+	Left     Expression `json:"left"`
+	Right    Expression `json:"right"`
+}
+
+func (l *LogicalExpression) Type() NodeType  { return TypeLogicalExpression }
+func (l *LogicalExpression) expressionNode() {}

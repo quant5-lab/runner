@@ -95,6 +95,9 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
+	if expr.Ternary != nil {
+		return c.convertTernaryExpr(expr.Ternary)
+	}
 	if expr.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -376,7 +379,213 @@ func (c *Converter) parseCallee(name string) (ast.Expression, error) {
 	}, nil
 }
 
+func (c *Converter) convertTernaryExpr(ternary *TernaryExpr) (ast.Expression, error) {
+	// Check if it's actually a ternary (has ? :) or just a simple expression
+	if ternary.TrueVal == nil && ternary.FalseVal == nil {
+		// No ternary, just convert the condition as expression
+		return c.convertOrExpr(ternary.Condition)
+	}
+	
+	test, err := c.convertOrExpr(ternary.Condition)
+	if err != nil {
+		return nil, err
+	}
+	
+	consequent, err := c.convertExpression(ternary.TrueVal)
+	if err != nil {
+		return nil, err
+	}
+	
+	alternate, err := c.convertExpression(ternary.FalseVal)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.ConditionalExpression{
+		NodeType:   ast.TypeConditionalExpression,
+		Test:       test,
+		Consequent: consequent,
+		Alternate:  alternate,
+	}, nil
+}
 
+func (c *Converter) convertOrExpr(or *OrExpr) (ast.Expression, error) {
+	left, err := c.convertAndExpr(or.Left)
+	if err != nil {
+		return nil, err
+	}
+	
+	if or.Right == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertOrExpr(or.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.LogicalExpression{
+		NodeType: ast.TypeLogicalExpression,
+		Operator: "||",
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertAndExpr(and *AndExpr) (ast.Expression, error) {
+	left, err := c.convertCompExpr(and.Left)
+	if err != nil {
+		return nil, err
+	}
+	
+	if and.Right == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertAndExpr(and.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.LogicalExpression{
+		NodeType: ast.TypeLogicalExpression,
+		Operator: "&&",
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertCompExpr(comp *CompExpr) (ast.Expression, error) {
+	left, err := c.convertArithExpr(comp.Left)
+	if err != nil {
+		return nil, err
+	}
+	
+	if comp.Op == nil || comp.Right == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertCompExpr(comp.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.BinaryExpression{
+		NodeType: ast.TypeBinaryExpression,
+		Operator: *comp.Op,
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
+	left, err := c.convertTerm(arith.Left)
+	if err != nil {
+		return nil, err
+	}
+	
+	if arith.Op == nil || arith.Right == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertArithExpr(arith.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.BinaryExpression{
+		NodeType: ast.TypeBinaryExpression,
+		Operator: *arith.Op,
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
+	left, err := c.convertFactor(term.Left)
+	if err != nil {
+		return nil, err
+	}
+	
+	if term.Op == nil || term.Right == nil {
+		return left, nil
+	}
+	
+	right, err := c.convertTerm(term.Right)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &ast.BinaryExpression{
+		NodeType: ast.TypeBinaryExpression,
+		Operator: *term.Op,
+		Left:     left,
+		Right:    right,
+	}, nil
+}
+
+func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
+	if factor.Call != nil {
+		return c.convertCallExpr(factor.Call)
+	}
+	
+	if factor.MemberAccess != nil {
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     factor.MemberAccess.Object,
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     factor.MemberAccess.Property,
+			},
+			Computed: false,
+		}, nil
+	}
+	
+	if factor.Boolean != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *factor.Boolean,
+			Raw:      fmt.Sprintf("%t", *factor.Boolean),
+		}, nil
+	}
+	
+	if factor.Ident != nil {
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     *factor.Ident,
+			},
+			Property: &ast.Literal{
+				NodeType: ast.TypeLiteral,
+				Value:    0,
+				Raw:      "0",
+			},
+			Computed: true,
+		}, nil
+	}
+	
+	if factor.Number != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *factor.Number,
+			Raw:      fmt.Sprintf("%v", *factor.Number),
+		}, nil
+	}
+	
+	if factor.String != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *factor.String,
+			Raw:      *factor.String,
+		}, nil
+	}
+	
+	return nil, fmt.Errorf("empty factor")
+}
 
 func (c *Converter) ToJSON(program *ast.Program) ([]byte, error) {
 	return json.MarshalIndent(program, "", "  ")
