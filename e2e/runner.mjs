@@ -17,11 +17,24 @@ class TestRunner {
   }
 
   async discoverTests() {
-    const files = await readdir(TESTS_DIR);
-    return files
-      .filter((f) => f.endsWith('.mjs') && !f.endsWith('.bak'))
-      .sort()
-      .map((f) => join(TESTS_DIR, f));
+    const tests = [];
+    
+    async function walkDir(dir) {
+      const entries = await readdir(dir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        
+        if (entry.isDirectory()) {
+          await walkDir(fullPath);
+        } else if (entry.name.endsWith('.mjs') && !entry.name.endsWith('.bak')) {
+          tests.push(fullPath);
+        }
+      }
+    }
+    
+    await walkDir(TESTS_DIR);
+    return tests.sort();
   }
 
   async runTest(testPath) {
