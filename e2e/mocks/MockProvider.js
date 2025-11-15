@@ -14,6 +14,7 @@ export class MockProvider {
     this.dataPattern = config.dataPattern || 'linear'; // 'linear', 'constant', 'random', 'edge', 'sawtooth', 'bullish', 'bearish', 'volatile', 'gaps', 'trending'
     this.basePrice = config.basePrice || 1;
     this.amplitude = config.amplitude || 10; // For sawtooth, volatile, gaps patterns
+    this.baseTimestamp = config.baseTimestamp || null; // Fixed timestamp for deterministic tests (overrides Date.now())
     this.supportedTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', 'D', 'W', 'M'];
   }
 
@@ -26,7 +27,9 @@ export class MockProvider {
    */
   async getMarketData(symbol, timeframe, limit = 100) {
     const candles = [];
-    const now = Date.now(); // Current Unix timestamp in milliseconds
+    // Use fixed timestamp if provided, otherwise fall back to Date.now()
+    // Fixed timestamp ensures 100% deterministic tests
+    const baseTime = this.baseTimestamp !== null ? this.baseTimestamp : Date.now();
     const timeframeMs = this.getTimeframeSeconds(timeframe) * 1000; // Convert to milliseconds
 
     for (let i = 0; i < limit; i++) {
@@ -50,7 +53,7 @@ export class MockProvider {
       }
 
       candles.push({
-        openTime: now - (limit - 1 - i) * timeframeMs, // Unix milliseconds (PineTS convention)
+        openTime: baseTime - (limit - 1 - i) * timeframeMs, // Unix milliseconds (PineTS convention)
         open: price,
         high,
         low,

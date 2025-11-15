@@ -66,10 +66,16 @@ plot(in_inline, "Inline", color=color.red)
 plot(hour, "Hour", color=color.gray)
 `;
 
-  /* Use MockProvider for deterministic data */
+  /* Use MockProvider with FIXED timestamp for 100% deterministic tests */
+  /* Fixed at 2025-11-15 18:00:00 UTC */
+  /* This ensures 500 1m bars cover 09:41-18:00, overlapping with 09:50-16:45 session */
+  /* Result: 416 IN / 84 OUT (83% coverage) - perfect for testing */
+  const FIXED_TIMESTAMP = new Date('2025-11-15T18:00:00Z').getTime();
+  
   const mockProvider = new MockProviderManager({
     dataPattern: 'linear',
     basePrice: 100,
+    baseTimestamp: FIXED_TIMESTAMP,
   });
   const createProviderChain = () => [{ name: 'MockProvider', instance: mockProvider }];
   const DEFAULTS = { showDebug: false, showStats: false };
