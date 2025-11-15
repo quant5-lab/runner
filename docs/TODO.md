@@ -49,16 +49,16 @@
 - [x] `runtime/ta/ta.go` BBands (upper, middle, lower bands)
 - [x] `runtime/ta/ta.go` Macd (macd, signal, histogram with NaN-aware EMA)
 - [x] `runtime/ta/ta.go` Stoch (%K, %D oscillator)
-- [ ] `runtime/strategy/entry.go` Entry(), Close(), Exit()
-- [ ] `runtime/strategy/trades.go` trade tracking slice
-- [ ] `runtime/strategy/equity.go` equity calculation
-- [ ] `runtime/request/security.go` multi-timeframe data fetching
-- [ ] `runtime/output/chart.go` ChartData struct
-- [ ] `runtime/output/chart.go` Candlestick []OHLCV field
-- [ ] `runtime/output/chart.go` Plots []Plot field
-- [ ] `runtime/output/chart.go` Strategy struct (Trades, OpenTrades, Equity, NetProfit)
-- [ ] `runtime/output/chart.go` Timestamp time.Time field
-- [ ] `runtime/output/json.go` json.Marshal(chartData)
+- [x] `runtime/strategy/entry.go` Entry(), Close(), Exit()
+- [x] `runtime/strategy/trades.go` trade tracking slice
+- [x] `runtime/strategy/equity.go` equity calculation
+- [x] `runtime/request/security.go` multi-timeframe data fetching
+- [x] `runtime/chartdata/chartdata.go` ChartData struct
+- [x] `runtime/chartdata/chartdata.go` Candlestick []OHLCV field
+- [x] `runtime/chartdata/chartdata.go` Plots map[string]PlotSeries field
+- [x] `runtime/chartdata/chartdata.go` Strategy struct (Trades, OpenTrades, Equity, NetProfit)
+- [x] `runtime/chartdata/chartdata.go` Timestamp field
+- [x] `runtime/chartdata/chartdata.go` ToJSON() method
 
 ## Phase 3: Binary Template (4 weeks)
 - [ ] `mkdir -p golang-port/template`
