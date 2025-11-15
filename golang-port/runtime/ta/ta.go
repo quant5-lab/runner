@@ -38,17 +38,17 @@ func Ema(source []float64, period int) []float64 {
 	validCount := 0
 	sum := 0.0
 	startIdx := -1
-	
+
 	for i := 0; i < len(source); i++ {
 		result[i] = math.NaN()
-		
+
 		if !math.IsNaN(source[i]) {
 			if startIdx == -1 {
 				startIdx = i
 			}
 			sum += source[i]
 			validCount++
-			
+
 			if validCount == period {
 				result[i] = sum / float64(period)
 				startIdx = i
@@ -171,7 +171,7 @@ func Tr(high, low, close []float64) []float64 {
 	}
 
 	result := make([]float64, minLen)
-	
+
 	// First bar: high - low
 	result[0] = high[0] - low[0]
 
@@ -180,7 +180,7 @@ func Tr(high, low, close []float64) []float64 {
 		hl := high[i] - low[i]
 		hc := math.Abs(high[i] - close[i-1])
 		lc := math.Abs(low[i] - close[i-1])
-		
+
 		result[i] = math.Max(hl, math.Max(hc, lc))
 	}
 
@@ -196,7 +196,7 @@ func Atr(high, low, close []float64, period int) []float64 {
 /* BBands calculates Bollinger Bands (upper, middle, lower) */
 func BBands(source []float64, period int, stdDev float64) ([]float64, []float64, []float64) {
 	middle := Sma(source, period)
-	
+
 	upper := make([]float64, len(source))
 	lower := make([]float64, len(source))
 
@@ -237,7 +237,7 @@ func Macd(source []float64, fastPeriod, slowPeriod, signalPeriod int) ([]float64
 	}
 
 	signal := Ema(macd, signalPeriod)
-	
+
 	histogram := make([]float64, len(source))
 	for i := range source {
 		if math.IsNaN(macd[i]) || math.IsNaN(signal[i]) {

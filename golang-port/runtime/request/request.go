@@ -49,9 +49,9 @@ func (r *Request) Security(symbol, timeframe string, expression []float64, looka
 	// 1. Fetch data for target timeframe (if not cached)
 	// 2. Find matching bar based on current context time
 	// 3. Return expression value from that bar with lookahead logic
-	
+
 	cacheKey := fmt.Sprintf("%s:%s", symbol, timeframe)
-	
+
 	// Check cache
 	secCtx, cached := r.cache[cacheKey]
 	if !cached {
@@ -63,17 +63,17 @@ func (r *Request) Security(symbol, timeframe string, expression []float64, looka
 		}
 		r.cache[cacheKey] = secCtx
 	}
-	
+
 	// Get current bar time
 	currentTimeObj := r.ctx.GetTime(0)
 	currentTime := currentTimeObj.Unix()
-	
+
 	// Find matching bar in security context
 	secIdx := r.findMatchingBar(secCtx, currentTime, lookahead)
 	if secIdx < 0 || secIdx >= len(expression) {
 		return math.NaN(), nil
 	}
-	
+
 	return expression[secIdx], nil
 }
 
@@ -92,7 +92,7 @@ func (r *Request) findMatchingBar(secCtx *context.Context, currentTime int64, lo
 	// Simplified: find bar where time <= currentTime
 	// With lookahead: use next bar
 	// Without lookahead: use confirmed bar (2 bars back)
-	
+
 	for i := 0; i <= secCtx.LastBarIndex(); i++ {
 		barTimeObj := secCtx.GetTime(-i)
 		barTime := barTimeObj.Unix()
@@ -103,6 +103,6 @@ func (r *Request) findMatchingBar(secCtx *context.Context, currentTime int64, lo
 			return i + 2
 		}
 	}
-	
+
 	return -1
 }

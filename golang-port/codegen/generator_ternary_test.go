@@ -19,7 +19,7 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 							Test: &ast.BinaryExpression{
 								Operator: ">",
 								Left: &ast.MemberExpression{
-									Object: &ast.Identifier{Name: "close"},
+									Object:   &ast.Identifier{Name: "close"},
 									Property: &ast.Literal{Value: float64(0)},
 									Computed: true,
 								},
@@ -74,7 +74,7 @@ func TestTernaryWithArithmetic(t *testing.T) {
 							Test: &ast.BinaryExpression{
 								Operator: ">",
 								Left: &ast.MemberExpression{
-									Object: &ast.Identifier{Name: "volume"},
+									Object:   &ast.Identifier{Name: "volume"},
 									Property: &ast.Literal{Value: float64(0)},
 									Computed: true,
 								},
@@ -131,12 +131,12 @@ func TestTernaryWithLogicalOperators(t *testing.T) {
 								Left: &ast.BinaryExpression{
 									Operator: ">",
 									Left: &ast.MemberExpression{
-										Object: &ast.Identifier{Name: "close"},
+										Object:   &ast.Identifier{Name: "close"},
 										Property: &ast.Literal{Value: float64(0)},
 										Computed: true,
 									},
 									Right: &ast.MemberExpression{
-										Object: &ast.Identifier{Name: "open"},
+										Object:   &ast.Identifier{Name: "open"},
 										Property: &ast.Literal{Value: float64(0)},
 										Computed: true,
 									},
@@ -144,7 +144,7 @@ func TestTernaryWithLogicalOperators(t *testing.T) {
 								Right: &ast.BinaryExpression{
 									Operator: ">",
 									Left: &ast.MemberExpression{
-										Object: &ast.Identifier{Name: "volume"},
+										Object:   &ast.Identifier{Name: "volume"},
 										Property: &ast.Literal{Value: float64(0)},
 										Computed: true,
 									},

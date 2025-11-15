@@ -60,7 +60,7 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		consequent := []ast.Node{}
 		for _, bodyStmt := range stmt.If.Body {
 			node, err := c.convertStatement(bodyStmt)
@@ -71,7 +71,7 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 				consequent = append(consequent, node)
 			}
 		}
-		
+
 		return &ast.IfStatement{
 			NodeType:   ast.TypeIfStatement,
 			Test:       test,
@@ -153,17 +153,17 @@ func (c *Converter) convertComparison(comp *Comparison) (ast.Expression, error) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// No operator means just a simple expression
 	if comp.Op == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertComparisonTerm(comp.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.BinaryExpression{
 		NodeType: ast.TypeBinaryExpression,
 		Operator: *comp.Op,
@@ -179,7 +179,7 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 		if err != nil {
 			return nil, err
 		}
-		
+
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
 			Object: &ast.Identifier{
@@ -190,7 +190,7 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 			Computed: true,
 		}, nil
 	}
-	
+
 	if term.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -250,7 +250,7 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 
 func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	var callee ast.Expression
-	
+
 	if call.Callee.MemberAccess != nil {
 		// ta.sma(...) -> MemberExpression as callee
 		callee = &ast.MemberExpression{
@@ -283,7 +283,7 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if arg.Name != nil {
 			namedArgs[*arg.Name] = converted
 		} else {
@@ -327,7 +327,7 @@ func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
 			Object: &ast.Identifier{
@@ -338,7 +338,7 @@ func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
 			Computed: true,
 		}, nil
 	}
-	
+
 	if val.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -421,22 +421,22 @@ func (c *Converter) convertTernaryExpr(ternary *TernaryExpr) (ast.Expression, er
 		// No ternary, just convert the condition as expression
 		return c.convertOrExpr(ternary.Condition)
 	}
-	
+
 	test, err := c.convertOrExpr(ternary.Condition)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	consequent, err := c.convertExpression(ternary.TrueVal)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	alternate, err := c.convertExpression(ternary.FalseVal)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.ConditionalExpression{
 		NodeType:   ast.TypeConditionalExpression,
 		Test:       test,
@@ -450,16 +450,16 @@ func (c *Converter) convertOrExpr(or *OrExpr) (ast.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if or.Right == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertOrExpr(or.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.LogicalExpression{
 		NodeType: ast.TypeLogicalExpression,
 		Operator: "||",
@@ -473,16 +473,16 @@ func (c *Converter) convertAndExpr(and *AndExpr) (ast.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if and.Right == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertAndExpr(and.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.LogicalExpression{
 		NodeType: ast.TypeLogicalExpression,
 		Operator: "&&",
@@ -496,16 +496,16 @@ func (c *Converter) convertCompExpr(comp *CompExpr) (ast.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if comp.Op == nil || comp.Right == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertCompExpr(comp.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.BinaryExpression{
 		NodeType: ast.TypeBinaryExpression,
 		Operator: *comp.Op,
@@ -519,16 +519,16 @@ func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if arith.Op == nil || arith.Right == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertArithExpr(arith.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.BinaryExpression{
 		NodeType: ast.TypeBinaryExpression,
 		Operator: *arith.Op,
@@ -542,16 +542,16 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if term.Op == nil || term.Right == nil {
 		return left, nil
 	}
-	
+
 	right, err := c.convertTerm(term.Right)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ast.BinaryExpression{
 		NodeType: ast.TypeBinaryExpression,
 		Operator: *term.Op,
@@ -564,14 +564,14 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	if factor.Call != nil {
 		return c.convertCallExpr(factor.Call)
 	}
-	
+
 	if factor.Subscript != nil {
 		// Convert subscript like close[1] to MemberExpression with Computed: true
 		indexExpr, err := c.convertArithExpr(factor.Subscript.Index)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
 			Object: &ast.Identifier{
@@ -582,7 +582,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Computed: true,
 		}, nil
 	}
-	
+
 	if factor.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -597,7 +597,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Computed: false,
 		}, nil
 	}
-	
+
 	if factor.Boolean != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
@@ -605,7 +605,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Raw:      fmt.Sprintf("%t", *factor.Boolean),
 		}, nil
 	}
-	
+
 	if factor.Ident != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -621,7 +621,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Computed: true,
 		}, nil
 	}
-	
+
 	if factor.Number != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
@@ -629,7 +629,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Raw:      fmt.Sprintf("%v", *factor.Number),
 		}, nil
 	}
-	
+
 	if factor.String != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
@@ -637,7 +637,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			Raw:      *factor.String,
 		}, nil
 	}
-	
+
 	return nil, fmt.Errorf("empty factor")
 }
 

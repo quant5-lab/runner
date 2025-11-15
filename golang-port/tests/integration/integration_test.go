@@ -100,7 +100,7 @@ func TestParseFixtureStrategy(t *testing.T) {
 func TestChartDataGeneration(t *testing.T) {
 	// Create mock context
 	ctx := context.New("TEST", "1h", 100)
-	
+
 	// Add sample bars
 	for i := 0; i < 50; i++ {
 		ctx.AddBar(context.OHLCV{
@@ -164,7 +164,7 @@ func TestChartDataGeneration(t *testing.T) {
 /* Test parsing all fixture strategies */
 func TestParseAllFixtures(t *testing.T) {
 	fixturesDir := "../../../e2e/fixtures/strategies"
-	
+
 	entries, err := os.ReadDir(fixturesDir)
 	if err != nil {
 		t.Skipf("Skipping: fixtures directory not found: %v", err)
@@ -219,7 +219,7 @@ func TestParseAllFixtures(t *testing.T) {
 func TestRuntimeIntegration(t *testing.T) {
 	// Create context
 	ctx := context.New("TEST", "1h", 100)
-	
+
 	// Add bars with price movement for crossover
 	for i := 0; i < 100; i++ {
 		price := 100.0
@@ -228,7 +228,7 @@ func TestRuntimeIntegration(t *testing.T) {
 		} else if i >= 40 && i < 60 {
 			price = 105.0 - float64(i-40)*0.3 // Downtrend
 		}
-		
+
 		ctx.AddBar(context.OHLCV{
 			Time:   int64(1700000000 + i*3600),
 			Open:   price,
@@ -247,7 +247,7 @@ func TestRuntimeIntegration(t *testing.T) {
 	for i := 0; i < len(ctx.Data); i++ {
 		ctx.BarIndex = i
 		strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)
-		
+
 		// Simple strategy logic: buy on uptrend, sell on downtrend
 		if i > 25 && i < 30 && strat.GetPositionSize() == 0 {
 			strat.Entry("long", strategy.Long, 1)
@@ -260,7 +260,7 @@ func TestRuntimeIntegration(t *testing.T) {
 	// Verify results
 	th := strat.GetTradeHistory()
 	closedTrades := th.GetClosedTrades()
-	
+
 	if len(closedTrades) == 0 {
 		t.Log("No trades executed (expected for simple test)")
 	} else {

@@ -13,7 +13,7 @@ import (
 func TestNewChartData(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
 	now := time.Now().Unix()
-	
+
 	for i := 0; i < 5; i++ {
 		ctx.AddBar(context.OHLCV{
 			Time:   now + int64(i*3600),
@@ -26,7 +26,7 @@ func TestNewChartData(t *testing.T) {
 	}
 
 	cd := NewChartData(ctx)
-	
+
 	if len(cd.Candlestick) != 5 {
 		t.Errorf("Expected 5 candlesticks, got %d", len(cd.Candlestick))
 	}
@@ -41,20 +41,20 @@ func TestNewChartData(t *testing.T) {
 func TestAddPlots(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
 	cd := NewChartData(ctx)
-	
+
 	collector := output.NewCollector()
 	now := time.Now().Unix()
-	
+
 	collector.Add("SMA 20", now, 100.0, nil)
 	collector.Add("SMA 20", now+3600, 102.0, nil)
 	collector.Add("RSI", now, 50.0, map[string]interface{}{"pane": "indicator"})
-	
+
 	cd.AddPlots(collector)
-	
+
 	if len(cd.Plots) != 2 {
 		t.Errorf("Expected 2 plot series, got %d", len(cd.Plots))
 	}
-	
+
 	smaSeries, ok := cd.Plots["SMA 20"]
 	if !ok {
 		t.Fatal("SMA 20 series not found")
@@ -70,17 +70,17 @@ func TestAddPlots(t *testing.T) {
 func TestAddStrategy(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
 	cd := NewChartData(ctx)
-	
+
 	strat := strategy.NewStrategy()
 	strat.Call("Test Strategy", 10000)
-	
+
 	// Place and execute trade
 	strat.Entry("long1", strategy.Long, 10)
 	strat.OnBarUpdate(1, 100, 1000)
 	strat.Close("long1", 110, 2000)
-	
+
 	cd.AddStrategy(strat, 110)
-	
+
 	if cd.Strategy == nil {
 		t.Fatal("Strategy data should be set")
 	}
@@ -101,25 +101,25 @@ func TestToJSON(t *testing.T) {
 	ctx.AddBar(context.OHLCV{
 		Time: now, Open: 100, High: 105, Low: 95, Close: 102, Volume: 1000,
 	})
-	
+
 	cd := NewChartData(ctx)
-	
+
 	collector := output.NewCollector()
 	collector.Add("SMA", now, 100.0, nil)
 	cd.AddPlots(collector)
-	
+
 	jsonBytes, err := cd.ToJSON()
 	if err != nil {
 		t.Fatalf("ToJSON() failed: %v", err)
 	}
-	
+
 	// Validate JSON structure
 	var parsed map[string]interface{}
 	err = json.Unmarshal(jsonBytes, &parsed)
 	if err != nil {
 		t.Fatalf("JSON unmarshal failed: %v", err)
 	}
-	
+
 	if _, ok := parsed["candlestick"]; !ok {
 		t.Error("JSON should have 'candlestick' field")
 	}
@@ -134,23 +134,23 @@ func TestToJSON(t *testing.T) {
 func TestStrategyDataStructure(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
 	cd := NewChartData(ctx)
-	
+
 	strat := strategy.NewStrategy()
 	strat.Call("Test Strategy", 10000)
-	
+
 	// Open trade
 	strat.Entry("long1", strategy.Long, 5)
 	strat.OnBarUpdate(1, 100, 1000)
-	
+
 	// Close trade
 	strat.Close("long1", 110, 2000)
-	
+
 	// Another open trade
 	strat.Entry("long2", strategy.Long, 3)
 	strat.OnBarUpdate(2, 110, 3000)
-	
+
 	cd.AddStrategy(strat, 115)
-	
+
 	if cd.Strategy == nil {
 		t.Fatal("Strategy should be set")
 	}
@@ -160,7 +160,7 @@ func TestStrategyDataStructure(t *testing.T) {
 	if len(cd.Strategy.OpenTrades) != 1 {
 		t.Errorf("Expected 1 open trade, got %d", len(cd.Strategy.OpenTrades))
 	}
-	
+
 	// Check closed trade structure
 	trade := cd.Strategy.Trades[0]
 	if trade.EntryID != "long1" {
@@ -169,7 +169,7 @@ func TestStrategyDataStructure(t *testing.T) {
 	if trade.Profit != 50 {
 		t.Errorf("Expected profit 50, got %.2f", trade.Profit)
 	}
-	
+
 	// Check open trade structure
 	openTrade := cd.Strategy.OpenTrades[0]
 	if openTrade.EntryID != "long2" {

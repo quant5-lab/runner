@@ -14,7 +14,7 @@ func main() {
 	}
 
 	inputPath := os.Args[1]
-	
+
 	content, err := os.ReadFile(inputPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)

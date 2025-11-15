@@ -17,7 +17,7 @@ func TestCrossoverExecution(t *testing.T) {
 	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
 		"-input", "testdata/crossover-builtin-test.pine",
 		"-output", "/tmp/test-crossover-exec")
-	
+
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
@@ -27,7 +27,7 @@ func TestCrossoverExecution(t *testing.T) {
 	compileCmd := exec.Command("go", "build",
 		"-o", "/tmp/test-crossover-exec",
 		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
-	
+
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
@@ -42,7 +42,7 @@ func TestCrossoverExecution(t *testing.T) {
 		"-symbol", "TEST",
 		"-data", "testdata/crossover-bars.json",
 		"-output", outputFile)
-	
+
 	execOutput, err := execCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, execOutput)
@@ -79,7 +79,7 @@ func TestCrossoverExecution(t *testing.T) {
 	}
 
 	t.Logf("Crossover trades: %d", len(result.Strategy.OpenTrades))
-	
+
 	// Verify first trade is at crossover point (bar 2: close 104 > open 104, prev close 98 <= prev open 100)
 	firstTrade := result.Strategy.OpenTrades[0]
 	if firstTrade.EntryBar != 2 {

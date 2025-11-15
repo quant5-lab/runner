@@ -17,7 +17,7 @@ func TestTernaryExecution(t *testing.T) {
 	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
 		"-input", "testdata/ternary-test.pine",
 		"-output", "/tmp/test-ternary-exec")
-	
+
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
@@ -27,7 +27,7 @@ func TestTernaryExecution(t *testing.T) {
 	compileCmd := exec.Command("go", "build",
 		"-o", "/tmp/test-ternary-exec",
 		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
-	
+
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
@@ -78,7 +78,7 @@ func TestTernaryExecution(t *testing.T) {
 		"-symbol", "TEST",
 		"-data", dataFile,
 		"-output", outputFile)
-	
+
 	execOutput, err := execCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, execOutput)

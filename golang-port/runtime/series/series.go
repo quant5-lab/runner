@@ -17,7 +17,7 @@ func NewSeries(capacity int) *Series {
 	if capacity <= 0 {
 		panic(fmt.Sprintf("Series: capacity must be positive, got %d", capacity))
 	}
-	
+
 	return &Series{
 		buffer:      make([]float64, capacity),
 		cursor:      0,
@@ -32,11 +32,11 @@ func (s *Series) Set(value float64) {
 	if !s.initialized && s.cursor == 0 {
 		s.initialized = true
 	}
-	
+
 	if s.cursor >= s.capacity {
 		panic(fmt.Sprintf("Series: cursor %d exceeds capacity %d", s.cursor, s.capacity))
 	}
-	
+
 	s.buffer[s.cursor] = value
 }
 
@@ -46,14 +46,14 @@ func (s *Series) Get(offset int) float64 {
 	if offset < 0 {
 		panic(fmt.Sprintf("Series: negative offset %d not allowed (prevents future access)", offset))
 	}
-	
+
 	targetIndex := s.cursor - offset
-	
+
 	if targetIndex < 0 {
 		// Warmup period - return 0.0 (Pine Script uses na, we use 0.0)
 		return 0.0
 	}
-	
+
 	return s.buffer[targetIndex]
 }
 

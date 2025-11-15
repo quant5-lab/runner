@@ -28,7 +28,7 @@ func TestContextAddBar(t *testing.T) {
 		Volume: 1000,
 	}
 	ctx.AddBar(bar)
-	
+
 	if len(ctx.Data) != 1 {
 		t.Errorf("Data length = %d, want 1", len(ctx.Data))
 	}
@@ -42,9 +42,9 @@ func TestContextGetClose(t *testing.T) {
 	ctx.AddBar(OHLCV{Close: 100.0})
 	ctx.AddBar(OHLCV{Close: 101.0})
 	ctx.AddBar(OHLCV{Close: 102.0})
-	
+
 	ctx.BarIndex = 2
-	
+
 	if got := ctx.GetClose(0); got != 102.0 {
 		t.Errorf("GetClose(0) = %f, want 102.0", got)
 	}
@@ -61,7 +61,7 @@ func TestContextGetTime(t *testing.T) {
 	timestamp := int64(1700000000)
 	ctx.AddBar(OHLCV{Time: timestamp})
 	ctx.BarIndex = 0
-	
+
 	tm := ctx.GetTime(0)
 	if tm.Unix() != timestamp {
 		t.Errorf("GetTime(0) = %d, want %d", tm.Unix(), timestamp)
@@ -72,7 +72,7 @@ func TestContextBoundsCheck(t *testing.T) {
 	ctx := New("SBER", "1h", 10)
 	ctx.AddBar(OHLCV{Close: 100.0})
 	ctx.BarIndex = 0
-	
+
 	if got := ctx.GetClose(1); got != 0 {
 		t.Errorf("GetClose(1) out of bounds = %f, want 0", got)
 	}
@@ -86,7 +86,7 @@ func TestLastBarIndex(t *testing.T) {
 	ctx.AddBar(OHLCV{})
 	ctx.AddBar(OHLCV{})
 	ctx.AddBar(OHLCV{})
-	
+
 	if got := ctx.LastBarIndex(); got != 2 {
 		t.Errorf("LastBarIndex() = %d, want 2", got)
 	}

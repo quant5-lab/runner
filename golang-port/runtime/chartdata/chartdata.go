@@ -43,8 +43,8 @@ type StrategyData struct {
 
 /* PlotPoint represents a single plot data point */
 type PlotPoint struct {
-	Time  int64                  `json:"time"`
-	Value float64                `json:"value"`
+	Time    int64                  `json:"time"`
+	Value   float64                `json:"value"`
 	Options map[string]interface{} `json:"options,omitempty"`
 }
 
@@ -57,10 +57,10 @@ type PlotSeries struct {
 
 /* ChartData represents complete chart output */
 type ChartData struct {
-	Candlestick []context.OHLCV        `json:"candlestick"`
-	Plots       map[string]PlotSeries  `json:"plots"`
-	Strategy    *StrategyData          `json:"strategy,omitempty"`
-	Timestamp   string                 `json:"timestamp"`
+	Candlestick []context.OHLCV       `json:"candlestick"`
+	Plots       map[string]PlotSeries `json:"plots"`
+	Strategy    *StrategyData         `json:"strategy,omitempty"`
+	Timestamp   string                `json:"timestamp"`
 }
 
 /* NewChartData creates a new chart data structure */

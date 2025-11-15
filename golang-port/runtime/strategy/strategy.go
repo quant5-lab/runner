@@ -167,7 +167,7 @@ func (th *TradeHistory) CloseTrade(entryID string, exitPrice float64, exitBar in
 			trade.ExitPrice = exitPrice
 			trade.ExitBar = exitBar
 			trade.ExitTime = exitTime
-			
+
 			// Calculate profit
 			priceDiff := exitPrice - trade.EntryPrice
 			multiplier := 1.0
@@ -277,7 +277,7 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64) {
 					oppositeDir = Short
 				}
 				s.positionTracker.UpdatePosition(trade.Size, currentPrice, oppositeDir)
-				
+
 				// Update equity
 				s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
 			}
@@ -301,7 +301,7 @@ func (s *Strategy) CloseAll(currentPrice float64, currentTime int64) {
 				oppositeDir = Short
 			}
 			s.positionTracker.UpdatePosition(trade.Size, currentPrice, oppositeDir)
-			
+
 			// Update equity
 			s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
 		}
@@ -318,14 +318,14 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	if !s.initialized {
 		return
 	}
-	
+
 	s.currentBar = currentBar
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
-	
+
 	for _, order := range pendingOrders {
 		// Update position
 		s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
-		
+
 		// Add to open trades
 		s.tradeHistory.AddOpenTrade(Trade{
 			EntryID:    order.ID,
@@ -335,7 +335,7 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 			EntryBar:   currentBar,
 			EntryTime:  openTime,
 		})
-		
+
 		// Remove order
 		s.orderManager.RemoveOrder(order.ID)
 	}
@@ -359,7 +359,7 @@ func (s *Strategy) GetPositionAvgPrice() float64 {
 func (s *Strategy) GetEquity(currentPrice float64) float64 {
 	unrealizedPL := 0.0
 	openTrades := s.tradeHistory.GetOpenTrades()
-	
+
 	for _, trade := range openTrades {
 		priceDiff := currentPrice - trade.EntryPrice
 		multiplier := 1.0
@@ -368,7 +368,7 @@ func (s *Strategy) GetEquity(currentPrice float64) float64 {
 		}
 		unrealizedPL += priceDiff * trade.Size * multiplier
 	}
-	
+
 	return s.equityCalculator.GetEquity(unrealizedPL)
 }
 

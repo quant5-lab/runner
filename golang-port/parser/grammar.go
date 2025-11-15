@@ -21,7 +21,7 @@ type Statement struct {
 }
 
 type IfStatement struct {
-	Condition *Comparison `parser:"'if' @@"`
+	Condition *Comparison  `parser:"'if' @@"`
 	Body      []*Statement `parser:"@@+"`
 }
 
@@ -88,11 +88,11 @@ type Factor struct {
 }
 
 type Subscript struct {
-	Object string      `parser:"@Ident"`
-	Index  *ArithExpr  `parser:"'[' @@ ']'"`
+	Object string     `parser:"@Ident"`
+	Index  *ArithExpr `parser:"'[' @@ ']'"`
 }
 
-type Comparison struct{
+type Comparison struct {
 	Left  *ComparisonTerm `parser:"@@"`
 	Op    *string         `parser:"( @( '>' | '<' | '>=' | '<=' | '==' | '!=' | 'and' | 'or' )"`
 	Right *ComparisonTerm `parser:"@@ )?"`
@@ -110,7 +110,7 @@ type ComparisonTerm struct {
 
 type MemberAccess struct {
 	Object   string `parser:"@Ident"`
-	Property string `parser:"'.' @Ident"`  
+	Property string `parser:"'.' @Ident"`
 }
 
 type CallExpr struct {

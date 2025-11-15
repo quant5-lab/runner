@@ -24,7 +24,7 @@ func TestRequestSecurity(t *testing.T) {
 	// Create main context (1h timeframe)
 	mainCtx := context.New("TEST", "1h", 24)
 	now := time.Now().Unix()
-	
+
 	// Add hourly bars
 	for i := 0; i < 24; i++ {
 		mainCtx.AddBar(context.OHLCV{
@@ -69,7 +69,7 @@ func TestRequestSecurity(t *testing.T) {
 	// Test security call
 	expression := []float64{110.0, 125.0} // Daily close values
 	value, err := req.Security("TEST", "1D", expression, false)
-	
+
 	if err != nil {
 		t.Fatalf("Security() failed: %v", err)
 	}

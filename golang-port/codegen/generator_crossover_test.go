@@ -21,7 +21,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 		{
 			name: "close built-in series",
 			expr: &ast.MemberExpression{
-				Object: &ast.Identifier{Name: "close"},
+				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
 			},
 			expected: "bar.Close",
@@ -29,7 +29,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 		{
 			name: "open built-in series",
 			expr: &ast.MemberExpression{
-				Object: &ast.Identifier{Name: "open"},
+				Object:   &ast.Identifier{Name: "open"},
 				Property: &ast.Literal{Value: 0},
 			},
 			expected: "bar.Open",
@@ -42,7 +42,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 		{
 			name: "user variable with subscript",
 			expr: &ast.MemberExpression{
-				Object: &ast.Identifier{Name: "sma20"},
+				Object:   &ast.Identifier{Name: "sma20"},
 				Property: &ast.Literal{Value: 0},
 			},
 			expected: "sma20",
@@ -66,7 +66,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 			expr: &ast.BinaryExpression{
 				Operator: "+",
 				Left: &ast.MemberExpression{
-					Object: &ast.Identifier{Name: "close"},
+					Object:   &ast.Identifier{Name: "close"},
 					Property: &ast.Literal{Value: 0},
 				},
 				Right: &ast.BinaryExpression{

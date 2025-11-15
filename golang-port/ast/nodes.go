@@ -3,20 +3,20 @@ package ast
 type NodeType string
 
 const (
-	TypeProgram              NodeType = "Program"
-	TypeExpressionStatement  NodeType = "ExpressionStatement"
-	TypeCallExpression       NodeType = "CallExpression"
-	TypeVariableDeclaration  NodeType = "VariableDeclaration"
-	TypeVariableDeclarator   NodeType = "VariableDeclarator"
-	TypeMemberExpression     NodeType = "MemberExpression"
-	TypeIdentifier           NodeType = "Identifier"
-	TypeLiteral              NodeType = "Literal"
-	TypeObjectExpression     NodeType = "ObjectExpression"
-	TypeProperty             NodeType = "Property"
-	TypeBinaryExpression     NodeType = "BinaryExpression"
-	TypeIfStatement          NodeType = "IfStatement"
+	TypeProgram               NodeType = "Program"
+	TypeExpressionStatement   NodeType = "ExpressionStatement"
+	TypeCallExpression        NodeType = "CallExpression"
+	TypeVariableDeclaration   NodeType = "VariableDeclaration"
+	TypeVariableDeclarator    NodeType = "VariableDeclarator"
+	TypeMemberExpression      NodeType = "MemberExpression"
+	TypeIdentifier            NodeType = "Identifier"
+	TypeLiteral               NodeType = "Literal"
+	TypeObjectExpression      NodeType = "ObjectExpression"
+	TypeProperty              NodeType = "Property"
+	TypeBinaryExpression      NodeType = "BinaryExpression"
+	TypeIfStatement           NodeType = "IfStatement"
 	TypeConditionalExpression NodeType = "ConditionalExpression"
-	TypeLogicalExpression    NodeType = "LogicalExpression"
+	TypeLogicalExpression     NodeType = "LogicalExpression"
 )
 
 type Node interface {
@@ -52,9 +52,9 @@ func (c *CallExpression) Type() NodeType  { return TypeCallExpression }
 func (c *CallExpression) expressionNode() {}
 
 type VariableDeclaration struct {
-	NodeType     NodeType              `json:"type"`
-	Declarations []VariableDeclarator  `json:"declarations"`
-	Kind         string                `json:"kind"`
+	NodeType     NodeType             `json:"type"`
+	Declarations []VariableDeclarator `json:"declarations"`
+	Kind         string               `json:"kind"`
 }
 
 func (v *VariableDeclaration) Type() NodeType { return TypeVariableDeclaration }

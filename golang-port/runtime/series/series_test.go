@@ -6,11 +6,11 @@ import (
 
 func TestNewSeries(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	if s.Capacity() != 10 {
 		t.Errorf("Expected capacity 10, got %d", s.Capacity())
 	}
-	
+
 	if s.Position() != 0 {
 		t.Errorf("Expected initial position 0, got %d", s.Position())
 	}
@@ -27,13 +27,13 @@ func TestNewSeriesInvalidCapacity(t *testing.T) {
 
 func TestSeriesSetGet(t *testing.T) {
 	s := NewSeries(5)
-	
+
 	// Bar 0
 	s.Set(100.0)
 	if got := s.Get(0); got != 100.0 {
 		t.Errorf("Bar 0: expected 100.0, got %f", got)
 	}
-	
+
 	// Bar 1
 	s.Next()
 	s.Set(110.0)
@@ -43,7 +43,7 @@ func TestSeriesSetGet(t *testing.T) {
 	if got := s.Get(1); got != 100.0 {
 		t.Errorf("Bar 1 previous: expected 100.0, got %f", got)
 	}
-	
+
 	// Bar 2
 	s.Next()
 	s.Set(120.0)
@@ -60,13 +60,13 @@ func TestSeriesSetGet(t *testing.T) {
 
 func TestSeriesWarmupPeriod(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	// Bar 0: no history, Get(1) should return 0.0
 	s.Set(100.0)
 	if got := s.Get(1); got != 0.0 {
 		t.Errorf("Warmup: expected 0.0 for Get(1) on first bar, got %f", got)
 	}
-	
+
 	if got := s.Get(5); got != 0.0 {
 		t.Errorf("Warmup: expected 0.0 for Get(5) on first bar, got %f", got)
 	}
@@ -75,7 +75,7 @@ func TestSeriesWarmupPeriod(t *testing.T) {
 func TestSeriesNegativeOffsetPanics(t *testing.T) {
 	s := NewSeries(10)
 	s.Set(100.0)
-	
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for negative offset")
@@ -91,7 +91,7 @@ func TestSeriesExceedCapacityPanics(t *testing.T) {
 	s.Set(110.0)
 	s.Next()
 	s.Set(120.0)
-	
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic when advancing beyond capacity")
@@ -102,17 +102,17 @@ func TestSeriesExceedCapacityPanics(t *testing.T) {
 
 func TestSeriesForwardOnlyIteration(t *testing.T) {
 	s := NewSeries(5)
-	
+
 	values := []float64{100, 110, 120, 130, 140}
-	
+
 	for i, val := range values {
 		s.Set(val)
-		
+
 		// Verify current value
 		if got := s.Get(0); got != val {
 			t.Errorf("Bar %d: expected current value %f, got %f", i, val, got)
 		}
-		
+
 		// Verify all historical values are accessible
 		for offset := 1; offset <= i; offset++ {
 			expected := values[i-offset]
@@ -120,7 +120,7 @@ func TestSeriesForwardOnlyIteration(t *testing.T) {
 				t.Errorf("Bar %d offset %d: expected %f, got %f", i, offset, expected, got)
 			}
 		}
-		
+
 		if i < len(values)-1 {
 			s.Next()
 		}
@@ -129,24 +129,24 @@ func TestSeriesForwardOnlyIteration(t *testing.T) {
 
 func TestSeriesImmutability(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	// Set value at bar 0
 	s.Set(100.0)
 	originalValue := s.Get(0)
-	
+
 	// Move to bar 1
 	s.Next()
 	s.Set(110.0)
-	
+
 	// Verify bar 0 value hasn't changed (accessed via offset)
 	if got := s.Get(1); got != originalValue {
 		t.Errorf("Historical value mutated: expected %f, got %f", originalValue, got)
 	}
-	
+
 	// Move to bar 2
 	s.Next()
 	s.Set(120.0)
-	
+
 	// Verify bar 0 and bar 1 values are still intact
 	if got := s.Get(2); got != 100.0 {
 		t.Errorf("Bar 0 value mutated: expected 100.0, got %f", got)
@@ -158,17 +158,17 @@ func TestSeriesImmutability(t *testing.T) {
 
 func TestSeriesPosition(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	if s.Position() != 0 {
 		t.Errorf("Initial position: expected 0, got %d", s.Position())
 	}
-	
+
 	s.Set(100.0)
 	s.Next()
 	if s.Position() != 1 {
 		t.Errorf("After Next: expected 1, got %d", s.Position())
 	}
-	
+
 	s.Set(110.0)
 	s.Next()
 	if s.Position() != 2 {
@@ -178,7 +178,7 @@ func TestSeriesPosition(t *testing.T) {
 
 func TestSeriesReset(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	// Fill some bars
 	for i := 0; i < 5; i++ {
 		s.Set(float64(100 + i*10))
@@ -186,17 +186,17 @@ func TestSeriesReset(t *testing.T) {
 			s.Next()
 		}
 	}
-	
+
 	if s.Position() != 4 {
 		t.Errorf("Before reset: expected position 4, got %d", s.Position())
 	}
-	
+
 	// Reset to position 2
 	s.Reset(2)
 	if s.Position() != 2 {
 		t.Errorf("After reset: expected position 2, got %d", s.Position())
 	}
-	
+
 	// Can overwrite from this position
 	s.Set(999.0)
 	if got := s.Get(0); got != 999.0 {
@@ -206,17 +206,17 @@ func TestSeriesReset(t *testing.T) {
 
 func TestSeriesLength(t *testing.T) {
 	s := NewSeries(10)
-	
+
 	if s.Length() != 1 {
 		t.Errorf("Initial length: expected 1, got %d", s.Length())
 	}
-	
+
 	s.Set(100.0)
 	s.Next()
 	if s.Length() != 2 {
 		t.Errorf("After 1 Next: expected 2, got %d", s.Length())
 	}
-	
+
 	s.Set(110.0)
 	s.Next()
 	if s.Length() != 3 {
@@ -226,7 +226,7 @@ func TestSeriesLength(t *testing.T) {
 
 func BenchmarkSeriesSequentialAccess(b *testing.B) {
 	s := NewSeries(10000)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		idx := i % 10000
@@ -243,7 +243,7 @@ func BenchmarkSeriesSequentialAccess(b *testing.B) {
 
 func BenchmarkSeriesHistoricalAccess(b *testing.B) {
 	s := NewSeries(1000)
-	
+
 	// Populate series
 	for i := 0; i < 1000; i++ {
 		s.Set(float64(i))
@@ -251,7 +251,7 @@ func BenchmarkSeriesHistoricalAccess(b *testing.B) {
 			s.Next()
 		}
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Access various historical offsets

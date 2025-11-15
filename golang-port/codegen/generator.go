@@ -46,7 +46,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			for _, declarator := range varDecl.Declarations {
 				varName := declarator.ID.Name
 				varType := "float64" // Default type
-				
+
 				// Check init expression for type hints
 				if declarator.Init != nil {
 					if call, ok := declarator.Init.(*ast.CallExpression); ok {
@@ -60,17 +60,17 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			}
 		}
 	}
-	
+
 	// Second pass: analyze Series requirements (variables accessed with [offset > 0])
 	for _, stmt := range program.Body {
 		g.analyzeSeriesRequirements(stmt)
 	}
 
 	code := ""
-	
+
 	// Initialize strategy
 	code += g.ind() + "strat.Call(\"Generated Strategy\", 10000)\n\n"
-	
+
 	// Declare series variables
 	if len(g.variables) > 0 {
 		code += g.ind() + "// Series variables\n"
@@ -84,7 +84,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			}
 		}
 		code += "\n"
-		
+
 		// Initialize Series before bar loop
 		if len(g.seriesVariables) > 0 {
 			code += g.ind() + "// Initialize Series storage\n"
@@ -94,14 +94,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += "\n"
 		}
 	}
-	
+
 	// Bar loop for strategy execution
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "bar := ctx.Data[i]\n"
 	code += g.ind() + "strat.OnBarUpdate(i, bar.Open, bar.Time)\n\n"
-	
+
 	// Generate statements inside bar loop
 	for _, stmt := range program.Body {
 		stmtCode, err := g.generateStatement(stmt)
@@ -110,7 +110,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		code += stmtCode
 	}
-	
+
 	// Advance Series cursors at end of bar loop
 	if len(g.seriesVariables) > 0 {
 		code += "\n" + g.ind() + "// Advance Series cursors\n"
@@ -118,7 +118,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("if i < len(ctx.Data)-1 { %sSeries.Next() }\n", varName)
 		}
 	}
-	
+
 	g.indent--
 	code += g.ind() + "}\n"
 
@@ -198,9 +198,9 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 					plotVar = id.Name
 				}
 			}
-			
+
 			plotTitle := plotVar // Default title
-			
+
 			// Check for title in second argument (object expression)
 			if len(call.Arguments) > 1 {
 				if obj, ok := call.Arguments[1].(*ast.ObjectExpression); ok {
@@ -215,7 +215,7 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 					}
 				}
 			}
-			
+
 			if plotVar != "" {
 				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", plotTitle, plotVar)
 			}
@@ -232,7 +232,7 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 			if len(call.Arguments) >= 3 {
 				qty = g.extractFloatLiteral(call.Arguments[2])
 			}
-			
+
 			code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f)\n", entryID, direction, qty)
 		}
 	case "strategy.close":
@@ -260,10 +260,10 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	if err != nil {
 		return "", err
 	}
-	
+
 	code := g.ind() + fmt.Sprintf("if %s {\n", condition)
 	g.indent++
-	
+
 	// Generate consequent (body) statements
 	for _, stmt := range ifStmt.Consequent {
 		stmtCode, err := g.generateStatement(stmt)
@@ -272,12 +272,12 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 		}
 		code += stmtCode
 	}
-	
+
 	g.indent--
 	code += g.ind() + "}\n"
-	
+
 	// TODO: Handle alternate (else) if needed
-	
+
 	return code, nil
 }
 
@@ -293,13 +293,13 @@ func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (s
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Generate right expression
 	rightCode, err := g.generateConditionExpression(logExpr.Right)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Map Pine logical operators to Go operators
 	op := logExpr.Operator
 	switch op {
@@ -308,7 +308,7 @@ func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (s
 	case "or":
 		op = "||"
 	}
-	
+
 	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
 }
 
@@ -318,22 +318,22 @@ func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpre
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Generate consequent (true branch)
 	consequentCode, err := g.generateConditionExpression(condExpr.Consequent)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Generate alternate (false branch)
 	alternateCode, err := g.generateConditionExpression(condExpr.Alternate)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Generate Go ternary-style code using if-else expression
 	// Go doesn't have ternary operator, so we use a function-like pattern
-	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()", 
+	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 		testCode, consequentCode, alternateCode), nil
 }
 
@@ -353,9 +353,9 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()", 
+		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 			testCode, consequentCode, alternateCode), nil
-			
+
 	case *ast.LogicalExpression:
 		// Handle logical expressions (and, or)
 		leftCode, err := g.generateConditionExpression(e.Left)
@@ -374,18 +374,18 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			op = "||"
 		}
 		return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
-		
+
 	case *ast.BinaryExpression:
 		left, err := g.generateConditionExpression(e.Left)
 		if err != nil {
 			return "", err
 		}
-		
+
 		right, err := g.generateConditionExpression(e.Right)
 		if err != nil {
 			return "", err
 		}
-		
+
 		// Map Pine operators to Go operators
 		op := e.Operator
 		switch op {
@@ -394,20 +394,20 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		case "or":
 			op = "||"
 		}
-		
+
 		return fmt.Sprintf("%s %s %s", left, op, right), nil
-		
+
 	case *ast.MemberExpression:
 		// Use extractSeriesExpression for proper offset handling
 		return g.extractSeriesExpression(e), nil
-		
+
 	case *ast.Identifier:
 		varName := e.Name
 		if g.seriesVariables[varName] {
 			return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
 		}
 		return varName, nil
-		
+
 	case *ast.Literal:
 		switch v := e.Value.(type) {
 		case float64:
@@ -419,7 +419,7 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		default:
 			return fmt.Sprintf("%v", v), nil
 		}
-		
+
 	default:
 		return "", fmt.Errorf("unsupported condition expression: %T", expr)
 	}
@@ -429,7 +429,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	code := ""
 	for _, declarator := range decl.Declarations {
 		varName := declarator.ID.Name
-		
+
 		// Determine variable type based on init expression
 		varType := "float64" // Default type
 		if declarator.Init != nil {
@@ -441,7 +441,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			}
 		}
 		g.variables[varName] = varType
-		
+
 		// Generate initialization from init expression
 		if declarator.Init != nil {
 			initCode, err := g.generateVariableInit(varName, declarator.Init)
@@ -475,10 +475,10 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		}
 		// Generate inline conditional with Series.Set() if needed
 		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n", 
+			return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 				varName, condCode, consequentCode, alternateCode), nil
 		}
-		return g.ind() + fmt.Sprintf("%s = func() float64 { if %s { return %s } else { return %s } }()\n", 
+		return g.ind() + fmt.Sprintf("%s = func() float64 { if %s { return %s } else { return %s } }()\n",
 			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.Literal:
 		// Simple literal assignment
@@ -511,6 +511,16 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
 		}
 		return g.ind() + fmt.Sprintf("%s = %s\n", varName, binaryCode), nil
+	case *ast.LogicalExpression:
+		// Logical expression like (a and b) or (c and d)
+		logicalCode, err := g.generateConditionExpression(expr)
+		if err != nil {
+			return "", err
+		}
+		if g.seriesVariables[varName] {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, logicalCode), nil
+		}
+		return g.ind() + fmt.Sprintf("%s = %s\n", varName, logicalCode), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
 	}
@@ -518,18 +528,18 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpression) (string, error) {
 	funcName := g.extractFunctionName(call.Callee)
-	
+
 	switch funcName {
 	case "ta.sma":
 		// ta.sma(source, length)
 		if len(call.Arguments) < 2 {
 			return "", fmt.Errorf("ta.sma requires 2 arguments")
 		}
-		
+
 		// Get source and length
 		source := g.extractArgIdentifier(call.Arguments[0])
 		lengthVal := g.extractArgLiteral(call.Arguments[1])
-		
+
 		code := g.ind() + fmt.Sprintf("// Calculate SMA for %s\n", varName)
 		code += g.ind() + fmt.Sprintf("if i >= %d - 1 {\n", lengthVal)
 		g.indent++
@@ -539,80 +549,80 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + fmt.Sprintf("sum += ctx.Data[i-j].%s\n", source)
 		g.indent--
 		code += g.ind() + "}\n"
-		
+
 		if g.seriesVariables[varName] {
 			code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %.1f)\n", varName, float64(lengthVal))
 		} else {
 			code += g.ind() + fmt.Sprintf("%s = sum / %.1f\n", varName, float64(lengthVal))
 		}
-		
+
 		g.indent--
 		code += g.ind() + "} else {\n"
 		g.indent++
-		
+
 		if g.seriesVariables[varName] {
 			code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0) // NaN warmup\n", varName)
 		} else {
 			code += g.ind() + fmt.Sprintf("%s = 0.0 // NaN warmup\n", varName)
 		}
-		
+
 		g.indent--
 		code += g.ind() + "}\n"
-		
+
 		return code, nil
-		
+
 	case "ta.crossover":
 		// ta.crossover(series1, series2) - series1 crosses ABOVE series2
 		if len(call.Arguments) < 2 {
 			return "", fmt.Errorf("ta.crossover requires 2 arguments")
 		}
-		
+
 		series1 := g.extractSeriesExpression(call.Arguments[0])
 		series2 := g.extractSeriesExpression(call.Arguments[1])
-		
+
 		// Need previous values for both series
 		prev1Var := varName + "_prev1"
 		prev2Var := varName + "_prev2"
-		
+
 		code := g.ind() + fmt.Sprintf("// Crossover: %s crosses above %s\n", series1, series2)
 		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
 		code += g.ind() + "if i > 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%s = %s > %s && %s <= %s\n", 
+		code += g.ind() + fmt.Sprintf("%s = %s > %s && %s <= %s\n",
 			varName, series1, series2, prev1Var, prev2Var)
 		g.indent--
 		code += g.ind() + "}\n"
-		
+
 		return code, nil
-		
+
 	case "ta.crossunder":
 		// ta.crossunder(series1, series2) - series1 crosses BELOW series2
 		if len(call.Arguments) < 2 {
 			return "", fmt.Errorf("ta.crossunder requires 2 arguments")
 		}
-		
+
 		series1 := g.extractSeriesExpression(call.Arguments[0])
 		series2 := g.extractSeriesExpression(call.Arguments[1])
-		
+
 		// Need previous values for both series
 		prev1Var := varName + "_prev1"
 		prev2Var := varName + "_prev2"
-		
+
 		code := g.ind() + fmt.Sprintf("// Crossunder: %s crosses below %s\n", series1, series2)
 		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
 		code += g.ind() + "if i > 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%s = %s < %s && %s >= %s\n", 
+		code += g.ind() + fmt.Sprintf("%s = %s < %s && %s >= %s\n",
 			varName, series1, series2, prev1Var, prev2Var)
 		g.indent--
 		code += g.ind() + "}\n"
-		
+
 		return code, nil
-		
+
 	default:
 		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
 	}
@@ -730,7 +740,7 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 	if id, ok := expr.Property.(*ast.Identifier); ok {
 		prop = id.Name
 	}
-	
+
 	// Map Pine constants to Go runtime constants
 	if obj == "strategy" {
 		switch prop {
@@ -740,7 +750,7 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 			return "strategy.Short"
 		}
 	}
-	
+
 	return obj + "." + prop
 }
 
@@ -750,7 +760,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// Handle series subscript like close[0], close[1], sma20[0], sma20[1]
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
-			
+
 			// Extract offset from subscript
 			offset := 0
 			if e.Computed {
@@ -763,7 +773,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 					}
 				}
 			}
-			
+
 			// Check if it's a Pine built-in series
 			switch varName {
 			case "close":
@@ -831,7 +841,7 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	// Convert current bar access to previous bar access
 	// bar.Close → ctx.Data[i-1].Close
 	// User variables need history tracking (store at end of bar loop)
-	
+
 	if seriesCode == "bar.Close" {
 		return "ctx.Data[i-1].Close"
 	}
@@ -847,13 +857,12 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	if seriesCode == "bar.Volume" {
 		return "ctx.Data[i-1].Volume"
 	}
-	
+
 	// For user variables like sma20, we need to recalculate at i-1
 	// This is a simplification - full implementation would store history
 	// For now, use 0.0 as placeholder (crossover won't work correctly with expressions)
 	return "0.0"
 }
-
 
 func (g *generator) generateLiteral(lit *ast.Literal) (string, error) {
 	switch v := lit.Value.(type) {
@@ -886,16 +895,16 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 	if node == nil {
 		return
 	}
-	
+
 	switch n := node.(type) {
 	case *ast.ExpressionStatement:
 		g.analyzeSeriesRequirements(n.Expression)
-		
+
 	case *ast.VariableDeclaration:
 		for _, decl := range n.Declarations {
 			g.analyzeSeriesRequirements(decl.Init)
 		}
-		
+
 	case *ast.CallExpression:
 		// Analyze callee
 		g.analyzeSeriesRequirements(n.Callee)
@@ -903,7 +912,7 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 		for _, arg := range n.Arguments {
 			g.analyzeSeriesRequirements(arg)
 		}
-		
+
 	case *ast.MemberExpression:
 		// Check if this is a subscript with offset > 0
 		if n.Computed {
@@ -935,11 +944,11 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 		}
 		// Analyze object recursively
 		g.analyzeSeriesRequirements(n.Object)
-		
+
 	case *ast.BinaryExpression:
 		g.analyzeSeriesRequirements(n.Left)
 		g.analyzeSeriesRequirements(n.Right)
-		
+
 	case *ast.ConditionalExpression:
 		g.analyzeSeriesRequirements(n.Test)
 		g.analyzeSeriesRequirements(n.Consequent)
