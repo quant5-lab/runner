@@ -173,6 +173,24 @@ func (c *Converter) convertComparison(comp *Comparison) (ast.Expression, error) 
 }
 
 func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression, error) {
+	if term.Subscript != nil {
+		// Convert subscript like close[1] to MemberExpression with Computed: true
+		indexExpr, err := c.convertArithExpr(term.Subscript.Index)
+		if err != nil {
+			return nil, err
+		}
+		
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     term.Subscript.Object,
+			},
+			Property: indexExpr,
+			Computed: true,
+		}, nil
+	}
+	
 	if term.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -303,6 +321,24 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 }
 
 func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
+	if val.Subscript != nil {
+		// Convert subscript like close[1] to MemberExpression with Computed: true
+		indexExpr, err := c.convertArithExpr(val.Subscript.Index)
+		if err != nil {
+			return nil, err
+		}
+		
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     val.Subscript.Object,
+			},
+			Property: indexExpr,
+			Computed: true,
+		}, nil
+	}
+	
 	if val.MemberAccess != nil {
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
@@ -527,6 +563,24 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	if factor.Call != nil {
 		return c.convertCallExpr(factor.Call)
+	}
+	
+	if factor.Subscript != nil {
+		// Convert subscript like close[1] to MemberExpression with Computed: true
+		indexExpr, err := c.convertArithExpr(factor.Subscript.Index)
+		if err != nil {
+			return nil, err
+		}
+		
+		return &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     factor.Subscript.Object,
+			},
+			Property: indexExpr,
+			Computed: true,
+		}, nil
 	}
 	
 	if factor.MemberAccess != nil {

@@ -79,11 +79,17 @@ type Term struct {
 
 type Factor struct {
 	Call         *CallExpr     `parser:"@@"`
+	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+}
+
+type Subscript struct {
+	Object string      `parser:"@Ident"`
+	Index  *ArithExpr  `parser:"'[' @@ ']'"`
 }
 
 type Comparison struct{
@@ -94,6 +100,7 @@ type Comparison struct{
 
 type ComparisonTerm struct {
 	Call         *CallExpr     `parser:"@@"`
+	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
 	Ident        *string       `parser:"| @Ident"`
@@ -122,7 +129,8 @@ type Argument struct {
 }
 
 type Value struct {
-	MemberAccess *MemberAccess `parser:"@@"`
+	Subscript    *Subscript    `parser:"@@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
 	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
@@ -136,7 +144,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `[(),=@/.><!?:+\-*%]+`},
+	{Name: "Punct", Pattern: `[(),=@/.><!?:+\-*%\[\]]+`},
 })
 
 func NewParser() (*participle.Parser[Script], error) {
