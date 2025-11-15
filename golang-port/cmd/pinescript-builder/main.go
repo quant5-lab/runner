@@ -58,7 +58,7 @@ func main() {
 	}
 
 	/* Generate Go code from AST */
-	strategyCode, err := codegen.GenerateStrategyCode(astJSON)
+	strategyCode, err := codegen.GenerateStrategyCodeFromAST(estree)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Codegen error: %v\n", err)
 		os.Exit(1)

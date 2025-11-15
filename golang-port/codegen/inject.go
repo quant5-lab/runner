@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -45,8 +46,15 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 
 /* GenerateStrategyCode converts parsed Pine AST to Go code */
 func GenerateStrategyCode(astJSON []byte) (*StrategyCode, error) {
-	// TODO: Implement AST → Go code generation
+	// Parse JSON to ESTree AST
+	var program map[string]interface{}
+	err := json.Unmarshal(astJSON, &program)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse AST JSON: %w", err)
+	}
+
 	// For now, return placeholder code
+	// TODO: Implement full AST traversal and code generation
 	code := &StrategyCode{
 		FunctionBody: `	// Strategy code will be generated here
 	strat.Call("Generated Strategy", 10000)
