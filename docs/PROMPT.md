@@ -1,0 +1,1 @@
+Provide long-term consistency and security for entire code base aligning to a mission of running original proven to work .pine files in our own custom runtime and visualize the charts,
