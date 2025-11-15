@@ -3,6 +3,7 @@ package codegen
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/borisquantlab/pinescript-go/ast"
 )
@@ -45,17 +46,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
 				varName := declarator.ID.Name
-				varType := "float64" // Default type
-
-				// Check init expression for type hints
-				if declarator.Init != nil {
-					if call, ok := declarator.Init.(*ast.CallExpression); ok {
-						funcName := g.extractFunctionName(call.Callee)
-						if funcName == "ta.crossover" || funcName == "ta.crossunder" {
-							varType = "bool"
-						}
-					}
-				}
+				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
 			}
 		}
@@ -70,6 +61,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	// Initialize strategy
 	code += g.ind() + "strat.Call(\"Generated Strategy\", 10000)\n\n"
+
+	// Suppress unused series import if no Series variables
+	if len(g.seriesVariables) == 0 {
+		code += g.ind() + "_ = series.NewSeries // Suppress unused import\n\n"
+	}
 
 	// Declare series variables
 	if len(g.variables) > 0 {
@@ -109,6 +105,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			return "", err
 		}
 		code += stmtCode
+	}
+
+	// Suppress unused variable warnings (simple approach - mark all as potentially used)
+	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
+	for varName := range g.variables {
+		if !g.seriesVariables[varName] {
+			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
+		}
 	}
 
 	// Advance Series cursors at end of bar loop
@@ -217,7 +221,12 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 			}
 
 			if plotVar != "" {
-				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", plotTitle, plotVar)
+				// Check if variable requires Series storage
+				plotExpr := plotVar
+				if g.seriesVariables[plotVar] {
+					plotExpr = plotVar + "Series.Get(0)"
+				}
+				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", plotTitle, plotExpr)
 			}
 		}
 	case "ta.sma":
@@ -431,15 +440,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		varName := declarator.ID.Name
 
 		// Determine variable type based on init expression
-		varType := "float64" // Default type
-		if declarator.Init != nil {
-			if call, ok := declarator.Init.(*ast.CallExpression); ok {
-				funcName := g.extractFunctionName(call.Callee)
-				if funcName == "ta.crossover" || funcName == "ta.crossunder" {
-					varType = "bool"
-				}
-			}
-		}
+		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
 
 		// Generate initialization from init expression
@@ -452,6 +453,36 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 	}
 	return code, nil
+}
+
+func (g *generator) inferVariableType(expr ast.Expression) string {
+	if expr == nil {
+		return "float64"
+	}
+
+	switch e := expr.(type) {
+	case *ast.BinaryExpression:
+		// Comparison operators produce bool
+		if e.Operator == ">" || e.Operator == "<" || e.Operator == ">=" ||
+			e.Operator == "<=" || e.Operator == "==" || e.Operator == "!=" {
+			return "bool"
+		}
+		return "float64"
+	case *ast.LogicalExpression:
+		// and/or produce bool
+		return "bool"
+	case *ast.CallExpression:
+		funcName := g.extractFunctionName(e.Callee)
+		if funcName == "ta.crossover" || funcName == "ta.crossunder" {
+			return "bool"
+		}
+		return "float64"
+	case *ast.ConditionalExpression:
+		// Ternary type depends on consequent/alternate
+		return g.inferVariableType(e.Consequent)
+	default:
+		return "float64"
+	}
 }
 
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
@@ -840,7 +871,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	// Convert current bar access to previous bar access
 	// bar.Close → ctx.Data[i-1].Close
-	// User variables need history tracking (store at end of bar loop)
+	// sma20Series.Get(0) → sma20Series.Get(1)
 
 	if seriesCode == "bar.Close" {
 		return "ctx.Data[i-1].Close"
@@ -858,9 +889,12 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 		return "ctx.Data[i-1].Volume"
 	}
 
-	// For user variables like sma20, we need to recalculate at i-1
-	// This is a simplification - full implementation would store history
-	// For now, use 0.0 as placeholder (crossover won't work correctly with expressions)
+	// Handle Series.Get(0) → Series.Get(1)
+	if strings.HasSuffix(seriesCode, "Series.Get(0)") {
+		return strings.Replace(seriesCode, "Series.Get(0)", "Series.Get(1)", 1)
+	}
+
+	// For non-Series user variables, return 0.0 (shouldn't happen in crossover with Series)
 	return "0.0"
 }
 
