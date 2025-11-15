@@ -20,25 +20,27 @@
 - Target: github.com/markcheno/go-talib (MIT - safe)
 
 ## Phase 1: Go Parser + Transpiler (8 weeks)
-- [ ] `mkdir -p golang-port/{lexer,parser,codegen,ast}`
-- [ ] `go mod init github.com/borisquantlab/pinescript-go`
-- [ ] Study `services/pine-parser/parser.py` lines 1-795 AST output
-- [ ] Install `github.com/alecthomas/participle/v2` (MIT license)
-- [ ] Define PineScript v5 grammar in `parser/grammar.go`
-- [ ] Implement lexer using participle.Lexer
-- [ ] Implement parser using participle.Parser
-- [ ] Map pynescript AST nodes to Go structs in `ast/nodes.go`
+- [x] `mkdir -p golang-port/{lexer,parser,codegen,ast}`
+- [x] `go mod init github.com/borisquantlab/pinescript-go`
+- [x] Study `services/pine-parser/parser.py` lines 1-795 AST output
+- [x] Install `github.com/alecthomas/participle/v2` (MIT license)
+- [x] Define PineScript v5 grammar in `parser/grammar.go`
+- [x] Implement lexer using participle.Lexer
+- [x] Implement parser using participle.Parser
+- [x] Map pynescript AST nodes to Go structs in `ast/nodes.go`
 - [ ] Implement `codegen/generator.go` AST → Go source
-- [ ] Test parse `strategies/test-simple.pine` → AST
-- [ ] Compare AST output vs `services/pine-parser/parser.py`
+- [x] Test parse `strategies/test-simple.pine` → AST
+- [x] Compare AST output vs `services/pine-parser/parser.py`
 - [ ] Generate Go code matching PineTS execution semantics
 - [ ] Test generated code compiles with `go build`
 
 ## Phase 2: Go Runtime (12 weeks)
-- [ ] `mkdir -p golang-port/runtime/{context,core,math,input,ta,strategy,request}`
+- [x] `mkdir -p golang-port/runtime/{context,core,math,input,ta,strategy,request}`
 - [ ] Install `github.com/markcheno/go-talib` (MIT license)
-- [ ] `runtime/context/context.go` OHLCV structs, bar_index, time
-- [ ] `runtime/core/core.go` plot(), color, na, nz(), fixnan()
+- [x] `runtime/context/context.go` OHLCV structs, bar_index, time
+- [x] `runtime/value/na.go` na, nz(), fixnan() (SOLID: separated from visual)
+- [x] `runtime/visual/color.go` color constants as hex strings (PineTS compatible)
+- [x] `runtime/output/plot.go` PlotCollector interface (SOLID: testable, mockable)
 - [ ] `runtime/math/math.go` abs(), max(), min() wrappers
 - [ ] `runtime/input/input.go` Int(), Float(), String() with JSON overrides
 - [ ] `runtime/ta/sma.go` using go-talib.Sma()
