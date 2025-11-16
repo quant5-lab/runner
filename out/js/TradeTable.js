@@ -35,17 +35,25 @@ export class TradeDataFormatter {
     return 'N/A';
   }
 
-  formatTrade(trade, index) {
+  calculateUnrealizedProfit(trade, currentPrice) {
+    if (trade.status !== 'open' || !currentPrice) return 0;
+    const multiplier = trade.direction === 'long' ? 1 : -1;
+    return (currentPrice - trade.entryPrice) * trade.size * multiplier;
+  }
+
+  formatTrade(trade, index, currentPrice) {
     const isOpen = trade.status === 'open';
+    const unrealizedProfit = this.calculateUnrealizedProfit(trade, currentPrice);
+    
     return {
       number: index + 1,
       date: this.getTradeDate(trade),
       direction: trade.direction,
       entryPrice: this.formatPrice(trade.entryPrice),
-      exitPrice: isOpen ? 'OPEN' : this.formatPrice(trade.exitPrice),
+      exitPrice: isOpen ? this.formatPrice(currentPrice) : this.formatPrice(trade.exitPrice),
       size: trade.size.toFixed(2),
-      profit: isOpen ? 'OPEN' : this.formatProfit(trade.profit),
-      profitRaw: isOpen ? 0 : trade.profit,
+      profit: isOpen ? this.formatProfit(unrealizedProfit) : this.formatProfit(trade.profit),
+      profitRaw: isOpen ? unrealizedProfit : trade.profit,
       isOpen: isOpen,
     };
   }
@@ -57,14 +65,16 @@ export class TradeTableRenderer {
     this.formatter = formatter;
   }
 
-  renderRows(trades) {
+  renderRows(trades, currentPrice) {
     return trades
       .map((trade, index) => {
-        const formatted = this.formatter.formatTrade(trade, index);
+        const formatted = this.formatter.formatTrade(trade, index, currentPrice);
         const directionClass =
           formatted.direction === 'long' ? 'trade-long' : 'trade-short';
         const profitClass = formatted.isOpen
-          ? 'trade-open'
+          ? formatted.profitRaw >= 0
+            ? 'trade-profit-positive'
+            : 'trade-profit-negative'
           : formatted.profitRaw >= 0
           ? 'trade-profit-positive'
           : 'trade-profit-negative';

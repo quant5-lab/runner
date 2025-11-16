@@ -137,14 +137,26 @@ export class ChartApplication {
       return;
     }
 
+    const currentPrice = candlestickData?.length > 0 
+      ? candlestickData[candlestickData.length - 1].close 
+      : null;
+
     const formatter = new TradeDataFormatter(candlestickData);
     const renderer = new TradeTableRenderer(formatter);
-    tbody.innerHTML = renderer.renderRows(allTrades);
+    tbody.innerHTML = renderer.renderRows(allTrades, currentPrice);
 
-    const netProfit = strategy.netProfit || 0;
+    const realizedProfit = strategy.netProfit || 0;
+    const unrealizedProfit = currentPrice
+      ? (strategy.openTrades || []).reduce((sum, trade) => {
+          const multiplier = trade.direction === 'long' ? 1 : -1;
+          return sum + (currentPrice - trade.entryPrice) * trade.size * multiplier;
+        }, 0)
+      : 0;
+    const totalProfit = realizedProfit + unrealizedProfit;
+    
     const profitClass =
-      netProfit >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
-    summary.innerHTML = `${allTrades.length} trades | Net P/L: <span class="${profitClass}">$${netProfit.toFixed(
+      totalProfit >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
+    summary.innerHTML = `${allTrades.length} trades | Net P/L: <span class="${profitClass}">$${totalProfit.toFixed(
       2
     )}</span>`;
   }
