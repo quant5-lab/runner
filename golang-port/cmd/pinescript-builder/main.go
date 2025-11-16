@@ -55,6 +55,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Preprocessing error: %v\n", err)
 			os.Exit(1)
 		}
+		fmt.Printf("Preprocessing complete\n")
+	} else {
+		fmt.Printf("Detected Pine v%d - no preprocessing needed\n", version)
 	}
 
 	/* Convert to ESTree */
