@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/borisquantlab/pinescript-go/codegen"
 	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/borisquantlab/pinescript-go/preprocessor"
 )
 
 var (
@@ -41,6 +43,18 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
 		os.Exit(1)
+	}
+
+	/* Detect Pine version and apply preprocessing if needed */
+	version := detectPineVersion(string(content))
+	if version < 5 {
+		fmt.Printf("Detected Pine v%d - applying v4→v5 preprocessing\n", version)
+		pipeline := preprocessor.NewV4ToV5Pipeline()
+		ast, err = pipeline.Run(ast)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Preprocessing error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	/* Convert to ESTree */
@@ -77,5 +91,18 @@ func main() {
 	fmt.Printf("Parsed: %s\n", *inputFlag)
 	fmt.Printf("Generated: %s\n", tempGoFile)
 	fmt.Printf("AST size: %d bytes\n", len(astJSON))
-	fmt.Printf("\nNext: Compile with: go build -o %s %s\n", *outputFlag, tempGoFile)
+	fmt.Printf("Next: Compile with: go build -o %s %s\n", *outputFlag, tempGoFile)
+}
+
+// detectPineVersion extracts version from //@version=N comment
+func detectPineVersion(content string) int {
+	re := regexp.MustCompile(`//@version\s*=\s*(\d+)`)
+	matches := re.FindStringSubmatch(content)
+	if len(matches) >= 2 {
+		var version int
+		fmt.Sscanf(matches[1], "%d", &version)
+		return version
+	}
+	// No version comment = assume v4 (pre-v5 default)
+	return 4
 }
