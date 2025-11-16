@@ -104,3 +104,4 @@
 - **Output**: Unified chart format (metadata + candlestick + indicators + strategy + ui sections)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
+- **Test Suite**: 70+ tests (preprocessor: 21, chartdata: 16, builder: 18, integration, codegen, runtime)
