@@ -69,12 +69,20 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 					funcName := obj + "." + prop
 					
 					if funcName == "indicator" || funcName == "strategy" {
-						if len(call.Arguments) > 0 {
-							if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-								if name, ok := lit.Value.(string); ok {
-									g.strategyName = name
-								}
-							}
+						// Extract title from first argument or from 'title=' named parameter
+						strategyName := g.extractStrategyName(call.Arguments)
+						if strategyName != "" {
+							g.strategyName = strategyName
+						}
+					}
+				}
+				// Handle v4 'study()' and v5 'indicator()' as Identifier calls
+				if id, ok := call.Callee.(*ast.Identifier); ok {
+					if id.Name == "study" || id.Name == "indicator" || id.Name == "strategy" {
+						// Extract title from first argument or from 'title=' named parameter
+						strategyName := g.extractStrategyName(call.Arguments)
+						if strategyName != "" {
+							g.strategyName = strategyName
 						}
 					}
 				}
@@ -118,7 +126,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code := ""
 
 	// Initialize strategy
-	code += g.ind() + "strat.Call(\"Generated Strategy\", 10000)\n\n"
+	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
 
 	// Declare ALL variables as Series (ForwardSeriesBuffer paradigm)
 	if len(g.variables) > 0 {
@@ -814,6 +822,47 @@ func (g *generator) extractArgLiteral(expr ast.Expression) int {
 	return 0
 }
 
+/* extractStrategyName extracts title from strategy/indicator/study arguments */
+func (g *generator) extractStrategyName(args []ast.Expression) string {
+	if len(args) == 0 {
+		return ""
+	}
+	
+	// First argument is positional title (simple case)
+	if lit, ok := args[0].(*ast.Literal); ok {
+		if name, ok := lit.Value.(string); ok {
+			return name
+		}
+	}
+	
+	// Search for 'title=' named parameter in ObjectExpression
+	for _, arg := range args {
+		if obj, ok := arg.(*ast.ObjectExpression); ok {
+			for _, prop := range obj.Properties {
+				// Check if key is 'title'
+				keyName := ""
+				if id, ok := prop.Key.(*ast.Identifier); ok {
+					keyName = id.Name
+				} else if lit, ok := prop.Key.(*ast.Literal); ok {
+					if name, ok := lit.Value.(string); ok {
+						keyName = name
+					}
+				}
+				
+				if keyName == "title" {
+					// Extract value
+					if lit, ok := prop.Value.(*ast.Literal); ok {
+						if name, ok := lit.Value.(string); ok {
+							return name
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return ""
+}
 func (g *generator) extractStringLiteral(expr ast.Expression) string {
 	if lit, ok := expr.(*ast.Literal); ok {
 		if val, ok := lit.Value.(string); ok {
@@ -1149,7 +1198,7 @@ func (g *generator) generateTAPreCalc(taFunc taFunctionCall) (string, error) {
 
 func (g *generator) generatePlaceholder() string {
 	code := g.ind() + "// Strategy code will be generated here\n"
-	code += g.ind() + "strat.Call(\"Generated Strategy\", 10000)\n\n"
+	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
