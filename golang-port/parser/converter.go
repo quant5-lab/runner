@@ -321,6 +321,11 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 }
 
 func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
+	if val.CallExpr != nil {
+		// Handle nested function calls like sma(close, 20) inside security()
+		return c.convertCallExpr(val.CallExpr)
+	}
+
 	if val.Subscript != nil {
 		// Convert subscript like close[1] to MemberExpression with Computed: true
 		indexExpr, err := c.convertArithExpr(val.Subscript.Index)

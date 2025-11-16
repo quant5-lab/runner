@@ -129,7 +129,8 @@ type Argument struct {
 }
 
 type Value struct {
-	Subscript    *Subscript    `parser:"@@"`
+	CallExpr     *CallExpr     `parser:"@@"`
+	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
 	Ident        *string       `parser:"| @Ident"`
@@ -140,17 +141,17 @@ type Value struct {
 var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
 	{Name: "Whitespace", Pattern: `[ \t\r\n]+`},
-	{Name: "String", Pattern: `"[^"]*"`},
+	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `[(),=@/.><!?:+\-*%\[\]]+`},
+	{Name: "Punct", Pattern: `==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
 })
 
 func NewParser() (*participle.Parser[Script], error) {
 	return participle.Build[Script](
 		participle.Lexer(pineLexer),
 		participle.Elide("Comment", "Whitespace"),
-		participle.UseLookahead(2),
+		participle.UseLookahead(4),
 	)
 }
