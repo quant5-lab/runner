@@ -300,6 +300,33 @@ mod-update: ## Update all dependencies
 	@$(MAKE) mod-tidy
 	@echo "✓ Dependencies updated"
 
+##@ Security Testing
+
+build-daily-lines: ## Build daily-lines strategy with security()
+	@echo "Building daily-lines strategy..."
+	@cd $(GOLANG_PORT) && $(GO) run cmd/pinescript-builder/main.go \
+		-input ../strategies/daily-lines.pine \
+		-output /tmp/daily-lines-bin \
+		-template template/main.go.tmpl > /tmp/build-output.txt 2>&1
+	@TEMP_GO=$$(grep "Generated:" /tmp/build-output.txt | awk '{print $$2}'); \
+	cd $(GOLANG_PORT) && $(GO) build -o /tmp/daily-lines $$TEMP_GO
+	@echo "✓ Binary: /tmp/daily-lines"
+
+run-daily-lines-btc: build-daily-lines ## Run daily-lines with BTCUSDT data
+	@mkdir -p out
+	@/tmp/daily-lines -symbol BTCUSDT -data $(GOLANG_PORT)/testdata/ohlcv/BTCUSDT_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
+	@echo "✓ Output: out/chart-data.json"
+
+run-daily-lines-gazp: build-daily-lines ## Run daily-lines with GAZP data
+	@mkdir -p out
+	@/tmp/daily-lines -symbol GAZP -data $(GOLANG_PORT)/testdata/ohlcv/GAZP_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
+	@echo "✓ Output: out/chart-data.json"
+
+run-daily-lines-sber: build-daily-lines ## Run daily-lines with SBER data
+	@mkdir -p out
+	@/tmp/daily-lines -symbol SBER -data $(GOLANG_PORT)/testdata/ohlcv/SBER_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
+	@echo "✓ Output: out/chart-data.json"
+
 ##@ Quick Commands
 
 all: clean build test ## Clean, build, and test everything
@@ -311,3 +338,4 @@ install-hooks: ## Install git hooks
 	@echo '#!/bin/sh\nmake fmt vet' > .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 	@echo "✓ Git hooks installed"
+

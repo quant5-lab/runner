@@ -8,6 +8,13 @@ import (
 	"github.com/borisquantlab/pinescript-go/ast"
 )
 
+/* StrategyCode holds generated Go code for strategy execution */
+type StrategyCode struct {
+	FunctionBody       string // executeStrategy() function body
+	StrategyName       string // Pine Script strategy name
+	NeedsSeriesPreCalc bool   // Whether TA pre-calculation imports are needed
+}
+
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
 func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen := &generator{
@@ -745,6 +752,126 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		g.indent--
 		code += g.ind() + "}\n"
 
+		return code, nil
+
+	case "request.security", "security":
+		/* security(symbol, timeframe, expression) - runtime evaluation with cached context
+		 * 1. Lookup security context from prefetch cache
+		 * 2. Find matching bar index using timestamp alignment
+		 * 3. Evaluate expression in security context at that bar
+		 */
+		if len(call.Arguments) < 3 {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // security() missing arguments\n", varName), nil
+		}
+
+		/* Extract symbol and timeframe literals */
+		symbolExpr := call.Arguments[0]
+		timeframeExpr := call.Arguments[1]
+		
+		/* Get symbol string (tickerid → ctx.Symbol, literal → "BTCUSDT") */
+		symbolStr := ""
+		if id, ok := symbolExpr.(*ast.Identifier); ok {
+			if id.Name == "tickerid" {
+				symbolStr = "ctx.Symbol"
+			} else {
+				symbolStr = fmt.Sprintf("%q", id.Name)
+			}
+		} else if mem, ok := symbolExpr.(*ast.MemberExpression); ok {
+			/* syminfo.tickerid */
+			_ = mem
+			symbolStr = "ctx.Symbol"
+		} else if lit, ok := symbolExpr.(*ast.Literal); ok {
+			if s, ok := lit.Value.(string); ok {
+				symbolStr = fmt.Sprintf("%q", s)
+			}
+		}
+		
+		/* Get timeframe string */
+		timeframeStr := ""
+		if lit, ok := timeframeExpr.(*ast.Literal); ok {
+			if s, ok := lit.Value.(string); ok {
+				tf := strings.Trim(s, "'\"") /* Strip Pine string quotes */
+				/* Normalize: D→1D, W→1W, M→1M */
+				if tf == "D" {
+					tf = "1D"
+				} else if tf == "W" {
+					tf = "1W"
+				} else if tf == "M" {
+					tf = "1M"
+				}
+				timeframeStr = tf /* Use normalized value directly without quoting yet */
+			}
+		}
+		
+		if symbolStr == "" || timeframeStr == "" {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // security() unresolved symbol/timeframe\n", varName), nil
+		}
+		
+		/* Build cache key using normalized timeframe */
+		cacheKey := fmt.Sprintf("%%s:%s", timeframeStr)
+		if symbolStr == "ctx.Symbol" {
+			cacheKey = fmt.Sprintf("%s:%s", "%s", timeframeStr)
+		} else {
+			cacheKey = fmt.Sprintf("%s:%s", strings.Trim(symbolStr, `"`), timeframeStr)
+		}
+		
+		/* Generate runtime lookup and evaluation */
+		code := g.ind() + fmt.Sprintf("/* security(%s, %s, ...) */\n", symbolStr, timeframeStr)
+		code += g.ind() + "{\n"
+		g.indent++
+		
+		code += g.ind() + fmt.Sprintf("secKey := fmt.Sprintf(%q, %s)\n", cacheKey, symbolStr)
+		code += g.ind() + "secCtx, secFound := securityContexts[secKey]\n"
+		code += g.ind() + "if !secFound {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		
+		/* Find bar index using timestamp */
+		code += g.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		code += g.ind() + "if secBarIdx < 0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + "secCtx.BarIndex = secBarIdx\n"
+		
+		/* Evaluate expression in security context by generating variable init */
+		/* Create temporary series variable for expression result */
+		exprArg := call.Arguments[2]
+		secTempVar := fmt.Sprintf("secTmp_%s", varName)
+		
+		/* Generate series declaration for temporary variable */
+		code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
+		
+		/* Store original context reference, temporarily use secCtx */
+		code += g.ind() + "origCtx := ctx\n"
+		code += g.ind() + "ctx = secCtx\n"
+		
+		/* Generate the expression evaluation using normal code generation */
+		exprInit, err := g.generateVariableInit(secTempVar, exprArg)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate security expression: %w", err)
+		}
+		code += exprInit
+		
+		/* Restore original context */
+		code += g.ind() + "ctx = origCtx\n"
+		
+		/* Extract value from temporary series */
+		code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
+		
+		g.indent--
+		code += g.ind() + "}\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		
 		return code, nil
 
 	default:

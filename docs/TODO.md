@@ -52,13 +52,28 @@
 - [x] `runtime/strategy/entry.go` Entry(), Close(), Exit()
 - [x] `runtime/strategy/trades.go` trade tracking slice
 - [x] `runtime/strategy/equity.go` equity calculation
-- [x] `runtime/request/security.go` multi-timeframe data fetching
 - [x] `runtime/chartdata/chartdata.go` ChartData struct
 - [x] `runtime/chartdata/chartdata.go` Candlestick []OHLCV field
 - [x] `runtime/chartdata/chartdata.go` Plots map[string]PlotSeries field
 - [x] `runtime/chartdata/chartdata.go` Strategy struct (Trades, OpenTrades, Equity, NetProfit)
 - [x] `runtime/chartdata/chartdata.go` Timestamp field
 - [x] `runtime/chartdata/chartdata.go` ToJSON() method
+
+## Phase 2.5: request.security() Module (4 weeks)
+- [x] `mkdir -p golang-port/{security,datafetcher}`
+- [x] `security/analyzer.go` AST scanner for security() calls (5/5 tests)
+- [x] `datafetcher/fetcher.go` DataFetcher interface (DIP)
+- [x] `datafetcher/file_fetcher.go` Local JSON reader with async simulation (5/5 tests)
+- [x] `security/cache.go` Multi-timeframe context + expression storage (8/8 tests)
+- [x] `security/evaluator.go` Expression evaluation in security context (6/6 tests)
+- [x] `security/prefetcher.go` Orchestration: dedupe, fetch, evaluate, cache (3/3 tests)
+- [x] `codegen/security_inject.go` Generate prefetch and lookup code (4/4 tests)
+- [ ] Integrate InjectSecurityCode into builder pipeline
+- [ ] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json data
+- [ ] Verify: SMA values NOT zeros, correct daily averages
+- [ ] Test: Downsampling (1h chart → 1D security)
+- [ ] Test: Same timeframe (1D chart → 1D security)
+- [ ] Test: Upsampling error handling (1D chart → 1h security)
 
 ## Phase 3: Binary Template (4 weeks)
 - [x] `mkdir -p golang-port/template`
@@ -102,6 +117,7 @@
 - **Strategy**: entry/close/close_all, if statements, ternary operators, Series historical access (var[offset])
 - **Binary**: test-simple.pine → 2.9MB static binary (49µs execution for 30 bars)
 - **Output**: Unified chart format (metadata + candlestick + indicators + strategy + ui sections)
-- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md
+- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 70+ tests (preprocessor: 21, chartdata: 16, builder: 18, integration, codegen, runtime)
+- **Test Suite**: 101+ tests (preprocessor: 21, chartdata: 16, builder: 18, codegen: 8, integration, runtime, datafetcher: 5, security: 27, security_inject: 4)
+- **security() Module**: Complete disk-based prefetch architecture (31/31 tests) - analyzer, file_fetcher, cache, evaluator, prefetcher, codegen injection - ready for builder integration

@@ -27,35 +27,31 @@ type SecurityDataFetcher interface {
 
 /* Request implements request.security() for multi-timeframe data */
 type Request struct {
-	ctx        *context.Context
-	fetcher    SecurityDataFetcher
-	cache      map[string]*context.Context
-	currentBar int
+	ctx          *context.Context
+	fetcher      SecurityDataFetcher
+	cache        map[string]*context.Context
+	exprCache    map[string][]float64
+	currentBar   int
 }
 
 /* NewRequest creates a new request handler */
 func NewRequest(ctx *context.Context, fetcher SecurityDataFetcher) *Request {
 	return &Request{
-		ctx:     ctx,
-		fetcher: fetcher,
-		cache:   make(map[string]*context.Context),
+		ctx:       ctx,
+		fetcher:   fetcher,
+		cache:     make(map[string]*context.Context),
+		exprCache: make(map[string][]float64),
 	}
 }
 
-/* Security fetches data from another timeframe/symbol */
-func (r *Request) Security(symbol, timeframe string, expression []float64, lookahead bool) (float64, error) {
-	// Simplified implementation for PoC - returns expression value for current bar
-	// Full implementation would:
-	// 1. Fetch data for target timeframe (if not cached)
-	// 2. Find matching bar based on current context time
-	// 3. Return expression value from that bar with lookahead logic
-
+/* Security fetches data from another timeframe/symbol and evaluates expression */
+func (r *Request) Security(symbol, timeframe string, exprFunc func(*context.Context) []float64, lookahead bool) (float64, error) {
 	cacheKey := fmt.Sprintf("%s:%s", symbol, timeframe)
 
-	// Check cache
+	// Check context cache
 	secCtx, cached := r.cache[cacheKey]
 	if !cached {
-		// Fetch data
+		// Fetch data for security timeframe
 		var err error
 		secCtx, err = r.fetcher.FetchData(symbol, timeframe, r.ctx.LastBarIndex()+1)
 		if err != nil {
@@ -64,17 +60,34 @@ func (r *Request) Security(symbol, timeframe string, expression []float64, looka
 		r.cache[cacheKey] = secCtx
 	}
 
-	// Get current bar time
-	currentTimeObj := r.ctx.GetTime(0)
+	// Check expression cache
+	exprValues, exprCached := r.exprCache[cacheKey]
+	if !exprCached {
+		// Calculate expression in security context
+		exprValues = exprFunc(secCtx)
+		r.exprCache[cacheKey] = exprValues
+	}
+
+	// Get current bar time from main context
+	currentTimeObj := r.ctx.GetTime(-r.currentBar)
 	currentTime := currentTimeObj.Unix()
 
 	// Find matching bar in security context
 	secIdx := r.findMatchingBar(secCtx, currentTime, lookahead)
-	if secIdx < 0 || secIdx >= len(expression) {
+	if secIdx < 0 || secIdx >= len(exprValues) {
 		return math.NaN(), nil
 	}
 
-	return expression[secIdx], nil
+	return exprValues[secIdx], nil
+}
+
+/* SecurityLegacy for backward compatibility with tests */
+func (r *Request) SecurityLegacy(symbol, timeframe string, expression []float64, lookahead bool) (float64, error) {
+	// Wrap pre-calculated array in function
+	exprFunc := func(secCtx *context.Context) []float64 {
+		return expression
+	}
+	return r.Security(symbol, timeframe, exprFunc, lookahead)
 }
 
 /* SetCurrentBar updates current bar index for context alignment */
@@ -82,9 +95,10 @@ func (r *Request) SetCurrentBar(bar int) {
 	r.currentBar = bar
 }
 
-/* ClearCache clears security data cache */
+/* ClearCache clears security data and expression caches */
 func (r *Request) ClearCache() {
 	r.cache = make(map[string]*context.Context)
+	r.exprCache = make(map[string][]float64)
 }
 
 /* findMatchingBar finds the bar index in security context that matches current time */

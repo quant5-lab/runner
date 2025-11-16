@@ -68,10 +68,10 @@ func TestRequestSecurity(t *testing.T) {
 
 	// Test security call
 	expression := []float64{110.0, 125.0} // Daily close values
-	value, err := req.Security("TEST", "1D", expression, false)
+	value, err := req.SecurityLegacy("TEST", "1D", expression, false)
 
 	if err != nil {
-		t.Fatalf("Security() failed: %v", err)
+		t.Fatalf("SecurityLegacy() failed: %v", err)
 	}
 
 	// Value should be from expression (simplified PoC may return NaN)
@@ -105,13 +105,13 @@ func TestRequestCaching(t *testing.T) {
 
 	// First call - should fetch
 	expression := []float64{110.0}
-	req.Security("TEST", "1D", expression, false)
+	req.SecurityLegacy("TEST", "1D", expression, false)
 	if fetchCount != 1 {
 		t.Errorf("Expected 1 fetch, got %d", fetchCount)
 	}
 
 	// Second call - should use cache
-	req.Security("TEST", "1D", expression, false)
+	req.SecurityLegacy("TEST", "1D", expression, false)
 	if fetchCount != 1 {
 		t.Errorf("Expected 1 fetch (cached), got %d", fetchCount)
 	}
@@ -120,7 +120,7 @@ func TestRequestCaching(t *testing.T) {
 	req.ClearCache()
 
 	// Third call - should fetch again
-	req.Security("TEST", "1D", expression, false)
+	req.SecurityLegacy("TEST", "1D", expression, false)
 	if fetchCount != 2 {
 		t.Errorf("Expected 2 fetches (after cache clear), got %d", fetchCount)
 	}
@@ -151,10 +151,10 @@ func TestRequestLookahead(t *testing.T) {
 
 	// Test with lookahead off
 	expression := []float64{110.0, 125.0}
-	valueOff, _ := req.Security("TEST", "1D", expression, false)
+	valueOff, _ := req.SecurityLegacy("TEST", "1D", expression, false)
 
 	// Test with lookahead on
-	valueOn, _ := req.Security("TEST", "1D", expression, true)
+	valueOn, _ := req.SecurityLegacy("TEST", "1D", expression, true)
 
 	// Values should differ based on lookahead
 	if valueOff == valueOn {

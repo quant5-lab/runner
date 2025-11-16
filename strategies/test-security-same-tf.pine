@@ -1,0 +1,10 @@
+//@version=4
+strategy("Same Timeframe Security Test", overlay=true)
+
+// Test same timeframe: 1h→1h (no warmup needed)
+same_tf_close = security(syminfo.tickerid, timeframe.period, close)
+same_tf_sma20 = security(syminfo.tickerid, timeframe.period, sma(close, 20))
+
+plot(close, "Close", color.blue, 1)
+plot(same_tf_close, "Same TF Close", color.green, 2)
+plot(same_tf_sma20, "Same TF SMA20", color.orange, 2)

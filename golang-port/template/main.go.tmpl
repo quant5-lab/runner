@@ -4,16 +4,28 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/borisquantlab/pinescript-go/datafetcher"
 	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 	"github.com/borisquantlab/pinescript-go/runtime/output"
 	"github.com/borisquantlab/pinescript-go/runtime/series"
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
 	"github.com/borisquantlab/pinescript-go/runtime/ta"
+	"github.com/borisquantlab/pinescript-go/security"
 	_ "github.com/borisquantlab/pinescript-go/runtime/value" // May be used by generated code
+)
+
+/* Prevent unused import errors - consumed by init() side effects */
+var (
+	_ = math.IsNaN
+	_ = datafetcher.NewFileFetcher
+	_ = ta.Sma
+	_ = security.AnalyzeAST
 )
 
 /* CLI flags */
@@ -21,6 +33,7 @@ var (
 	symbolFlag    = flag.String("symbol", "", "Trading symbol (e.g., BTCUSDT)")
 	timeframeFlag = flag.String("timeframe", "1h", "Timeframe (e.g., 1m, 5m, 1h, 1D)")
 	dataFlag      = flag.String("data", "", "Path to OHLCV data JSON file")
+	dataDirFlag   = flag.String("datadir", "", "Directory containing security() data files (optional)")
 	outputFlag    = flag.String("output", "chart-data.json", "Output file path")
 )
 
@@ -60,9 +73,17 @@ func main() {
 		ctx.AddBar(bar)
 	}
 
-	/* Execute strategy */
+	/* Determine data directory for security() calls */
+	dataDir := *dataDirFlag
+	if dataDir == "" {
+		/* Default: same directory as main data file */
+		dataDir = filepath.Dir(*dataFlag)
+	}
+
+	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
 	startTime := time.Now()
-	plotCollector, strat := executeStrategy(ctx)
+	securityContexts := make(map[string]*context.Context)
+	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts)
 	executionTime := time.Since(startTime)
 
 	/* Generate chart data with metadata */

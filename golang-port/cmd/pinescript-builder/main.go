@@ -81,6 +81,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	/* Inject security() prefetch code if needed */
+	strategyCode, err = codegen.InjectSecurityCode(strategyCode, estree)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Security injection error: %v\n", err)
+		os.Exit(1)
+	}
+
 	/* Create temp Go source file */
 	tempDir := os.TempDir()
 	tempGoFile := filepath.Join(tempDir, "pine_strategy_temp.go")
