@@ -82,7 +82,7 @@
 - [x] Complete AST → Go code generation for Pine functions (ta.sma/ema/rsi/atr/bbands/macd/stoch, plot, if/ternary, Series[offset])
 - [x] Implement strategy.entry, strategy.close, strategy.exit codegen (strategy.close lines 247-251, strategy.entry working)
 - [x] `./bin/strategy` on daily-lines-simple.pine validates basic features
-- [ ] `./bin/strategy` on daily-lines.pine validates advanced features
+- [x] `./bin/strategy` on daily-lines.pine validates advanced features
 - [ ] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy
 - [ ] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations
 - [ ] `./bin/strategy` on BB7 produces 9 trades
