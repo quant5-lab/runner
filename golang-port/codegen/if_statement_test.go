@@ -45,9 +45,16 @@ if (signal)
 	generated := code.FunctionBody
 	t.Logf("Generated code:\n%s", generated)
 
-	// Verify the if statement is generated correctly
-	if !strings.Contains(generated, "if signal {") && !strings.Contains(generated, "if (signal") {
-		t.Errorf("Expected 'if signal {', got:\n%s", generated)
+	// Verify ForwardSeriesBuffer paradigm (ALL variables use Series)
+	if !strings.Contains(generated, "signalSeries") {
+		t.Errorf("Expected signalSeries (ForwardSeriesBuffer paradigm), got:\n%s", generated)
+	}
+	if !strings.Contains(generated, "signalSeries.Set(") {
+		t.Errorf("Expected Series.Set() assignment, got:\n%s", generated)
+	}
+	// Bool variable stored as float64 in Series, needs != 0 for if condition
+	if !strings.Contains(generated, "if signalSeries.Get(0) != 0") {
+		t.Errorf("Expected 'if signalSeries.Get(0) != 0', got:\n%s", generated)
 	}
 	if !strings.Contains(generated, "strat.Entry(") {
 		t.Errorf("Expected 'strat.Entry(', got:\n%s", generated)

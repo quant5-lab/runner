@@ -102,9 +102,9 @@ func TestBuiltinSeriesHistoricalAccess(t *testing.T) {
 		t.Fatalf("Failed to generate code: %v", err)
 	}
 
-	// Should NOT create Series for builtin close
-	if strings.Contains(code.FunctionBody, "closeSeries") {
-		t.Error("Should not create Series for builtin close")
+	// ForwardSeriesBuffer paradigm: ALL variables use Series
+	if !strings.Contains(code.FunctionBody, "prev_closeSeries") {
+		t.Error("Expected prev_closeSeries (ForwardSeriesBuffer paradigm)", code.FunctionBody)
 	}
 
 	// Should use ctx.Data[i-1].Close for historical access
@@ -114,7 +114,7 @@ func TestBuiltinSeriesHistoricalAccess(t *testing.T) {
 }
 
 func TestNoSeriesForSimpleVariable(t *testing.T) {
-	// Variable never accessed with [offset > 0] - no Series needed
+	// ForwardSeriesBuffer paradigm: ALL variables use Series even without historical access
 	program := &ast.Program{
 		Body: []ast.Node{
 			&ast.VariableDeclaration{
@@ -133,19 +133,19 @@ func TestNoSeriesForSimpleVariable(t *testing.T) {
 		t.Fatalf("Failed to generate code: %v", err)
 	}
 
-	// Should declare as simple float64
-	if !strings.Contains(code.FunctionBody, "var simple_var float64") {
-		t.Error("Expected simple float64 declaration")
+	// Should declare as Series (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code.FunctionBody, "var simple_varSeries *series.Series") {
+		t.Error("Expected Series declaration (ForwardSeriesBuffer paradigm)", code.FunctionBody)
 	}
 
-	// Should NOT create Series
-	if strings.Contains(code.FunctionBody, "simple_varSeries") {
-		t.Error("Should not create Series for variable without historical access")
+	// Should initialize Series
+	if !strings.Contains(code.FunctionBody, "simple_varSeries = series.NewSeries") {
+		t.Error("Expected Series initialization", code.FunctionBody)
 	}
 
-	// Should NOT call Series.Next()
-	if strings.Contains(code.FunctionBody, "simple_varSeries.Next()") {
-		t.Error("Should not call Next() for non-Series variable")
+	// Should call Series.Next()
+	if !strings.Contains(code.FunctionBody, "simple_varSeries.Next()") {
+		t.Error("Expected Series.Next() call (ForwardSeriesBuffer paradigm)", code.FunctionBody)
 	}
 }
 

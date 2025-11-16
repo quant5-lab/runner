@@ -79,19 +79,28 @@
 - [x] Execution <50ms (24µs for 30 bars with placeholder strategy)
 
 ## Validation
-- [x] Complete AST → Go code generation for Pine functions (ta.sma, plot implemented)
+- [x] Complete AST → Go code generation for Pine functions (ta.sma/ema/rsi/atr/bbands/macd/stoch, plot, if/ternary, Series[offset])
 - [x] Implement strategy.entry, strategy.close, strategy.exit codegen (strategy.close lines 247-251, strategy.entry working)
+- [ ] `./bin/strategy` on daily-lines-simple.pine validates basic features
+- [ ] `./bin/strategy` on daily-lines.pine validates advanced features
+- [ ] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy
+- [ ] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations
 - [ ] `./bin/strategy` on BB7 produces 9 trades
+- [ ] `./bin/strategy` on BB8 produces expected trades
+- [ ] `./bin/strategy` on BB9 produces expected trades
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)
 - [ ] `ldd ./bin/strategy` shows no external deps (static binary)
 - [ ] E2E: replace `node src/index.js` with `./bin/strategy` in tests
 - [ ] E2E: 26/26 tests pass with Go binary
 
-## Current Status (as of commit cea50a7)
+## Current Status
 - **Parser**: 18/37 Pine fixtures parse successfully
-- **Runtime**: 10 packages with 80 passing tests
-- **Codegen**: ta.sma() and plot() generation working
+- **Runtime**: 14 packages (codegen, parser, chartdata, context, input, math, output, request, series, strategy, ta, value, visual, integration)
+- **Codegen**: ForwardSeriesBuffer paradigm (ALL variables → Series storage, cursor-based, forward-only, immutable history, O(1) advance)
+- **TA Functions**: ta.sma/ema/rma/rsi/atr/bbands/macd/stoch/crossover/crossunder/stdev/change/pivothigh/pivotlow, valuewhen (runtime library pre-calculation)
+- **Strategy**: entry/close/close_all, if statements, ternary operators, Series historical access (var[offset])
 - **Binary**: test-simple.pine → 2.9MB static binary (49µs execution for 30 bars)
-- **Output**: SMA20 values: [121.00 @ bar 19, 128.50 @ bar 29]
+- **Output**: Unified chart format (metadata + candlestick + indicators + strategy + ui sections)
+- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)

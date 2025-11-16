@@ -2,6 +2,7 @@ package chartdata
 
 import (
 	"encoding/json"
+	"math"
 	"time"
 
 	"github.com/borisquantlab/pinescript-go/runtime/context"
@@ -80,6 +81,27 @@ type PlotPoint struct {
 	Time    int64                  `json:"time"`
 	Value   float64                `json:"value"`
 	Options map[string]interface{} `json:"options,omitempty"`
+}
+
+/* MarshalJSON implements custom JSON marshaling to convert NaN to null */
+func (p PlotPoint) MarshalJSON() ([]byte, error) {
+	type Alias PlotPoint
+	var value interface{}
+	if math.IsNaN(p.Value) || math.IsInf(p.Value, 0) {
+		value = nil // Encode as JSON null
+	} else {
+		value = p.Value
+	}
+	
+	return json.Marshal(&struct {
+		Time    int64                  `json:"time"`
+		Value   interface{}            `json:"value"`
+		Options map[string]interface{} `json:"options,omitempty"`
+	}{
+		Time:    p.Time,
+		Value:   value,
+		Options: p.Options,
+	})
 }
 
 /* PlotSeries represents a plot series (deprecated - use IndicatorSeries) */
@@ -196,7 +218,8 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	}
 }
 
-/* ToJSON converts chart data to JSON bytes */
+/* ToJSON converts chart data to JSON bytes, with NaN as null */
 func (cd *ChartData) ToJSON() ([]byte, error) {
+	// PlotPoint.MarshalJSON automatically converts NaN to null
 	return json.MarshalIndent(cd, "", "  ")
 }

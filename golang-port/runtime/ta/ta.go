@@ -292,3 +292,147 @@ func Stoch(high, low, close []float64, kPeriod, dPeriod int) ([]float64, []float
 
 	return k, d
 }
+
+/* Stdev calculates standard deviation (PineTS compatible) */
+func Stdev(source []float64, period int) []float64 {
+	if period <= 0 || len(source) == 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	for i := range result {
+		if i < period-1 {
+			result[i] = math.NaN()
+			continue
+		}
+
+		// Calculate mean
+		sum := 0.0
+		for j := 0; j < period; j++ {
+			sum += source[i-j]
+		}
+		mean := sum / float64(period)
+
+		// Calculate variance
+		variance := 0.0
+		for j := 0; j < period; j++ {
+			diff := source[i-j] - mean
+			variance += diff * diff
+		}
+		variance /= float64(period)
+
+		result[i] = math.Sqrt(variance)
+	}
+	return result
+}
+
+/* Change calculates bar-to-bar difference (source - source[1]) (PineTS compatible) */
+func Change(source []float64) []float64 {
+	if len(source) == 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	result[0] = math.NaN()
+
+	for i := 1; i < len(source); i++ {
+		if math.IsNaN(source[i]) || math.IsNaN(source[i-1]) {
+			result[i] = math.NaN()
+		} else {
+			result[i] = source[i] - source[i-1]
+		}
+	}
+	return result
+}
+
+/* Pivothigh detects pivot high points (local maxima) (PineTS compatible) */
+func Pivothigh(source []float64, leftBars, rightBars int) []float64 {
+	if len(source) == 0 || leftBars < 0 || rightBars < 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	for i := range result {
+		result[i] = math.NaN()
+	}
+
+	// Need leftBars before and rightBars after current bar
+	for i := leftBars; i < len(source)-rightBars; i++ {
+		isPivot := true
+		center := source[i]
+
+		if math.IsNaN(center) {
+			continue
+		}
+
+		// Check left bars - all must be less than or equal to center
+		for j := 1; j <= leftBars; j++ {
+			if math.IsNaN(source[i-j]) || source[i-j] > center {
+				isPivot = false
+				break
+			}
+		}
+
+		// Check right bars - all must be less than or equal to center
+		if isPivot {
+			for j := 1; j <= rightBars; j++ {
+				if math.IsNaN(source[i+j]) || source[i+j] > center {
+					isPivot = false
+					break
+				}
+			}
+		}
+
+		if isPivot {
+			result[i] = center
+		}
+	}
+
+	return result
+}
+
+/* Pivotlow detects pivot low points (local minima) (PineTS compatible) */
+func Pivotlow(source []float64, leftBars, rightBars int) []float64 {
+	if len(source) == 0 || leftBars < 0 || rightBars < 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	for i := range result {
+		result[i] = math.NaN()
+	}
+
+	// Need leftBars before and rightBars after current bar
+	for i := leftBars; i < len(source)-rightBars; i++ {
+		isPivot := true
+		center := source[i]
+
+		if math.IsNaN(center) {
+			continue
+		}
+
+		// Check left bars - all must be greater than or equal to center
+		for j := 1; j <= leftBars; j++ {
+			if math.IsNaN(source[i-j]) || source[i-j] < center {
+				isPivot = false
+				break
+			}
+		}
+
+		// Check right bars - all must be greater than or equal to center
+		if isPivot {
+			for j := 1; j <= rightBars; j++ {
+				if math.IsNaN(source[i+j]) || source[i+j] < center {
+					isPivot = false
+					break
+				}
+			}
+		}
+
+		if isPivot {
+			result[i] = center
+		}
+	}
+
+	return result
+}

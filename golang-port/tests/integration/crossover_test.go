@@ -58,12 +58,12 @@ if longCrossover
 	t.Logf("Generated code written to %s", tmpFile)
 	t.Logf("Generated code:\n%s", goCode)
 
-	// Verify key elements in generated code
-	if !strings.Contains(goCode, "var sma20 float64") {
-		t.Error("Missing sma20 float64 declaration")
+	// Verify key elements in generated code (ForwardSeriesBuffer patterns)
+	if !strings.Contains(goCode, "var sma20Series *series.Series") {
+		t.Error("Missing sma20Series Series declaration")
 	}
-	if !strings.Contains(goCode, "var longCrossover bool") {
-		t.Error("Missing longCrossover bool declaration")
+	if !strings.Contains(goCode, "var longCrossoverSeries *series.Series") {
+		t.Error("Missing longCrossoverSeries Series declaration")
 	}
 	if !strings.Contains(goCode, "Crossover") {
 		t.Error("Missing crossover comment")
@@ -71,7 +71,7 @@ if longCrossover
 	if !strings.Contains(goCode, "if i > 0") {
 		t.Error("Missing warmup check for crossover")
 	}
-	if !strings.Contains(goCode, "bar.Close > sma20") {
-		t.Error("Missing crossover condition")
+	if !strings.Contains(goCode, "bar.Close > sma20Series.Get(0)") {
+		t.Error("Missing crossover condition with Series.Get(0)")
 	}
 }

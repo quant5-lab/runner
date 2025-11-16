@@ -37,7 +37,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 		{
 			name:     "user variable identifier",
 			expr:     &ast.Identifier{Name: "sma20"},
-			expected: "sma20",
+			expected: "sma20Series.GetCurrent()",
 		},
 		{
 			name: "user variable with subscript",
@@ -45,7 +45,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 				Object:   &ast.Identifier{Name: "sma20"},
 				Property: &ast.Literal{Value: 0},
 			},
-			expected: "sma20",
+			expected: "sma20Series.Get(0)",
 		},
 		{
 			name:     "float literal",
@@ -59,7 +59,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 				Left:     &ast.Identifier{Name: "sma20"},
 				Right:    &ast.Literal{Value: 1.02},
 			},
-			expected: "(sma20 * 1.02)",
+			expected: "(sma20Series.GetCurrent() * 1.02)",
 		},
 		{
 			name: "complex arithmetic",
@@ -75,7 +75,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 					Right:    &ast.Literal{Value: 0.05},
 				},
 			},
-			expected: "(bar.Close + (sma20 * 0.05))",
+			expected: "(bar.Close + (sma20Series.GetCurrent() * 0.05))",
 		},
 	}
 
@@ -171,9 +171,9 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 		t.Fatalf("generateVariableFromCall failed: %v", err)
 	}
 
-	// Verify generated code structure
-	if !strings.Contains(code, "longCross = false") {
-		t.Error("Missing initial false assignment")
+	// Verify generated code structure (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code, "longCrossSeries.Set(0.0)") {
+		t.Error("Missing initial Series.Set(0.0) assignment")
 	}
 	if !strings.Contains(code, "if i > 0") {
 		t.Error("Missing warmup check")
@@ -181,7 +181,7 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 	if !strings.Contains(code, "ctx.Data[i-1].Close") {
 		t.Error("Missing previous close access")
 	}
-	if !strings.Contains(code, "bar.Close > sma20") {
+	if !strings.Contains(code, "bar.Close > sma20Series.Get(0)") {
 		t.Error("Missing crossover condition (current)")
 	}
 	if !strings.Contains(code, "&&") {
@@ -189,6 +189,9 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 	}
 	if !strings.Contains(code, "<=") {
 		t.Error("Missing previous comparison operator")
+	}
+	if !strings.Contains(code, "longCrossSeries.Set(func() float64") {
+		t.Error("Missing Series.Set with bool→float64 conversion")
 	}
 }
 
@@ -218,18 +221,24 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 		t.Fatalf("generateVariableFromCall failed: %v", err)
 	}
 
-	// Verify generated code structure
-	if !strings.Contains(code, "shortCross = false") {
-		t.Error("Missing initial false assignment")
+	t.Logf("Generated code:\n%s", code)
+
+	// Verify generated code structure (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code, "shortCrossSeries.Set(0.0)") {
+		t.Error("Missing initial Series.Set(0.0) assignment")
 	}
 	if !strings.Contains(code, "if i > 0") {
 		t.Error("Missing warmup check")
 	}
-	if !strings.Contains(code, "bar.Close < sma50") {
+	// sma50 is an Identifier (not MemberExpression), so it uses GetCurrent()
+	if !strings.Contains(code, "bar.Close < sma50Series.GetCurrent()") && !strings.Contains(code, "bar.Close < sma50Series.Get(0)") {
 		t.Error("Missing crossunder condition (current below)")
 	}
 	if !strings.Contains(code, ">=") {
 		t.Error("Missing previous >= operator for crossunder")
+	}
+	if !strings.Contains(code, "shortCrossSeries.Set(func() float64") {
+		t.Error("Missing Series.Set with bool→float64 conversion")
 	}
 }
 
@@ -263,11 +272,11 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 		t.Fatalf("generateVariableFromCall failed: %v", err)
 	}
 
-	// Verify arithmetic expression in generated code
-	if !strings.Contains(code, "(sma20 * 1.02)") {
+	// Verify arithmetic expression in generated code (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code, "(sma20Series.GetCurrent() * 1.02)") {
 		t.Error("Missing arithmetic expression in crossover")
 	}
-	if !strings.Contains(code, "bar.Close > (sma20 * 1.02)") {
+	if !strings.Contains(code, "bar.Close > (sma20Series.GetCurrent() * 1.02)") {
 		t.Error("Missing arithmetic comparison")
 	}
 }
@@ -322,11 +331,18 @@ func TestBooleanTypeTracking(t *testing.T) {
 		t.Fatalf("generateProgram failed: %v", err)
 	}
 
-	// Verify correct type declarations
-	if !strings.Contains(code, "var longCross bool") {
-		t.Error("longCross should be declared as bool")
+	// Verify ForwardSeriesBuffer paradigm (ALL variables are *series.Series)
+	if !strings.Contains(code, "var longCrossSeries *series.Series") {
+		t.Error("longCross should be declared as *series.Series")
 	}
-	if !strings.Contains(code, "var sma50 float64") {
-		t.Error("sma50 should be declared as float64")
+	if !strings.Contains(code, "var sma50Series *series.Series") {
+		t.Error("sma50 should be declared as *series.Series")
+	}
+	// Verify type tracking in g.variables map
+	if gen.variables["longCross"] != "bool" {
+		t.Errorf("longCross should be tracked as bool type, got: %s", gen.variables["longCross"])
+	}
+	if gen.variables["sma50"] != "float64" {
+		t.Errorf("sma50 should be tracked as float64 type, got: %s", gen.variables["sma50"])
 	}
 }

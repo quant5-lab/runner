@@ -48,17 +48,21 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 		t.Fatalf("Generate failed: %v", err)
 	}
 
-	// Verify generated code structure
-	if !strings.Contains(code, "var signal float64") {
-		t.Errorf("Missing signal variable declaration: got %s", code)
+	// Verify generated code structure (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code, "var signalSeries *series.Series") {
+		t.Errorf("Missing signal Series declaration: got %s", code)
 	}
 
-	if !strings.Contains(code, "if bar.Close > close_avg { return 1") {
+	if !strings.Contains(code, "if bar.Close > close_avgSeries.GetCurrent() { return 1") {
 		t.Errorf("Missing ternary true branch: got %s", code)
 	}
 
 	if !strings.Contains(code, "} else { return 0") {
 		t.Errorf("Missing ternary false branch: got %s", code)
+	}
+	
+	if !strings.Contains(code, "signalSeries.Set(func() float64") {
+		t.Errorf("Missing Series.Set with inline function: got %s", code)
 	}
 }
 
@@ -107,12 +111,12 @@ func TestTernaryWithArithmetic(t *testing.T) {
 		t.Fatalf("Generate failed: %v", err)
 	}
 
-	// Verify arithmetic in condition
-	if !strings.Contains(code, "volume_avg * 1.50") {
+	// Verify arithmetic in condition (ForwardSeriesBuffer paradigm)
+	if !strings.Contains(code, "volume_avgSeries.GetCurrent() * 1.50") {
 		t.Errorf("Missing arithmetic in ternary condition: got %s", code)
 	}
 
-	if !strings.Contains(code, "bar.Volume > volume_avg * 1.50") {
+	if !strings.Contains(code, "bar.Volume > volume_avgSeries.GetCurrent() * 1.50") {
 		t.Errorf("Missing complete condition with arithmetic: got %s", code)
 	}
 }

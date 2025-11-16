@@ -11,10 +11,9 @@ import (
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
 func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen := &generator{
-		imports:         make(map[string]bool),
-		variables:       make(map[string]string),
-		seriesVariables: make(map[string]bool),
-		strategyName:    "Generated Strategy",
+		imports:      make(map[string]bool),
+		variables:    make(map[string]string),
+		strategyName: "Generated Strategy",
 	}
 
 	body, err := gen.generateProgram(program)
@@ -23,20 +22,28 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	}
 
 	code := &StrategyCode{
-		FunctionBody: body,
-		StrategyName: gen.strategyName,
+		FunctionBody:       body,
+		StrategyName:       gen.strategyName,
+		NeedsSeriesPreCalc: gen.needsSeriesPreCalc,
 	}
 
 	return code, nil
 }
 
 type generator struct {
-	imports         map[string]bool
-	variables       map[string]string
-	seriesVariables map[string]bool // Variables requiring Series storage (accessed with [offset > 0])
-	plots           []string        // Track plot variables
-	strategyName    string          // Strategy name from indicator() or strategy()
-	indent          int
+	imports            map[string]bool
+	variables          map[string]string
+	plots              []string        // Track plot variables
+	strategyName       string          // Strategy name from indicator() or strategy()
+	indent             int
+	needsSeriesPreCalc bool                 // Flag if we need series pre-calculation
+	taFunctions        []taFunctionCall     // List of TA function calls to pre-calculate
+}
+
+type taFunctionCall struct {
+	varName  string
+	funcName string
+	args     []ast.Expression
 }
 
 func (g *generator) generateProgram(program *ast.Program) (string, error) {
@@ -84,9 +91,28 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
-	// Second pass: analyze Series requirements (variables accessed with [offset > 0])
+	// Second pass: No longer needed (ALL variables use Series storage)
+	// Kept for future optimizations if needed
+
+	// Third pass: collect TA function calls for pre-calculation
 	for _, stmt := range program.Body {
-		g.analyzeSeriesRequirements(stmt)
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+					funcName := g.extractFunctionName(callExpr.Callee)
+					if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
+						funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
+						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" {
+						g.needsSeriesPreCalc = true
+						g.taFunctions = append(g.taFunctions, taFunctionCall{
+							varName:  declarator.ID.Name,
+							funcName: funcName,
+							args:     callExpr.Arguments,
+						})
+					}
+				}
+			}
+		}
 	}
 
 	code := ""
@@ -94,33 +120,56 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Initialize strategy
 	code += g.ind() + "strat.Call(\"Generated Strategy\", 10000)\n\n"
 
-	// Suppress unused series import if no Series variables
-	if len(g.seriesVariables) == 0 {
-		code += g.ind() + "_ = series.NewSeries // Suppress unused import\n\n"
-	}
-
-	// Declare series variables
+	// Declare ALL variables as Series (ForwardSeriesBuffer paradigm)
 	if len(g.variables) > 0 {
-		code += g.ind() + "// Series variables\n"
-		for varName, varType := range g.variables {
-			if g.seriesVariables[varName] {
-				// Variable requires Series storage
-				code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
-			} else {
-				// Simple variable
-				code += g.ind() + fmt.Sprintf("var %s %s\n", varName, varType)
-			}
+		code += g.ind() + "// ALL variables use Series storage (ForwardSeriesBuffer paradigm)\n"
+		for varName := range g.variables {
+			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 		code += "\n"
 
-		// Initialize Series before bar loop
-		if len(g.seriesVariables) > 0 {
-			code += g.ind() + "// Initialize Series storage\n"
-			for varName := range g.seriesVariables {
-				code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
-			}
-			code += "\n"
+		// Initialize ALL Series before bar loop
+		code += g.ind() + "// Initialize Series storage\n"
+		for varName := range g.variables {
+			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
 		}
+		code += "\n"
+	}
+
+	// Pre-calculate TA functions using runtime library
+	if g.needsSeriesPreCalc && len(g.taFunctions) > 0 {
+		code += g.ind() + "// Pre-calculate TA functions using runtime library\n"
+		
+		// Extract source series (close, high, low, open, etc.)
+		sourcesNeeded := make(map[string]bool)
+		for _, taFunc := range g.taFunctions {
+			if len(taFunc.args) > 0 {
+				sourceName := g.extractArgIdentifier(taFunc.args[0])
+				if sourceName != "" {
+					sourcesNeeded[sourceName] = true
+				}
+			}
+		}
+		
+		for source := range sourcesNeeded {
+			code += g.ind() + fmt.Sprintf("%sSeries := make([]float64, len(ctx.Data))\n", strings.ToLower(source))
+			code += g.ind() + "for i := range ctx.Data {\n"
+			g.indent++
+			code += g.ind() + fmt.Sprintf("%sSeries[i] = ctx.Data[i].%s\n", strings.ToLower(source), source)
+			g.indent--
+			code += g.ind() + "}\n"
+		}
+		code += "\n"
+		
+		// Call runtime TA functions
+		for _, taFunc := range g.taFunctions {
+			funcCode, err := g.generateTAPreCalc(taFunc)
+			if err != nil {
+				return "", err
+			}
+			code += funcCode
+		}
+		code += "\n"
 	}
 
 	// Bar loop for strategy execution
@@ -139,20 +188,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += stmtCode
 	}
 
-	// Suppress unused variable warnings (simple approach - mark all as potentially used)
+	// Suppress unused variable warnings
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
 	for varName := range g.variables {
-		if !g.seriesVariables[varName] {
-			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
-		}
+		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
 
 	// Advance Series cursors at end of bar loop
-	if len(g.seriesVariables) > 0 {
-		code += "\n" + g.ind() + "// Advance Series cursors\n"
-		for varName := range g.seriesVariables {
-			code += g.ind() + fmt.Sprintf("if i < len(ctx.Data)-1 { %sSeries.Next() }\n", varName)
-		}
+	code += "\n" + g.ind() + "// Advance Series cursors\n"
+	for varName := range g.variables {
+		code += g.ind() + fmt.Sprintf("if i < len(ctx.Data)-1 { %sSeries.Next() }\n", varName)
 	}
 
 	g.indent--
@@ -253,11 +298,8 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 			}
 
 			if plotVar != "" {
-				// Check if variable requires Series storage
-				plotExpr := plotVar
-				if g.seriesVariables[plotVar] {
-					plotExpr = plotVar + "Series.Get(0)"
-				}
+				// ALL variables use Series storage
+				plotExpr := plotVar + "Series.Get(0)"
 				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", plotTitle, plotExpr)
 			}
 		}
@@ -286,8 +328,14 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 		// strategy.close_all()
 		code += g.ind() + "strat.CloseAll(bar.Close, bar.Time)\n"
 	case "ta.crossover", "ta.crossunder":
-		// Crossover functions - TODO: implement
-		code += g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName)
+		// Crossover functions - handled in variable declaration
+		return "", nil
+	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow":
+		// TA functions - handled in variable declaration
+		return "", nil
+	case "valuewhen":
+		// Value functions - handled in variable declaration
+		return "", nil
 	default:
 		code += g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName)
 	}
@@ -301,6 +349,9 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	if err != nil {
 		return "", err
 	}
+
+	// If the condition accesses a bool Series variable, add != 0 conversion
+	condition = g.addBoolConversionIfNeeded(ifStmt.Test, condition)
 
 	code := g.ind() + fmt.Sprintf("if %s {\n", condition)
 	g.indent++
@@ -360,6 +411,9 @@ func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpre
 		return "", err
 	}
 
+	// If the test accesses a bool Series variable, add != 0 conversion
+	testCode = g.addBoolConversionIfNeeded(condExpr.Test, testCode)
+
 	// Generate consequent (true branch)
 	consequentCode, err := g.generateConditionExpression(condExpr.Consequent)
 	if err != nil {
@@ -376,6 +430,33 @@ func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpre
 	// Go doesn't have ternary operator, so we use a function-like pattern
 	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 		testCode, consequentCode, alternateCode), nil
+}
+
+// addBoolConversionIfNeeded checks if the expression accesses a bool Series variable
+// and wraps the code with != 0 conversion for use in boolean contexts
+func (g *generator) addBoolConversionIfNeeded(expr ast.Expression, code string) string {
+	needsConversion := false
+	
+	// Check if this is a simple identifier that maps to a bool variable
+	if ident, ok := expr.(*ast.Identifier); ok {
+		if varType, exists := g.variables[ident.Name]; exists && varType == "bool" {
+			needsConversion = true
+		}
+	}
+	
+	// Check if this is a member expression (e.g., signal[0]) that accesses a bool Series
+	if member, ok := expr.(*ast.MemberExpression); ok {
+		if ident, ok := member.Object.(*ast.Identifier); ok {
+			if varType, exists := g.variables[ident.Name]; exists && varType == "bool" {
+				needsConversion = true
+			}
+		}
+	}
+	
+	if needsConversion {
+		return fmt.Sprintf("%s != 0", code)
+	}
+	return code
 }
 
 func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
@@ -443,11 +524,9 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Identifier:
+		// ALL variables use Series storage
 		varName := e.Name
-		if g.seriesVariables[varName] {
-			return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
-		}
-		return varName, nil
+		return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
 
 	case *ast.Literal:
 		switch v := e.Value.(type) {
@@ -475,13 +554,31 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
 
+		// Check if this is a TA function call
+		isTAFunc := false
+		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+			funcName := g.extractFunctionName(callExpr.Callee)
+			if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" || 
+			   funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
+			   funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" {
+				isTAFunc = true
+			}
+		}
+
 		// Generate initialization from init expression
 		if declarator.Init != nil {
-			initCode, err := g.generateVariableInit(varName, declarator.Init)
-			if err != nil {
-				return "", err
+			// For TA functions that are pre-calculated
+			if isTAFunc {
+				// Store in Series (ALL variables use Series)
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(%sArray[i])\n", varName, varName)
+			} else {
+				// Regular variable initialization (use Series.Set())
+				initCode, err := g.generateVariableInit(varName, declarator.Init)
+				if err != nil {
+					return "", err
+				}
+				code += initCode
 			}
-			code += initCode
 		}
 	}
 	return code, nil
@@ -528,6 +625,9 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		if err != nil {
 			return "", err
 		}
+		// If the test accesses a bool Series variable, add != 0 conversion
+		condCode = g.addBoolConversionIfNeeded(expr.Test, condCode)
+		
 		consequentCode, err := g.generateConditionExpression(expr.Consequent)
 		if err != nil {
 			return "", err
@@ -536,54 +636,38 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		if err != nil {
 			return "", err
 		}
-		// Generate inline conditional with Series.Set() if needed
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
-				varName, condCode, consequentCode, alternateCode), nil
-		}
-		return g.ind() + fmt.Sprintf("%s = func() float64 { if %s { return %s } else { return %s } }()\n",
+		// Generate inline conditional with Series.Set() (ALL variables use Series)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.Literal:
-		// Simple literal assignment
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, expr.Value), nil
-		}
-		return g.ind() + fmt.Sprintf("%s = %.2f\n", varName, expr.Value), nil
+		// Simple literal assignment (use Series.Set())
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, expr.Value), nil
 	case *ast.Identifier:
-		// Reference to another variable
+		// Reference to another variable (ALL use Series)
 		refName := expr.Name
-		accessCode := refName
-		if g.seriesVariables[refName] {
-			accessCode = fmt.Sprintf("%sSeries.GetCurrent()", refName)
-		}
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, accessCode), nil
-		}
-		return g.ind() + fmt.Sprintf("%s = %s\n", varName, accessCode), nil
+		accessCode := fmt.Sprintf("%sSeries.GetCurrent()", refName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, accessCode), nil
 	case *ast.MemberExpression:
-		// Member access like strategy.long or close[1]
+		// Member access like strategy.long or close[1] (use Series.Set())
 		memberCode := g.extractSeriesExpression(expr)
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
-		}
-		return g.ind() + fmt.Sprintf("%s = %s\n", varName, memberCode), nil
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
 	case *ast.BinaryExpression:
-		// Binary expression like sma20[1] > ema50[1]
+		// Binary expression like sma20[1] > ema50[1] → bool needs float64 conversion
 		binaryCode := g.extractSeriesExpression(expr)
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
+		varType := g.inferVariableType(expr)
+		if varType == "bool" {
+			// Convert bool to float64 for Series storage
+			return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, binaryCode), nil
 		}
-		return g.ind() + fmt.Sprintf("%s = %s\n", varName, binaryCode), nil
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
 	case *ast.LogicalExpression:
-		// Logical expression like (a and b) or (c and d)
+		// Logical expression like (a and b) or (c and d) → bool needs float64 conversion
 		logicalCode, err := g.generateConditionExpression(expr)
 		if err != nil {
 			return "", err
 		}
-		if g.seriesVariables[varName] {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, logicalCode), nil
-		}
-		return g.ind() + fmt.Sprintf("%s = %s\n", varName, logicalCode), nil
+		// Convert bool to float64 for Series storage
+		return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, logicalCode), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
 	}
@@ -593,46 +677,9 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	funcName := g.extractFunctionName(call.Callee)
 
 	switch funcName {
-	case "ta.sma":
-		// ta.sma(source, length)
-		if len(call.Arguments) < 2 {
-			return "", fmt.Errorf("ta.sma requires 2 arguments")
-		}
-
-		// Get source and length
-		source := g.extractArgIdentifier(call.Arguments[0])
-		lengthVal := g.extractArgLiteral(call.Arguments[1])
-
-		code := g.ind() + fmt.Sprintf("// Calculate SMA for %s\n", varName)
-		code += g.ind() + fmt.Sprintf("if i >= %d - 1 {\n", lengthVal)
-		g.indent++
-		code += g.ind() + "sum := 0.0\n"
-		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", lengthVal)
-		g.indent++
-		code += g.ind() + fmt.Sprintf("sum += ctx.Data[i-j].%s\n", source)
-		g.indent--
-		code += g.ind() + "}\n"
-
-		if g.seriesVariables[varName] {
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %.1f)\n", varName, float64(lengthVal))
-		} else {
-			code += g.ind() + fmt.Sprintf("%s = sum / %.1f\n", varName, float64(lengthVal))
-		}
-
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-
-		if g.seriesVariables[varName] {
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0) // NaN warmup\n", varName)
-		} else {
-			code += g.ind() + fmt.Sprintf("%s = 0.0 // NaN warmup\n", varName)
-		}
-
-		g.indent--
-		code += g.ind() + "}\n"
-
-		return code, nil
+	case "ta.sma", "ta.ema", "ta.rma", "ta.rsi", "ta.atr", "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow":
+		// TA functions - registered in third pass, just return empty here
+		return "", nil
 
 	case "ta.crossover":
 		// ta.crossover(series1, series2) - series1 crosses ABOVE series2
@@ -648,13 +695,16 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		prev2Var := varName + "_prev2"
 
 		code := g.ind() + fmt.Sprintf("// Crossover: %s crosses above %s\n", series1, series2)
-		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
 		code += g.ind() + "if i > 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%s = %s > %s && %s <= %s\n",
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s > %s && %s <= %s { return 1.0 } else { return 0.0 } }())\n",
 			varName, series1, series2, prev1Var, prev2Var)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
 		g.indent--
 		code += g.ind() + "}\n"
 
@@ -674,13 +724,16 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		prev2Var := varName + "_prev2"
 
 		code := g.ind() + fmt.Sprintf("// Crossunder: %s crosses below %s\n", series1, series2)
-		code += g.ind() + fmt.Sprintf("%s = false\n", varName)
 		code += g.ind() + "if i > 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
 		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%s = %s < %s && %s >= %s\n",
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s < %s && %s >= %s { return 1.0 } else { return 0.0 } }())\n",
 			varName, series1, series2, prev1Var, prev2Var)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
 		g.indent--
 		code += g.ind() + "}\n"
 
@@ -866,23 +919,15 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				}
 				return fmt.Sprintf("ctx.Data[i-%d].Volume", offset)
 			default:
-				// User-defined variable
-				if g.seriesVariables[varName] {
-					// Variable uses Series storage
-					return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
-				}
-				// Simple variable (no historical access)
-				return varName
+				// User-defined variable (ALL use Series storage)
+				return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 			}
 		}
 		return g.extractMemberName(e)
 	case *ast.Identifier:
-		// User-defined variable like sma20
+		// User-defined variable (ALL use Series storage)
 		varName := e.Name
-		if g.seriesVariables[varName] {
-			return fmt.Sprintf("%sSeries.GetCurrent()", varName)
-		}
-		return varName
+		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	case *ast.Literal:
 		// Numeric literal
 		switch v := e.Value.(type) {
@@ -980,35 +1025,9 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 		}
 
 	case *ast.MemberExpression:
-		// Check if this is a subscript with offset > 0
-		if n.Computed {
-			// This is subscript syntax like close[1] or sma20[2]
-			if lit, ok := n.Property.(*ast.Literal); ok {
-				if offsetFloat, ok := lit.Value.(float64); ok && offsetFloat > 0 {
-					// User variable with historical access
-					if obj, ok := n.Object.(*ast.Identifier); ok {
-						varName := obj.Name
-						// Check if it's a user variable (not built-in series)
-						if _, isUserVar := g.variables[varName]; isUserVar {
-							g.seriesVariables[varName] = true
-						}
-					}
-				}
-				if offsetInt, ok := lit.Value.(int); ok && offsetInt > 0 {
-					// User variable with historical access
-					if obj, ok := n.Object.(*ast.Identifier); ok {
-						varName := obj.Name
-						// Check if it's a user variable (not built-in series)
-						if _, isUserVar := g.variables[varName]; isUserVar {
-							g.seriesVariables[varName] = true
-						}
-					}
-				}
-			}
-			// Also analyze the index expression recursively
-			g.analyzeSeriesRequirements(n.Property)
-		}
-		// Analyze object recursively
+		// No longer needed (ALL variables use Series storage)
+		// Kept for future optimizations
+		g.analyzeSeriesRequirements(n.Property)
 		g.analyzeSeriesRequirements(n.Object)
 
 	case *ast.BinaryExpression:
@@ -1019,7 +1038,113 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 		g.analyzeSeriesRequirements(n.Test)
 		g.analyzeSeriesRequirements(n.Consequent)
 		g.analyzeSeriesRequirements(n.Alternate)
+
+	case *ast.LogicalExpression:
+		g.analyzeSeriesRequirements(n.Left)
+		g.analyzeSeriesRequirements(n.Right)
 	}
+}
+
+/* generateTAPreCalc generates runtime library call for TA function */
+func (g *generator) generateTAPreCalc(taFunc taFunctionCall) (string, error) {
+	code := ""
+	
+	// Use "Array" suffix for TA function results to distinguish from Series
+	arrayName := taFunc.varName + "Array"
+	
+	switch taFunc.funcName {
+	case "ta.sma", "ta.ema", "ta.rma":
+		// ta.sma(source, period)
+		if len(taFunc.args) < 2 {
+			return "", fmt.Errorf("%s requires 2 arguments", taFunc.funcName)
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		period := g.extractArgLiteral(taFunc.args[1])
+		
+		funcMap := map[string]string{"ta.sma": "Sma", "ta.ema": "Ema", "ta.rma": "Rma"}
+		funcName := funcMap[taFunc.funcName]
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.%s(%sSeries, %d)\n", 
+			arrayName, funcName, source, period)
+		
+	case "ta.rsi":
+		// ta.rsi(source, period)
+		if len(taFunc.args) < 2 {
+			return "", fmt.Errorf("ta.rsi requires 2 arguments")
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		period := g.extractArgLiteral(taFunc.args[1])
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Rsi(%sSeries, %d)\n", 
+			arrayName, source, period)
+		
+	case "ta.atr":
+		// ta.atr(period)
+		if len(taFunc.args) < 1 {
+			return "", fmt.Errorf("ta.atr requires 1 argument")
+		}
+		
+		period := g.extractArgLiteral(taFunc.args[0])
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Atr(highSeries, lowSeries, closeSeries, %d)\n", 
+			arrayName, period)
+		
+	case "ta.stdev":
+		// ta.stdev(source, period)
+		if len(taFunc.args) < 2 {
+			return "", fmt.Errorf("ta.stdev requires 2 arguments")
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		period := g.extractArgLiteral(taFunc.args[1])
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Stdev(%sSeries, %d)\n", 
+			arrayName, source, period)
+		
+	case "ta.change":
+		// ta.change(source)
+		if len(taFunc.args) < 1 {
+			return "", fmt.Errorf("ta.change requires 1 argument")
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Change(%sSeries)\n", 
+			arrayName, source)
+		
+	case "ta.pivothigh":
+		// ta.pivothigh(source, leftBars, rightBars)
+		if len(taFunc.args) < 3 {
+			return "", fmt.Errorf("ta.pivothigh requires 3 arguments")
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		leftBars := g.extractArgLiteral(taFunc.args[1])
+		rightBars := g.extractArgLiteral(taFunc.args[2])
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Pivothigh(%sSeries, %d, %d)\n", 
+			arrayName, source, leftBars, rightBars)
+		
+	case "ta.pivotlow":
+		// ta.pivotlow(source, leftBars, rightBars)
+		if len(taFunc.args) < 3 {
+			return "", fmt.Errorf("ta.pivotlow requires 3 arguments")
+		}
+		
+		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
+		leftBars := g.extractArgLiteral(taFunc.args[1])
+		rightBars := g.extractArgLiteral(taFunc.args[2])
+		
+		code += g.ind() + fmt.Sprintf("%s := ta.Pivotlow(%sSeries, %d, %d)\n", 
+			arrayName, source, leftBars, rightBars)
+		
+	default:
+		return "", fmt.Errorf("unsupported TA function: %s", taFunc.funcName)
+	}
+	
+	return code, nil
 }
 
 func (g *generator) generatePlaceholder() string {

@@ -9,8 +9,9 @@ import (
 
 /* StrategyCode holds generated Go code for strategy execution */
 type StrategyCode struct {
-	FunctionBody string // executeStrategy() function body
-	StrategyName string // Pine Script strategy name
+	FunctionBody       string // executeStrategy() function body
+	StrategyName       string // Pine Script strategy name
+	NeedsSeriesPreCalc bool   // Whether TA pre-calculation imports are needed
 }
 
 /* InjectStrategy reads template, injects strategy code, writes output */
@@ -36,6 +37,13 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 	// Replace placeholders
 	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)
 	output = strings.Replace(output, "{{STRATEGY_NAME}}", code.StrategyName, 1)
+	
+	// Conditional imports based on code requirements
+	if !code.NeedsSeriesPreCalc {
+		// Remove ta and value imports if not used
+		output = strings.Replace(output, `"github.com/borisquantlab/pinescript-go/runtime/ta"`, `// ta import not needed`, 1)
+		output = strings.Replace(output, `_ "github.com/borisquantlab/pinescript-go/runtime/value"`, `// value import not needed`, 1)
+	}
 
 	// Write output file
 	err = os.WriteFile(outputPath, []byte(output), 0644)
