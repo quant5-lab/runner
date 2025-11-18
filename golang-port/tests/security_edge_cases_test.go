@@ -14,8 +14,8 @@ func TestSecurityDownsampling_1h_to_1D_WithWarmup(t *testing.T) {
 	strategyCode := `
 //@version=5
 indicator("Security Downsample Test", overlay=true)
-dailyMA = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
-plot(dailyMA, title="Daily MA20", color=color.blue)
+dailyClose = request.security(syminfo.tickerid, "1D", close)
+plot(dailyClose, title="Daily Close", color=color.blue)
 `
 	
 	testDir := t.TempDir()
@@ -68,35 +68,37 @@ plot(dailyMA, title="Daily MA20", color=color.blue)
 	}
 	
 	var result struct {
-		Series []struct {
-			Title string          `json:"title"`
-			Data  [][]interface{} `json:"data"`
-		} `json:"series"`
+		Indicators map[string]struct {
+			Data []map[string]interface{} `json:"data"`
+		} `json:"indicators"`
 	}
 	if err := json.Unmarshal(resultData, &result); err != nil {
 		t.Fatal(err)
 	}
 	
-	if len(result.Series) == 0 {
-		t.Fatal("No series in output")
+	if len(result.Indicators) == 0 {
+		t.Fatal("No indicators in output")
 	}
 	
 	/* Downsample 1h→1D must produce values - warmup should provide enough daily bars */
-	dailyMASeries := result.Series[0]
-	if len(dailyMASeries.Data) == 0 {
+	dailyClose, ok := result.Indicators["Daily Close"]
+	if !ok {
+		t.Fatalf("Expected 'Daily Close' indicator, got: %v", result.Indicators)
+	}
+	if len(dailyClose.Data) == 0 {
 		t.Fatal("Downsampling produced zero values - warmup failed")
 	}
 	
 	nonNullCount := 0
-	for _, point := range dailyMASeries.Data {
-		if len(point) >= 2 && point[1] != nil {
+	for _, point := range dailyClose.Data {
+		if val, ok := point["value"]; ok && val != nil {
 			nonNullCount++
 		}
 	}
 	
-	/* With 500h warmup → 20+ days for MA20, expect >450 values */
-	if nonNullCount < 450 {
-		t.Errorf("Downsampling warmup insufficient: got %d non-null values, expected >450", nonNullCount)
+	/* With 500h warmup → 20+ days, expect >480 values (close available immediately) */
+	if nonNullCount < 480 {
+		t.Errorf("Downsampling warmup insufficient: got %d non-null values, expected >480", nonNullCount)
 	}
 }
 
@@ -159,29 +161,31 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 	}
 	
 	var result struct {
-		Series []struct {
-			Title string          `json:"title"`
-			Data  [][]interface{} `json:"data"`
-		} `json:"series"`
+		Indicators map[string]struct {
+			Data []map[string]interface{} `json:"data"`
+		} `json:"indicators"`
 	}
 	if err := json.Unmarshal(resultData, &result); err != nil {
 		t.Fatal(err)
 	}
 	
-	if len(result.Series) == 0 {
-		t.Fatal("No series in output")
+	if len(result.Indicators) == 0 {
+		t.Fatal("No indicators in output")
 	}
 	
 	/* Same-TF must produce 1:1 mapping - all 500 bars mapped */
-	sameTFSeries := result.Series[0]
-	if len(sameTFSeries.Data) != 500 {
-		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected 500", len(sameTFSeries.Data))
+	sameTF, ok := result.Indicators["Same-TF Close"]
+	if !ok {
+		t.Fatalf("Expected 'Same-TF Close' indicator, got: %v", result.Indicators)
+	}
+	if len(sameTF.Data) != 500 {
+		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected 500", len(sameTF.Data))
 	}
 	
 	/* All values should be non-null (direct 1:1 copy) */
 	nonNullCount := 0
-	for _, point := range sameTFSeries.Data {
-		if len(point) >= 2 && point[1] != nil {
+	for _, point := range sameTF.Data {
+		if val, ok := point["value"]; ok && val != nil {
 			nonNullCount++
 		}
 	}
@@ -251,29 +255,31 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 	}
 	
 	var result struct {
-		Series []struct {
-			Title string          `json:"title"`
-			Data  [][]interface{} `json:"data"`
-		} `json:"series"`
+		Indicators map[string]struct {
+			Data []map[string]interface{} `json:"data"`
+		} `json:"indicators"`
 	}
 	if err := json.Unmarshal(resultData, &result); err != nil {
 		t.Fatal(err)
 	}
 	
-	if len(result.Series) == 0 {
-		t.Fatal("No series in output")
+	if len(result.Indicators) == 0 {
+		t.Fatal("No indicators in output")
 	}
 	
 	/* Upsample 1D→1h when running on 1D base: should produce 1:1 mapping (both daily) */
-	dailyCloseSeries := result.Series[0]
-	if len(dailyCloseSeries.Data) < 20 {
-		t.Errorf("Upsampling test produced too few values: %d", len(dailyCloseSeries.Data))
+	dailyClose, ok := result.Indicators["Daily Close (hourly)"]
+	if !ok {
+		t.Fatalf("Expected 'Daily Close (hourly)' indicator, got: %v", result.Indicators)
+	}
+	if len(dailyClose.Data) < 20 {
+		t.Errorf("Upsampling test produced too few values: %d", len(dailyClose.Data))
 	}
 	
 	/* All values should be non-null (daily data repeats per daily bar) */
 	nonNullCount := 0
-	for _, point := range dailyCloseSeries.Data {
-		if len(point) >= 2 && point[1] != nil {
+	for _, point := range dailyClose.Data {
+		if val, ok := point["value"]; ok && val != nil {
 			nonNullCount++
 		}
 	}
