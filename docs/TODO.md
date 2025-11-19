@@ -89,13 +89,17 @@
 - [x] `codegen/generator.go` Identifier in security context (ctx.Data[ctx.BarIndex].Close)
 - [x] Test suite: 5/5 comprehensive security codegen tests PASS (BinaryExpression, ConditionalExpression, ATR, STDEV, ContextIsolation)
 - [x] Baseline: 7/7 BB pattern tests PASS (regression safety validated)
-- [ ] `services/pine-parser/parser.py` Allow BinaryExpression in security() 3rd argument
-- [ ] Test: ta.sma(close,20) + ta.ema(close,10) parses successfully
-- [ ] Test: (high - low) / close * 100 parses successfully
-- [ ] Test: 13/13 complex expression integration tests PASS
+- [x] `parser/grammar.go` Argument → TernaryExpr (supports all operators in function arguments)
+- [x] `parser/converter.go` String literal quote trimming fixed (both " and ')
+- [x] `parser/grammar.go` Parenthesized expressions added to Factor (supports complex precedence)
+- [x] `preprocessor/*.go` Updated visitor and ta_namespace transformer for TernaryExpr arguments
+- [x] Test: ta.sma(close,20) + ta.ema(close,10) parses successfully ✅
+- [x] Test: (high - low) / close * 100 parses successfully ✅
+- [x] Test: 10/10 security integration test suites PASS (28+ test cases, 100% success) ✅
 
 ### Integration & Validation
-- [ ] Integrate InjectSecurityCode into builder pipeline
+- [x] Integrate InjectSecurityCode into builder pipeline (complete)
+- [x] All security() test suites PASS (10 suites, 28+ cases)
 - [ ] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json
 - [ ] Verify: SMA values correct daily averages, not zeros
 - [ ] Test: Downsampling (1h → 1D), Same timeframe (1D → 1D), Upsampling error (1D → 1h)
