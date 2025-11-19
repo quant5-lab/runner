@@ -6,10 +6,9 @@ import (
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 )
 
-/* CacheEntry stores fetched context and evaluated expression values */
+/* CacheEntry stores fetched context only (O(1) per-bar access pattern) */
 type CacheEntry struct {
-	Context     *context.Context      /* Security context (OHLCV data) */
-	Expressions map[string][]float64  /* expressionName -> evaluated values */
+	Context *context.Context /* Security context (OHLCV data) */
 }
 
 /* SecurityCache stores multi-timeframe data and expressions */
@@ -37,34 +36,14 @@ func (c *SecurityCache) Set(symbol, timeframe string, entry *CacheEntry) {
 	c.entries[key] = entry
 }
 
-/* GetExpression retrieves specific expression values */
-func (c *SecurityCache) GetExpression(symbol, timeframe, exprName string) ([]float64, error) {
+/* GetContext retrieves context for symbol and timeframe */
+func (c *SecurityCache) GetContext(symbol, timeframe string) (*context.Context, error) {
 	entry, exists := c.Get(symbol, timeframe)
 	if !exists {
 		return nil, fmt.Errorf("no cache entry for %s:%s", symbol, timeframe)
 	}
 
-	values, exists := entry.Expressions[exprName]
-	if !exists {
-		return nil, fmt.Errorf("expression %s not found in %s:%s", exprName, symbol, timeframe)
-	}
-
-	return values, nil
-}
-
-/* SetExpression stores expression values in existing entry */
-func (c *SecurityCache) SetExpression(symbol, timeframe, exprName string, values []float64) error {
-	entry, exists := c.Get(symbol, timeframe)
-	if !exists {
-		return fmt.Errorf("no cache entry for %s:%s", symbol, timeframe)
-	}
-
-	if entry.Expressions == nil {
-		entry.Expressions = make(map[string][]float64)
-	}
-
-	entry.Expressions[exprName] = values
-	return nil
+	return entry.Context, nil
 }
 
 /* Clear removes all cache entries */

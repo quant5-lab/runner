@@ -9,11 +9,10 @@ import (
 func TestSecurityCache_SetAndGet(t *testing.T) {
 	cache := NewSecurityCache()
 
-	/* Create test entry */
+	/* Create test entry with context only */
 	ctx := context.New("BTC", "1D", 10)
 	entry := &CacheEntry{
-		Context:     ctx,
-		Expressions: map[string][]float64{"sma20": {100, 101, 102}},
+		Context: ctx,
 	}
 
 	/* Store entry */
@@ -29,8 +28,8 @@ func TestSecurityCache_SetAndGet(t *testing.T) {
 		t.Errorf("Expected symbol BTC, got %s", retrieved.Context.Symbol)
 	}
 
-	if len(retrieved.Expressions["sma20"]) != 3 {
-		t.Errorf("Expected 3 values, got %d", len(retrieved.Expressions["sma20"]))
+	if retrieved.Context.Timeframe != "1D" {
+		t.Errorf("Expected timeframe 1D, got %s", retrieved.Context.Timeframe)
 	}
 }
 
@@ -43,81 +42,37 @@ func TestSecurityCache_GetNonexistent(t *testing.T) {
 	}
 }
 
-func TestSecurityCache_GetExpression(t *testing.T) {
+func TestSecurityCache_GetContext(t *testing.T) {
 	cache := NewSecurityCache()
 
 	ctx := context.New("TEST", "1h", 5)
 	entry := &CacheEntry{
 		Context: ctx,
-		Expressions: map[string][]float64{
-			"close":  {100, 101, 102, 103, 104},
-			"sma10":  {99, 100, 101, 102, 103},
-		},
 	}
 
 	cache.Set("TEST", "1h", entry)
 
-	/* Get existing expression */
-	values, err := cache.GetExpression("TEST", "1h", "sma10")
+	/* Get context */
+	retrieved, err := cache.GetContext("TEST", "1h")
 	if err != nil {
-		t.Fatalf("GetExpression failed: %v", err)
+		t.Fatalf("GetContext failed: %v", err)
 	}
 
-	if len(values) != 5 {
-		t.Errorf("Expected 5 values, got %d", len(values))
+	if retrieved.Symbol != "TEST" {
+		t.Errorf("Expected symbol TEST, got %s", retrieved.Symbol)
 	}
 
-	if values[0] != 99 {
-		t.Errorf("Expected first value 99, got %.2f", values[0])
+	if retrieved.Timeframe != "1h" {
+		t.Errorf("Expected timeframe 1h, got %s", retrieved.Timeframe)
 	}
 }
 
-func TestSecurityCache_GetExpressionNotFound(t *testing.T) {
+func TestSecurityCache_GetContextNotFound(t *testing.T) {
 	cache := NewSecurityCache()
 
-	ctx := context.New("TEST", "1D", 1)
-	entry := &CacheEntry{
-		Context:     ctx,
-		Expressions: map[string][]float64{},
-	}
-
-	cache.Set("TEST", "1D", entry)
-
-	_, err := cache.GetExpression("TEST", "1D", "nonexistent")
+	_, err := cache.GetContext("NONE", "1D")
 	if err == nil {
-		t.Error("Expected error for nonexistent expression")
-	}
-}
-
-func TestSecurityCache_SetExpression(t *testing.T) {
-	cache := NewSecurityCache()
-
-	/* Create entry without expressions */
-	ctx := context.New("TEST", "1W", 3)
-	entry := &CacheEntry{Context: ctx}
-
-	cache.Set("TEST", "1W", entry)
-
-	/* Add expression */
-	values := []float64{10, 20, 30}
-	err := cache.SetExpression("TEST", "1W", "ema9", values)
-	if err != nil {
-		t.Fatalf("SetExpression failed: %v", err)
-	}
-
-	/* Verify expression was stored */
-	retrieved, _ := cache.GetExpression("TEST", "1W", "ema9")
-	if len(retrieved) != 3 {
-		t.Errorf("Expected 3 values, got %d", len(retrieved))
-	}
-}
-
-func TestSecurityCache_SetExpressionNoEntry(t *testing.T) {
-	cache := NewSecurityCache()
-
-	err := cache.SetExpression("NONE", "1m", "test", []float64{1})
-	if err == nil {
-		t.Error("Expected error for nonexistent entry")
+		t.Error("Expected error for nonexistent context")
 	}
 }
 
@@ -145,29 +100,31 @@ func TestSecurityCache_Clear(t *testing.T) {
 	}
 }
 
-func TestSecurityCache_MultipleExpressions(t *testing.T) {
+func TestSecurityCache_MultipleContexts(t *testing.T) {
 	cache := NewSecurityCache()
 
-	ctx := context.New("MULTI", "1D", 2)
-	entry := &CacheEntry{
-		Context: ctx,
-		Expressions: map[string][]float64{
-			"sma":  {100, 101},
-			"ema":  {102, 103},
-			"rsi":  {50, 51},
-		},
+	/* Add multiple contexts */
+	cache.Set("BTC", "1h", &CacheEntry{Context: context.New("BTC", "1h", 100)})
+	cache.Set("ETH", "1D", &CacheEntry{Context: context.New("ETH", "1D", 50)})
+	cache.Set("SOL", "1W", &CacheEntry{Context: context.New("SOL", "1W", 10)})
+
+	if cache.Size() != 3 {
+		t.Errorf("Expected size 3, got %d", cache.Size())
 	}
 
-	cache.Set("MULTI", "1D", entry)
+	/* Verify all contexts */
+	btcCtx, err := cache.GetContext("BTC", "1h")
+	if err != nil || btcCtx.Symbol != "BTC" {
+		t.Error("Failed to retrieve BTC context")
+	}
 
-	/* Verify all expressions */
-	for name := range entry.Expressions {
-		vals, err := cache.GetExpression("MULTI", "1D", name)
-		if err != nil {
-			t.Errorf("Failed to get expression %s: %v", name, err)
-		}
-		if len(vals) != 2 {
-			t.Errorf("Expression %s: expected 2 values, got %d", name, len(vals))
-		}
+	ethCtx, err := cache.GetContext("ETH", "1D")
+	if err != nil || ethCtx.Symbol != "ETH" {
+		t.Error("Failed to retrieve ETH context")
+	}
+
+	solCtx, err := cache.GetContext("SOL", "1W")
+	if err != nil || solCtx.Symbol != "SOL" {
+		t.Error("Failed to retrieve SOL context")
 	}
 }

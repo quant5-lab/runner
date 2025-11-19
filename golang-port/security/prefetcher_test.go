@@ -75,21 +75,11 @@ func TestPrefetcher_WithMockFetcher(t *testing.T) {
 		t.Errorf("Expected 5 bars from mock, got %d", len(entry.Context.Data))
 	}
 
-	/* Verify close expression cached */
-	closeValues, err := cache.GetExpression("TEST", "1D", "unnamed")
-	if err != nil {
-		t.Fatalf("Failed to get close expression: %v", err)
-	}
-
-	if len(closeValues) != 5 {
-		t.Errorf("Expected 5 close values, got %d", len(closeValues))
-	}
-
-	/* Verify synthetic data (102, 103, 104, 105, 106) */
+	/* Verify context data (synthetic values 102-106) */
 	expected := []float64{102, 103, 104, 105, 106}
 	for i, exp := range expected {
-		if closeValues[i] != exp {
-			t.Errorf("Close[%d]: expected %.0f, got %.0f", i, exp, closeValues[i])
+		if entry.Context.Data[i].Close != exp {
+			t.Errorf("Close[%d]: expected %.0f, got %.0f", i, exp, entry.Context.Data[i].Close)
 		}
 	}
 }
@@ -141,11 +131,14 @@ func TestPrefetcher_Deduplication(t *testing.T) {
 		t.Errorf("Expected 1 cache entry (deduplicated), got %d", cache.Size())
 	}
 
-	/* But should have 2 expressions (both named "unnamed" - will be last one) */
-	_, errExpr := cache.GetExpression("TEST", "1D", "unnamed")
+	/* Verify context exists */
+	ctx, err := cache.GetContext("TEST", "1D")
+	if err != nil {
+		t.Errorf("Expected context cached: %v", err)
+	}
 
-	if errExpr != nil {
-		t.Error("Expected expression cached")
+	if len(ctx.Data) == 0 {
+		t.Error("Expected context to have data bars")
 	}
 }
 

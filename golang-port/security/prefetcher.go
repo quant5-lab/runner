@@ -11,9 +11,8 @@ import (
 /* SecurityPrefetcher orchestrates the security() data prefetch workflow:
  * 1. Analyze AST for security() calls
  * 2. Deduplicate requests (same symbol+timeframe)
- * 3. Fetch data via DataFetcher interface
- * 4. Evaluate expressions in security contexts
- * 5. Populate SecurityCache for O(1) runtime lookups
+ * 3. Fetch OHLCV data via DataFetcher interface
+ * 4. Store contexts in cache for O(1) runtime access
  */
 type SecurityPrefetcher struct {
 	fetcher datafetcher.DataFetcher
@@ -35,7 +34,7 @@ type PrefetchRequest struct {
 	Expressions map[string]ast.Expression // "sma20" -> ta.sma(close, 20)
 }
 
-/* Prefetch executes complete workflow: analyze → fetch → evaluate → cache */
+/* Prefetch executes complete workflow: analyze → fetch → cache contexts */
 func (p *SecurityPrefetcher) Prefetch(program *ast.Program, limit int) error {
 	/* Step 1: Analyze AST for security() calls */
 	calls := AnalyzeAST(program)
@@ -46,8 +45,8 @@ func (p *SecurityPrefetcher) Prefetch(program *ast.Program, limit int) error {
 	/* Step 2: Deduplicate requests (group by symbol:timeframe) */
 	requests := p.deduplicateCalls(calls)
 
-	/* Step 3: Fetch data and evaluate expressions */
-	for key, req := range requests {
+	/* Step 3: Fetch data and store contexts */
+	for _, req := range requests {
 		/* Fetch OHLCV data for symbol+timeframe */
 		ohlcvData, err := p.fetcher.Fetch(req.Symbol, req.Timeframe, limit)
 		if err != nil {
@@ -60,28 +59,13 @@ func (p *SecurityPrefetcher) Prefetch(program *ast.Program, limit int) error {
 			secCtx.AddBar(bar)
 		}
 
-		/* Create cache entry with context */
+		/* Create cache entry with context only */
 		entry := &CacheEntry{
-			Context:     secCtx,
-			Expressions: make(map[string][]float64),
+			Context: secCtx,
 		}
 
 		/* Store entry in cache */
 		p.cache.Set(req.Symbol, req.Timeframe, entry)
-
-		/* Evaluate all expressions for this symbol+timeframe */
-		for exprName, exprAST := range req.Expressions {
-			values, err := EvaluateExpression(exprAST, secCtx)
-			if err != nil {
-				return fmt.Errorf("evaluate %s %s: %w", key, exprName, err)
-			}
-
-			/* Store evaluated expression in cache entry */
-			err = p.cache.SetExpression(req.Symbol, req.Timeframe, exprName, values)
-			if err != nil {
-				return fmt.Errorf("cache expression %s %s: %w", key, exprName, err)
-			}
-		}
 	}
 
 	return nil

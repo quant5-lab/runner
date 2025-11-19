@@ -45,6 +45,7 @@ type generator struct {
 	indent             int
 	needsSeriesPreCalc bool                 // Flag if we need series pre-calculation
 	taFunctions        []taFunctionCall     // List of TA function calls to pre-calculate
+	inSecurityContext  bool                 // Flag when generating code inside security() context
 }
 
 type taFunctionCall struct {
@@ -658,8 +659,26 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		// Simple literal assignment (use Series.Set())
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, expr.Value), nil
 	case *ast.Identifier:
-		// Reference to another variable (ALL use Series)
+		// Reference to another variable or Pine built-in
 		refName := expr.Name
+		
+		/* In security context, built-ins need direct field access */
+		if g.inSecurityContext {
+			switch refName {
+			case "close":
+				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Close)\n", varName), nil
+			case "open":
+				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Open)\n", varName), nil
+			case "high":
+				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].High)\n", varName), nil
+			case "low":
+				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Low)\n", varName), nil
+			case "volume":
+				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Volume)\n", varName), nil
+			}
+		}
+		
+		// User-defined variable (ALL use Series)
 		accessCode := fmt.Sprintf("%sSeries.GetCurrent()", refName)
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, accessCode), nil
 	case *ast.MemberExpression:
@@ -667,7 +686,13 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		memberCode := g.extractSeriesExpression(expr)
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
 	case *ast.BinaryExpression:
-		// Binary expression like sma20[1] > ema50[1] → bool needs float64 conversion
+		// Binary expression like sma20[1] > ema50[1] or SMA + EMA
+		/* In security context, need to generate temp series for operands */
+		if g.inSecurityContext {
+			return g.generateBinaryExpressionInSecurityContext(varName, expr)
+		}
+		
+		// Normal context: compile-time evaluation
 		binaryCode := g.extractSeriesExpression(expr)
 		varType := g.inferVariableType(expr)
 		if varType == "bool" {
@@ -692,8 +717,14 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	funcName := g.extractFunctionName(call.Callee)
 
 	switch funcName {
-	case "ta.sma", "ta.ema", "ta.rma", "ta.rsi", "ta.atr", "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow":
-		// TA functions - registered in third pass, just return empty here
+	case "ta.sma", "ta.ema", "ta.rma", "ta.rsi", "ta.atr", "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow",
+		"sma", "ema", "rma", "rsi", "atr", "stdev": // Pine v4 and v5 syntax
+		/* TA functions - normally registered in third pass for global pre-calculation
+		 * But when called from security() context, need inline evaluation */
+		if g.inSecurityContext {
+			return g.generateInlineTA(varName, funcName, call)
+		}
+		/* Global context - will be computed in third pass */
 		return "", nil
 
 	case "ta.crossover":
@@ -837,33 +868,88 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		g.indent--
 		code += g.ind() + "} else {\n"
 		g.indent++
-		code += g.ind() + "secCtx.BarIndex = secBarIdx\n"
 		
-		/* Evaluate expression in security context by generating variable init */
-		/* Create temporary series variable for expression result */
+		/* Evaluate expression directly in security context (O(1) per-bar access) */
 		exprArg := call.Arguments[2]
-		secTempVar := fmt.Sprintf("secTmp_%s", varName)
 		
-		/* Generate series declaration for temporary variable */
-		code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
-		
-		/* Store original context reference, temporarily use secCtx */
-		code += g.ind() + "origCtx := ctx\n"
-		code += g.ind() + "ctx = secCtx\n"
-		
-		/* Generate the expression evaluation using normal code generation */
-		exprInit, err := g.generateVariableInit(secTempVar, exprArg)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate security expression: %w", err)
+		/* Handle simple identifier access: close, open, high, low, volume */
+		if ident, ok := exprArg.(*ast.Identifier); ok {
+			fieldName := ident.Name
+			switch fieldName {
+			case "close":
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Close)\n", varName)
+			case "open":
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Open)\n", varName)
+			case "high":
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].High)\n", varName)
+			case "low":
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Low)\n", varName)
+			case "volume":
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Volume)\n", varName)
+			default:
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // Unknown identifier: %s\n", varName, fieldName)
+			}
+		} else if callExpr, ok := exprArg.(*ast.CallExpression); ok {
+			/* Handle TA function calls: ta.sma(close, 20), ta.ema(close, 10) */
+			/* Create temporary series variable for inline TA result */
+			secTempVar := fmt.Sprintf("secTmp_%s", varName)
+			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
+			
+			/* Store original context, switch to security context */
+			code += g.ind() + "origCtx := ctx\n"
+			code += g.ind() + "ctx = secCtx\n"
+			code += g.ind() + "ctx.BarIndex = secBarIdx\n"
+			
+			/* Set security context flag for inline TA */
+			g.inSecurityContext = true
+			
+			/* Generate inline TA calculation */
+			exprInit, err := g.generateVariableInit(secTempVar, callExpr)
+			if err != nil {
+				return "", fmt.Errorf("failed to generate security expression: %w", err)
+			}
+			code += exprInit
+			
+			/* Clear security context flag */
+			g.inSecurityContext = false
+			
+			/* Restore original context */
+			code += g.ind() + "ctx = origCtx\n"
+			
+			/* Extract value from temporary series */
+			code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
+		} else {
+			/* Complex expression (BinaryExpression, ConditionalExpression, etc.) */
+			/* Create temporary series variable for expression result */
+			secTempVar := fmt.Sprintf("secTmp_%s", varName)
+			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
+			
+			/* Store original context, switch to security context */
+			code += g.ind() + "origCtx := ctx\n"
+			code += g.ind() + "ctx = secCtx\n"
+			code += g.ind() + "ctx.BarIndex = secBarIdx\n"
+			
+			/* Set security context flag */
+			g.inSecurityContext = true
+			
+			/* Generate expression evaluation using full generateVariableInit */
+			exprInit, err := g.generateVariableInit(secTempVar, exprArg)
+			if err != nil {
+				return "", fmt.Errorf("failed to generate security expression: %w", err)
+			}
+			code += exprInit
+			
+			/* Clear security context flag */
+			g.inSecurityContext = false
+			
+			/* Restore original context */
+			code += g.ind() + "ctx = origCtx\n"
+			
+			/* Extract value from temporary series */
+			code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
 		}
-		code += exprInit
-		
-		/* Restore original context */
-		code += g.ind() + "ctx = origCtx\n"
-		
-		/* Extract value from temporary series */
-		code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
 		
 		g.indent--
 		code += g.ind() + "}\n"
@@ -877,6 +963,234 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	default:
 		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
 	}
+}
+
+/* generateInlineTA generates inline TA calculation for security() context */
+func (g *generator) generateInlineTA(varName string, funcName string, call *ast.CallExpression) (string, error) {
+	/* Normalize function name (handle both v4 and v5 syntax) */
+	normalizedFunc := funcName
+	if !strings.HasPrefix(funcName, "ta.") {
+		normalizedFunc = "ta." + funcName
+	}
+	
+	/* ATR special case: requires 1 argument (period only) */
+	if normalizedFunc == "ta.atr" {
+		if len(call.Arguments) < 1 {
+			return "", fmt.Errorf("ta.atr requires 1 argument (period)")
+		}
+		periodArg, ok := call.Arguments[0].(*ast.Literal)
+		if !ok {
+			return "", fmt.Errorf("ta.atr period must be literal")
+		}
+		period := int(periodArg.Value.(float64))
+		return g.generateInlineATR(varName, period)
+	}
+	
+	/* Extract source and period arguments */
+	if len(call.Arguments) < 2 {
+		return "", fmt.Errorf("%s requires at least 2 arguments", funcName)
+	}
+	
+	sourceExpr := g.extractSeriesExpression(call.Arguments[0])
+	/* Extract field name from expression like "bar.Close" -> "Close" */
+	fieldName := sourceExpr
+	if strings.Contains(sourceExpr, ".") {
+		parts := strings.Split(sourceExpr, ".")
+		fieldName = parts[len(parts)-1]
+	}
+	
+	periodArg, ok := call.Arguments[1].(*ast.Literal)
+	if !ok {
+		return "", fmt.Errorf("%s period must be literal", funcName)
+	}
+	period := int(periodArg.Value.(float64))
+	
+	var code string
+	
+	switch normalizedFunc {
+	case "ta.sma":
+		/* Inline SMA calculation: average of last N values */
+		code += g.ind() + fmt.Sprintf("/* Inline SMA(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + "sum := 0.0\n"
+		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("sum += ctx.Data[ctx.BarIndex-j].%s\n", fieldName)
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %d.0)\n", varName, period)
+		g.indent--
+		code += g.ind() + "}\n"
+		
+	case "ta.ema":
+		/* Inline EMA calculation */
+		code += g.ind() + fmt.Sprintf("/* Inline EMA(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("alpha := 2.0 / float64(%d+1)\n", period)
+		code += g.ind() + fmt.Sprintf("ema := ctx.Data[ctx.BarIndex-(%d-1)].%s\n", period, fieldName)
+		code += g.ind() + fmt.Sprintf("for j := %d-2; j >= 0; j-- {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("ema = alpha*ctx.Data[ctx.BarIndex-j].%s + (1-alpha)*ema\n", fieldName)
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(ema)\n", varName)
+		g.indent--
+		code += g.ind() + "}\n"
+		
+	case "ta.stdev":
+		/* Inline STDEV calculation */
+		code += g.ind() + fmt.Sprintf("/* Inline STDEV(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		/* Calculate mean */
+		code += g.ind() + "sum := 0.0\n"
+		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("sum += ctx.Data[ctx.BarIndex-j].%s\n", fieldName)
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period)
+		/* Calculate variance */
+		code += g.ind() + "variance := 0.0\n"
+		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
+		g.indent++
+		code += g.ind() + fmt.Sprintf("diff := ctx.Data[ctx.BarIndex-j].%s - mean\n", fieldName)
+		code += g.ind() + "variance += diff * diff\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + fmt.Sprintf("variance /= %d.0\n", period)
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName)
+		g.indent--
+		code += g.ind() + "}\n"
+		
+	default:
+		return "", fmt.Errorf("inline TA not implemented for %s", funcName)
+	}
+	
+	return code, nil
+}
+
+/* generateInlineATR generates inline ATR calculation for security() context
+ * ATR = RMA(TR, period) where TR = max(H-L, |H-prevC|, |L-prevC|)
+ */
+func (g *generator) generateInlineATR(varName string, period int) (string, error) {
+	var code string
+	
+	code += g.ind() + fmt.Sprintf("/* Inline ATR(%d) in security context */\n", period)
+	code += g.ind() + "if ctx.BarIndex < 1 {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	
+	/* Calculate TR for current bar */
+	code += g.ind() + "hl := ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low\n"
+	code += g.ind() + "hc := math.Abs(ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex-1].Close)\n"
+	code += g.ind() + "lc := math.Abs(ctx.Data[ctx.BarIndex].Low - ctx.Data[ctx.BarIndex-1].Close)\n"
+	code += g.ind() + "tr := math.Max(hl, math.Max(hc, lc))\n"
+	
+	/* RMA smoothing of TR */
+	code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d {\n", period)
+	g.indent++
+	/* Warmup: use SMA for first period bars */
+	code += g.ind() + "sum := 0.0\n"
+	code += g.ind() + "for j := 0; j <= ctx.BarIndex; j++ {\n"
+	g.indent++
+	code += g.ind() + "if j == 0 {\n"
+	g.indent++
+	code += g.ind() + "sum += ctx.Data[j].High - ctx.Data[j].Low\n"
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + "hl_j := ctx.Data[j].High - ctx.Data[j].Low\n"
+	code += g.ind() + "hc_j := math.Abs(ctx.Data[j].High - ctx.Data[j-1].Close)\n"
+	code += g.ind() + "lc_j := math.Abs(ctx.Data[j].Low - ctx.Data[j-1].Close)\n"
+	code += g.ind() + "sum += math.Max(hl_j, math.Max(hc_j, lc_j))\n"
+	g.indent--
+	code += g.ind() + "}\n"
+	g.indent--
+	code += g.ind() + "}\n"
+	code += g.ind() + fmt.Sprintf("if ctx.BarIndex == %d-1 {\n", period)
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %d.0)\n", varName, period)
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	/* RMA: prevATR + (TR - prevATR) / period */
+	code += g.ind() + fmt.Sprintf("alpha := 1.0 / %d.0\n", period)
+	code += g.ind() + fmt.Sprintf("prevATR := %sSeries.Get(1)\n", varName)
+	code += g.ind() + "atr := prevATR + alpha*(tr - prevATR)\n"
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(atr)\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+	
+	g.indent--
+	code += g.ind() + "}\n"
+	
+	return code, nil
+}
+
+/* generateBinaryExpressionInSecurityContext handles BinaryExpression with temp series
+ * Creates temp series for left/right operands, then combines with operator
+ */
+func (g *generator) generateBinaryExpressionInSecurityContext(varName string, expr *ast.BinaryExpression) (string, error) {
+	var code string
+	
+	/* Generate temp series for left operand */
+	leftVar := fmt.Sprintf("%s_left", varName)
+	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", leftVar)
+	
+	leftInit, err := g.generateVariableInit(leftVar, expr.Left)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate left operand: %w", err)
+	}
+	code += leftInit
+	
+	/* Generate temp series for right operand */
+	rightVar := fmt.Sprintf("%s_right", varName)
+	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", rightVar)
+	
+	rightInit, err := g.generateVariableInit(rightVar, expr.Right)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate right operand: %w", err)
+	}
+	code += rightInit
+	
+	/* Combine operands with operator */
+	combineExpr := fmt.Sprintf("%sSeries.GetCurrent() %s %sSeries.GetCurrent()", 
+		leftVar, expr.Operator, rightVar)
+	
+	/* Check if result is boolean (comparison operators) */
+	varType := g.inferVariableType(expr)
+	if varType == "bool" {
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", 
+			varName, combineExpr)
+	} else {
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, combineExpr)
+	}
+	
+	return code, nil
 }
 
 func (g *generator) extractFunctionName(callee ast.Expression) string {

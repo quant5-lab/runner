@@ -59,21 +59,43 @@
 - [x] `runtime/chartdata/chartdata.go` Timestamp field
 - [x] `runtime/chartdata/chartdata.go` ToJSON() method
 
-## Phase 2.5: request.security() Module (4 weeks)
-- [x] `mkdir -p golang-port/{security,datafetcher}`
+## Phase 2.5: request.security() Module - Series Alignment (6 weeks)
+
+### Baseline (Working - Array-Based)
 - [x] `security/analyzer.go` AST scanner for security() calls (5/5 tests)
-- [x] `datafetcher/fetcher.go` DataFetcher interface (DIP)
-- [x] `datafetcher/file_fetcher.go` Local JSON reader with async simulation (5/5 tests)
-- [x] `security/cache.go` Multi-timeframe context + expression storage (8/8 tests)
-- [x] `security/evaluator.go` Expression evaluation in security context (6/6 tests)
-- [x] `security/prefetcher.go` Orchestration: dedupe, fetch, evaluate, cache (3/3 tests)
-- [x] `codegen/security_inject.go` Generate prefetch and lookup code (4/4 tests)
+- [x] `datafetcher/file_fetcher.go` Local JSON reader (5/5 tests)
+- [x] `security/cache.go` Context + expression array storage (8/8 tests)
+- [x] `security/evaluator.go` Batch array evaluation (6/6 tests)
+- [x] `security/prefetcher.go` Upfront expression computation (3/3 tests)
+- [x] `codegen/security_inject.go` Array lookup code generation (4/4 tests)
+- [x] BB pattern tests: 7/7 PASS (close, sma, ema, open with identifiers + named TA)
+
+### Phase 2.5.1: Context-Only Cache (O(1) Per-Bar Access)
+- [ ] `security/cache.go` Remove Expressions map[string][]float64, keep Context only
+- [ ] `security/evaluator.go` Remove EvaluateExpression batch processing
+- [ ] `security/prefetcher.go` Remove expression evaluation loop, fetch contexts only
+- [ ] `codegen/generator.go` Replace array lookup with secCtx.Data[barIndex].Close direct access
+- [ ] Test: 7/7 BB pattern tests PASS (baseline preserved)
+- [ ] Benchmark: evaluateIdentifier 40KB → 0B allocation proof
+
+### Phase 2.5.2: Inline TA Series States (O(1) Streaming)
+- [ ] `codegen/generator.go` generateInlineTA use circular buffer for SMA/EMA warmup
+- [ ] Replace ctx.Data backward loops with forward-only sliding window
+- [ ] Test: 7/7 BB pattern tests PASS (TA calculations correct)
+- [ ] Benchmark: ta.Sma 82KB → 0B, O(N) → O(1) proof
+
+### Phase 2.5.3: Complex Expressions (Parser Enhancement)
+- [ ] `services/pine-parser/parser.py` Allow BinaryExpression in security() 3rd argument
+- [ ] Test: ta.sma(close,20) + ta.ema(close,10) parses successfully
+- [ ] Test: (high - low) / close * 100 parses successfully
+- [ ] Codegen: generateVariableInit BinaryExpression case (already exists line 670)
+- [ ] Test: 13/13 complex expression tests PASS
+
+### Integration & Validation
 - [ ] Integrate InjectSecurityCode into builder pipeline
-- [ ] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json data
-- [ ] Verify: SMA values NOT zeros, correct daily averages
-- [ ] Test: Downsampling (1h chart → 1D security)
-- [ ] Test: Same timeframe (1D chart → 1D security)
-- [ ] Test: Upsampling error handling (1D chart → 1h security)
+- [ ] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json
+- [ ] Verify: SMA values correct daily averages, not zeros
+- [ ] Test: Downsampling (1h → 1D), Same timeframe (1D → 1D), Upsampling error (1D → 1h)
 
 ## Phase 3: Binary Template (4 weeks)
 - [x] `mkdir -p golang-port/template`

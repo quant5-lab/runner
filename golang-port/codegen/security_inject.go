@@ -63,6 +63,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	
 	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
+	codeBuilder.WriteString("\tvar secTimeframeSeconds int64 /* Reused for multiple security() calls */\n")
 	
 	/* Generate fetch and store code for each unique symbol:timeframe */
 	for key, callsForKey := range dedupMap {
@@ -106,7 +107,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		}
 		
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Fetch %s data */\n", key))
-		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds := context.TimeframeToSeconds(%q)\n", timeframe))
+		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
 		codeBuilder.WriteString("\t/* Empty timeframe means use base timeframe (same timeframe) */\n")
 		codeBuilder.WriteString("\tif secTimeframeSeconds == 0 {\n")
 		codeBuilder.WriteString("\t\tsecTimeframeSeconds = baseTimeframeSeconds\n")
