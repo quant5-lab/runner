@@ -47,7 +47,7 @@ func (v *functionRenamer) visitCallExpr(call *parser.CallExpr) {
 	// Recurse into arguments
 	for _, arg := range call.Args {
 		if arg.Value != nil {
-			v.visitValue(arg.Value)
+			v.visitTernaryExpr(arg.Value)
 		}
 	}
 }

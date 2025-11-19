@@ -149,7 +149,7 @@ func (t *TANamespaceTransformer) transformCallExpr(call *parser.CallExpr) {
 	// Recursively transform arguments
 	for _, arg := range call.Args {
 		if arg.Value != nil {
-			t.transformValue(arg.Value)
+			t.transformTernaryExpr(arg.Value)
 		}
 	}
 }

@@ -138,7 +138,7 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 		}, nil
 	}
 	if expr.String != nil {
-		cleaned := strings.Trim(*expr.String, `"`)
+		cleaned := strings.Trim(strings.Trim(*expr.String, `"`), `'`)
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
 			Value:    cleaned,
@@ -279,7 +279,7 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	namedArgs := make(map[string]ast.Expression)
 
 	for _, arg := range call.Args {
-		converted, err := c.convertValue(arg.Value)
+		converted, err := c.convertTernaryExpr(arg.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +388,7 @@ func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
 		}, nil
 	}
 	if val.String != nil {
-		cleaned := strings.Trim(*val.String, `"`)
+		cleaned := strings.Trim(strings.Trim(*val.String, `"`), `'`)
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
 			Value:    cleaned,
@@ -566,6 +566,11 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 }
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
+	if factor.Paren != nil {
+		// Parenthesized expression - just pass through the inner expression
+		return c.convertArithExpr(factor.Paren)
+	}
+
 	if factor.Call != nil {
 		return c.convertCallExpr(factor.Call)
 	}
@@ -636,10 +641,11 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	}
 
 	if factor.String != nil {
+		cleaned := strings.Trim(strings.Trim(*factor.String, `"`), `'`)
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
-			Value:    *factor.String,
-			Raw:      *factor.String,
+			Value:    cleaned,
+			Raw:      fmt.Sprintf("'%s'", cleaned),
 		}, nil
 	}
 

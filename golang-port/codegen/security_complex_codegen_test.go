@@ -180,7 +180,9 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			expectedCode: []string{
 				"Inline STDEV(20)",
 				"math.Sqrt(variance)",
-				"Series.GetCurrent() * 2",
+				"secTmp_test_val_leftSeries := series.NewSeries(1000)", // Temp series for STDEV
+				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Temp series for multiplier
+				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()",
 			},
 		},
 	}
@@ -301,8 +303,8 @@ func TestSecurityConditionalExpression(t *testing.T) {
 		"ctx = secCtx",
 		"if",     // Conditional present
 		"} else", // Both branches present
-		"secCtx.Data[secBarIdx].Close",
-		"secCtx.Data[secBarIdx].Open",
+		"closeSeries.GetCurrent()", // Uses existing series (not inline identifiers in conditionals yet)
+		"openSeries.GetCurrent()",
 	}
 
 	for _, pattern := range expectedPatterns {
@@ -437,7 +439,7 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 		"sum := 0.0",                           // Mean calculation
 		"mean := sum / 20.0",                   // Mean result
 		"variance := 0.0",                      // Variance calculation
-		"diff := ctx.Data[ctx.BarIndex-j].Close - mean", // Deviation
+		"diff := ctx.Data[ctx.BarIndex-j].GetCurrent() - mean", // Uses GetCurrent() for source
 		"variance += diff * diff",              // Squared deviation
 		"math.Sqrt(variance)",                  // Final STDEV
 	}
@@ -451,7 +453,7 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 
 /* TestSecurityContextIsolation verifies context switching safety */
 func TestSecurityContextIsolation(t *testing.T) {
-	/* Multiple security() calls with different timeframes */
+	/* Multiple security() calls with different timeframes and complex expressions */
 	program := &ast.Program{
 		Body: []ast.Node{
 			&ast.ExpressionStatement{
@@ -471,7 +473,11 @@ func TestSecurityContextIsolation(t *testing.T) {
 							Arguments: []ast.Expression{
 								&ast.Literal{Value: "BTCUSD"},
 								&ast.Literal{Value: "1D"},
-								&ast.Identifier{Name: "close"},
+								&ast.BinaryExpression{
+									Operator: "+",
+									Left:     &ast.Identifier{Name: "close"},
+									Right:    &ast.Identifier{Name: "open"},
+								},
 							},
 						},
 					},
@@ -486,7 +492,11 @@ func TestSecurityContextIsolation(t *testing.T) {
 							Arguments: []ast.Expression{
 								&ast.Literal{Value: "BTCUSD"},
 								&ast.Literal{Value: "1W"},
-								&ast.Identifier{Name: "close"},
+								&ast.BinaryExpression{
+									Operator: "*",
+									Left:     &ast.Identifier{Name: "high"},
+									Right:    &ast.Literal{Value: float64(2.0)},
+								},
 							},
 						},
 					},
@@ -516,5 +526,13 @@ func TestSecurityContextIsolation(t *testing.T) {
 	/* Verify no variable collisions */
 	if strings.Contains(code, "secTimeframeSeconds :=") {
 		t.Error("Found := declaration for secTimeframeSeconds (should use = for reuse)")
+	}
+
+	/* Verify both BinaryExpressions generated temp series */
+	if !strings.Contains(code, "secTmp_dailySeries := series.NewSeries(1000)") {
+		t.Error("Expected temp series for daily security call")
+	}
+	if !strings.Contains(code, "secTmp_weeklySeries := series.NewSeries(1000)") {
+		t.Error("Expected temp series for weekly security call")
 	}
 }

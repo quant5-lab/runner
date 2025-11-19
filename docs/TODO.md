@@ -71,25 +71,28 @@
 - [x] BB pattern tests: 7/7 PASS (close, sma, ema, open with identifiers + named TA)
 
 ### Phase 2.5.1: Context-Only Cache (O(1) Per-Bar Access)
-- [ ] `security/cache.go` Remove Expressions map[string][]float64, keep Context only
-- [ ] `security/evaluator.go` Remove EvaluateExpression batch processing
-- [ ] `security/prefetcher.go` Remove expression evaluation loop, fetch contexts only
-- [ ] `codegen/generator.go` Replace array lookup with secCtx.Data[barIndex].Close direct access
-- [ ] Test: 7/7 BB pattern tests PASS (baseline preserved)
-- [ ] Benchmark: evaluateIdentifier 40KB → 0B allocation proof
+- [x] `security/cache.go` Remove Expressions map[string][]float64, keep Context only
+- [x] `security/evaluator.go` Remove EvaluateExpression batch processing
+- [x] `security/prefetcher.go` Remove expression evaluation loop, fetch contexts only
+- [x] `codegen/generator.go` Replace array lookup with secCtx.Data[barIndex].Close direct access
+- [x] Test: 7/7 BB pattern tests PASS (baseline preserved)
+- [x] Benchmark: evaluateIdentifier 40KB → 0B allocation proof
 
 ### Phase 2.5.2: Inline TA Series States (O(1) Streaming)
-- [ ] `codegen/generator.go` generateInlineTA use circular buffer for SMA/EMA warmup
-- [ ] Replace ctx.Data backward loops with forward-only sliding window
-- [ ] Test: 7/7 BB pattern tests PASS (TA calculations correct)
-- [ ] Benchmark: ta.Sma 82KB → 0B, O(N) → O(1) proof
+- [x] `codegen/generator.go` generateInlineTA use circular buffer for SMA/EMA warmup
+- [x] Replace ctx.Data backward loops with forward-only sliding window
+- [x] Test: 7/7 BB pattern tests PASS (TA calculations correct)
+- [x] Benchmark: ta.Sma 82KB → 0B, O(N) → O(1) proof
 
 ### Phase 2.5.3: Complex Expressions (Parser Enhancement)
+- [x] `codegen/generator.go` BinaryExpression in security context (generateBinaryExpressionInSecurityContext)
+- [x] `codegen/generator.go` Identifier in security context (ctx.Data[ctx.BarIndex].Close)
+- [x] Test suite: 5/5 comprehensive security codegen tests PASS (BinaryExpression, ConditionalExpression, ATR, STDEV, ContextIsolation)
+- [x] Baseline: 7/7 BB pattern tests PASS (regression safety validated)
 - [ ] `services/pine-parser/parser.py` Allow BinaryExpression in security() 3rd argument
 - [ ] Test: ta.sma(close,20) + ta.ema(close,10) parses successfully
 - [ ] Test: (high - low) / close * 100 parses successfully
-- [ ] Codegen: generateVariableInit BinaryExpression case (already exists line 670)
-- [ ] Test: 13/13 complex expression tests PASS
+- [ ] Test: 13/13 complex expression integration tests PASS
 
 ### Integration & Validation
 - [ ] Integrate InjectSecurityCode into builder pipeline

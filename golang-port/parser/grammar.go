@@ -78,7 +78,8 @@ type Term struct {
 }
 
 type Factor struct {
-	Call         *CallExpr     `parser:"@@"`
+	Paren        *ArithExpr    `parser:"( '(' @@ ')' )"`
+	Call         *CallExpr     `parser:"| @@"`
 	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
@@ -124,8 +125,8 @@ type CallCallee struct {
 }
 
 type Argument struct {
-	Name  *string `parser:"( @Ident '=' )?"`
-	Value *Value  `parser:"@@"`
+	Name  *string      `parser:"( @Ident '=' )?"`
+	Value *TernaryExpr `parser:"@@"`
 }
 
 type Value struct {
