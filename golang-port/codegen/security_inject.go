@@ -112,10 +112,26 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\tif secTimeframeSeconds == 0 {\n")
 		codeBuilder.WriteString("\t\tsecTimeframeSeconds = baseTimeframeSeconds\n")
 		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString("\t/* Only add warmup buffer for downsampling (higher timeframe: 1h→1D) */\n")
+		/* Calculate dynamic warmup based on indicator periods in expressions */
+		maxPeriod := 0
+		for _, call := range callsForKey {
+			period := security.ExtractMaxPeriod(call.Expression)
+			if period > maxPeriod {
+				maxPeriod = period
+			}
+		}
+		/* Default minimum warmup if no periods found or very small periods */
+		warmupBars := maxPeriod
+		if warmupBars < 50 {
+			warmupBars = 50 /* Minimum warmup for basic indicators */
+		}
+		
+		codeBuilder.WriteString(fmt.Sprintf("\t/* Dynamic warmup based on indicators: %d bars */\n", warmupBars))
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\tif secTimeframeSeconds > baseTimeframeSeconds {\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit += 500 /* Warmup for indicators like SMA200 */\n", varName))
+		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds {\n")
+		codeBuilder.WriteString(fmt.Sprintf("\t\t/* Convert base timeframe bars to security timeframe bars + warmup */\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\ttimeframeRatio := float64(secTimeframeSeconds) / float64(baseTimeframeSeconds)\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = int(float64(len(ctx.Data)) * timeframeRatio) + %d\n", varName, warmupBars))
 		codeBuilder.WriteString("\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %q, %s_limit)\n",
 			varName, varName, symbolCode, timeframe, varName))

@@ -136,3 +136,120 @@ func parseCode(t *testing.T, code string) *ast.Program {
 
 	return program
 }
+
+/* TestExtractMaxPeriod_SimpleSMA tests basic SMA period extraction */
+func TestExtractMaxPeriod_SimpleSMA(t *testing.T) {
+	/* ta.sma(close, 20) */
+	expr := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "ta",
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "sma",
+			},
+		},
+		Arguments: []ast.Expression{
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: float64(20)},
+		},
+	}
+
+	period := ExtractMaxPeriod(expr)
+	if period != 20 {
+		t.Errorf("Expected period 20, got %d", period)
+	}
+}
+
+/* TestExtractMaxPeriod_SMA200 tests SMA200 extraction */
+func TestExtractMaxPeriod_SMA200(t *testing.T) {
+	/* ta.sma(close, 200) */
+	expr := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "ta",
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "sma",
+			},
+		},
+		Arguments: []ast.Expression{
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: float64(200)},
+		},
+	}
+
+	period := ExtractMaxPeriod(expr)
+	if period != 200 {
+		t.Errorf("Expected period 200, got %d", period)
+	}
+}
+
+/* TestExtractMaxPeriod_NestedTA tests nested TA functions */
+func TestExtractMaxPeriod_NestedTA(t *testing.T) {
+	/* ta.sma(ta.ema(close, 50), 200) → should return 200 (max of 50 and 200) */
+	innerCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "ta",
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "ema",
+			},
+		},
+		Arguments: []ast.Expression{
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: float64(50)},
+		},
+	}
+
+	outerCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "ta",
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     "sma",
+			},
+		},
+		Arguments: []ast.Expression{
+			innerCall,
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: float64(200)},
+		},
+	}
+
+	period := ExtractMaxPeriod(outerCall)
+	if period != 200 {
+		t.Errorf("Expected period 200 (max), got %d", period)
+	}
+}
+
+/* TestExtractMaxPeriod_DirectClose tests direct close access (no TA) */
+func TestExtractMaxPeriod_DirectClose(t *testing.T) {
+	/* Just "close" identifier - no period needed */
+	expr := &ast.Identifier{
+		NodeType: ast.TypeIdentifier,
+		Name:     "close",
+	}
+
+	period := ExtractMaxPeriod(expr)
+	if period != 0 {
+		t.Errorf("Expected period 0 for direct close, got %d", period)
+	}
+}

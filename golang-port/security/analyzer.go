@@ -134,3 +134,86 @@ func extractIdentifier(expr ast.Expression) string {
 	}
 	return ""
 }
+
+/* ExtractMaxPeriod analyzes expression to find maximum indicator period needed
+ * For ta.sma(close, 20) → returns 20
+ * For ta.ema(close, 50) → returns 50
+ * For complex expressions → returns maximum of all periods found
+ * Returns 0 if no periods found (e.g., direct close access)
+ */
+func ExtractMaxPeriod(expr ast.Expression) int {
+	if expr == nil {
+		return 0
+	}
+	
+	switch e := expr.(type) {
+	case *ast.CallExpression:
+		/* Check if this is a TA function call */
+		funcName := extractFunctionName(e.Callee)
+		maxPeriod := 0
+		
+		/* TA functions typically have period as second argument
+		 * ta.sma(source, length), ta.ema(source, length), etc.
+		 */
+		if strings.HasPrefix(funcName, "ta.") && len(e.Arguments) >= 2 {
+			/* Extract period from second argument */
+			if lit, ok := e.Arguments[1].(*ast.Literal); ok {
+				if period, ok := lit.Value.(float64); ok {
+					maxPeriod = int(period)
+				}
+			}
+		}
+		
+		/* Recursively check all arguments for nested TA calls
+		 * Example: ta.sma(ta.ema(close, 50), 200) → max(50, 200) = 200
+		 */
+		for _, arg := range e.Arguments {
+			argPeriod := ExtractMaxPeriod(arg)
+			if argPeriod > maxPeriod {
+				maxPeriod = argPeriod
+			}
+		}
+		
+		return maxPeriod
+		
+	case *ast.BinaryExpression:
+		/* Binary expressions: close + ta.sma(close, 20) */
+		leftPeriod := ExtractMaxPeriod(e.Left)
+		rightPeriod := ExtractMaxPeriod(e.Right)
+		if leftPeriod > rightPeriod {
+			return leftPeriod
+		}
+		return rightPeriod
+		
+	case *ast.ConditionalExpression:
+		/* Conditional: condition ? ta.sma(close, 20) : ta.ema(close, 50) */
+		testPeriod := ExtractMaxPeriod(e.Test)
+		conseqPeriod := ExtractMaxPeriod(e.Consequent)
+		altPeriod := ExtractMaxPeriod(e.Alternate)
+		
+		maxPeriod := testPeriod
+		if conseqPeriod > maxPeriod {
+			maxPeriod = conseqPeriod
+		}
+		if altPeriod > maxPeriod {
+			maxPeriod = altPeriod
+		}
+		return maxPeriod
+		
+	case *ast.MemberExpression:
+		/* Member expressions don't have periods */
+		return 0
+		
+	case *ast.Identifier:
+		/* Identifiers don't have periods */
+		return 0
+		
+	case *ast.Literal:
+		/* Literals don't have periods */
+		return 0
+		
+	default:
+		/* Unknown expression type - return 0 */
+		return 0
+	}
+}

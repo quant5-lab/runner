@@ -80,12 +80,79 @@ node scripts/convert-binance-to-standard.cjs "$BINANCE_FILE" "$DATA_FILE" > /dev
     exit 1
 }
 
+# Normalize timeframe for filename (D → 1D, W → 1W, M → 1M)
+NORM_TIMEFRAME="$TIMEFRAME"
+if [ "$TIMEFRAME" = "D" ]; then
+    NORM_TIMEFRAME="1D"
+elif [ "$TIMEFRAME" = "W" ]; then
+    NORM_TIMEFRAME="1W"
+elif [ "$TIMEFRAME" = "M" ]; then
+    NORM_TIMEFRAME="1M"
+fi
+
 # Save to test data directory for future use
 TESTDATA_DIR="golang-port/testdata/ohlcv"
 mkdir -p "$TESTDATA_DIR"
-SAVED_FILE="${TESTDATA_DIR}/${SYMBOL}_${TIMEFRAME}.json"
+SAVED_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TIMEFRAME}.json"
 cp "$DATA_FILE" "$SAVED_FILE"
 echo "  Saved: $SAVED_FILE"
+
+# Detect security() calls and fetch additional timeframes
+echo "  Checking for security() calls..."
+SECURITY_TFS=$(grep -o "security([^)]*)" "$STRATEGY" | grep -o "'[^']*'" | tr -d "'" | grep -v "^$" | sort -u || true)
+for SEC_TF in $SECURITY_TFS; do
+    # Skip if same as base timeframe
+    if [ "$SEC_TF" = "$TIMEFRAME" ]; then
+        continue
+    fi
+    
+    # Normalize timeframe (D → 1D, W → 1W, M → 1M)
+    NORM_TF="$SEC_TF"
+    if [ "$SEC_TF" = "D" ]; then
+        NORM_TF="1D"
+    elif [ "$SEC_TF" = "W" ]; then
+        NORM_TF="1W"
+    elif [ "$SEC_TF" = "M" ]; then
+        NORM_TF="1M"
+    fi
+    
+    SEC_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TF}.json"
+    if [ ! -f "$SEC_FILE" ]; then
+        echo "  Fetching security timeframe: $NORM_TF (need 3000 bars for warmup)"
+        SEC_TEMP="$TEMP_DIR/security_${NORM_TF}.json"
+        SEC_STD="$TEMP_DIR/security_${NORM_TF}_std.json"
+        
+        node -e "
+import('./src/container.js').then(({ createContainer }) => {
+  import('./src/config.js').then(({ createProviderChain, DEFAULTS }) => {
+    const container = createContainer(createProviderChain, DEFAULTS);
+    const providerManager = container.resolve('providerManager');
+    
+    providerManager.getMarketData('$SYMBOL', '$NORM_TF', 3000)
+      .then(bars => {
+        const fs = require('fs');
+        fs.writeFileSync('$SEC_TEMP', JSON.stringify(bars, null, 2));
+        console.log('  ✓ Fetched ' + bars.length + ' ' + '$NORM_TF' + ' bars');
+      })
+      .catch(err => {
+        console.error('  Warning: Could not fetch $NORM_TF data:', err.message);
+        process.exit(0);
+      });
+  });
+});
+        " || echo "  Warning: Failed to fetch $NORM_TF data"
+        
+        if [ -f "$SEC_TEMP" ]; then
+            node scripts/convert-binance-to-standard.cjs "$SEC_TEMP" "$SEC_STD" > /dev/null 2>&1 || true
+            if [ -f "$SEC_STD" ]; then
+                cp "$SEC_STD" "$SEC_FILE"
+                echo "  Saved: $SEC_FILE"
+            fi
+        fi
+    else
+        echo "  Using cached: $SEC_FILE"
+    fi
+done
 
 # Step 2: Build strategy binary
 echo ""
@@ -93,9 +160,16 @@ echo "[2/4] 🔨 Building strategy binary..."
 STRATEGY_NAME=$(basename "$STRATEGY" .pine)
 OUTPUT_BINARY="/tmp/${STRATEGY_NAME}"
 
-# Run builder with output flag
-cd golang-port && go run cmd/pinescript-builder/main.go -input ../"$STRATEGY" -output "$OUTPUT_BINARY" > /dev/null 2>&1 || {
-    echo "❌ Failed to build strategy"
+# Generate Go code
+TEMP_GO=$(cd golang-port && go run cmd/pinescript-builder/main.go -input ../"$STRATEGY" -output "$OUTPUT_BINARY" 2>&1 | grep "Generated:" | awk '{print $2}')
+if [ -z "$TEMP_GO" ]; then
+    echo "❌ Failed to generate Go code"
+    exit 1
+fi
+
+# Compile binary from golang-port directory (needs go.mod)
+cd golang-port && go build -o "$OUTPUT_BINARY" "$TEMP_GO" > /dev/null 2>&1 || {
+    echo "❌ Failed to compile binary"
     exit 1
 }
 cd ..
@@ -109,6 +183,7 @@ mkdir -p out
     -symbol "$SYMBOL" \
     -timeframe "$TIMEFRAME" \
     -data "$DATA_FILE" \
+    -datadir golang-port/testdata/ohlcv \
     -output out/chart-data.json || {
     echo "❌ Failed to execute strategy"
     exit 1
