@@ -83,6 +83,9 @@
 - [x] Replace ctx.Data backward loops with forward-only sliding window
 - [x] Test: 7/7 BB pattern tests PASS (TA calculations correct)
 - [x] Benchmark: ta.Sma 82KB → 0B, O(N) → O(1) proof
+- [ ] Streaming state optimization: 8/13 TA functions support O(1) per-bar (SMA, EMA, RMA, RSI, ATR, TR, Change, MACD)
+- [ ] Priority: SMA circular buffer (50-200x speedup for period>100), RSI/ATR composition
+- [ ] Keep O(period): Stdev, BBands, Stoch, Pivothigh, Pivotlow (inherent window scan)
 
 ### Phase 2.5.3: Complex Expressions (Parser Enhancement)
 - [x] `codegen/generator.go` BinaryExpression in security context (generateBinaryExpressionInSecurityContext)

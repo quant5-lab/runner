@@ -251,7 +251,7 @@ run: build ## Build and run binary
 	@echo "Running $(BINARY_NAME)..."
 	@./$(BUILD_DIR)/$(BINARY_NAME) $(ARGS)
 
-run-strategy: ## Run strategy and generate chart-data.json (usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json)
+run-strategy: ## Run strategy with pre-generated data file (usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json)
 	@if [ -z "$(STRATEGY)" ]; then echo "Error: STRATEGY not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@echo "Running strategy: $(STRATEGY)"
@@ -260,9 +260,23 @@ run-strategy: ## Run strategy and generate chart-data.json (usage: make run-stra
 		-input ../$(STRATEGY) \
 		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
 	cd $(GOLANG_PORT) && $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
-	@/tmp/pinescript-strategy -symbol TEST -data $(DATA) -output out/chart-data.json
+	@SYMBOL=$$(basename $(DATA) | sed 's/_[^_]*\.json//'); \
+	TIMEFRAME=$$(basename $(DATA) .json | sed 's/.*_//'); \
+	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir golang-port/testdata/ohlcv -output out/chart-data.json
 	@echo "✓ Strategy executed: out/chart-data.json"
 	@ls -lh out/chart-data.json
+
+fetch-strategy: ## Fetch live data and run strategy (usage: make fetch-strategy SYMBOL=GDYN TIMEFRAME=1D BARS=500 STRATEGY=strategies/daily-lines.pine)
+	@if [ -z "$(SYMBOL)" ] || [ -z "$(STRATEGY)" ]; then \
+		echo "Usage: make fetch-strategy SYMBOL=<symbol> TIMEFRAME=<tf> BARS=<n> STRATEGY=<file>"; \
+		echo ""; \
+		echo "Examples:"; \
+		echo "  make fetch-strategy SYMBOL=BTCUSDT TIMEFRAME=1h BARS=500 STRATEGY=strategies/daily-lines.pine"; \
+		echo "  make fetch-strategy SYMBOL=AAPL TIMEFRAME=1D BARS=200 STRATEGY=strategies/test-simple.pine"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@./scripts/fetch-strategy.sh $(SYMBOL) $(TIMEFRAME) $(BARS) $(STRATEGY)
 
 serve: ## Serve ./out directory with Python HTTP server on port 8000
 	@echo "Starting web server on http://localhost:8000"
@@ -270,7 +284,7 @@ serve: ## Serve ./out directory with Python HTTP server on port 8000
 	@echo "Press Ctrl+C to stop server"
 	@cd out && python3 -m http.server 8000
 
-test-manual: run-strategy serve ## Run strategy and start web server for manual testing
+serve-strategy: fetch-strategy serve ## Fetch live data, run strategy, and start web server
 
 watch: ## Watch for changes and run tests (requires entr)
 	@echo "Watching for changes..."
@@ -299,33 +313,6 @@ mod-update: ## Update all dependencies
 	@cd $(GOLANG_PORT) && $(GO) get -u ./...
 	@$(MAKE) mod-tidy
 	@echo "✓ Dependencies updated"
-
-##@ Security Testing
-
-build-daily-lines: ## Build daily-lines strategy with security()
-	@echo "Building daily-lines strategy..."
-	@cd $(GOLANG_PORT) && $(GO) run cmd/pinescript-builder/main.go \
-		-input ../strategies/daily-lines.pine \
-		-output /tmp/daily-lines-bin \
-		-template template/main.go.tmpl > /tmp/build-output.txt 2>&1
-	@TEMP_GO=$$(grep "Generated:" /tmp/build-output.txt | awk '{print $$2}'); \
-	cd $(GOLANG_PORT) && $(GO) build -o /tmp/daily-lines $$TEMP_GO
-	@echo "✓ Binary: /tmp/daily-lines"
-
-run-daily-lines-btc: build-daily-lines ## Run daily-lines with BTCUSDT data
-	@mkdir -p out
-	@/tmp/daily-lines -symbol BTCUSDT -data $(GOLANG_PORT)/testdata/ohlcv/BTCUSDT_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
-	@echo "✓ Output: out/chart-data.json"
-
-run-daily-lines-gazp: build-daily-lines ## Run daily-lines with GAZP data
-	@mkdir -p out
-	@/tmp/daily-lines -symbol GAZP -data $(GOLANG_PORT)/testdata/ohlcv/GAZP_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
-	@echo "✓ Output: out/chart-data.json"
-
-run-daily-lines-sber: build-daily-lines ## Run daily-lines with SBER data
-	@mkdir -p out
-	@/tmp/daily-lines -symbol SBER -data $(GOLANG_PORT)/testdata/ohlcv/SBER_1h.json -datadir $(GOLANG_PORT)/testdata/ohlcv -output out/chart-data.json
-	@echo "✓ Output: out/chart-data.json"
 
 ##@ Quick Commands
 

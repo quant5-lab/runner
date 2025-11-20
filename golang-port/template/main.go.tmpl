@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"time"
+	"encoding/json"
 
-	"github.com/borisquantlab/pinescript-go/datafetcher"
 	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 	"github.com/borisquantlab/pinescript-go/runtime/output"
@@ -17,6 +16,7 @@ import (
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
 	"github.com/borisquantlab/pinescript-go/runtime/ta"
 	"github.com/borisquantlab/pinescript-go/security"
+	"github.com/borisquantlab/pinescript-go/datafetcher"
 	_ "github.com/borisquantlab/pinescript-go/runtime/value" // May be used by generated code
 )
 
@@ -48,7 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	/* Load OHLCV data */
+	/* Load OHLCV data from standard JSON format */
 	dataBytes, err := os.ReadFile(*dataFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read data file: %v\n", err)
@@ -56,9 +56,8 @@ func main() {
 	}
 
 	var bars []context.OHLCV
-	err = json.Unmarshal(dataBytes, &bars)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse data JSON: %v\n", err)
+	if err := json.Unmarshal(dataBytes, &bars); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
 		os.Exit(1)
 	}
 
