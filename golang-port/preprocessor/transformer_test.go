@@ -29,13 +29,13 @@ func TestTANamespaceTransformer_SimpleAssignment(t *testing.T) {
 	if result.Statements[0].Assignment == nil {
 		t.Fatal("Expected assignment statement")
 	}
-	
+
 	// The Call is nested inside Ternary.Condition.Left...Left.Left.Call
 	expr := result.Statements[0].Assignment.Value
 	if expr.Ternary == nil || expr.Ternary.Condition == nil {
 		t.Fatal("Expected ternary with condition")
 	}
-	
+
 	// Navigate through the nested structure to find the Call
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {

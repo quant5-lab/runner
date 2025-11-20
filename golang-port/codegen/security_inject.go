@@ -18,7 +18,7 @@ type SecurityInjection struct {
 func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error) {
 	/* Analyze AST for security() calls */
 	calls := security.AnalyzeAST(program)
-	
+
 	if len(calls) == 0 {
 		/* No security() calls - return empty injection */
 		return &SecurityInjection{
@@ -29,13 +29,13 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 	/* Generate prefetch initialization code */
 	var codeBuilder strings.Builder
-	
+
 	codeBuilder.WriteString("\n\t/* === request.security() Prefetch === */\n")
 	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
-	
+
 	/* Generate prefetch request map (deduplicated symbol:timeframe pairs) */
 	codeBuilder.WriteString("\t/* Fetch and cache multi-timeframe data */\n")
-	
+
 	/* Build deduplicated map of symbol:timeframe → expressions */
 	dedupMap := make(map[string][]security.SecurityCall)
 	for _, call := range calls {
@@ -44,7 +44,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		if sym == "" || sym == "tickerid" || sym == "syminfo.tickerid" {
 			sym = "%s" // Runtime placeholder
 		}
-		
+
 		/* Normalize timeframe */
 		tf := call.Timeframe
 		if tf == "D" {
@@ -54,21 +54,21 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		} else if tf == "M" {
 			tf = "1M"
 		}
-		
+
 		key := fmt.Sprintf("%s:%s", sym, tf)
 		dedupMap[key] = append(dedupMap[key], call)
 	}
-	
+
 	/* Don't create new map - use parameter passed to function */
-	
+
 	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
 	codeBuilder.WriteString("\tvar secTimeframeSeconds int64 /* Reused for multiple security() calls */\n")
-	
+
 	/* Generate fetch and store code for each unique symbol:timeframe */
 	for key, callsForKey := range dedupMap {
 		firstCall := callsForKey[0]
-		
+
 		/* Extract normalized symbol and timeframe from key */
 		sym := "%s"
 		tf := ""
@@ -77,7 +77,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			sym = parts[0]
 			tf = parts[1]
 		}
-		
+
 		/* Resolve symbol: use ctx.Symbol for runtime placeholders */
 		symbolCode := firstCall.Symbol
 		if symbolCode == "" || symbolCode == "tickerid" || symbolCode == "syminfo.tickerid" || sym == "%s" {
@@ -85,7 +85,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		} else {
 			symbolCode = fmt.Sprintf("%q", symbolCode)
 		}
-		
+
 		/* Normalize timeframe for fetcher */
 		timeframe := tf
 		if timeframe == "" {
@@ -98,14 +98,14 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		} else if timeframe == "M" {
 			timeframe = "1M"
 		}
-		
+
 		varName := sanitizeVarName(fmt.Sprintf("ctx_%s", tf))
 		/* Generate runtime key - if symbol is placeholder, use fmt.Sprintf at runtime */
 		runtimeKey := key
 		if sym == "%s" {
 			runtimeKey = fmt.Sprintf("%%s:%s", tf) // Will be formatted at runtime
 		}
-		
+
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Fetch %s data */\n", key))
 		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
 		codeBuilder.WriteString("\t/* Empty timeframe means use base timeframe (same timeframe) */\n")
@@ -125,7 +125,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		if warmupBars < 50 {
 			warmupBars = 50 /* Minimum warmup for basic indicators */
 		}
-		
+
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Dynamic warmup based on indicators: %d bars */\n", warmupBars))
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
 		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds {\n")
@@ -144,7 +144,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")
-		
+
 		/* Store in map with runtime key resolution */
 		if sym == "%s" {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n\n", runtimeKey, varName))
@@ -152,7 +152,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n\n", key, varName))
 		}
 	}
-	
+
 	codeBuilder.WriteString("\t_ = fetcher // Suppress unused warning\n")
 	codeBuilder.WriteString("\t/* === End Prefetch === */\n\n")
 
@@ -176,9 +176,9 @@ func GenerateSecurityLookup(call *security.SecurityCall, varName string) string 
 	 * if err != nil { return NaN }
 	 * value := values[ctx.BarIndex] // Index matching logic
 	 */
-	
+
 	var code strings.Builder
-	
+
 	code.WriteString(fmt.Sprintf("\t/* security(%q, %q, ...) lookup */\n", call.Symbol, call.Timeframe))
 	code.WriteString(fmt.Sprintf("\t%s_values, err := securityCache.GetExpression(%q, %q, %q)\n",
 		varName, call.Symbol, call.Timeframe, call.ExprName))
@@ -191,7 +191,7 @@ func GenerateSecurityLookup(call *security.SecurityCall, varName string) string 
 	code.WriteString(fmt.Sprintf("\t\t\t%s = math.NaN()\n", varName))
 	code.WriteString(fmt.Sprintf("\t\t}\n"))
 	code.WriteString(fmt.Sprintf("\t}\n"))
-	
+
 	return code.String()
 }
 
@@ -213,18 +213,18 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 	 * func executeStrategy(ctx *context.Context) (*output.Collector, *strategy.Strategy) {
 	 *     collector := output.NewCollector()
 	 *     strat := strategy.NewStrategy()
-	 *     
+	 *
 	 *     <<< INJECT PREFETCH HERE >>>
-	 *     
+	 *
 	 *     for i := 0; i < len(ctx.Data); i++ {
 	 *         ...
 	 *     }
 	 * }
 	 */
-	
+
 	/* Find insertion point: after strat initialization, before for loop */
 	functionBody := code.FunctionBody
-	
+
 	/* Simple injection: prepend before existing body */
 	updatedBody := injection.PrefetchCode + functionBody
 

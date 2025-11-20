@@ -12,7 +12,7 @@ import (
 func TestIntegration_DailyLinesSimple(t *testing.T) {
 	// Find the strategies directory
 	strategyPath := filepath.Join("..", "..", "strategies", "daily-lines-simple.pine")
-	
+
 	// Read the actual file
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
@@ -121,15 +121,15 @@ ma = sma(close, 20)
 	// Check first statement (study → indicator)
 	call1 := findCallInFactor(result1.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	call2 := findCallInFactor(result2.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
-	
+
 	if call1 == nil || call2 == nil {
 		t.Fatal("Expected call expressions")
 	}
-	
+
 	if call1.Callee.Ident == nil || call2.Callee.Ident == nil {
 		t.Fatal("Expected callee identifiers")
 	}
-	
+
 	if *call1.Callee.Ident != *call2.Callee.Ident {
 		t.Errorf("Different transformations: %s vs %s", *call1.Callee.Ident, *call2.Callee.Ident)
 	}
@@ -166,16 +166,16 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 		stmtIndex int
 		expected  string
 	}{
-		{0, "indicator"},     // study → indicator
-		{1, "ta.sma"},        // sma → ta.sma
-		{2, "ta.stdev"},      // stdev → ta.stdev
-		{3, "math.abs"},      // abs → math.abs
+		{0, "indicator"},        // study → indicator
+		{1, "ta.sma"},           // sma → ta.sma
+		{2, "ta.stdev"},         // stdev → ta.stdev
+		{3, "math.abs"},         // abs → math.abs
 		{4, "request.security"}, // security → request.security
 	}
 
 	for _, exp := range expectedTransformations {
 		var call *parser.CallExpr
-		
+
 		stmt := result.Statements[exp.stmtIndex]
 		if stmt.Expression != nil {
 			call = findCallInFactor(stmt.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
@@ -186,7 +186,7 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call expression", exp.stmtIndex)
 		}
-		
+
 		if call.Callee.Ident == nil || *call.Callee.Ident != exp.expected {
 			t.Errorf("Statement %d: expected '%s', got '%v'", exp.stmtIndex, exp.expected, call.Callee.Ident)
 		}
@@ -209,7 +209,7 @@ ma = sma(close 20)
 	if err == nil {
 		t.Error("Expected parse error for invalid syntax")
 	}
-	
+
 	// Error should be descriptive
 	if err != nil && len(err.Error()) == 0 {
 		t.Error("Parse error should have descriptive message")

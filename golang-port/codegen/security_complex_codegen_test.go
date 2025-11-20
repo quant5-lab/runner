@@ -43,13 +43,13 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				},
 			},
 			expectedCode: []string{
-				"Inline SMA(20)",        // Left operand inlined
-				"Inline EMA(10)",        // Right operand inlined
-				"origCtx := ctx",        // Context switching
-				"ctx = secCtx",          // Security context assignment
+				"Inline SMA(20)",           // Left operand inlined
+				"Inline EMA(10)",           // Right operand inlined
+				"origCtx := ctx",           // Context switching
+				"ctx = secCtx",             // Security context assignment
 				"ctx.BarIndex = secBarIdx", // Bar index set
-				"ctx = origCtx",         // Context restored
-				"Series.GetCurrent() +", // Binary operation composition
+				"ctx = origCtx",            // Context restored
+				"Series.GetCurrent() +",    // Binary operation composition
 			},
 			unexpectedCode: []string{
 				"cache.GetExpression", // Should NOT use old expression cache
@@ -75,9 +75,9 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			expectedCode: []string{
 				"Inline SMA(20)",
 				"origCtx := ctx",
-				"secTmp_test_val_leftSeries := series.NewSeries(1000)", // Temp series for left operand
-				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Temp series for right operand
-				"secTmp_test_val_rightSeries.Set(2.00)", // Literal value
+				"secTmp_test_val_leftSeries := series.NewSeries(1000)",                               // Temp series for left operand
+				"secTmp_test_val_rightSeries := series.NewSeries(1000)",                              // Temp series for right operand
+				"secTmp_test_val_rightSeries.Set(2.00)",                                              // Literal value
 				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()", // Composition
 			},
 		},
@@ -155,9 +155,9 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			expectedCode: []string{
 				"Inline SMA(20)",
 				"Inline EMA(20)",
-				"secTmp_test_val_leftSeries := series.NewSeries(1000)", // Outer left operand
-				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Outer right operand
-				"secTmp_test_val_left_leftSeries := series.NewSeries(1000)", // Nested: (SMA - EMA) left
+				"secTmp_test_val_leftSeries := series.NewSeries(1000)",       // Outer left operand
+				"secTmp_test_val_rightSeries := series.NewSeries(1000)",      // Outer right operand
+				"secTmp_test_val_left_leftSeries := series.NewSeries(1000)",  // Nested: (SMA - EMA) left
 				"secTmp_test_val_left_rightSeries := series.NewSeries(1000)", // Nested: (SMA - EMA) right
 			},
 		},
@@ -180,7 +180,7 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			expectedCode: []string{
 				"Inline STDEV(20)",
 				"math.Sqrt(variance)",
-				"secTmp_test_val_leftSeries := series.NewSeries(1000)", // Temp series for STDEV
+				"secTmp_test_val_leftSeries := series.NewSeries(1000)",  // Temp series for STDEV
 				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Temp series for multiplier
 				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()",
 			},
@@ -301,8 +301,8 @@ func TestSecurityConditionalExpression(t *testing.T) {
 	expectedPatterns := []string{
 		"origCtx := ctx",
 		"ctx = secCtx",
-		"if",     // Conditional present
-		"} else", // Both branches present
+		"if",                       // Conditional present
+		"} else",                   // Both branches present
 		"closeSeries.GetCurrent()", // Uses existing series (not inline identifiers in conditionals yet)
 		"openSeries.GetCurrent()",
 	}
@@ -365,10 +365,10 @@ func TestSecurityATRGeneration(t *testing.T) {
 		"Inline ATR(14)",
 		"ctx.Data[ctx.BarIndex].High",
 		"ctx.Data[ctx.BarIndex].Low",
-		"ctx.Data[ctx.BarIndex-1].Close", // Previous close for TR
+		"ctx.Data[ctx.BarIndex-1].Close",       // Previous close for TR
 		"tr := math.Max(hl, math.Max(hc, lc))", // True Range calculation
-		"alpha := 1.0 / 14", // RMA smoothing
-		"prevATR :=",        // RMA uses previous value
+		"alpha := 1.0 / 14",                    // RMA smoothing
+		"prevATR :=",                           // RMA uses previous value
 	}
 
 	for _, pattern := range expectedPatterns {
@@ -436,12 +436,12 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
 		"Inline STDEV(20)",
-		"sum := 0.0",                           // Mean calculation
-		"mean := sum / 20.0",                   // Mean result
-		"variance := 0.0",                      // Variance calculation
+		"sum := 0.0",         // Mean calculation
+		"mean := sum / 20.0", // Mean result
+		"variance := 0.0",    // Variance calculation
 		"diff := ctx.Data[ctx.BarIndex-j].GetCurrent() - mean", // Uses GetCurrent() for source
-		"variance += diff * diff",              // Squared deviation
-		"math.Sqrt(variance)",                  // Final STDEV
+		"variance += diff * diff",                              // Squared deviation
+		"math.Sqrt(variance)",                                  // Final STDEV
 	}
 
 	for _, pattern := range expectedPatterns {

@@ -11,12 +11,12 @@ type RequestNamespaceTransformer struct {
 func NewRequestNamespaceTransformer() *RequestNamespaceTransformer {
 	return &RequestNamespaceTransformer{
 		mappings: map[string]string{
-			"security":   "request.security",
-			"financial":  "request.financial",
-			"quandl":     "request.quandl",
-			"splits":     "request.splits",
-			"dividends":  "request.dividends",
-			"earnings":   "request.earnings",
+			"security":  "request.security",
+			"financial": "request.financial",
+			"quandl":    "request.quandl",
+			"splits":    "request.splits",
+			"dividends": "request.dividends",
+			"earnings":  "request.earnings",
 		},
 	}
 }

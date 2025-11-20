@@ -37,7 +37,7 @@ ma50 = ta.ema(close, 50)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call expression", i)
 		}
-		
+
 		// Should have MemberAccess (ta.sma), not simple Ident
 		if call.Callee.MemberAccess == nil {
 			t.Errorf("Statement %d: expected member access (ta.xxx), got simple identifier", i)
@@ -167,7 +167,7 @@ func TestTANamespaceTransformer_UnknownFunction(t *testing.T) {
 func TestPipeline_ErrorPropagation(t *testing.T) {
 	// This test verifies that errors from transformers are properly propagated
 	// Currently all transformers return nil error, but this tests the mechanism
-	
+
 	input := `ma = sma(close, 20)`
 
 	p, err := parser.NewParser()
@@ -260,7 +260,7 @@ func TestTANamespaceTransformer_NilPointerSafety(t *testing.T) {
 
 	transformer := NewTANamespaceTransformer()
 	_, err := transformer.Transform(ast)
-	
+
 	// Should not panic, should handle nil gracefully
 	if err != nil {
 		t.Fatalf("Transform should handle nil gracefully, got error: %v", err)
@@ -299,13 +299,13 @@ rsi14 = rsi(close, 14)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call", i)
 		}
-		
+
 		// For already-transformed ema, check it doesn't double-transform
 		if i == 1 && call.Callee.MemberAccess == nil {
 			// Parser saw "ta.ema" as MemberAccess
 			continue
 		}
-		
+
 		if call.Callee.Ident != nil && *call.Callee.Ident != expected {
 			t.Errorf("Statement %d: expected %s, got %s", i, expected, *call.Callee.Ident)
 		}

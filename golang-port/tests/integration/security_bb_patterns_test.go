@@ -9,7 +9,7 @@ import (
 
 /* TestSecurityBBRealWorldPatterns tests actual security() patterns from production BB strategies
  * These are patterns that WORK with our current implementation (Python parser + Go codegen)
- * 
+ *
  * From bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine
  */
 func TestSecurityBBRealWorldPatterns(t *testing.T) {
@@ -212,7 +212,7 @@ plot(ema10_1d, "EMA")
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
-	
+
 	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write Pine file: %v", err)
@@ -271,7 +271,7 @@ func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
-	
+
 	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
 	if err != nil {
 		t.Errorf("Failed to write Pine file: %v", err)
@@ -306,7 +306,7 @@ func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 }
 
 func containsSubstring(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && 
+	return len(s) > 0 && len(substr) > 0 &&
 		(s == substr || (len(s) >= len(substr) && containsSubstringHelper(s, substr)))
 }
 

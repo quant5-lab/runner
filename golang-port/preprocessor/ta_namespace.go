@@ -15,27 +15,27 @@ func NewTANamespaceTransformer() *TANamespaceTransformer {
 	return &TANamespaceTransformer{
 		mappings: map[string]string{
 			// Moving averages
-			"sma":   "ta.sma",
-			"ema":   "ta.ema",
-			"rma":   "ta.rma",
-			"wma":   "ta.wma",
-			"vwma":  "ta.vwma",
-			"swma":  "ta.swma",
-			"alma":  "ta.alma",
-			"hma":   "ta.hma",
+			"sma":    "ta.sma",
+			"ema":    "ta.ema",
+			"rma":    "ta.rma",
+			"wma":    "ta.wma",
+			"vwma":   "ta.vwma",
+			"swma":   "ta.swma",
+			"alma":   "ta.alma",
+			"hma":    "ta.hma",
 			"linreg": "ta.linreg",
 
 			// Oscillators
-			"rsi":    "ta.rsi",
-			"macd":   "ta.macd",
-			"stoch":  "ta.stoch",
-			"cci":    "ta.cci",
-			"cmo":    "ta.cmo",
-			"mfi":    "ta.mfi",
-			"mom":    "ta.mom",
-			"roc":    "ta.roc",
-			"tsi":    "ta.tsi",
-			"wpr":    "ta.wpr",
+			"rsi":   "ta.rsi",
+			"macd":  "ta.macd",
+			"stoch": "ta.stoch",
+			"cci":   "ta.cci",
+			"cmo":   "ta.cmo",
+			"mfi":   "ta.mfi",
+			"mom":   "ta.mom",
+			"roc":   "ta.roc",
+			"tsi":   "ta.tsi",
+			"wpr":   "ta.wpr",
 
 			// Bands & channels
 			"bb":  "ta.bb",
@@ -44,21 +44,21 @@ func NewTANamespaceTransformer() *TANamespaceTransformer {
 			"kcw": "ta.kcw",
 
 			// Volatility
-			"atr":   "ta.atr",
-			"tr":    "ta.tr",
-			"stdev": "ta.stdev",
-			"dev":   "ta.dev",
+			"atr":      "ta.atr",
+			"tr":       "ta.tr",
+			"stdev":    "ta.stdev",
+			"dev":      "ta.dev",
 			"variance": "ta.variance",
 
 			// Volume
-			"obv": "ta.obv",
-			"pvt": "ta.pvt",
-			"nvi": "ta.nvi",
-			"pvi": "ta.pvi",
-			"wad": "ta.wad",
-			"wvad": "ta.wvad",
+			"obv":     "ta.obv",
+			"pvt":     "ta.pvt",
+			"nvi":     "ta.nvi",
+			"pvi":     "ta.pvi",
+			"wad":     "ta.wad",
+			"wvad":    "ta.wvad",
 			"accdist": "ta.accdist",
-			"iii": "ta.iii",
+			"iii":     "ta.iii",
 
 			// Trend
 			"sar":        "ta.sar",
@@ -72,12 +72,12 @@ func NewTANamespaceTransformer() *TANamespaceTransformer {
 			"crossunder": "ta.crossunder",
 
 			// Statistical
-			"change":     "ta.change",
-			"cum":        "ta.cum",
-			"falling":    "ta.falling",
-			"rising":     "ta.rising",
-			"barsince":   "ta.barsince",
-			"valuewhen":  "ta.valuewhen",
+			"change":    "ta.change",
+			"cum":       "ta.cum",
+			"falling":   "ta.falling",
+			"rising":    "ta.rising",
+			"barsince":  "ta.barsince",
+			"valuewhen": "ta.valuewhen",
 
 			// High/Low
 			"highest":     "ta.highest",
@@ -247,7 +247,7 @@ func (t *TANamespaceTransformer) transformValue(val *parser.Value) {
 	if val == nil {
 		return
 	}
-	
+
 	if val.Subscript != nil && val.Subscript.Index != nil {
 		t.transformArithExpr(val.Subscript.Index)
 	}

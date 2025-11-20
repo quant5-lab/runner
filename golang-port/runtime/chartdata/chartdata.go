@@ -12,11 +12,11 @@ import (
 
 /* Metadata contains chart metadata */
 type Metadata struct {
-	Symbol     string `json:"symbol"`
-	Timeframe  string `json:"timeframe"`
-	Strategy   string `json:"strategy,omitempty"`
-	Title      string `json:"title"`
-	Timestamp  string `json:"timestamp"`
+	Symbol    string `json:"symbol"`
+	Timeframe string `json:"timeframe"`
+	Strategy  string `json:"strategy,omitempty"`
+	Title     string `json:"title"`
+	Timestamp string `json:"timestamp"`
 }
 
 /* StyleConfig contains plot styling */
@@ -27,10 +27,10 @@ type StyleConfig struct {
 
 /* IndicatorSeries represents a plot indicator with metadata */
 type IndicatorSeries struct {
-	Title string       `json:"title"`
-	Pane  string       `json:"pane,omitempty"`
-	Style StyleConfig  `json:"style"`
-	Data  []PlotPoint  `json:"data"`
+	Title string      `json:"title"`
+	Pane  string      `json:"pane,omitempty"`
+	Style StyleConfig `json:"style"`
+	Data  []PlotPoint `json:"data"`
 }
 
 /* PaneConfig contains pane layout configuration */
@@ -92,7 +92,7 @@ func (p PlotPoint) MarshalJSON() ([]byte, error) {
 	} else {
 		value = p.Value
 	}
-	
+
 	return json.Marshal(&struct {
 		Time    int64                  `json:"time"`
 		Value   interface{}            `json:"value"`
@@ -126,7 +126,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 	if strategyName != "" {
 		title = strategyName + " - " + symbol
 	}
-	
+
 	return &ChartData{
 		Metadata: Metadata{
 			Symbol:    symbol,
@@ -139,7 +139,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 		Indicators:  make(map[string]IndicatorSeries),
 		UI: UIConfig{
 			Panes: map[string]PaneConfig{
-				"main": {Height: 400, Fixed: true},
+				"main":      {Height: 400, Fixed: true},
 				"indicator": {Height: 200, Fixed: false},
 			},
 		},
@@ -150,7 +150,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 func (cd *ChartData) AddPlots(collector *output.Collector) {
 	series := collector.GetSeries()
 	colors := []string{"#2196F3", "#4CAF50", "#FF9800", "#F44336", "#9C27B0", "#00BCD4"}
-	
+
 	for i, s := range series {
 		plotPoints := make([]PlotPoint, len(s.Data))
 		for j, p := range s.Data {
@@ -160,10 +160,10 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 				Options: p.Options,
 			}
 		}
-		
+
 		/* Backend emits raw data without presentation concerns */
 		color := colors[i%len(colors)]
-		
+
 		cd.Indicators[s.Title] = IndicatorSeries{
 			Title: s.Title,
 			Pane:  "", /* Presentation layer assigns pane based on range analysis */

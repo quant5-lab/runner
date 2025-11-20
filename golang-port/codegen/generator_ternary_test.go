@@ -60,7 +60,7 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 	if !strings.Contains(code, "} else { return 0") {
 		t.Errorf("Missing ternary false branch: got %s", code)
 	}
-	
+
 	if !strings.Contains(code, "signalSeries.Set(func() float64") {
 		t.Errorf("Missing Series.Set with inline function: got %s", code)
 	}

@@ -8,30 +8,30 @@ import (
 
 /* SecurityCall represents a detected request.security() invocation */
 type SecurityCall struct {
-	Symbol     string          /* Symbol parameter (e.g., "BTCUSDT", "syminfo.tickerid") */
-	Timeframe  string          /* Timeframe parameter (e.g., "1D", "1h") */
-	Expression ast.Expression  /* AST node of expression argument for evaluation */
-	ExprName   string          /* Optional name from array notation: [expr, "name"] */
+	Symbol     string         /* Symbol parameter (e.g., "BTCUSDT", "syminfo.tickerid") */
+	Timeframe  string         /* Timeframe parameter (e.g., "1D", "1h") */
+	Expression ast.Expression /* AST node of expression argument for evaluation */
+	ExprName   string         /* Optional name from array notation: [expr, "name"] */
 }
 
 /* AnalyzeAST scans Pine Script AST for request.security() calls */
 func AnalyzeAST(program *ast.Program) []SecurityCall {
 	var calls []SecurityCall
-	
+
 	/* Walk variable declarations looking for security() calls */
 	for _, stmt := range program.Body {
 		varDecl, ok := stmt.(*ast.VariableDeclaration)
 		if !ok {
 			continue
 		}
-		
+
 		for _, declarator := range varDecl.Declarations {
 			if call := extractSecurityCall(declarator.Init); call != nil {
 				calls = append(calls, *call)
 			}
 		}
 	}
-	
+
 	return calls
 }
 
@@ -41,18 +41,18 @@ func extractSecurityCall(expr ast.Expression) *SecurityCall {
 	if !ok {
 		return nil
 	}
-	
+
 	/* Match: request.security(...) or security(...) */
 	funcName := extractFunctionName(callExpr.Callee)
 	if funcName != "request.security" && funcName != "security" {
 		return nil
 	}
-	
+
 	/* Require at least 3 arguments: symbol, timeframe, expression */
 	if len(callExpr.Arguments) < 3 {
 		return nil
 	}
-	
+
 	return &SecurityCall{
 		Symbol:     extractSymbol(callExpr.Arguments[0]),
 		Timeframe:  extractTimeframe(callExpr.Arguments[1]),
@@ -84,12 +84,12 @@ func extractSymbol(expr ast.Expression) string {
 			return strings.Trim(s, "\"'")
 		}
 	}
-	
+
 	/* Identifier: syminfo.tickerid */
 	if id, ok := expr.(*ast.Identifier); ok {
 		return id.Name
 	}
-	
+
 	/* Member expression: syminfo.tickerid */
 	if mem, ok := expr.(*ast.MemberExpression); ok {
 		obj := extractIdentifier(mem.Object)
@@ -98,7 +98,7 @@ func extractSymbol(expr ast.Expression) string {
 			return obj + "." + prop
 		}
 	}
-	
+
 	return ""
 }
 
@@ -111,12 +111,12 @@ func extractTimeframe(expr ast.Expression) string {
 			return strings.Trim(s, "\"'")
 		}
 	}
-	
+
 	/* Identifier: timeframe variable */
 	if id, ok := expr.(*ast.Identifier); ok {
 		return id.Name
 	}
-	
+
 	return ""
 }
 
@@ -145,13 +145,13 @@ func ExtractMaxPeriod(expr ast.Expression) int {
 	if expr == nil {
 		return 0
 	}
-	
+
 	switch e := expr.(type) {
 	case *ast.CallExpression:
 		/* Check if this is a TA function call */
 		funcName := extractFunctionName(e.Callee)
 		maxPeriod := 0
-		
+
 		/* TA functions typically have period as second argument
 		 * ta.sma(source, length), ta.ema(source, length), etc.
 		 */
@@ -163,7 +163,7 @@ func ExtractMaxPeriod(expr ast.Expression) int {
 				}
 			}
 		}
-		
+
 		/* Recursively check all arguments for nested TA calls
 		 * Example: ta.sma(ta.ema(close, 50), 200) → max(50, 200) = 200
 		 */
@@ -173,9 +173,9 @@ func ExtractMaxPeriod(expr ast.Expression) int {
 				maxPeriod = argPeriod
 			}
 		}
-		
+
 		return maxPeriod
-		
+
 	case *ast.BinaryExpression:
 		/* Binary expressions: close + ta.sma(close, 20) */
 		leftPeriod := ExtractMaxPeriod(e.Left)
@@ -184,13 +184,13 @@ func ExtractMaxPeriod(expr ast.Expression) int {
 			return leftPeriod
 		}
 		return rightPeriod
-		
+
 	case *ast.ConditionalExpression:
 		/* Conditional: condition ? ta.sma(close, 20) : ta.ema(close, 50) */
 		testPeriod := ExtractMaxPeriod(e.Test)
 		conseqPeriod := ExtractMaxPeriod(e.Consequent)
 		altPeriod := ExtractMaxPeriod(e.Alternate)
-		
+
 		maxPeriod := testPeriod
 		if conseqPeriod > maxPeriod {
 			maxPeriod = conseqPeriod
@@ -199,19 +199,19 @@ func ExtractMaxPeriod(expr ast.Expression) int {
 			maxPeriod = altPeriod
 		}
 		return maxPeriod
-		
+
 	case *ast.MemberExpression:
 		/* Member expressions don't have periods */
 		return 0
-		
+
 	case *ast.Identifier:
 		/* Identifiers don't have periods */
 		return 0
-		
+
 	case *ast.Literal:
 		/* Literals don't have periods */
 		return 0
-		
+
 	default:
 		/* Unknown expression type - return 0 */
 		return 0

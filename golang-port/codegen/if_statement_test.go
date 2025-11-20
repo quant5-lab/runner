@@ -59,7 +59,7 @@ if (signal)
 	if !strings.Contains(generated, "strat.Entry(") {
 		t.Errorf("Expected 'strat.Entry(', got:\n%s", generated)
 	}
-	
+
 	// Make sure no TODO placeholders
 	if strings.Contains(generated, "TODO: implement") {
 		t.Errorf("Found TODO placeholder, if statement not properly generated:\n%s", generated)

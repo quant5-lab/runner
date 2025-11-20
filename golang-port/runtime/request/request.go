@@ -27,11 +27,11 @@ type SecurityDataFetcher interface {
 
 /* Request implements request.security() for multi-timeframe data */
 type Request struct {
-	ctx          *context.Context
-	fetcher      SecurityDataFetcher
-	cache        map[string]*context.Context
-	exprCache    map[string][]float64
-	currentBar   int
+	ctx        *context.Context
+	fetcher    SecurityDataFetcher
+	cache      map[string]*context.Context
+	exprCache  map[string][]float64
+	currentBar int
 }
 
 /* NewRequest creates a new request handler */

@@ -11,7 +11,7 @@ import (
 /* BenchmarkEvaluateIdentifier measures array allocation cost */
 func BenchmarkEvaluateIdentifier(b *testing.B) {
 	sizes := []int{100, 500, 1000, 5000}
-	
+
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("bars_%d", size), func(b *testing.B) {
 			/* Setup context with N bars */
@@ -26,12 +26,12 @@ func BenchmarkEvaluateIdentifier(b *testing.B) {
 					Volume: 1000.0,
 				})
 			}
-			
+
 			id := &ast.Identifier{Name: "close"}
-			
+
 			b.ResetTimer()
 			b.ReportAllocs()
-			
+
 			/* Measure: evaluateIdentifier allocates []float64 every call */
 			for i := 0; i < b.N; i++ {
 				_, err := evaluateIdentifier(id, secCtx)
@@ -46,18 +46,18 @@ func BenchmarkEvaluateIdentifier(b *testing.B) {
 /* BenchmarkTASma measures TA function allocation overhead */
 func BenchmarkTASma(b *testing.B) {
 	sizes := []int{100, 500, 1000, 5000}
-	
+
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("bars_%d", size), func(b *testing.B) {
 			/* Setup context */
 			secCtx := context.New("BTCUSDT", "1D", size)
 			for i := 0; i < size; i++ {
 				secCtx.AddBar(context.OHLCV{
-					Time:   int64(i * 86400),
-					Close:  100.0 + float64(i%10),
+					Time:  int64(i * 86400),
+					Close: 100.0 + float64(i%10),
 				})
 			}
-			
+
 			/* Parse ta.sma(close, 20) */
 			call := &ast.CallExpression{
 				Callee: &ast.MemberExpression{
@@ -69,10 +69,10 @@ func BenchmarkTASma(b *testing.B) {
 					&ast.Literal{Value: 20},
 				},
 			}
-			
+
 			b.ResetTimer()
 			b.ReportAllocs()
-			
+
 			/* Measure: evaluateTASma calls ta.Sma() which allocates result array */
 			for i := 0; i < b.N; i++ {
 				_, err := evaluateCallExpression(call, secCtx)
@@ -118,13 +118,13 @@ func BenchmarkPrefetchWorkflow(b *testing.B) {
 			},
 		},
 	}
-	
+
 	/* Mock fetcher */
 	fetcher := &mockFetcher{barCount: 1000}
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	/* Measure: full prefetch allocates contexts + evaluates expressions */
 	for i := 0; i < b.N; i++ {
 		prefetcher := NewSecurityPrefetcher(fetcher)
@@ -145,7 +145,7 @@ func (m *mockFetcher) Fetch(symbol, timeframe string, limit int) ([]context.OHLC
 	if limit > 0 && limit < count {
 		count = limit
 	}
-	
+
 	bars := make([]context.OHLCV, count)
 	for i := 0; i < count; i++ {
 		bars[i] = context.OHLCV{
@@ -157,6 +157,6 @@ func (m *mockFetcher) Fetch(symbol, timeframe string, limit int) ([]context.OHLC
 			Volume: 1000.0,
 		}
 	}
-	
+
 	return bars, nil
 }

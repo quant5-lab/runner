@@ -140,7 +140,7 @@ func (v *functionRenamer) visitValue(val *parser.Value) {
 	if val == nil {
 		return
 	}
-	
+
 	if val.Subscript != nil && val.Subscript.Index != nil {
 		v.visitArithExpr(val.Subscript.Index)
 	}

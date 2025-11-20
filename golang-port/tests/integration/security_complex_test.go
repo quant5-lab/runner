@@ -22,7 +22,7 @@ plot(combined, "Combined", color=color.blue)
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
-	
+
 	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write Pine file: %v", err)
@@ -86,7 +86,7 @@ plot(volatility, "Volatility %", color=color.red)
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
-	
+
 	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write Pine file: %v", err)
@@ -314,7 +314,7 @@ func buildAndCompilePine(t *testing.T, pineScript string) bool {
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
-	
+
 	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
 	if err != nil {
 		t.Errorf("Failed to write Pine file: %v", err)
@@ -349,7 +349,7 @@ func buildAndCompilePine(t *testing.T, pineScript string) bool {
 }
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && 
+	return len(s) > 0 && len(substr) > 0 &&
 		(s == substr || (len(s) >= len(substr) && containsHelper(s, substr)))
 }
 
