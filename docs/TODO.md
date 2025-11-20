@@ -103,9 +103,13 @@
 ### Integration & Validation
 - [x] Integrate InjectSecurityCode into builder pipeline (complete)
 - [x] All security() test suites PASS (10 suites, 28+ cases)
-- [ ] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json
-- [ ] Verify: SMA values correct daily averages, not zeros
-- [ ] Test: Downsampling (1h → 1D), Same timeframe (1D → 1D), Upsampling error (1D → 1h)
+- [x] E2E: daily-lines.pine with BTCUSDT_1h.json + BTCUSDT_1D.json
+- [x] Verify: SMA values correct daily averages, not zeros
+- [x] Test: Downsampling (1h → 1D), Same timeframe (1D → 1D), Upsampling error (1D → 1h)
+- [x] Dynamic warmup calculation based on indicator periods (ta.sma(close,200) → 200 bars)
+- [x] Timeframe-aware bar conversion (weekly bars × 7 + warmup = daily bars needed)
+- [x] Automatic security timeframe fetching in fetch-strategy.sh
+- [x] Timeframe normalization (D→1D, W→1W, M→1M) across entire codebase
 
 ## Phase 3: Binary Template (4 weeks)
 - [x] `mkdir -p golang-port/template`
