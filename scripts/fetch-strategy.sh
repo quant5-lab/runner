@@ -118,7 +118,10 @@ for SEC_TF in $SECURITY_TFS; do
     
     SEC_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TF}.json"
     if [ ! -f "$SEC_FILE" ]; then
-        echo "  Fetching security timeframe: $NORM_TF (need 3000 bars for warmup)"
+        # Calculate needed bars: base_bars * timeframe_ratio + 500 (conservative warmup)
+        # For weekly base with 500 bars: 500 * 7 + 500 = 4000 daily bars needed
+        SEC_BARS=$((BARS * 10 + 500))
+        echo "  Fetching security timeframe: $NORM_TF (need ~$SEC_BARS bars for warmup)"
         SEC_TEMP="$TEMP_DIR/security_${NORM_TF}.json"
         SEC_STD="$TEMP_DIR/security_${NORM_TF}_std.json"
         
@@ -128,7 +131,7 @@ import('./src/container.js').then(({ createContainer }) => {
     const container = createContainer(createProviderChain, DEFAULTS);
     const providerManager = container.resolve('providerManager');
     
-    providerManager.getMarketData('$SYMBOL', '$NORM_TF', 3000)
+    providerManager.getMarketData('$SYMBOL', '$NORM_TF', $SEC_BARS)
       .then(bars => {
         const fs = require('fs');
         fs.writeFileSync('$SEC_TEMP', JSON.stringify(bars, null, 2));
