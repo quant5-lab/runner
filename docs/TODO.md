@@ -121,11 +121,11 @@
 - [x] `template/main.go.tmpl` context.LoadData() integration
 - [x] `codegen/inject.go` insert generated strategy code into template
 - [x] `codegen/generator.go` AST → Go code generation (placeholder)
-- [x] `cmd/pinescript-builder/main.go` CLI entry point
-- [x] `go build -o bin/pinescript-builder cmd/pinescript-builder/main.go`
-- [x] Test `./bin/pinescript-builder -input test-simple.pine -output bin/strategy`
-- [x] Test `go build -o bin/test-simple-runner /tmp/pine_strategy_temp.go`
-- [x] Test `./bin/test-simple-runner -symbol TEST -data sample-bars.json -output output.json`
+- [x] `cmd/pine-gen/main.go` CLI entry point
+- [x] `go build -o bin/pine-gen cmd/pine-gen/main.go`
+- [x] Test `./bin/pine-gen -input test-simple.pine -output bin/strategy`
+- [x] Test `go build -o bin/test-simple-strategy /tmp/pine_strategy_temp.go`
+- [x] Test `./bin/test-simple-strategy -symbol TEST -data sample-bars.json -output output.json`
 - [x] Verify JSON output with candlestick/plots/strategy/timestamp
 - [x] Execution <50ms (24µs for 30 bars with placeholder strategy)
 

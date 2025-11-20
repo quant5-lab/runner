@@ -222,7 +222,7 @@ plot(ema10_1d, "EMA")
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
 
@@ -266,7 +266,7 @@ plot(ema10_1d, "EMA")
 	t.Log("✅ Inline TA code generation validated")
 }
 
-/* Helper function to build and compile Pine script using pinescript-builder */
+/* Helper function to build and compile Pine script using pine-gen */
 func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
@@ -282,7 +282,7 @@ func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
 

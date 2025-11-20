@@ -28,12 +28,12 @@ plot(combined, "Combined", color=color.blue)
 		t.Fatalf("Failed to write Pine file: %v", err)
 	}
 
-	/* Build using pinescript-builder */
+	/* Build using pine-gen */
 	originalDir, _ := os.Getwd()
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
 
@@ -96,7 +96,7 @@ plot(volatility, "Volatility %", color=color.red)
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
 
@@ -309,7 +309,7 @@ plot(sma20, "SMA20")`
 	t.Log("✅ NaN handling compiled successfully")
 }
 
-/* Helper function to build and compile Pine script using pinescript-builder */
+/* Helper function to build and compile Pine script using pine-gen */
 func buildAndCompilePine(t *testing.T, pineScript string) bool {
 	tmpDir := t.TempDir()
 	pineFile := filepath.Join(tmpDir, "test.pine")
@@ -325,7 +325,7 @@ func buildAndCompilePine(t *testing.T, pineScript string) bool {
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
 

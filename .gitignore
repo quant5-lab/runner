@@ -32,6 +32,22 @@ bower_components
 # Compiled binary addons
 build/Release
 
+# Go binaries
+build/
+dist/
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binaries
+*.test
+
+# Go coverage
+*.out
+
 # Dependency directories
 jspm_packages/
 

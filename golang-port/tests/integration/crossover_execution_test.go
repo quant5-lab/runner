@@ -14,7 +14,7 @@ func TestCrossoverExecution(t *testing.T) {
 	defer os.Chdir(originalDir)
 
 	// Build strategy binary
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/crossover-builtin-test.pine",
 		"-output", "/tmp/test-crossover-exec")
 

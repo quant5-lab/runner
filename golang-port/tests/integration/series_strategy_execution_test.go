@@ -14,7 +14,7 @@ func TestSeriesStrategyExecution(t *testing.T) {
 	defer os.Chdir(originalDir)
 
 	// Build strategy binary from Series test strategy
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/strategy-sma-crossover-series.pine",
 		"-output", "/tmp/test-series-strategy")
 

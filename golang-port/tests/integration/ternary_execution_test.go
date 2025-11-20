@@ -14,7 +14,7 @@ func TestTernaryExecution(t *testing.T) {
 	defer os.Chdir(originalDir)
 
 	// Build strategy binary
-	buildCmd := exec.Command("go", "run", "cmd/pinescript-builder/main.go",
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/ternary-test.pine",
 		"-output", "/tmp/test-ternary-exec")
 

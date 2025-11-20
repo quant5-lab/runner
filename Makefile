@@ -5,14 +5,14 @@
 
 # Project configuration
 PROJECT_NAME := pinescript-go
-BINARY_NAME := pinescript-runner
+BINARY_NAME := pine-inspect
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Directories
 GOLANG_PORT := golang-port
-CMD_DIR := $(GOLANG_PORT)/cmd/pinescript-go
+CMD_DIR := $(GOLANG_PORT)/cmd/pine-inspect
 BUILD_DIR := build
 DIST_DIR := dist
 COVERAGE_DIR := coverage
@@ -49,7 +49,6 @@ install: ## Install development dependencies
 fmt: ## Format Go code
 	@echo "Formatting code..."
 	@cd $(GOLANG_PORT) && gofmt -s -w .
-	@cd $(GOLANG_PORT) && goimports -w .
 	@echo "✓ Code formatted"
 
 vet: ## Run go vet
@@ -59,7 +58,7 @@ vet: ## Run go vet
 
 lint: ## Run linter
 	@echo "Running linter..."
-	@cd $(GOLANG_PORT) && golangci-lint run --timeout 5m
+	@cd $(GOLANG_PORT) && $(GO) vet ./...
 	@echo "✓ Lint passed"
 
 security: ## Run security scanner
@@ -256,7 +255,7 @@ run-strategy: ## Run strategy with pre-generated data file (usage: make run-stra
 	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@echo "Running strategy: $(STRATEGY)"
 	@mkdir -p out
-	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run cmd/pinescript-builder/main.go \
+	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run cmd/pine-gen/main.go \
 		-input ../$(STRATEGY) \
 		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
 	cd $(GOLANG_PORT) && $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE

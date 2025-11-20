@@ -164,7 +164,7 @@ STRATEGY_NAME=$(basename "$STRATEGY" .pine)
 OUTPUT_BINARY="/tmp/${STRATEGY_NAME}"
 
 # Generate Go code
-TEMP_GO=$(cd golang-port && go run cmd/pinescript-builder/main.go -input ../"$STRATEGY" -output "$OUTPUT_BINARY" 2>&1 | grep "Generated:" | awk '{print $2}')
+TEMP_GO=$(cd golang-port && go run cmd/pine-gen/main.go -input ../"$STRATEGY" -output "$OUTPUT_BINARY" 2>&1 | grep "Generated:" | awk '{print $2}')
 if [ -z "$TEMP_GO" ]; then
     echo "❌ Failed to generate Go code"
     exit 1

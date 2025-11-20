@@ -1,6 +1,12 @@
-# PineScript Go Port
+# Runner - PineScript Go Port
 
-High-performance PineScript v5 parser, transpiler, and runtime written in Go.
+High-performance PineScript v5 parser, transpiler, and runtime written in Go for Quant 5 Lab.
+
+## Tooling
+
+- **pine-inspect**: AST parser/debugger (outputs JSON AST for inspection)
+- **pine-gen**: Code generator (transpiles .pine → Go source)
+- **Strategy binaries**: Standalone executables (compiled per-strategy)
 
 ## Quick Start
 

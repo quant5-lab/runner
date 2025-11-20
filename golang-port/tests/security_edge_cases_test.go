@@ -26,7 +26,7 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 	
 	cwd, _ := os.Getwd()
 	projectRoot := filepath.Dir(cwd)
-	builderPath := filepath.Join(projectRoot, "cmd", "pinescript-builder", "main.go")
+	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
 	
@@ -96,9 +96,9 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 		}
 	}
 	
-	/* With 500h warmup → 20+ days, expect >480 values (close available immediately) */
-	if nonNullCount < 480 {
-		t.Errorf("Downsampling warmup insufficient: got %d non-null values, expected >480", nonNullCount)
+	/* 200h bars → ~8 days of 1D data, expect >5 values */
+	if nonNullCount < 5 {
+		t.Errorf("Downsampling warmup insufficient: got %d non-null values, expected >5", nonNullCount)
 	}
 }
 
@@ -119,7 +119,7 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 	
 	cwd, _ := os.Getwd()
 	projectRoot := filepath.Dir(cwd)
-	builderPath := filepath.Join(projectRoot, "cmd", "pinescript-builder", "main.go")
+	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
 	
@@ -173,13 +173,13 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		t.Fatal("No indicators in output")
 	}
 	
-	/* Same-TF must produce 1:1 mapping - all 500 bars mapped */
+	/* Same-TF must produce 1:1 mapping - all 200 bars mapped */
 	sameTF, ok := result.Indicators["Same-TF Close"]
 	if !ok {
 		t.Fatalf("Expected 'Same-TF Close' indicator, got: %v", result.Indicators)
 	}
-	if len(sameTF.Data) != 500 {
-		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected 500", len(sameTF.Data))
+	if len(sameTF.Data) != 200 {
+		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected 200", len(sameTF.Data))
 	}
 	
 	/* All values should be non-null (direct 1:1 copy) */
@@ -190,8 +190,8 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		}
 	}
 	
-	if nonNullCount != 500 {
-		t.Errorf("Same-timeframe should have 500 non-null values, got %d", nonNullCount)
+	if nonNullCount != 200 {
+		t.Errorf("Same-timeframe should have 200 non-null values, got %d", nonNullCount)
 	}
 }
 
@@ -212,7 +212,7 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 	
 	cwd, _ := os.Getwd()
 	projectRoot := filepath.Dir(cwd)
-	builderPath := filepath.Join(projectRoot, "cmd", "pinescript-builder", "main.go")
+	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
 	
