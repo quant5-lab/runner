@@ -71,12 +71,16 @@ build-strategy: ## Build standalone strategy binary (usage: make build-strategy 
 _build_strategy_internal:
 	@mkdir -p $(BUILD_DIR)
 	@echo "[1/3] Generating Go code from Pine Script..."
-	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input ../$(STRATEGY) -output $(BUILD_DIR)/$(OUTPUT) 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	@OUTPUT_PATH="$(OUTPUT)"; \
+	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="../$(BUILD_DIR)/$(OUTPUT)";; esac; \
+	TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input ../$(STRATEGY) -output $$OUTPUT_PATH 2>&1 | grep "Generated:" | awk '{print $$2}'); \
 	if [ -z "$$TEMP_FILE" ]; then echo "Failed to generate Go code"; exit 1; fi; \
 	echo "[2/3] Compiling binary..."; \
-	cd $(GOLANG_PORT) && $(GO) build -o ../$(BUILD_DIR)/$(OUTPUT) $$TEMP_FILE
-	@echo "[3/3] Cleanup..."
-	@echo "✓ Strategy compiled: $(BUILD_DIR)/$(OUTPUT)"
+	cd $(GOLANG_PORT) && $(GO) build -o $$OUTPUT_PATH $$TEMP_FILE
+	@OUTPUT_PATH="$(OUTPUT)"; \
+	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="$(BUILD_DIR)/$(OUTPUT)";; esac; \
+	echo "[3/3] Cleanup..."; \
+	echo "✓ Strategy compiled: $$OUTPUT_PATH"
 
 cross-compile: ## Build pine-gen for all platforms (strategy code generator)
 	@echo "Cross-compiling pine-gen for distribution..."
