@@ -134,9 +134,28 @@
 - [x] Implement strategy.entry, strategy.close, strategy.exit codegen (strategy.close lines 247-251, strategy.entry working)
 - [x] `./bin/strategy` on daily-lines-simple.pine validates basic features
 - [x] `./bin/strategy` on daily-lines.pine validates advanced features
-- [ ] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy
-- [ ] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations
-- [ ] `./bin/strategy` on BB7 produces 9 trades
+
+## Phase 4: Additional Pine Features for Complex Strategies (3 weeks)
+- [x] Unary expressions (`-1`, `+x`, `not x`, `!condition`)
+- [x] `na` constant for NaN value representation
+- [x] `timeframe.ismonthly`, `timeframe.isdaily`, `timeframe.isweekly` built-in variables
+- [x] `timeframe.period` built-in variable
+- [ ] `input.float()` with title and defval parameters
+- [ ] `input.source()` for selecting price source (close, open, high, low)
+- [ ] `input.session()` for time range inputs
+- [ ] `input.bool()` for boolean configuration
+- [ ] `input.integer()` for integer configuration
+- [ ] `math.pow()` with expression arguments (not just literals)
+- [ ] Variable subscript indexing `src[variable]` where variable is computed
+- [ ] `barstate.isfirst` built-in variable
+- [ ] `syminfo.tickerid` built-in variable
+- [ ] `fixnan()` function for forward-filling NaN values
+- [ ] `change()` function for detecting value changes
+
+## Phase 5: Strategy Validation
+- [ ] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts)
+- [ ] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations (requires: same as above + ta.ema)
+- [ ] `./bin/strategy` on BB7 produces 9 trades (requires: all input types, security() with complex expressions, fixnan, pivothigh/pivotlow)
 - [ ] `./bin/strategy` on BB8 produces expected trades
 - [ ] `./bin/strategy` on BB9 produces expected trades
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
