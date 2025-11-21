@@ -5,6 +5,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/borisquantlab/pinescript-go/runtime/clock"
+
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 	"github.com/borisquantlab/pinescript-go/runtime/output"
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
@@ -133,7 +135,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 			Timeframe: timeframe,
 			Strategy:  strategyName,
 			Title:     title,
-			Timestamp: time.Now().Format(time.RFC3339),
+			Timestamp: clock.Now().Format(time.RFC3339),
 		},
 		Candlestick: ctx.Data,
 		Indicators:  make(map[string]IndicatorSeries),

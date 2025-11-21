@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/borisquantlab/pinescript-go/runtime/clock"
 	"os"
 	"time"
 
@@ -222,7 +223,7 @@ func main() {
 	}
 
 	/* Execute strategy */
-	startTime := time.Now()
+	startTime := clock.Now()
 	plotCollector, strat := executeStrategy(ctx)
 	executionTime := time.Since(startTime)
 

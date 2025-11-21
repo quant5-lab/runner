@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"github.com/borisquantlab/pinescript-go/runtime/clock"
 	"encoding/json"
 
 	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
@@ -80,7 +81,7 @@ func main() {
 	}
 
 	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
-	startTime := time.Now()
+	startTime := clock.Now()
 	securityContexts := make(map[string]*context.Context)
 	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts)
 	executionTime := time.Since(startTime)

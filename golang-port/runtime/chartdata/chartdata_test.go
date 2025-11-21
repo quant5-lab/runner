@@ -3,8 +3,8 @@ package chartdata
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
+	"github.com/borisquantlab/pinescript-go/runtime/clock"
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 	"github.com/borisquantlab/pinescript-go/runtime/output"
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
@@ -12,7 +12,7 @@ import (
 
 func TestNewChartData(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 
 	for i := 0; i < 5; i++ {
 		ctx.AddBar(context.OHLCV{
@@ -49,7 +49,7 @@ func TestAddPlots(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "")
 
 	collector := output.NewCollector()
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 
 	collector.Add("SMA 20", now, 100.0, nil)
 	collector.Add("SMA 20", now+3600, 102.0, nil)
@@ -103,7 +103,7 @@ func TestAddStrategy(t *testing.T) {
 
 func TestToJSON(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 	ctx.AddBar(context.OHLCV{
 		Time: now, Open: 100, High: 105, Low: 95, Close: 102, Volume: 1000,
 	})

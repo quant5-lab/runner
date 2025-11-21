@@ -2,8 +2,8 @@ package request
 
 import (
 	"testing"
-	"time"
 
+	"github.com/borisquantlab/pinescript-go/runtime/clock"
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 )
 
@@ -23,7 +23,7 @@ func (m *MockDataFetcher) FetchData(symbol, timeframe string, limit int) (*conte
 func TestRequestSecurity(t *testing.T) {
 	// Create main context (1h timeframe)
 	mainCtx := context.New("TEST", "1h", 24)
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 
 	// Add hourly bars
 	for i := 0; i < 24; i++ {
@@ -83,7 +83,7 @@ func TestRequestSecurity(t *testing.T) {
 
 func TestRequestCaching(t *testing.T) {
 	mainCtx := context.New("TEST", "1h", 1)
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 	mainCtx.AddBar(context.OHLCV{
 		Open: 100, High: 105, Low: 95, Close: 102, Volume: 1000, Time: now,
 	})
@@ -128,7 +128,7 @@ func TestRequestCaching(t *testing.T) {
 
 func TestRequestLookahead(t *testing.T) {
 	mainCtx := context.New("TEST", "1h", 1)
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 	mainCtx.AddBar(context.OHLCV{
 		Open: 100, High: 105, Low: 95, Close: 102, Volume: 1000, Time: now,
 	})
