@@ -16,18 +16,21 @@ type SecurityInjection struct {
 
 /* AnalyzeAndGeneratePrefetch analyzes AST for security() calls and generates prefetch code */
 func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error) {
-	/* Analyze AST for security() calls */
 	calls := security.AnalyzeAST(program)
 
 	if len(calls) == 0 {
-		/* No security() calls - return empty injection */
 		return &SecurityInjection{
 			PrefetchCode: "",
 			ImportPaths:  []string{},
 		}, nil
 	}
 
-	/* Generate prefetch initialization code */
+	limits := NewCodeGenerationLimits()
+	validator := NewSecurityCallValidator(limits)
+	if err := validator.ValidateCallCount(len(calls)); err != nil {
+		return nil, err
+	}
+
 	var codeBuilder strings.Builder
 
 	codeBuilder.WriteString("\n\t/* === request.security() Prefetch === */\n")

@@ -21,6 +21,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		imports:      make(map[string]bool),
 		variables:    make(map[string]string),
 		strategyName: "Generated Strategy",
+		limits:       NewCodeGenerationLimits(),
+		safetyGuard:  NewRuntimeSafetyGuard(),
 	}
 
 	body, err := gen.generateProgram(program)
@@ -46,6 +48,8 @@ type generator struct {
 	needsSeriesPreCalc bool             // Flag if we need series pre-calculation
 	taFunctions        []taFunctionCall // List of TA function calls to pre-calculate
 	inSecurityContext  bool             // Flag when generating code inside security() context
+	limits             CodeGenerationLimits
+	safetyGuard        RuntimeSafetyGuard
 }
 
 type taFunctionCall struct {
@@ -59,8 +63,18 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		return g.generatePlaceholder(), nil
 	}
 
+	// Initialize safety limits if not already set (for tests)
+	if g.limits.MaxStatementsPerPass == 0 {
+		g.limits = NewCodeGenerationLimits()
+		g.safetyGuard = NewRuntimeSafetyGuard()
+	}
+
 	// First pass: collect variables, analyze Series requirements, extract strategy name
+	statementCounter := NewStatementCounter(g.limits)
 	for _, stmt := range program.Body {
+		if err := statementCounter.Increment(); err != nil {
+			return "", err
+		}
 		// Extract strategy name from indicator() or strategy() calls
 		if exprStmt, ok := stmt.(*ast.ExpressionStatement); ok {
 			if call, ok := exprStmt.Expression.(*ast.CallExpression); ok {
@@ -111,7 +125,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Kept for future optimizations if needed
 
 	// Third pass: collect TA function calls for pre-calculation
+	statementCounter.Reset()
 	for _, stmt := range program.Body {
+		if err := statementCounter.Increment(); err != nil {
+			return "", err
+		}
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
@@ -189,14 +207,27 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	// Bar loop for strategy execution
-	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
+	code += g.ind() + "const maxBars = 1000000\n"
+	code += g.ind() + "barCount := len(ctx.Data)\n"
+	code += g.ind() + "if barCount > maxBars {\n"
 	g.indent++
-	code += g.ind() + "ctx.BarIndex = i\n"
-	code += g.ind() + "bar := ctx.Data[i]\n"
+	code += g.ind() + `fmt.Fprintf(os.Stderr, "Error: bar count (%d) exceeds safety limit (%d)\n", barCount, maxBars)` + "\n"
+	code += g.ind() + "os.Exit(1)\n"
+	g.indent--
+	code += g.ind() + "}\n"
+	iterVar := g.safetyGuard.GenerateIterationVariableReference()
+	code += g.ind() + fmt.Sprintf("for %s := 0; %s < barCount; %s++ {\n", iterVar, iterVar, iterVar)
+	g.indent++
+	code += g.ind() + fmt.Sprintf("ctx.BarIndex = %s\n", iterVar)
+	code += g.ind() + fmt.Sprintf("bar := ctx.Data[%s]\n", iterVar)
 	code += g.ind() + "strat.OnBarUpdate(i, bar.Open, bar.Time)\n\n"
 
 	// Generate statements inside bar loop
+	statementCounter.Reset()
 	for _, stmt := range program.Body {
+		if err := statementCounter.Increment(); err != nil {
+			return "", err
+		}
 		stmtCode, err := g.generateStatement(stmt)
 		if err != nil {
 			return "", err
@@ -213,7 +244,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Advance Series cursors at end of bar loop
 	code += "\n" + g.ind() + "// Advance Series cursors\n"
 	for varName := range g.variables {
-		code += g.ind() + fmt.Sprintf("if i < len(ctx.Data)-1 { %sSeries.Next() }\n", varName)
+		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
 	}
 
 	g.indent--
