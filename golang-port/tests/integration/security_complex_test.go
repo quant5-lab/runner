@@ -69,7 +69,7 @@ plot(combined, "Combined", color=color.blue)
 		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
 	}
 
-	t.Log("✅ TA combination security() compiled successfully")
+	t.Log("TA combination security() compiled successfully")
 }
 
 /* TestSecurityArithmeticExpression tests arithmetic expressions inside security()
@@ -130,7 +130,7 @@ plot(volatility, "Volatility %", color=color.red)
 		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
 	}
 
-	t.Log("✅ Arithmetic expression security() compiled successfully")
+	t.Log("Arithmetic expression security() compiled successfully")
 }
 
 /* TestSecurityBBStrategy7Patterns tests real-world patterns from bb-strategy-7-rus.pine
@@ -170,7 +170,7 @@ plot(open_1d)`,
 			if !success {
 				t.Fatalf("Pattern '%s' failed", tc.name)
 			}
-			t.Logf("✅ BB7 pattern '%s' compiled successfully", tc.name)
+			t.Logf("BB7 pattern '%s' compiled successfully", tc.name)
 		})
 	}
 }
@@ -205,7 +205,7 @@ plot(bb_1d_dev)`,
 			if !success {
 				t.Fatalf("Pattern '%s' failed", tc.name)
 			}
-			t.Logf("✅ BB8 pattern '%s' compiled successfully", tc.name)
+			t.Logf("BB8 pattern '%s' compiled successfully", tc.name)
 		})
 	}
 }
@@ -275,11 +275,11 @@ plot(dev)`,
 			if !success {
 				t.Fatalf("'%s' failed: %s", tc.name, tc.description)
 			}
-			t.Logf("✅ '%s' - %s", tc.name, tc.description)
+			t.Logf("'%s' - %s", tc.name, tc.description)
 		})
 	}
 
-	t.Logf("\n🎯 All %d regression test cases passed", len(testCases))
+	t.Logf("All %d regression test cases passed", len(testCases))
 }
 
 /* TestSecurityNaN_Handling ensures NaN values are handled correctly
@@ -306,7 +306,7 @@ plot(sma20, "SMA20")`
 		t.Error("Expected NaN handling in generated code for insufficient warmup")
 	}
 
-	t.Log("✅ NaN handling compiled successfully")
+	t.Log("NaN handling compiled successfully")
 }
 
 /* Helper function to build and compile Pine script using pine-gen */

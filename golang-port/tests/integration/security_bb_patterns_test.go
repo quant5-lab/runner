@@ -93,11 +93,11 @@ plot(ema_1d_10, "EMA10 1D")
 			if !success {
 				t.Fatalf("'%s' failed: %s", tc.name, tc.description)
 			}
-			t.Logf("✅ '%s' - %s", tc.name, tc.description)
+			t.Logf("'%s' - %s", tc.name, tc.description)
 		})
 	}
 
-	t.Logf("\n🎯 All %d BB strategy patterns compiled successfully", len(patterns))
+	t.Logf("All %d BB strategy patterns compiled successfully", len(patterns))
 }
 
 /* TestSecurityStdevWorkaround tests BB strategy pattern with stdev
@@ -139,7 +139,7 @@ plot(bb_dev, "BB Dev")
 			if !success {
 				t.Fatalf("Test failed: %s", tc.status)
 			}
-			t.Logf("✅ %s: %s", tc.name, tc.status)
+			t.Logf("%s: %s", tc.name, tc.status)
 		})
 	}
 }
@@ -192,7 +192,7 @@ plot(sma_1d, "SMA")
 			if !success {
 				t.Fatalf("REGRESSION: %s failed - critical for: %s", tc.name, tc.criticalFor)
 			}
-			t.Logf("✅ Stability check passed: %s", tc.criticalFor)
+			t.Logf("Stability check passed: %s", tc.criticalFor)
 		})
 	}
 }
@@ -263,7 +263,7 @@ plot(ema10_1d, "EMA")
 		t.Error("Expected NaN handling for insufficient warmup")
 	}
 
-	t.Log("✅ Inline TA code generation validated")
+	t.Log("Inline TA code generation validated")
 }
 
 /* Helper function to build and compile Pine script using pine-gen */

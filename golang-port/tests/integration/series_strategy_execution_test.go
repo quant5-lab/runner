@@ -112,7 +112,7 @@ func TestSeriesStrategyExecution(t *testing.T) {
 		t.Error("Expected at least one long trade from crossover")
 	}
 
-	t.Logf("✓ Series strategy execution test passed")
+	t.Log("Series strategy execution test passed")
 }
 
 func createSMACrossoverTestData() []map[string]interface{} {

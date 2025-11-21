@@ -98,5 +98,5 @@ func TestCrossoverExecution(t *testing.T) {
 		}
 	}
 
-	t.Logf("✓ Crossover execution test passed: %d trades detected", len(result.Strategy.OpenTrades))
+	t.Logf("Crossover execution test passed: %d trades detected", len(result.Strategy.OpenTrades))
 }
