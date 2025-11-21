@@ -1,21 +1,21 @@
-# Makefile for PineScript Go Port
+# Makefile for Runner - PineScript Go Port
 # Centralized build automation following Go project conventions
 
-.PHONY: help build test clean install lint fmt vet bench coverage parser codegen integration e2e docker run dev release cross-compile
+.PHONY: help build test clean fmt vet bench coverage integration e2e cross-compile
 
 # Project configuration
-PROJECT_NAME := pinescript-go
-BINARY_NAME := pine-inspect
+PROJECT_NAME := runner
+BINARY_NAME := pine-gen
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Directories
 GOLANG_PORT := golang-port
-CMD_DIR := $(GOLANG_PORT)/cmd/pine-inspect
-BUILD_DIR := build
-DIST_DIR := dist
-COVERAGE_DIR := coverage
+CMD_DIR := $(GOLANG_PORT)/cmd/pine-gen
+BUILD_DIR := $(GOLANG_PORT)/build
+DIST_DIR := $(GOLANG_PORT)/dist
+COVERAGE_DIR := $(GOLANG_PORT)/coverage
 
 # Go configuration
 GO := go
@@ -39,13 +39,6 @@ help: ## Display this help
 
 ##@ Development
 
-install: ## Install development dependencies
-	@echo "Installing development tools..."
-	@$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@$(GO) install golang.org/x/tools/cmd/goimports@latest
-	@$(GO) install github.com/securego/gosec/v2/cmd/gosec@latest
-	@echo "✓ Development tools installed"
-
 fmt: ## Format Go code
 	@echo "Formatting code..."
 	@cd $(GOLANG_PORT) && gofmt -s -w .
@@ -61,17 +54,12 @@ lint: ## Run linter
 	@cd $(GOLANG_PORT) && $(GO) vet ./...
 	@echo "✓ Lint passed"
 
-security: ## Run security scanner
-	@echo "Running security scan..."
-	@cd $(GOLANG_PORT) && gosec -quiet ./...
-	@echo "✓ Security scan passed"
-
 ##@ Build
 
-build: ## Build binary for current platform
+build: ## Build pine-gen for current platform
 	@echo "Building $(BINARY_NAME) v$(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(GOLANG_PORT) && $(GOBUILD) -o ../$(BUILD_DIR)/$(BINARY_NAME) $(CMD_DIR)
+	@cd $(GOLANG_PORT) && $(GOBUILD) -o ../$(BUILD_DIR)/$(BINARY_NAME) ./cmd/pine-gen
 	@echo "✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)"
 
 build-strategy: ## Build standalone strategy binary (usage: make build-strategy STRATEGY=path/to/strategy.pine OUTPUT=runner-name)
@@ -82,18 +70,16 @@ build-strategy: ## Build standalone strategy binary (usage: make build-strategy 
 
 _build_strategy_internal:
 	@mkdir -p $(BUILD_DIR)
-	@echo "[1/4] Parsing Pine Script..."
-	@cd $(GOLANG_PORT) && $(GO) run $(CMD_DIR) ../$(STRATEGY) > /tmp/ast_output.json
-	@echo "[2/4] Generating Go code..."
-	@cd $(GOLANG_PORT) && $(GO) run -tags=build_strategy ./internal/build_strategy /tmp/ast_output.json $(BUILD_DIR)/$(OUTPUT)
-	@echo "[3/4] Compiling binary..."
-	@cd $(BUILD_DIR) && $(GOBUILD) -o $(OUTPUT) .
-	@echo "[4/4] Cleanup..."
-	@rm -f /tmp/ast_output.json
+	@echo "[1/3] Generating Go code from Pine Script..."
+	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input ../$(STRATEGY) -output $(BUILD_DIR)/$(OUTPUT) 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	if [ -z "$$TEMP_FILE" ]; then echo "Failed to generate Go code"; exit 1; fi; \
+	echo "[2/3] Compiling binary..."; \
+	cd $(GOLANG_PORT) && $(GO) build -o ../$(BUILD_DIR)/$(OUTPUT) $$TEMP_FILE
+	@echo "[3/3] Cleanup..."
 	@echo "✓ Strategy compiled: $(BUILD_DIR)/$(OUTPUT)"
 
-cross-compile: ## Build for all platforms
-	@echo "Cross-compiling for all platforms..."
+cross-compile: ## Build pine-gen for all platforms (strategy code generator)
+	@echo "Cross-compiling pine-gen for distribution..."
 	@mkdir -p $(DIST_DIR)
 	@$(foreach platform,$(PLATFORMS),\
 		GOOS=$(word 1,$(subst /, ,$(platform))) \
@@ -102,14 +88,14 @@ cross-compile: ## Build for all platforms
 		PLATFORM_OS=$(word 1,$(subst /, ,$(platform))) \
 		PLATFORM_ARCH=$(word 2,$(subst /, ,$(platform))) ; \
 	)
-	@echo "✓ Cross-compilation complete"
+	@echo "✓ Cross-compilation complete: $(DIST_DIR)/"
 	@ls -lh $(DIST_DIR)/
 
 _cross_compile_platform:
-	@BINARY=$(DIST_DIR)/$(BINARY_NAME)-$(PLATFORM_OS)-$(PLATFORM_ARCH)$(if $(findstring windows,$(PLATFORM_OS)),.exe,); \
-	echo "Building $$BINARY..."; \
+	@BINARY=$(DIST_DIR)/pine-gen-$(PLATFORM_OS)-$(PLATFORM_ARCH)$(if $(findstring windows,$(PLATFORM_OS)),.exe,); \
+	echo "  Building $$BINARY..."; \
 	cd $(GOLANG_PORT) && GOOS=$(PLATFORM_OS) GOARCH=$(PLATFORM_ARCH) \
-	$(GOBUILD) -o ../$$BINARY $(CMD_DIR)
+	$(GOBUILD) -o ../$$BINARY ./cmd/pine-gen
 
 ##@ Testing
 
@@ -177,15 +163,6 @@ coverage-show: coverage ## Generate and open coverage report
 check: fmt vet lint test ## Run all checks (format, vet, lint, test)
 	@echo "✓ All checks passed"
 
-ci: check bench ## Run CI pipeline (all checks + benchmarks)
-	@echo "✓ CI pipeline completed"
-
-verify-series: ## Verify Series implementation correctness
-	@echo "Verifying Series implementation..."
-	@cd $(GOLANG_PORT) && $(GOTEST) -v -run TestSeries ./codegen/...
-	@cd $(GOLANG_PORT) && $(GOTEST) -v ./runtime/series/...
-	@echo "✓ Series verification passed"
-
 ##@ Cleanup
 
 clean: ## Remove build artifacts
@@ -201,54 +178,7 @@ clean-all: clean ## Remove all generated files including dependencies
 	@cd $(GOLANG_PORT) && $(GO) clean -modcache
 	@echo "✓ Deep cleaned"
 
-##@ Docker
-
-docker-build: ## Build Docker image
-	@echo "Building Docker image..."
-	@docker build -t $(PROJECT_NAME):$(VERSION) -t $(PROJECT_NAME):latest .
-	@echo "✓ Docker image built: $(PROJECT_NAME):$(VERSION)"
-
-docker-run: docker-build ## Build and run in Docker
-	@echo "Running in Docker..."
-	@docker run --rm -it $(PROJECT_NAME):latest
-
-docker-test: ## Run tests in Docker
-	@echo "Running tests in Docker..."
-	@docker run --rm $(PROJECT_NAME):latest make test
-
-##@ Release
-
-release: clean check cross-compile ## Build release binaries for all platforms
-	@echo "Creating release artifacts..."
-	@mkdir -p $(DIST_DIR)/release
-	@cd $(DIST_DIR) && for f in $(BINARY_NAME)-*; do \
-		if [ -f "$$f" ]; then \
-			tar czf release/$${f}.tar.gz $$f; \
-			echo "Created release/$${f}.tar.gz"; \
-		fi \
-	done
-	@cd $(DIST_DIR)/release && shasum -a 256 *.tar.gz > checksums.txt
-	@echo "✓ Release artifacts created in $(DIST_DIR)/release/"
-	@echo ""
-	@echo "Release $(VERSION) ready for distribution"
-	@cat $(DIST_DIR)/release/checksums.txt
-
-tag: ## Create git tag (usage: make tag VERSION=v1.0.0)
-	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION not set. Usage: make tag VERSION=v1.0.0"; exit 1; fi
-	@echo "Creating tag $(VERSION)..."
-	@git tag -a $(VERSION) -m "Release $(VERSION)"
-	@git push origin $(VERSION)
-	@echo "✓ Tag $(VERSION) created and pushed"
-
 ##@ Development Workflow
-
-dev: ## Development mode with auto-rebuild
-	@echo "Starting development mode..."
-	@cd $(GOLANG_PORT) && $(GO) run $(CMD_DIR) $(ARGS)
-
-run: build ## Build and run binary
-	@echo "Running $(BINARY_NAME)..."
-	@./$(BUILD_DIR)/$(BINARY_NAME) $(ARGS)
 
 run-strategy: ## Run strategy with pre-generated data file (usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json)
 	@if [ -z "$(STRATEGY)" ]; then echo "Error: STRATEGY not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
@@ -285,10 +215,6 @@ serve: ## Serve ./out directory with Python HTTP server on port 8000
 
 serve-strategy: fetch-strategy serve ## Fetch live data, run strategy, and start web server
 
-watch: ## Watch for changes and run tests (requires entr)
-	@echo "Watching for changes..."
-	@find $(GOLANG_PORT) -name "*.go" | entr -c make test
-
 ##@ Information
 
 version: ## Show version information
@@ -319,9 +245,28 @@ all: clean build test ## Clean, build, and test everything
 
 quick: fmt test ## Quick check (format + test)
 
-install-hooks: ## Install git hooks
-	@echo "Installing git hooks..."
-	@echo '#!/bin/sh\nmake fmt vet' > .git/hooks/pre-commit
+install-hooks: ## Install/update git pre-commit hook
+	@echo "Installing pre-commit hook..."
+	@printf '#!/bin/sh\n\nset -e\n\necho "🔍 Running pre-commit checks..."\n\n' > .git/hooks/pre-commit
+	@printf '# SourceTree compatibility: Find go binary in common locations\n' >> .git/hooks/pre-commit
+	@printf 'if ! command -v go >/dev/null 2>&1; then\n' >> .git/hooks/pre-commit
+	@printf '    if [ -x "/usr/local/go/bin/go" ]; then\n' >> .git/hooks/pre-commit
+	@printf '        export PATH="/usr/local/go/bin:$$PATH"\n' >> .git/hooks/pre-commit
+	@printf '    elif [ -x "$$HOME/go/bin/go" ]; then\n' >> .git/hooks/pre-commit
+	@printf '        export PATH="$$HOME/go/bin:$$PATH"\n' >> .git/hooks/pre-commit
+	@printf '    elif [ -x "/opt/homebrew/bin/go" ]; then\n' >> .git/hooks/pre-commit
+	@printf '        export PATH="/opt/homebrew/bin:$$PATH"\n' >> .git/hooks/pre-commit
+	@printf '    else\n' >> .git/hooks/pre-commit
+	@printf '        echo "Error: go binary not found. Please install Go or add it to PATH."\n' >> .git/hooks/pre-commit
+	@printf '        exit 1\n' >> .git/hooks/pre-commit
+	@printf '    fi\nfi\n\n' >> .git/hooks/pre-commit
+	@printf '# Format\necho "  [1/3] Formatting Go code..."\n' >> .git/hooks/pre-commit
+	@printf 'cd golang-port && gofmt -s -w . && cd .. || exit 1\n\n' >> .git/hooks/pre-commit
+	@printf '# Lint\necho "  [2/3] Running linter..."\n' >> .git/hooks/pre-commit
+	@printf 'cd golang-port && go vet ./... && cd .. || exit 1\n\n' >> .git/hooks/pre-commit
+	@printf '# Test\necho "  [3/3] Running tests..."\n' >> .git/hooks/pre-commit
+	@printf 'cd golang-port && go test ./... -timeout 30m || exit 1\n\n' >> .git/hooks/pre-commit
+	@printf 'echo "✅ Pre-commit checks passed!"\nexit 0\n' >> .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
-	@echo "✓ Git hooks installed"
+	@echo "✓ Pre-commit hook installed"
 
