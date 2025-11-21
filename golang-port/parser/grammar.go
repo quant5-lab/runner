@@ -79,6 +79,7 @@ type Term struct {
 
 type Factor struct {
 	Paren        *ArithExpr    `parser:"( '(' @@ ')' )"`
+	Unary        *UnaryExpr    `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
 	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
@@ -86,6 +87,11 @@ type Factor struct {
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+}
+
+type UnaryExpr struct {
+	Op      string  `parser:"@( '-' | '+' | 'not' | '!' )"`
+	Operand *Factor `parser:"@@"`
 }
 
 type Subscript struct {

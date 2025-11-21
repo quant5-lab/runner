@@ -571,6 +571,21 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 		return c.convertArithExpr(factor.Paren)
 	}
 
+	if factor.Unary != nil {
+		// Convert unary expression like -1 or +x
+		operand, err := c.convertFactor(factor.Unary.Operand)
+		if err != nil {
+			return nil, err
+		}
+
+		return &ast.UnaryExpression{
+			NodeType: ast.TypeUnaryExpression,
+			Operator: factor.Unary.Op,
+			Argument: operand,
+			Prefix:   true,
+		}, nil
+	}
+
 	if factor.Call != nil {
 		return c.convertCallExpr(factor.Call)
 	}
@@ -617,6 +632,14 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	}
 
 	if factor.Ident != nil {
+		// Special handling for built-in identifiers that are NOT series
+		if *factor.Ident == "na" {
+			return &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     *factor.Ident,
+			}, nil
+		}
+
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
 			Object: &ast.Identifier{

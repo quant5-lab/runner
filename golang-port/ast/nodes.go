@@ -17,6 +17,7 @@ const (
 	TypeIfStatement           NodeType = "IfStatement"
 	TypeConditionalExpression NodeType = "ConditionalExpression"
 	TypeLogicalExpression     NodeType = "LogicalExpression"
+	TypeUnaryExpression       NodeType = "UnaryExpression"
 )
 
 type Node interface {
@@ -152,3 +153,13 @@ type LogicalExpression struct {
 
 func (l *LogicalExpression) Type() NodeType  { return TypeLogicalExpression }
 func (l *LogicalExpression) expressionNode() {}
+
+type UnaryExpression struct {
+	NodeType NodeType   `json:"type"`
+	Operator string     `json:"operator"`
+	Argument Expression `json:"argument"`
+	Prefix   bool       `json:"prefix"`
+}
+
+func (u *UnaryExpression) Type() NodeType  { return TypeUnaryExpression }
+func (u *UnaryExpression) expressionNode() {}

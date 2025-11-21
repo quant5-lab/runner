@@ -276,6 +276,8 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 		return g.generateLogicalExpression(e)
 	case *ast.ConditionalExpression:
 		return g.generateConditionalExpression(e)
+	case *ast.UnaryExpression:
+		return g.generateUnaryExpression(e)
 	case *ast.Identifier:
 		return g.ind() + "// " + e.Name + "\n", nil
 	case *ast.Literal:
@@ -426,6 +428,23 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 	return "", fmt.Errorf("binary expression should be used in condition context")
 }
 
+func (g *generator) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (string, error) {
+	// Generate the operand
+	operandCode, err := g.generateConditionExpression(unaryExpr.Argument)
+	if err != nil {
+		return "", err
+	}
+
+	// Map Pine unary operators to Go operators
+	op := unaryExpr.Operator
+	switch op {
+	case "not":
+		op = "!"
+	}
+
+	return fmt.Sprintf("%s%s", op, operandCode), nil
+}
+
 func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (string, error) {
 	// Generate left expression
 	leftCode, err := g.generateConditionExpression(logExpr.Left)
@@ -525,6 +544,19 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 			testCode, consequentCode, alternateCode), nil
 
+	case *ast.UnaryExpression:
+		// Handle unary expressions (-x, +x, !x, not x)
+		operandCode, err := g.generateConditionExpression(e.Argument)
+		if err != nil {
+			return "", err
+		}
+		op := e.Operator
+		switch op {
+		case "not":
+			op = "!"
+		}
+		return fmt.Sprintf("%s%s", op, operandCode), nil
+
 	case *ast.LogicalExpression:
 		// Handle logical expressions (and, or)
 		leftCode, err := g.generateConditionExpression(e.Left)
@@ -571,6 +603,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Identifier:
+		// Special built-in identifiers
+		if e.Name == "na" {
+			return "math.NaN()", nil
+		}
 		// ALL variables use Series storage
 		varName := e.Name
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
@@ -692,6 +728,11 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.Identifier:
 		// Reference to another variable or Pine built-in
 		refName := expr.Name
+
+		// Special built-in identifiers
+		if refName == "na" {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
+		}
 
 		/* In security context, built-ins need direct field access */
 		if g.inSecurityContext {
@@ -1394,9 +1435,27 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 	switch e := expr.(type) {
 	case *ast.MemberExpression:
-		// Handle series subscript like close[0], close[1], sma20[0], sma20[1]
+		// Check for built-in namespaces like timeframe.*
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
+
+			// Handle timeframe.* built-ins
+			if varName == "timeframe" {
+				if prop, ok := e.Property.(*ast.Identifier); ok {
+					switch prop.Name {
+					case "ismonthly":
+						return `(ctx.Timeframe == "1M")`
+					case "isdaily":
+						return `(ctx.Timeframe == "1D")`
+					case "isweekly":
+						return `(ctx.Timeframe == "1W")`
+					case "period":
+						return "ctx.Timeframe"
+					}
+				}
+			}
+
+			// Handle series subscript like close[0], close[1], sma20[0], sma20[1]
 
 			// Extract offset from subscript
 			offset := 0
@@ -1446,6 +1505,10 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		}
 		return g.extractMemberName(e)
 	case *ast.Identifier:
+		// Special built-in identifiers
+		if e.Name == "na" {
+			return "math.NaN()"
+		}
 		// User-defined variable (ALL use Series storage)
 		varName := e.Name
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
