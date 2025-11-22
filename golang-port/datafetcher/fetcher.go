@@ -1,7 +1,7 @@
 package datafetcher
 
 import (
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 /* DataFetcher abstracts data source for multi-timeframe fetching */

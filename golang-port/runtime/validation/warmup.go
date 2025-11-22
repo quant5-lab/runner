@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/borisquantlab/pinescript-go/ast"
+	"github.com/quant5-lab/runner/ast"
 )
 
 // WarmupRequirement represents data requirements for a strategy

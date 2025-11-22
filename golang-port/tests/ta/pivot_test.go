@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/ta"
+	"github.com/quant5-lab/runner/runtime/ta"
 )
 
 func TestPivothigh(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/clock"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
-	"github.com/borisquantlab/pinescript-go/runtime/output"
-	"github.com/borisquantlab/pinescript-go/runtime/strategy"
+	"github.com/quant5-lab/runner/runtime/clock"
+	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/output"
+	"github.com/quant5-lab/runner/runtime/strategy"
 )
 
 func TestNewChartData(t *testing.T) {

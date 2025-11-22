@@ -3,8 +3,8 @@ package request
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/clock"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/runtime/clock"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 /* MockDataFetcher for testing */

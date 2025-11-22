@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 /* BenchmarkDirectContextAccess measures O(1) runtime pattern used by codegen */

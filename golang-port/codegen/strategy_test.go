@@ -3,7 +3,7 @@ package codegen
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/ast"
+	"github.com/quant5-lab/runner/ast"
 )
 
 func TestGenerateStrategyEntry(t *testing.T) {

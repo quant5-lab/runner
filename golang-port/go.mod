@@ -1,4 +1,4 @@
-module github.com/borisquantlab/pinescript-go
+module github.com/quant5-lab/runner
 
 go 1.23.2
 

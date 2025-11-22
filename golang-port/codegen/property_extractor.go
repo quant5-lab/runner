@@ -1,6 +1,6 @@
 package codegen
 
-import "github.com/borisquantlab/pinescript-go/ast"
+import "github.com/quant5-lab/runner/ast"
 
 type PropertyExtractor interface {
 	Extract(value ast.Expression) (interface{}, bool)

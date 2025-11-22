@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/ast"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 /* BenchmarkEvaluateIdentifier measures array allocation cost */

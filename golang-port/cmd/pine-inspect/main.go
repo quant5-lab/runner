@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/parser"
 )
 
 func main() {

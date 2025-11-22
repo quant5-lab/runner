@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/parser"
-	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
-	"github.com/borisquantlab/pinescript-go/runtime/output"
-	"github.com/borisquantlab/pinescript-go/runtime/strategy"
+	"github.com/quant5-lab/runner/parser"
+	"github.com/quant5-lab/runner/runtime/chartdata"
+	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/output"
+	"github.com/quant5-lab/runner/runtime/strategy"
 )
 
 /* Test parsing simple Pine strategy */

@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/borisquantlab/pinescript-go/runtime/clock"
+	"github.com/quant5-lab/runner/runtime/clock"
 	"os"
 	"time"
 
-	"github.com/borisquantlab/pinescript-go/runtime/chartdata"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
-	"github.com/borisquantlab/pinescript-go/runtime/output"
-	"github.com/borisquantlab/pinescript-go/runtime/series"
-	"github.com/borisquantlab/pinescript-go/runtime/strategy"
-	"github.com/borisquantlab/pinescript-go/runtime/ta"
-	_ "github.com/borisquantlab/pinescript-go/runtime/value" // May be used by generated code
+	"github.com/quant5-lab/runner/runtime/chartdata"
+	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/output"
+	"github.com/quant5-lab/runner/runtime/series"
+	"github.com/quant5-lab/runner/runtime/strategy"
+	"github.com/quant5-lab/runner/runtime/ta"
+	_ "github.com/quant5-lab/runner/runtime/value" // May be used by generated code
 )
 
 /* CLI flags */

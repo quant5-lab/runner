@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/borisquantlab/pinescript-go/parser"
+import "github.com/quant5-lab/runner/parser"
 
 // MathNamespaceTransformer adds math. prefix to mathematical functions
 // Examples: abs() → math.abs(), max() → math.max(), sqrt() → math.sqrt()

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/borisquantlab/pinescript-go/codegen"
-	"github.com/borisquantlab/pinescript-go/parser"
-	"github.com/borisquantlab/pinescript-go/preprocessor"
-	"github.com/borisquantlab/pinescript-go/runtime/validation"
+	"github.com/quant5-lab/runner/codegen"
+	"github.com/quant5-lab/runner/parser"
+	"github.com/quant5-lab/runner/preprocessor"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
 var (

@@ -3,8 +3,8 @@ package codegen
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/ast"
-	"github.com/borisquantlab/pinescript-go/security"
+	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/security"
 )
 
 func TestAnalyzeAndGeneratePrefetch_NoSecurityCalls(t *testing.T) {
@@ -97,7 +97,7 @@ func TestAnalyzeAndGeneratePrefetch_WithSecurityCall(t *testing.T) {
 		t.Errorf("Expected 1 import, got %d", len(injection.ImportPaths))
 	}
 
-	expectedImport := "github.com/borisquantlab/pinescript-go/datafetcher"
+	expectedImport := "github.com/quant5-lab/runner/datafetcher"
 	found := false
 	for _, imp := range injection.ImportPaths {
 		if imp == expectedImport {

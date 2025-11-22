@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/ast"
+	"github.com/quant5-lab/runner/ast"
 )
 
 /* TestSecurityBinaryExpression tests code generation for binary operations in security() context

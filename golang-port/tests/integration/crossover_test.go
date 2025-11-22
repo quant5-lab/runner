@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/codegen"
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/codegen"
+	"github.com/quant5-lab/runner/parser"
 )
 
 func TestCrossoverCodegen(t *testing.T) {

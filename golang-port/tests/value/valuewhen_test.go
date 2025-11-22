@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/value"
+	"github.com/quant5-lab/runner/runtime/value"
 )
 
 func TestValuewhen(t *testing.T) {

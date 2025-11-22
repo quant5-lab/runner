@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/parser"
 )
 
 func TestGenerateSeriesStrategyFullPipeline(t *testing.T) {

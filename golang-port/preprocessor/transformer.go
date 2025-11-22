@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/borisquantlab/pinescript-go/parser"
+import "github.com/quant5-lab/runner/parser"
 
 // Transformer transforms Pine AST (v4 → v5 migrations, etc.)
 // Each transformer implements a single responsibility (SOLID principle)

@@ -107,7 +107,7 @@ accessor := CreateAccessGenerator("sma20Series.Get(0)")  // Auto-detects Series 
 ```go
 package main
 
-import "github.com/borisquantlab/pinescript-go/codegen"
+import "github.com/quant5-lab/runner/codegen"
 
 func generateSMA() string {
     accessor := codegen.CreateAccessGenerator("close")

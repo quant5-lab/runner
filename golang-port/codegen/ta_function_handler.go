@@ -3,7 +3,7 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/borisquantlab/pinescript-go/ast"
+	"github.com/quant5-lab/runner/ast"
 )
 
 // TAFunctionHandler defines the interface for handling TA function code generation.

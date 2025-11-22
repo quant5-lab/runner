@@ -3,8 +3,8 @@ package security
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/ast"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 func TestPrefetcher_WithMockFetcher(t *testing.T) {

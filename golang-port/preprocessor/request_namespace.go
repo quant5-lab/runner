@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/borisquantlab/pinescript-go/parser"
+import "github.com/quant5-lab/runner/parser"
 
 // RequestNamespaceTransformer adds request. prefix to data request functions
 // Examples: security() → request.security(), financial() → request.financial()

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/parser"
 )
 
 // TestIntegration_DailyLinesSimple tests the full v4→v5 pipeline with the actual file

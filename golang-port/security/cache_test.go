@@ -3,7 +3,7 @@ package security
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 func TestSecurityCache_SetAndGet(t *testing.T) {

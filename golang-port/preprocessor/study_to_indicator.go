@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/borisquantlab/pinescript-go/parser"
+import "github.com/quant5-lab/runner/parser"
 
 // StudyToIndicatorTransformer renames study() to indicator()
 // This is a simple function name replacement (v4 → v5)

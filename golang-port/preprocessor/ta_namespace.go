@@ -1,7 +1,7 @@
 package preprocessor
 
 import (
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/parser"
 )
 
 // TANamespaceTransformer adds ta. prefix to technical analysis functions

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/borisquantlab/pinescript-go/ast"
+	"github.com/quant5-lab/runner/ast"
 )
 
 /* StrategyCode holds generated Go code for strategy execution */

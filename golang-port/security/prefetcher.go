@@ -3,9 +3,9 @@ package security
 import (
 	"fmt"
 
-	"github.com/borisquantlab/pinescript-go/ast"
-	"github.com/borisquantlab/pinescript-go/datafetcher"
-	"github.com/borisquantlab/pinescript-go/runtime/context"
+	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/datafetcher"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 /* SecurityPrefetcher orchestrates the security() data prefetch workflow:

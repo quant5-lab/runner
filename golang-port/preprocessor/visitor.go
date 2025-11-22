@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/borisquantlab/pinescript-go/parser"
+import "github.com/quant5-lab/runner/parser"
 
 // functionRenamer is a shared visitor for simple function name replacements
 // DRY principle: reuse traversal logic across multiple transformers

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/borisquantlab/pinescript-go/ast"
-	"github.com/borisquantlab/pinescript-go/security"
+	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/security"
 )
 
 /* SecurityInjection holds prefetch code to inject before bar loop */
@@ -161,7 +161,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 	/* Required imports */
 	imports := []string{
-		"github.com/borisquantlab/pinescript-go/datafetcher",
+		"github.com/quant5-lab/runner/datafetcher",
 	}
 
 	return &SecurityInjection{

@@ -3,7 +3,7 @@ package preprocessor
 import (
 	"testing"
 
-	"github.com/borisquantlab/pinescript-go/parser"
+	"github.com/quant5-lab/runner/parser"
 )
 
 // Test idempotency - transforming already-transformed code
