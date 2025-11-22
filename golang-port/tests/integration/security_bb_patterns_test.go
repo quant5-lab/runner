@@ -240,12 +240,12 @@ plot(ema10_1d, "EMA")
 	generatedStr := string(generatedCode)
 
 	/* Validate inline SMA algorithm present */
-	if !containsSubstring(generatedStr, "Inline SMA") && !containsSubstring(generatedStr, "inline SMA") {
+	if !containsSubstring(generatedStr, "ta.sma") {
 		t.Error("Expected inline SMA generation (not runtime lookup)")
 	}
 
 	/* Validate inline EMA algorithm present */
-	if !containsSubstring(generatedStr, "Inline EMA") && !containsSubstring(generatedStr, "inline EMA") {
+	if !containsSubstring(generatedStr, "ta.ema") {
 		t.Error("Expected inline EMA generation (not runtime lookup)")
 	}
 

@@ -2,17 +2,58 @@ package codegen
 
 import "fmt"
 
-// TAIndicatorBuilder builds technical analysis indicator code
+// TAIndicatorBuilder constructs technical analysis indicator code using the Builder pattern.
+//
+// This builder provides a fluent interface for generating inline TA indicator calculations
+// (SMA, EMA, STDEV, etc.) with proper warmup period handling, NaN propagation, and
+// indentation management.
+//
+// Usage:
+//
+//	// Create accessor for data source
+//	accessor := CreateAccessGenerator("close")
+//
+//	// Build SMA indicator
+//	builder := NewTAIndicatorBuilder("SMA", "sma20", 20, accessor, false)
+//	builder.WithAccumulator(NewSumAccumulator())
+//	code := builder.Build()
+//
+//	// Build STDEV indicator (requires two passes)
+//	// Pass 1: Calculate mean
+//	meanBuilder := NewTAIndicatorBuilder("STDEV", "stdev20", 20, accessor, false)
+//	meanBuilder.WithAccumulator(NewSumAccumulator())
+//	meanCode := meanBuilder.Build()
+//
+//	// Pass 2: Calculate variance
+//	varianceBuilder := NewTAIndicatorBuilder("STDEV", "stdev20", 20, accessor, false)
+//	varianceBuilder.WithAccumulator(NewVarianceAccumulator("mean"))
+//	varianceCode := varianceBuilder.Build()
+//
+// Design:
+//   - Builder Pattern: Step-by-step construction of complex indicator code
+//   - Strategy Pattern: Pluggable accumulation strategies (Sum, Variance, EMA)
+//   - Single Responsibility: Each component handles one concern
+//   - Open/Closed: Easy to extend with new indicator types
 type TAIndicatorBuilder struct {
-	indicatorName string
-	varName       string
-	period        int
-	warmupChecker *WarmupChecker
-	loopGen       *LoopGenerator
-	accumulator   AccumulatorStrategy
-	indenter      CodeIndenter
+	indicatorName string              // Name of the indicator (SMA, EMA, STDEV)
+	varName       string              // Variable name for the Series
+	period        int                 // Lookback period
+	warmupChecker *WarmupChecker      // Handles warmup period validation
+	loopGen       *LoopGenerator      // Generates for loops with NaN handling
+	accumulator   AccumulatorStrategy // Accumulation logic (sum, variance, ema)
+	indenter      CodeIndenter        // Manages code indentation
 }
 
+// NewTAIndicatorBuilder creates a new builder for generating TA indicator code.
+//
+// Parameters:
+//   - name: Indicator name (e.g., "SMA", "EMA", "STDEV")
+//   - varName: Variable name for the output Series (e.g., "sma20")
+//   - period: Lookback period for the indicator
+//   - accessor: AccessGenerator for retrieving data values (Series or OHLCV field)
+//   - needsNaN: Whether to add NaN checking in the accumulation loop
+//
+// Returns a builder that must be configured with an accumulator before calling Build().
 func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGenerator, needsNaN bool) *TAIndicatorBuilder {
 	return &TAIndicatorBuilder{
 		indicatorName: name,
@@ -24,19 +65,30 @@ func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGene
 	}
 }
 
+// WithAccumulator sets the accumulation strategy for this indicator.
+//
+// Common strategies:
+//   - NewSumAccumulator(): For SMA calculations
+//   - NewEMAAccumulator(alpha): For EMA calculations
+//   - NewVarianceAccumulator(meanVar): For STDEV variance calculation
+//
+// Returns the builder for method chaining.
 func (b *TAIndicatorBuilder) WithAccumulator(acc AccumulatorStrategy) *TAIndicatorBuilder {
 	b.accumulator = acc
 	return b
 }
 
+// BuildHeader generates the comment header for the indicator code.
 func (b *TAIndicatorBuilder) BuildHeader() string {
 	return b.indenter.Line(fmt.Sprintf("/* Inline %s(%d) */", b.indicatorName, b.period))
 }
 
+// BuildWarmupCheck generates the warmup period check that sets NaN during warmup.
 func (b *TAIndicatorBuilder) BuildWarmupCheck() string {
 	return b.warmupChecker.GenerateCheck(b.varName, &b.indenter)
 }
 
+// BuildInitialization generates variable initialization code for the accumulator.
 func (b *TAIndicatorBuilder) BuildInitialization() string {
 	if b.accumulator == nil {
 		return ""

@@ -9,8 +9,9 @@ import (
 
 func TestExtractSeriesExpression(t *testing.T) {
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	tests := []struct {
@@ -91,8 +92,9 @@ func TestExtractSeriesExpression(t *testing.T) {
 
 func TestConvertSeriesAccessToPrev(t *testing.T) {
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	tests := []struct {
@@ -162,8 +164,9 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("longCross", call)
@@ -212,8 +215,9 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("shortCross", call)
@@ -263,8 +267,9 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("crossAboveThreshold", call)
@@ -322,8 +327,9 @@ func TestBooleanTypeTracking(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		taRegistry: NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateProgram(program)

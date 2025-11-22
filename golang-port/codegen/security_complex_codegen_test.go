@@ -43,8 +43,8 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				},
 			},
 			expectedCode: []string{
-				"Inline SMA(20)",           // Left operand inlined
-				"Inline EMA(10)",           // Right operand inlined
+				"Inline ta.sma(20)",        // Left operand inlined
+				"Inline ta.ema(10)",        // Right operand inlined
 				"origCtx := ctx",           // Context switching
 				"ctx = secCtx",             // Security context assignment
 				"ctx.BarIndex = secBarIdx", // Bar index set
@@ -73,7 +73,7 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				Right: &ast.Literal{Value: float64(2.0)},
 			},
 			expectedCode: []string{
-				"Inline SMA(20)",
+				"ta.sma(20)",
 				"origCtx := ctx",
 				"secTmp_test_val_leftSeries := series.NewSeries(1000)",                               // Temp series for left operand
 				"secTmp_test_val_rightSeries := series.NewSeries(1000)",                              // Temp series for right operand
@@ -96,7 +96,7 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				"secTmp_test_val_leftSeries.GetCurrent() - secTmp_test_val_rightSeries.GetCurrent()",
 			},
 			unexpectedCode: []string{
-				"Inline SMA", // Should NOT inline for simple identifiers
+				"ta.sma", // Should NOT inline for simple identifiers
 			},
 		},
 		{
@@ -153,8 +153,8 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				},
 			},
 			expectedCode: []string{
-				"Inline SMA(20)",
-				"Inline EMA(20)",
+				"Inline ta.sma(20)",
+				"Inline ta.ema(20)",
 				"secTmp_test_val_leftSeries := series.NewSeries(1000)",       // Outer left operand
 				"secTmp_test_val_rightSeries := series.NewSeries(1000)",      // Outer right operand
 				"secTmp_test_val_left_leftSeries := series.NewSeries(1000)",  // Nested: (SMA - EMA) left
@@ -178,7 +178,7 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				Right: &ast.Literal{Value: float64(2.0)},
 			},
 			expectedCode: []string{
-				"Inline STDEV(20)",
+				"ta.stdev(20)",
 				"math.Sqrt(variance)",
 				"secTmp_test_val_leftSeries := series.NewSeries(1000)",  // Temp series for STDEV
 				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Temp series for multiplier
@@ -435,7 +435,7 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
-		"Inline STDEV(20)",
+		"ta.stdev(20)",
 		"sum := 0.0",                        // Mean calculation
 		"mean := sum / 20.0",                // Mean result
 		"variance := 0.0",                   // Variance calculation

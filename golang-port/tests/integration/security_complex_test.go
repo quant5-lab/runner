@@ -51,11 +51,11 @@ plot(combined, "Combined", color=color.blue)
 	generatedStr := string(generatedCode)
 
 	/* Validate inline SMA and EMA present */
-	if !contains(generatedStr, "Inline SMA") && !contains(generatedStr, "inline SMA") {
+	if !contains(generatedStr, "ta.sma") {
 		t.Error("Expected inline SMA generation in security context")
 	}
 
-	if !contains(generatedStr, "Inline EMA") && !contains(generatedStr, "inline EMA") {
+	if !contains(generatedStr, "ta.ema") {
 		t.Error("Expected inline EMA generation in security context")
 	}
 

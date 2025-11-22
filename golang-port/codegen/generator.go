@@ -30,6 +30,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inputHandler = NewInputHandler()
 	gen.mathHandler = NewMathHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
+	gen.taRegistry = NewTAFunctionRegistry()
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -60,6 +61,7 @@ type generator struct {
 	inputHandler       *InputHandler
 	mathHandler        *MathHandler
 	subscriptResolver  *SubscriptResolver
+	taRegistry         *TAFunctionRegistry // Registry for TA function handlers
 }
 
 type taFunctionCall struct {
@@ -779,70 +781,12 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpression) (string, error) {
 	funcName := g.extractFunctionName(call.Callee)
 
+	// Try TA function registry first
+	if g.taRegistry.IsSupported(funcName) {
+		return g.taRegistry.GenerateInlineTA(g, varName, funcName, call)
+	}
+
 	switch funcName {
-	case "ta.sma", "ta.ema", "ta.rma", "ta.rsi", "ta.atr", "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow",
-		"sma", "ema", "rma", "rsi", "atr", "stdev": // Pine v4 and v5 syntax
-		/* TA functions - generate inline evaluation using ForwardSeriesBuffer */
-		return g.generateInlineTA(varName, funcName, call)
-
-	case "ta.crossover":
-		// ta.crossover(series1, series2) - series1 crosses ABOVE series2
-		if len(call.Arguments) < 2 {
-			return "", fmt.Errorf("ta.crossover requires 2 arguments")
-		}
-
-		series1 := g.extractSeriesExpression(call.Arguments[0])
-		series2 := g.extractSeriesExpression(call.Arguments[1])
-
-		// Need previous values for both series
-		prev1Var := varName + "_prev1"
-		prev2Var := varName + "_prev2"
-
-		code := g.ind() + fmt.Sprintf("// Crossover: %s crosses above %s\n", series1, series2)
-		code += g.ind() + "if i > 0 {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
-		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s > %s && %s <= %s { return 1.0 } else { return 0.0 } }())\n",
-			varName, series1, series2, prev1Var, prev2Var)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
-		g.indent--
-		code += g.ind() + "}\n"
-
-		return code, nil
-
-	case "ta.crossunder":
-		// ta.crossunder(series1, series2) - series1 crosses BELOW series2
-		if len(call.Arguments) < 2 {
-			return "", fmt.Errorf("ta.crossunder requires 2 arguments")
-		}
-
-		series1 := g.extractSeriesExpression(call.Arguments[0])
-		series2 := g.extractSeriesExpression(call.Arguments[1])
-
-		// Need previous values for both series
-		prev1Var := varName + "_prev1"
-		prev2Var := varName + "_prev2"
-
-		code := g.ind() + fmt.Sprintf("// Crossunder: %s crosses below %s\n", series1, series2)
-		code += g.ind() + "if i > 0 {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
-		code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s < %s && %s >= %s { return 1.0 } else { return 0.0 } }())\n",
-			varName, series1, series2, prev1Var, prev2Var)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
-		g.indent--
-		code += g.ind() + "}\n"
-
-		return code, nil
-
 	case "request.security", "security":
 		/* security(symbol, timeframe, expression) - runtime evaluation with cached context
 		 * 1. Lookup security context from prefetch cache
@@ -1088,131 +1032,29 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 		return "", fmt.Errorf("%s period must be numeric", funcName)
 	}
 
+	// Use TAIndicatorBuilder for all indicators
+	needsNaN := sourceInfo.IsSeriesVariable()
+
 	var code string
+	var err error
 
 	switch normalizedFunc {
 	case "ta.sma":
-		code += g.ind() + fmt.Sprintf("/* Inline SMA(%d) */\n", period)
-		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + "sum := 0.0\n"
-		code += g.ind() + "hasNaN := false\n"
-		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
-		g.indent++
-		if sourceInfo.IsSeriesVariable() {
-			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
-			code += g.ind() + "if math.IsNaN(val) {\n"
-			g.indent++
-			code += g.ind() + "hasNaN = true\n"
-			code += g.ind() + "break\n"
-			g.indent--
-			code += g.ind() + "}\n"
-			code += g.ind() + "sum += val\n"
-		} else {
-			code += g.ind() + fmt.Sprintf("sum += %s\n", accessGen.GenerateLoopValueAccess("j"))
-		}
-		g.indent--
-		code += g.ind() + "}\n"
-		code += g.ind() + "if hasNaN {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %d.0)\n", varName, period)
-		g.indent--
-		code += g.ind() + "}\n"
-		g.indent--
-		code += g.ind() + "}\n"
+		builder := NewTAIndicatorBuilder("ta.sma", varName, period, accessGen, needsNaN)
+		builder.WithAccumulator(NewSumAccumulator())
+		code = g.indentCode(builder.Build())
 
 	case "ta.ema":
-		code += g.ind() + fmt.Sprintf("/* Inline EMA(%d) */\n", period)
-		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("alpha := 2.0 / float64(%d+1)\n", period)
-		code += g.ind() + fmt.Sprintf("ema := %s\n", accessGen.GenerateInitialValueAccess(period))
-		code += g.ind() + "if math.IsNaN(ema) {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("for j := %d-2; j >= 0; j-- {\n", period)
-		g.indent++
-		if sourceInfo.IsSeriesVariable() {
-			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
-			code += g.ind() + "if math.IsNaN(val) {\n"
-			g.indent++
-			code += g.ind() + "ema = math.NaN()\n"
-			code += g.ind() + "break\n"
-			g.indent--
-			code += g.ind() + "}\n"
-			code += g.ind() + "ema = alpha*val + (1-alpha)*ema\n"
-		} else {
-			code += g.ind() + fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema\n", accessGen.GenerateLoopValueAccess("j"))
+		code, err = g.generateEMA(varName, period, accessGen, needsNaN)
+		if err != nil {
+			return "", err
 		}
-		g.indent--
-		code += g.ind() + "}\n"
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(ema)\n", varName)
-		g.indent--
-		code += g.ind() + "}\n"
-		g.indent--
-		code += g.ind() + "}\n"
 
 	case "ta.stdev":
-		code += g.ind() + fmt.Sprintf("/* Inline STDEV(%d) */\n", period)
-		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + "sum := 0.0\n"
-		code += g.ind() + "hasNaN := false\n"
-		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
-		g.indent++
-		if sourceInfo.IsSeriesVariable() {
-			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
-			code += g.ind() + "if math.IsNaN(val) {\n"
-			g.indent++
-			code += g.ind() + "hasNaN = true\n"
-			code += g.ind() + "break\n"
-			g.indent--
-			code += g.ind() + "}\n"
-			code += g.ind() + "sum += val\n"
-		} else {
-			code += g.ind() + fmt.Sprintf("sum += %s\n", accessGen.GenerateLoopValueAccess("j"))
+		code, err = g.generateSTDEV(varName, period, accessGen, needsNaN)
+		if err != nil {
+			return "", err
 		}
-		g.indent--
-		code += g.ind() + "}\n"
-		code += g.ind() + "if hasNaN {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-		g.indent--
-		code += g.ind() + "} else {\n"
-		g.indent++
-		code += g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period)
-		code += g.ind() + "variance := 0.0\n"
-		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
-		g.indent++
-		code += g.ind() + fmt.Sprintf("diff := %s - mean\n", accessGen.GenerateLoopValueAccess("j"))
-		code += g.ind() + "variance += diff * diff\n"
-		g.indent--
-		code += g.ind() + "}\n"
-		code += g.ind() + fmt.Sprintf("variance /= %d.0\n", period)
-		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName)
-		g.indent--
-		code += g.ind() + "}\n"
-		g.indent--
-		code += g.ind() + "}\n"
 
 	default:
 		return "", fmt.Errorf("inline TA not implemented for %s", funcName)
@@ -1762,4 +1604,189 @@ func (g *generator) ind() string {
 		indent += "\t"
 	}
 	return indent
+}
+
+// indentCode adds the current indentation level to each line of generated code.
+// This integrates builder-generated code with the generator's indentation context.
+func (g *generator) indentCode(code string) string {
+	if code == "" {
+		return ""
+	}
+
+	lines := strings.Split(code, "\n")
+	indented := make([]string, 0, len(lines))
+	currentIndent := g.ind()
+
+	for _, line := range lines {
+		if line == "" {
+			indented = append(indented, "")
+		} else {
+			indented = append(indented, currentIndent+line)
+		}
+	}
+
+	return strings.Join(indented, "\n")
+}
+
+// generateSTDEV generates STDEV calculation using two-pass algorithm.
+// Pass 1: Calculate mean, Pass 2: Calculate variance from mean.
+func (g *generator) generateSTDEV(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
+	var code strings.Builder
+
+	// Add header comment
+	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.stdev(%d) */\n", period))
+
+	// Warmup check
+	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+	g.indent--
+	code.WriteString(g.ind() + "} else {\n")
+	g.indent++
+
+	// Pass 1: Calculate mean (inline SMA calculation)
+	code.WriteString(g.ind() + "sum := 0.0\n")
+	if needsNaN {
+		code.WriteString(g.ind() + "hasNaN := false\n")
+	}
+	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
+	g.indent++
+
+	if needsNaN {
+		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
+		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
+		g.indent++
+		code.WriteString(g.ind() + "hasNaN = true\n")
+		code.WriteString(g.ind() + "break\n")
+		g.indent--
+		code.WriteString(g.ind() + "}\n")
+		code.WriteString(g.ind() + "sum += val\n")
+	} else {
+		code.WriteString(g.ind() + fmt.Sprintf("sum += %s\n", accessor.GenerateLoopValueAccess("j")))
+	}
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n")
+
+	// Check for NaN and calculate mean
+	if needsNaN {
+		code.WriteString(g.ind() + "if hasNaN {\n")
+		g.indent++
+		code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+		g.indent--
+		code.WriteString(g.ind() + "} else {\n")
+		g.indent++
+	}
+
+	code.WriteString(g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period))
+
+	// Pass 2: Calculate variance
+	code.WriteString(g.ind() + "variance := 0.0\n")
+	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("diff := %s - mean\n", accessor.GenerateLoopValueAccess("j")))
+	code.WriteString(g.ind() + "variance += diff * diff\n")
+	g.indent--
+	code.WriteString(g.ind() + "}\n")
+	code.WriteString(g.ind() + fmt.Sprintf("variance /= %d.0\n", period))
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName))
+
+	if needsNaN {
+		g.indent--
+		code.WriteString(g.ind() + "}\n") // close else (hasNaN check)
+	}
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n") // close else (warmup check)
+
+	return code.String(), nil
+}
+
+// generateEMA generates inline EMA (Exponential Moving Average) calculation.
+// EMA is different from SMA in that it:
+// - Initializes with the oldest value in the period
+// - Uses exponential smoothing with alpha = 2/(period+1)
+// - Iterates backwards from period-2 to 0
+func (g *generator) generateEMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
+	var code strings.Builder
+
+	// Header comment
+	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.ema(%d) */\n", period))
+
+	// Warmup check
+	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+	g.indent--
+	code.WriteString(g.ind() + "} else {\n")
+	g.indent++
+
+	// Calculate alpha and initialize EMA with oldest value
+	code.WriteString(g.ind() + fmt.Sprintf("alpha := 2.0 / float64(%d+1)\n", period))
+	code.WriteString(g.ind() + fmt.Sprintf("ema := %s\n", accessor.GenerateInitialValueAccess(period)))
+
+	// Check if initial value is NaN
+	code.WriteString(g.ind() + "if math.IsNaN(ema) {\n")
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+	g.indent--
+	code.WriteString(g.ind() + "} else {\n")
+	g.indent++
+
+	// Loop backwards from period-2 to 0
+	code.WriteString(g.ind() + fmt.Sprintf("for j := %d-2; j >= 0; j-- {\n", period))
+	g.indent++
+
+	if needsNaN {
+		// With NaN checking for Series variables
+		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
+		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
+		g.indent++
+		code.WriteString(g.ind() + "ema = math.NaN()\n")
+		code.WriteString(g.ind() + "break\n")
+		g.indent--
+		code.WriteString(g.ind() + "}\n")
+		code.WriteString(g.ind() + "ema = alpha*val + (1-alpha)*ema\n")
+	} else {
+		// Direct calculation for OHLCV fields
+		code.WriteString(g.ind() + fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema\n", accessor.GenerateLoopValueAccess("j")))
+	}
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n") // end for loop
+
+	// Set final result
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(ema)\n", varName))
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n") // end else (initial value check)
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n") // end else (warmup check)
+
+	return code.String(), nil
+}
+
+// generateRMA generates inline RMA (Relative Moving Average) calculation
+// TODO: Implement RMA inline generation
+func (g *generator) generateRMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
+	return "", fmt.Errorf("ta.rma inline generation not yet implemented")
+}
+
+// generateRSI generates inline RSI (Relative Strength Index) calculation
+// TODO: Implement RSI inline generation
+func (g *generator) generateRSI(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
+	return "", fmt.Errorf("ta.rsi inline generation not yet implemented")
+}
+
+// generateChange generates inline change calculation
+// TODO: Implement change inline generation
+func (g *generator) generateChange(varName string, sourceExpr string, offset int) (string, error) {
+	return "", fmt.Errorf("ta.change inline generation not yet implemented")
+}
+
+// generatePivot generates inline pivot high/low detection
+// TODO: Implement pivot inline generation
+func (g *generator) generatePivot(varName string, call *ast.CallExpression, isHigh bool) (string, error) {
+	return "", fmt.Errorf("ta.pivot inline generation not yet implemented")
 }
