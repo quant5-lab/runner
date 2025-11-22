@@ -219,6 +219,87 @@ serve: ## Serve ./out directory with Python HTTP server on port 8000
 
 serve-strategy: fetch-strategy serve ## Fetch live data, run strategy, and start web server
 
+##@ Visualization Config Management
+
+create-config: ## Create a visualization config for a strategy (usage: make create-config STRATEGY=strategies/my-strategy.pine)
+	@if [ -z "$(STRATEGY)" ]; then \
+		echo "Usage: make create-config STRATEGY=<path-to-strategy.pine>"; \
+		echo ""; \
+		echo "Example:"; \
+		echo "  make create-config STRATEGY=strategies/rolling-cagr-5-10yr.pine"; \
+		echo ""; \
+		echo "This will:"; \
+		echo "  1. Run the strategy to extract indicator names"; \
+		echo "  2. Create out/{strategy-name}.config with correct filename"; \
+		echo "  3. Pre-fill config with actual indicator names"; \
+		exit 1; \
+	fi
+	@./scripts/create-config.sh $(STRATEGY)
+
+validate-configs: ## Validate that all .config files follow naming convention
+	@./scripts/validate-configs.sh
+
+list-configs: ## List all visualization configs and their matching strategies
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📋 Visualization Configs"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@for config in $$(find out -name "*.config" -type f ! -name "template.config" 2>/dev/null); do \
+		name=$$(basename "$$config" .config); \
+		pine="strategies/$$name.pine"; \
+		if [ -f "$$pine" ]; then \
+			echo "✓ $$name"; \
+			echo "  Config:   $$config"; \
+			echo "  Strategy: $$pine"; \
+		else \
+			echo "⚠ $$name (orphaned)"; \
+			echo "  Config:   $$config"; \
+			echo "  Strategy: NOT FOUND"; \
+		fi; \
+		echo ""; \
+	done || echo "No config files found"
+
+remove-config: ## Remove specific visualization config (usage: make remove-config STRATEGY=strategies/my-strategy.pine)
+	@if [ -z "$(STRATEGY)" ]; then \
+		echo "Usage: make remove-config STRATEGY=<path-to-strategy.pine>"; \
+		echo ""; \
+		echo "Example:"; \
+		echo "  make remove-config STRATEGY=strategies/rolling-cagr.pine"; \
+		exit 1; \
+	fi
+	@name=$$(basename "$(STRATEGY)" .pine); \
+	config="out/$$name.config"; \
+	if [ -f "$$config" ]; then \
+		echo "Removing config: $$config"; \
+		rm "$$config"; \
+		echo "✓ Config removed"; \
+	else \
+		echo "Error: Config not found: $$config"; \
+		exit 1; \
+	fi
+
+clean-configs: ## Remove ALL visualization configs (except template) - requires confirmation
+	@echo "⚠️  WARNING: This will delete ALL .config files (except template.config)"
+	@echo ""
+	@echo "Config files that will be deleted:"
+	@for config in $$(find out -name "*.config" -type f ! -name "template.config" 2>/dev/null); do \
+		echo "  - $$config"; \
+	done || echo "  (none found)"
+	@echo ""
+	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" != "yes" ]; then \
+		echo "Cancelled."; \
+		exit 1; \
+	fi
+	@echo "Removing visualization configs..."
+	@find out -name "*.config" -type f ! -name "template.config" -delete 2>/dev/null || true
+	@echo "✓ All configs cleaned (template.config preserved)"
+
+clean-configs-force: ## Remove ALL configs without confirmation (use with caution)
+	@echo "Force removing all visualization configs..."
+	@find out -name "*.config" -type f ! -name "template.config" -delete 2>/dev/null || true
+	@echo "✓ All configs force-cleaned (template.config preserved)"
+
 ##@ Information
 
 version: ## Show version information
