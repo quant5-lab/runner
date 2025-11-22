@@ -1067,12 +1067,10 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 	}
 
 	sourceExpr := g.extractSeriesExpression(call.Arguments[0])
-	/* Extract field name from expression like "bar.Close" -> "Close" */
-	fieldName := sourceExpr
-	if strings.Contains(sourceExpr, ".") {
-		parts := strings.Split(sourceExpr, ".")
-		fieldName = parts[len(parts)-1]
-	}
+
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExpr)
+	accessGen := CreateAccessGenerator(sourceInfo)
 
 	periodArg, ok := call.Arguments[1].(*ast.Literal)
 	if !ok {
@@ -1094,8 +1092,7 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 
 	switch normalizedFunc {
 	case "ta.sma":
-		/* Inline SMA calculation: average of last N values */
-		code += g.ind() + fmt.Sprintf("/* Inline SMA(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("/* Inline SMA(%d) */\n", period)
 		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
@@ -1103,18 +1100,37 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 		code += g.ind() + "} else {\n"
 		g.indent++
 		code += g.ind() + "sum := 0.0\n"
+		code += g.ind() + "hasNaN := false\n"
 		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
 		g.indent++
-		code += g.ind() + fmt.Sprintf("sum += ctx.Data[ctx.BarIndex-j].%s\n", fieldName)
+		if sourceInfo.IsSeriesVariable() {
+			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
+			code += g.ind() + "if math.IsNaN(val) {\n"
+			g.indent++
+			code += g.ind() + "hasNaN = true\n"
+			code += g.ind() + "break\n"
+			g.indent--
+			code += g.ind() + "}\n"
+			code += g.ind() + "sum += val\n"
+		} else {
+			code += g.ind() + fmt.Sprintf("sum += %s\n", accessGen.GenerateLoopValueAccess("j"))
+		}
 		g.indent--
 		code += g.ind() + "}\n"
+		code += g.ind() + "if hasNaN {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %d.0)\n", varName, period)
+		g.indent--
+		code += g.ind() + "}\n"
 		g.indent--
 		code += g.ind() + "}\n"
 
 	case "ta.ema":
-		/* Inline EMA calculation */
-		code += g.ind() + fmt.Sprintf("/* Inline EMA(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("/* Inline EMA(%d) */\n", period)
 		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
@@ -1122,43 +1138,79 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 		code += g.ind() + "} else {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("alpha := 2.0 / float64(%d+1)\n", period)
-		code += g.ind() + fmt.Sprintf("ema := ctx.Data[ctx.BarIndex-(%d-1)].%s\n", period, fieldName)
+		code += g.ind() + fmt.Sprintf("ema := %s\n", accessGen.GenerateInitialValueAccess(period))
+		code += g.ind() + "if math.IsNaN(ema) {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
 		code += g.ind() + fmt.Sprintf("for j := %d-2; j >= 0; j-- {\n", period)
 		g.indent++
-		code += g.ind() + fmt.Sprintf("ema = alpha*ctx.Data[ctx.BarIndex-j].%s + (1-alpha)*ema\n", fieldName)
+		if sourceInfo.IsSeriesVariable() {
+			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
+			code += g.ind() + "if math.IsNaN(val) {\n"
+			g.indent++
+			code += g.ind() + "ema = math.NaN()\n"
+			code += g.ind() + "break\n"
+			g.indent--
+			code += g.ind() + "}\n"
+			code += g.ind() + "ema = alpha*val + (1-alpha)*ema\n"
+		} else {
+			code += g.ind() + fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema\n", accessGen.GenerateLoopValueAccess("j"))
+		}
 		g.indent--
 		code += g.ind() + "}\n"
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(ema)\n", varName)
 		g.indent--
 		code += g.ind() + "}\n"
+		g.indent--
+		code += g.ind() + "}\n"
 
 	case "ta.stdev":
-		/* Inline STDEV calculation */
-		code += g.ind() + fmt.Sprintf("/* Inline STDEV(%d) in security context */\n", period)
+		code += g.ind() + fmt.Sprintf("/* Inline STDEV(%d) */\n", period)
 		code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period)
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 		g.indent--
 		code += g.ind() + "} else {\n"
 		g.indent++
-		/* Calculate mean */
 		code += g.ind() + "sum := 0.0\n"
+		code += g.ind() + "hasNaN := false\n"
 		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
 		g.indent++
-		code += g.ind() + fmt.Sprintf("sum += ctx.Data[ctx.BarIndex-j].%s\n", fieldName)
+		if sourceInfo.IsSeriesVariable() {
+			code += g.ind() + fmt.Sprintf("val := %s\n", accessGen.GenerateLoopValueAccess("j"))
+			code += g.ind() + "if math.IsNaN(val) {\n"
+			g.indent++
+			code += g.ind() + "hasNaN = true\n"
+			code += g.ind() + "break\n"
+			g.indent--
+			code += g.ind() + "}\n"
+			code += g.ind() + "sum += val\n"
+		} else {
+			code += g.ind() + fmt.Sprintf("sum += %s\n", accessGen.GenerateLoopValueAccess("j"))
+		}
 		g.indent--
 		code += g.ind() + "}\n"
+		code += g.ind() + "if hasNaN {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
 		code += g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period)
-		/* Calculate variance */
 		code += g.ind() + "variance := 0.0\n"
 		code += g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period)
 		g.indent++
-		code += g.ind() + fmt.Sprintf("diff := ctx.Data[ctx.BarIndex-j].%s - mean\n", fieldName)
+		code += g.ind() + fmt.Sprintf("diff := %s - mean\n", accessGen.GenerateLoopValueAccess("j"))
 		code += g.ind() + "variance += diff * diff\n"
 		g.indent--
 		code += g.ind() + "}\n"
 		code += g.ind() + fmt.Sprintf("variance /= %d.0\n", period)
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName)
+		g.indent--
+		code += g.ind() + "}\n"
 		g.indent--
 		code += g.ind() + "}\n"
 

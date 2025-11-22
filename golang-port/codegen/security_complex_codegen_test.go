@@ -436,12 +436,12 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
 		"Inline STDEV(20)",
-		"sum := 0.0",         // Mean calculation
-		"mean := sum / 20.0", // Mean result
-		"variance := 0.0",    // Variance calculation
-		"diff := ctx.Data[ctx.BarIndex-j].GetCurrent() - mean", // Uses GetCurrent() for source
-		"variance += diff * diff",                              // Squared deviation
-		"math.Sqrt(variance)",                                  // Final STDEV
+		"sum := 0.0",                        // Mean calculation
+		"mean := sum / 20.0",                // Mean result
+		"variance := 0.0",                   // Variance calculation
+		"diff := closeSeries.Get(j) - mean", // Uses closeSeries.Get() with relative offset
+		"variance += diff * diff",           // Squared deviation
+		"math.Sqrt(variance)",               // Final STDEV
 	}
 
 	for _, pattern := range expectedPatterns {
