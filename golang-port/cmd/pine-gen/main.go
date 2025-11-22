@@ -10,6 +10,7 @@ import (
 	"github.com/borisquantlab/pinescript-go/codegen"
 	"github.com/borisquantlab/pinescript-go/parser"
 	"github.com/borisquantlab/pinescript-go/preprocessor"
+	"github.com/borisquantlab/pinescript-go/runtime/validation"
 )
 
 var (
@@ -72,6 +73,22 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "JSON error: %v\n", err)
 		os.Exit(1)
+	}
+
+	/* Analyze warmup requirements */
+	analyzer := validation.NewWarmupAnalyzer()
+	warmupReqs := analyzer.AnalyzeScript(estree)
+	if len(warmupReqs) > 0 {
+		fmt.Printf("Warmup requirements detected:\n")
+		maxLookback := 0
+		for _, req := range warmupReqs {
+			fmt.Printf("  - %s (lookback: %d bars)\n", req.Source, req.MaxLookback)
+			if req.MaxLookback > maxLookback {
+				maxLookback = req.MaxLookback
+			}
+		}
+		fmt.Printf("  ⚠️  Strategy requires at least %d bars of historical data\n", maxLookback+1)
+		fmt.Printf("  💡 First %d bars will produce null/NaN values (warmup period)\n", maxLookback)
 	}
 
 	/* Generate Go code from AST */

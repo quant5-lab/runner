@@ -20,10 +20,16 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen := &generator{
 		imports:      make(map[string]bool),
 		variables:    make(map[string]string),
+		constants:    make(map[string]interface{}),
 		strategyName: "Generated Strategy",
 		limits:       NewCodeGenerationLimits(),
 		safetyGuard:  NewRuntimeSafetyGuard(),
 	}
+
+	// Initialize handlers
+	gen.inputHandler = NewInputHandler()
+	gen.mathHandler = NewMathHandler()
+	gen.subscriptResolver = NewSubscriptResolver()
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -42,14 +48,18 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 type generator struct {
 	imports            map[string]bool
 	variables          map[string]string
-	plots              []string // Track plot variables
-	strategyName       string   // Strategy name from indicator() or strategy()
+	constants          map[string]interface{} // Input constants (input.float, input.int, etc)
+	plots              []string               // Track plot variables
+	strategyName       string                 // Strategy name from indicator() or strategy()
 	indent             int
 	needsSeriesPreCalc bool             // Flag if we need series pre-calculation
 	taFunctions        []taFunctionCall // List of TA function calls to pre-calculate
 	inSecurityContext  bool             // Flag when generating code inside security() context
 	limits             CodeGenerationLimits
 	safetyGuard        RuntimeSafetyGuard
+	inputHandler       *InputHandler
+	mathHandler        *MathHandler
+	subscriptResolver  *SubscriptResolver
 }
 
 type taFunctionCall struct {
@@ -115,6 +125,42 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
 				varName := declarator.ID.Name
+
+				// Check if this is an input.* function call
+				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+					funcName := g.extractFunctionName(callExpr.Callee)
+
+					// Generate input constants immediately (if handler exists)
+					if g.inputHandler != nil {
+						if funcName == "input.float" {
+							g.inputHandler.GenerateInputFloat(callExpr, varName)
+							g.constants[varName] = funcName
+							continue
+						}
+						if funcName == "input.int" {
+							g.inputHandler.GenerateInputInt(callExpr, varName)
+							g.constants[varName] = funcName
+							continue
+						}
+						if funcName == "input.bool" {
+							g.inputHandler.GenerateInputBool(callExpr, varName)
+							g.constants[varName] = funcName
+							continue
+						}
+						if funcName == "input.string" {
+							g.inputHandler.GenerateInputString(callExpr, varName)
+							g.constants[varName] = funcName
+							continue
+						}
+					}
+					if funcName == "input.source" {
+						// input.source is an alias to an existing series
+						// Don't add to variables - handle specially in codegen
+						g.constants[varName] = funcName
+						continue
+					}
+				}
+
 				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
 			}
@@ -153,6 +199,15 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	// Initialize strategy
 	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
+
+	// Generate input constants
+	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
+		code += g.ind() + "// Input constants\n"
+		for _, constCode := range g.inputHandler.inputConstants {
+			code += g.ind() + constCode
+		}
+		code += "\n"
+	}
 
 	// Declare ALL variables as Series (ForwardSeriesBuffer paradigm)
 	if len(g.variables) > 0 {
@@ -633,6 +688,25 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	for _, declarator := range decl.Declarations {
 		varName := declarator.ID.Name
 
+		// Check if this is an input.* function call
+		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+			funcName := g.extractFunctionName(callExpr.Callee)
+
+			// Handle input functions
+			if funcName == "input.float" || funcName == "input.int" ||
+				funcName == "input.bool" || funcName == "input.string" {
+				// Already handled in first pass - skip code generation here
+				continue
+			}
+
+			if funcName == "input.source" {
+				// input.source(defval=close) means varName is an alias to close
+				// Generate comment only - actual usage will reference source directly
+				code += g.ind() + fmt.Sprintf("// %s = input.source() - using source directly\n", varName)
+				continue
+			}
+		}
+
 		// Determine variable type based on init expression
 		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
@@ -1033,6 +1107,14 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		return code, nil
 
 	default:
+		// Check if it's a math function
+		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
+			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathCode), nil
+		}
 		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
 	}
 }
@@ -1444,11 +1526,11 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				if prop, ok := e.Property.(*ast.Identifier); ok {
 					switch prop.Name {
 					case "ismonthly":
-						return `(ctx.Timeframe == "1M")`
+						return "ctx.IsMonthly"
 					case "isdaily":
-						return `(ctx.Timeframe == "1D")`
+						return "ctx.IsDaily"
 					case "isweekly":
-						return `(ctx.Timeframe == "1W")`
+						return "ctx.IsWeekly"
 					case "period":
 						return "ctx.Timeframe"
 					}
@@ -1459,18 +1541,35 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 
 			// Extract offset from subscript
 			offset := 0
+			isVariableOffset := false
+			var variableOffsetCode string
 			if e.Computed {
 				if lit, ok := e.Property.(*ast.Literal); ok {
+					// Literal offset like [0], [1], [5]
 					switch v := lit.Value.(type) {
 					case float64:
 						offset = int(v)
 					case int:
 						offset = v
 					}
+				} else {
+					// Variable offset like [nA], [length]
+					isVariableOffset = true
+					if g.subscriptResolver != nil {
+						variableOffsetCode = g.subscriptResolver.ResolveSubscript(varName, e.Property, g)
+					} else {
+						// Fallback if no resolver
+						variableOffsetCode = fmt.Sprintf("%sSeries.Get(0)", varName)
+					}
 				}
 			}
 
-			// Check if it's a Pine built-in series
+			// If variable offset, return the resolved code
+			if isVariableOffset {
+				return variableOffsetCode
+			}
+
+			// Check if it's a Pine built-in series (literal offset)
 			switch varName {
 			case "close":
 				if offset == 0 {
@@ -1499,6 +1598,24 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				}
 				return fmt.Sprintf("ctx.Data[i-%d].Volume", offset)
 			default:
+				// Check if it's an input constant (not input.source)
+				if funcName, isConstant := g.constants[varName]; isConstant {
+					if funcName == "input.source" {
+						// For input.source, treat it as an alias to close (default)
+						// TODO: Extract actual source from input.source defval
+						if offset == 0 {
+							return "bar.Close"
+						}
+						return fmt.Sprintf("ctx.Data[i-%d].Close", offset)
+					}
+					// For other input constants (input.float, input.int, etc), if offset is 0, just return the constant name
+					if offset == 0 {
+						return varName
+					}
+					// Non-zero offset doesn't make sense for constants, but handle it
+					return varName
+				}
+
 				// User-defined variable (ALL use Series storage)
 				return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 			}
@@ -1509,8 +1626,14 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		if e.Name == "na" {
 			return "math.NaN()"
 		}
-		// User-defined variable (ALL use Series storage)
 		varName := e.Name
+
+		// Check if it's an input constant
+		if _, isConstant := g.constants[varName]; isConstant {
+			return varName // Use constant value directly
+		}
+
+		// User-defined variable (ALL use Series storage)
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	case *ast.Literal:
 		// Numeric literal
@@ -1525,6 +1648,32 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		left := g.extractSeriesExpression(e.Left)
 		right := g.extractSeriesExpression(e.Right)
 		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right)
+	case *ast.UnaryExpression:
+		// Unary expression like -1, +x
+		operand := g.extractSeriesExpression(e.Argument)
+		op := e.Operator
+		if op == "not" {
+			op = "!"
+		}
+		return fmt.Sprintf("%s%s", op, operand)
+	case *ast.CallExpression:
+		// Function call like math.pow(x, y) or ta.sma(close, 20)
+		funcName := g.extractFunctionName(e.Callee)
+
+		// Handle math.* functions
+		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
+			mathCode, err := g.mathHandler.GenerateMathCall(funcName, e.Arguments, g)
+			if err != nil {
+				// Return error placeholder
+				return "0.0"
+			}
+			return mathCode
+		}
+
+		// For other functions (TA, etc), return series access
+		// This assumes the function result is stored in a series variable
+		varName := strings.ReplaceAll(funcName, ".", "_")
+		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	}
 	return "0.0"
 }
