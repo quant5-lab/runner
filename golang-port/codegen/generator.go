@@ -225,42 +225,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
-	// Pre-calculate TA functions using runtime library
-	if g.needsSeriesPreCalc && len(g.taFunctions) > 0 {
-		code += g.ind() + "// Pre-calculate TA functions using runtime library\n"
-
-		// Extract source series (close, high, low, open, etc.)
-		sourcesNeeded := make(map[string]bool)
-		for _, taFunc := range g.taFunctions {
-			if len(taFunc.args) > 0 {
-				sourceName := g.extractArgIdentifier(taFunc.args[0])
-				if sourceName != "" {
-					sourcesNeeded[sourceName] = true
-				}
-			}
-		}
-
-		for source := range sourcesNeeded {
-			code += g.ind() + fmt.Sprintf("%sSeries := make([]float64, len(ctx.Data))\n", strings.ToLower(source))
-			code += g.ind() + "for i := range ctx.Data {\n"
-			g.indent++
-			code += g.ind() + fmt.Sprintf("%sSeries[i] = ctx.Data[i].%s\n", strings.ToLower(source), source)
-			g.indent--
-			code += g.ind() + "}\n"
-		}
-		code += "\n"
-
-		// Call runtime TA functions
-		for _, taFunc := range g.taFunctions {
-			funcCode, err := g.generateTAPreCalc(taFunc)
-			if err != nil {
-				return "", err
-			}
-			code += funcCode
-		}
-		code += "\n"
-	}
-
 	// Bar loop for strategy execution
 	code += g.ind() + "const maxBars = 1000000\n"
 	code += g.ind() + "barCount := len(ctx.Data)\n"
@@ -371,41 +335,11 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 		return "", nil
 	case "plot":
 		// Plot function - add to collector
-		if len(call.Arguments) > 0 {
-			// Get plot value (first argument) - could be identifier or member expression like sma20[0]
-			plotVar := ""
-			switch arg := call.Arguments[0].(type) {
-			case *ast.Identifier:
-				plotVar = arg.Name
-			case *ast.MemberExpression:
-				// Handle sma20[0] → extract "sma20"
-				if id, ok := arg.Object.(*ast.Identifier); ok {
-					plotVar = id.Name
-				}
-			}
-
-			plotTitle := plotVar // Default title
-
-			// Check for title in second argument (object expression)
-			if len(call.Arguments) > 1 {
-				if obj, ok := call.Arguments[1].(*ast.ObjectExpression); ok {
-					for _, prop := range obj.Properties {
-						if keyID, ok := prop.Key.(*ast.Identifier); ok && keyID.Name == "title" {
-							if valLit, ok := prop.Value.(*ast.Literal); ok {
-								if title, ok := valLit.Value.(string); ok {
-									plotTitle = title
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if plotVar != "" {
-				// ALL variables use Series storage
-				plotExpr := plotVar + "Series.Get(0)"
-				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", plotTitle, plotExpr)
-			}
+		opts := ParsePlotOptions(call)
+		if opts.Variable != "" {
+			// ALL variables use Series storage
+			plotExpr := opts.Variable + "Series.Get(0)"
+			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
 		}
 	case "ta.sma":
 		// SMA calculation - handled in variable declaration
@@ -711,31 +645,14 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
 
-		// Check if this is a TA function call
-		isTAFunc := false
-		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
-			funcName := g.extractFunctionName(callExpr.Callee)
-			if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
-				funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
-				funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" {
-				isTAFunc = true
-			}
-		}
-
 		// Generate initialization from init expression
 		if declarator.Init != nil {
-			// For TA functions that are pre-calculated
-			if isTAFunc {
-				// Store in Series (ALL variables use Series)
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(%sArray[i])\n", varName, varName)
-			} else {
-				// Regular variable initialization (use Series.Set())
-				initCode, err := g.generateVariableInit(varName, declarator.Init)
-				if err != nil {
-					return "", err
-				}
-				code += initCode
+			// ALL variables use same initialization path (ForwardSeriesBuffer paradigm)
+			initCode, err := g.generateVariableInit(varName, declarator.Init)
+			if err != nil {
+				return "", err
 			}
+			code += initCode
 		}
 	}
 	return code, nil
@@ -865,13 +782,8 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	switch funcName {
 	case "ta.sma", "ta.ema", "ta.rma", "ta.rsi", "ta.atr", "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow",
 		"sma", "ema", "rma", "rsi", "atr", "stdev": // Pine v4 and v5 syntax
-		/* TA functions - normally registered in third pass for global pre-calculation
-		 * But when called from security() context, need inline evaluation */
-		if g.inSecurityContext {
-			return g.generateInlineTA(varName, funcName, call)
-		}
-		/* Global context - will be computed in third pass */
-		return "", nil
+		/* TA functions - generate inline evaluation using ForwardSeriesBuffer */
+		return g.generateInlineTA(varName, funcName, call)
 
 	case "ta.crossover":
 		// ta.crossover(series1, series2) - series1 crosses ABOVE series2
@@ -1136,7 +1048,16 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 		if !ok {
 			return "", fmt.Errorf("ta.atr period must be literal")
 		}
-		period := int(periodArg.Value.(float64))
+		// Handle both int and float64 literals
+		var period int
+		switch v := periodArg.Value.(type) {
+		case float64:
+			period = int(v)
+		case int:
+			period = v
+		default:
+			return "", fmt.Errorf("ta.atr period must be numeric")
+		}
 		return g.generateInlineATR(varName, period)
 	}
 
@@ -1157,7 +1078,17 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 	if !ok {
 		return "", fmt.Errorf("%s period must be literal", funcName)
 	}
-	period := int(periodArg.Value.(float64))
+
+	// Handle both int and float64 literals
+	var period int
+	switch v := periodArg.Value.(type) {
+	case float64:
+		period = int(v)
+	case int:
+		period = v
+	default:
+		return "", fmt.Errorf("%s period must be numeric", funcName)
+	}
 
 	var code string
 
@@ -1423,35 +1354,17 @@ func (g *generator) extractStrategyName(args []ast.Expression) string {
 		return ""
 	}
 
-	// First argument is positional title (simple case)
 	if lit, ok := args[0].(*ast.Literal); ok {
 		if name, ok := lit.Value.(string); ok {
 			return name
 		}
 	}
 
-	// Search for 'title=' named parameter in ObjectExpression
 	for _, arg := range args {
 		if obj, ok := arg.(*ast.ObjectExpression); ok {
-			for _, prop := range obj.Properties {
-				// Check if key is 'title'
-				keyName := ""
-				if id, ok := prop.Key.(*ast.Identifier); ok {
-					keyName = id.Name
-				} else if lit, ok := prop.Key.(*ast.Literal); ok {
-					if name, ok := lit.Value.(string); ok {
-						keyName = name
-					}
-				}
-
-				if keyName == "title" {
-					// Extract value
-					if lit, ok := prop.Value.(*ast.Literal); ok {
-						if name, ok := lit.Value.(string); ok {
-							return name
-						}
-					}
-				}
+			parser := NewPropertyParser()
+			if title, ok := parser.ParseString(obj, "title"); ok {
+				return title
 			}
 		}
 	}
@@ -1776,108 +1689,6 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 		g.analyzeSeriesRequirements(n.Left)
 		g.analyzeSeriesRequirements(n.Right)
 	}
-}
-
-/* generateTAPreCalc generates runtime library call for TA function */
-func (g *generator) generateTAPreCalc(taFunc taFunctionCall) (string, error) {
-	code := ""
-
-	// Use "Array" suffix for TA function results to distinguish from Series
-	arrayName := taFunc.varName + "Array"
-
-	switch taFunc.funcName {
-	case "ta.sma", "ta.ema", "ta.rma":
-		// ta.sma(source, period)
-		if len(taFunc.args) < 2 {
-			return "", fmt.Errorf("%s requires 2 arguments", taFunc.funcName)
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-		period := g.extractArgLiteral(taFunc.args[1])
-
-		funcMap := map[string]string{"ta.sma": "Sma", "ta.ema": "Ema", "ta.rma": "Rma"}
-		funcName := funcMap[taFunc.funcName]
-
-		code += g.ind() + fmt.Sprintf("%s := ta.%s(%sSeries, %d)\n",
-			arrayName, funcName, source, period)
-
-	case "ta.rsi":
-		// ta.rsi(source, period)
-		if len(taFunc.args) < 2 {
-			return "", fmt.Errorf("ta.rsi requires 2 arguments")
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-		period := g.extractArgLiteral(taFunc.args[1])
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Rsi(%sSeries, %d)\n",
-			arrayName, source, period)
-
-	case "ta.atr":
-		// ta.atr(period)
-		if len(taFunc.args) < 1 {
-			return "", fmt.Errorf("ta.atr requires 1 argument")
-		}
-
-		period := g.extractArgLiteral(taFunc.args[0])
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Atr(highSeries, lowSeries, closeSeries, %d)\n",
-			arrayName, period)
-
-	case "ta.stdev":
-		// ta.stdev(source, period)
-		if len(taFunc.args) < 2 {
-			return "", fmt.Errorf("ta.stdev requires 2 arguments")
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-		period := g.extractArgLiteral(taFunc.args[1])
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Stdev(%sSeries, %d)\n",
-			arrayName, source, period)
-
-	case "ta.change":
-		// ta.change(source)
-		if len(taFunc.args) < 1 {
-			return "", fmt.Errorf("ta.change requires 1 argument")
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Change(%sSeries)\n",
-			arrayName, source)
-
-	case "ta.pivothigh":
-		// ta.pivothigh(source, leftBars, rightBars)
-		if len(taFunc.args) < 3 {
-			return "", fmt.Errorf("ta.pivothigh requires 3 arguments")
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-		leftBars := g.extractArgLiteral(taFunc.args[1])
-		rightBars := g.extractArgLiteral(taFunc.args[2])
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Pivothigh(%sSeries, %d, %d)\n",
-			arrayName, source, leftBars, rightBars)
-
-	case "ta.pivotlow":
-		// ta.pivotlow(source, leftBars, rightBars)
-		if len(taFunc.args) < 3 {
-			return "", fmt.Errorf("ta.pivotlow requires 3 arguments")
-		}
-
-		source := strings.ToLower(g.extractArgIdentifier(taFunc.args[0]))
-		leftBars := g.extractArgLiteral(taFunc.args[1])
-		rightBars := g.extractArgLiteral(taFunc.args[2])
-
-		code += g.ind() + fmt.Sprintf("%s := ta.Pivotlow(%sSeries, %d, %d)\n",
-			arrayName, source, leftBars, rightBars)
-
-	default:
-		return "", fmt.Errorf("unsupported TA function: %s", taFunc.funcName)
-	}
-
-	return code, nil
 }
 
 func (g *generator) generatePlaceholder() string {

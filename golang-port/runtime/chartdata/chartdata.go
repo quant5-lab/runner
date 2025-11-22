@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/borisquantlab/pinescript-go/runtime/clock"
-
 	"github.com/borisquantlab/pinescript-go/runtime/context"
 	"github.com/borisquantlab/pinescript-go/runtime/output"
 	"github.com/borisquantlab/pinescript-go/runtime/strategy"
@@ -163,15 +162,16 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 			}
 		}
 
-		/* Backend emits raw data without presentation concerns */
+		/* Use default color rotation */
 		color := colors[i%len(colors)]
+		lineWidth := 2
 
 		cd.Indicators[s.Title] = IndicatorSeries{
 			Title: s.Title,
 			Pane:  "", /* Presentation layer assigns pane based on range analysis */
 			Style: StyleConfig{
 				Color:     color,
-				LineWidth: 2,
+				LineWidth: lineWidth,
 			},
 			Data: plotPoints,
 		}

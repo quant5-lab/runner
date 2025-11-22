@@ -135,66 +135,29 @@ func (ih *InputHandler) GenerateInputString(call *ast.CallExpression, varName st
 
 /* Helper: extract float from ObjectExpression property */
 func (ih *InputHandler) extractFloatFromObject(obj *ast.ObjectExpression, key string, defaultVal float64) float64 {
-	for _, prop := range obj.Properties {
-		keyName := ih.extractPropertyKey(prop.Key)
-		if keyName == key {
-			if lit, ok := prop.Value.(*ast.Literal); ok {
-				if val, ok := lit.Value.(float64); ok {
-					return val
-				}
-			}
-		}
+	parser := NewPropertyParser()
+	if val, ok := parser.ParseFloat(obj, key); ok {
+		return val
 	}
 	return defaultVal
 }
 
-/* Helper: extract bool from ObjectExpression property */
 func (ih *InputHandler) extractBoolFromObject(obj *ast.ObjectExpression, key string, defaultVal bool) bool {
-	for _, prop := range obj.Properties {
-		keyName := ih.extractPropertyKey(prop.Key)
-		if keyName == key {
-			if lit, ok := prop.Value.(*ast.Literal); ok {
-				if val, ok := lit.Value.(bool); ok {
-					return val
-				}
-			}
-		}
+	parser := NewPropertyParser()
+	if val, ok := parser.ParseBool(obj, key); ok {
+		return val
 	}
 	return defaultVal
 }
 
-/* Helper: extract string from ObjectExpression property */
 func (ih *InputHandler) extractStringFromObject(obj *ast.ObjectExpression, key string, defaultVal string) string {
-	for _, prop := range obj.Properties {
-		keyName := ih.extractPropertyKey(prop.Key)
-		if keyName == key {
-			if lit, ok := prop.Value.(*ast.Literal); ok {
-				if val, ok := lit.Value.(string); ok {
-					return val
-				}
-			}
-		}
+	parser := NewPropertyParser()
+	if val, ok := parser.ParseString(obj, key); ok {
+		return val
 	}
 	return defaultVal
 }
 
-/* Helper: extract property key name from Identifier or Literal */
-func (ih *InputHandler) extractPropertyKey(key ast.Expression) string {
-	if id, ok := key.(*ast.Identifier); ok {
-		return id.Name
-	}
-	if lit, ok := key.(*ast.Literal); ok {
-		if name, ok := lit.Value.(string); ok {
-			return name
-		}
-	}
-	return ""
-}
-
-/*
-GenerateInputSource generates code for input.source(defval, title, ...).
-Returns comment - source is handled as alias not new series.
-*/
 func (ih *InputHandler) GenerateInputSource(call *ast.CallExpression, varName string) (string, error) {
 	source := "close"
 	if len(call.Arguments) > 0 {
