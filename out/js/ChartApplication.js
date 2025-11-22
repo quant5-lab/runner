@@ -25,6 +25,16 @@ export class ChartApplication {
       configOverride
     );
 
+    // Merge config style/color overrides into indicators
+    if (configOverride) {
+      Object.entries(indicatorsWithPanes).forEach(([key, indicator]) => {
+        const override = configOverride[key];
+        if (override && typeof override === 'object') {
+          if (override.style) indicator.style = { ...indicator.style, ...override };
+        }
+      });
+    }
+
     this.updateMetadataDisplay(data.metadata);
 
     const paneConfig = this.buildPaneConfig(indicatorsWithPanes, data.ui?.panes);
@@ -33,7 +43,7 @@ export class ChartApplication {
     this.createCharts(paneConfig);
 
     const seriesRouter = new SeriesRouter(this.paneManager, this.seriesMap);
-    this.routeAndLoadSeries(indicatorsWithPanes, data, seriesRouter);
+    this.routeAndLoadSeries(indicatorsWithPanes, data, seriesRouter, configOverride);
 
     this.loadTrades(data.strategy, data.candlestick);
     this.updateTimestamp(data.metadata);
@@ -73,7 +83,7 @@ export class ChartApplication {
     });
   }
 
-  routeAndLoadSeries(indicatorsWithPanes, data, seriesRouter) {
+  routeAndLoadSeries(indicatorsWithPanes, data, seriesRouter, configOverride) {
     const mainChart = this.paneManager.mainPane.chart;
 
     this.seriesMap.candlestick = ChartManager.addCandlestickSeries(mainChart, {
@@ -97,24 +107,33 @@ export class ChartApplication {
     this.seriesMap.candlestick.setData(candlestickData);
 
     Object.entries(indicatorsWithPanes).forEach(([key, indicator]) => {
+      // Extract style from config override
+      const styleType = configOverride?.[key]?.style || 'line';
+      const color = indicator.style?.color || configOverride?.[key]?.color || '#2196F3';
+      
       const seriesConfig = {
-        color: indicator.style?.color || '#2196F3',
+        color: color,
         lineWidth: indicator.style?.lineWidth || 2,
         title: indicator.title || key,
         chart: indicator.pane || 'main',
-        style: 'line',
+        style: styleType,
       };
 
-      seriesRouter.routeSeries(key, seriesConfig, ChartManager);
+      const series = seriesRouter.routeSeries(key, seriesConfig, ChartManager);
+      
+      if (!series) {
+        console.error(`Failed to create series for '${key}'`);
+        return;
+      }
 
       const dataWithColor = indicator.data.map((point) => ({
         ...point,
-        options: { color: indicator.style?.color || '#2196F3' },
+        options: { color: color },
       }));
 
       const processedData = window.adaptLineSeriesData(dataWithColor);
       if (processedData.length > 0) {
-        this.seriesMap[key].setData(processedData);
+        series.setData(processedData);
       }
     });
   }
@@ -190,14 +209,18 @@ export class ChartApplication {
   }
 
   async refresh() {
+    // Clear all charts and containers
+    const charts = this.paneManager.getAllCharts();
+    charts.forEach(chart => chart.remove());
+    
     const containers = this.paneManager.getAllContainers();
     containers.forEach((container) => {
-      if (container.id !== 'main-chart') {
-        container.remove();
-      }
+      container.innerHTML = '';
     });
 
     this.seriesMap = {};
+    this.paneManager = null;
+    
     await this.initialize();
   }
 }

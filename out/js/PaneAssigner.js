@@ -61,7 +61,9 @@ export class PaneAssigner {
 
   assignPane(indicatorKey, indicator, configOverride = null) {
     if (configOverride && configOverride[indicatorKey]) {
-      return configOverride[indicatorKey];
+      const override = configOverride[indicatorKey];
+      // Handle both string ("indicator") and object ({pane: "indicator", ...})
+      return typeof override === 'string' ? override : (override.pane || 'indicator');
     }
 
     if (indicator.pane && indicator.pane !== '') {
