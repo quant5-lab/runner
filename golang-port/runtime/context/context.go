@@ -12,20 +12,28 @@ type OHLCV struct {
 }
 
 type Context struct {
-	Symbol    string
-	Timeframe string
-	Bars      int
-	Data      []OHLCV
-	BarIndex  int
+	Symbol     string
+	Timeframe  string
+	Bars       int
+	Data       []OHLCV
+	BarIndex   int
+	IsMonthly  bool
+	IsDaily    bool
+	IsWeekly   bool
+	IsIntraday bool
 }
 
 func New(symbol, timeframe string, bars int) *Context {
 	return &Context{
-		Symbol:    symbol,
-		Timeframe: timeframe,
-		Bars:      bars,
-		Data:      make([]OHLCV, 0, bars),
-		BarIndex:  0,
+		Symbol:     symbol,
+		Timeframe:  timeframe,
+		Bars:       bars,
+		Data:       make([]OHLCV, 0, bars),
+		BarIndex:   0,
+		IsMonthly:  IsMonthlyTimeframe(timeframe),
+		IsDaily:    IsDailyTimeframe(timeframe),
+		IsWeekly:   IsWeeklyTimeframe(timeframe),
+		IsIntraday: IsIntradayTimeframe(timeframe),
 	}
 }
 
@@ -83,4 +91,21 @@ func (c *Context) GetTime(offset int) time.Time {
 
 func (c *Context) LastBarIndex() int {
 	return len(c.Data) - 1
+}
+
+/* Timeframe type detection helpers */
+func IsMonthlyTimeframe(tf string) bool {
+	return tf == "M" || tf == "1M" || tf == "1mo"
+}
+
+func IsDailyTimeframe(tf string) bool {
+	return tf == "D" || tf == "1D" || tf == "1d"
+}
+
+func IsWeeklyTimeframe(tf string) bool {
+	return tf == "W" || tf == "1W" || tf == "1w" || tf == "1wk"
+}
+
+func IsIntradayTimeframe(tf string) bool {
+	return !IsMonthlyTimeframe(tf) && !IsDailyTimeframe(tf) && !IsWeeklyTimeframe(tf)
 }
