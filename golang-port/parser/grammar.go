@@ -83,7 +83,8 @@ type Factor struct {
 	Call         *CallExpr     `parser:"| @@"`
 	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
-	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	True         *string       `parser:"| @'true'"`
+	False        *string       `parser:"| @'false'"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
@@ -109,7 +110,8 @@ type ComparisonTerm struct {
 	Call         *CallExpr     `parser:"@@"`
 	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
-	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	True         *string       `parser:"| @'true'"`
+	False        *string       `parser:"| @'false'"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
@@ -139,7 +141,8 @@ type Value struct {
 	CallExpr     *CallExpr     `parser:"@@"`
 	Subscript    *Subscript    `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
-	Boolean      *bool         `parser:"| ( @'true' | @'false' )"`
+	True         *string       `parser:"| @'true'"`
+	False        *string       `parser:"| @'false'"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`

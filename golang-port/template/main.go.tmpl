@@ -14,6 +14,7 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/series"
+	"github.com/quant5-lab/runner/runtime/session"
 	"github.com/quant5-lab/runner/runtime/strategy"
 	"github.com/quant5-lab/runner/runtime/ta"
 	"github.com/quant5-lab/runner/security"
@@ -27,6 +28,7 @@ var (
 	_ = datafetcher.NewFileFetcher
 	_ = ta.Sma
 	_ = security.AnalyzeAST
+	_ = session.Parse
 )
 
 /* CLI flags */
@@ -56,10 +58,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	/* Parse JSON - support both array format and object with timezone */
 	var bars []context.OHLCV
-	if err := json.Unmarshal(dataBytes, &bars); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
-		os.Exit(1)
+	var timezone string = "UTC" // default
+	
+	/* Try parsing as object with timezone metadata first */
+	var dataWithMetadata struct {
+		Timezone string           `json:"timezone"`
+		Bars     []context.OHLCV `json:"bars"`
+	}
+	if err := json.Unmarshal(dataBytes, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
+		bars = dataWithMetadata.Bars
+		timezone = dataWithMetadata.Timezone
+	} else {
+		/* Fallback: parse as plain array */
+		if err := json.Unmarshal(dataBytes, &bars); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if len(bars) == 0 {
@@ -67,8 +83,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	/* Create runtime context */
+	/* Create runtime context with timezone from data source */
 	ctx := context.New(*symbolFlag, *timeframeFlag, len(bars))
+	ctx.Timezone = timezone
 	for _, bar := range bars {
 		ctx.AddBar(bar)
 	}
@@ -107,6 +124,7 @@ func main() {
 	/* Print summary */
 	fmt.Printf("Symbol: %s\n", *symbolFlag)
 	fmt.Printf("Timeframe: %s\n", *timeframeFlag)
+	fmt.Printf("Timezone: %s\n", timezone)
 	fmt.Printf("Bars: %d\n", len(bars))
 	fmt.Printf("Execution time: %v\n", executionTime)
 	fmt.Printf("Output: %s (%d bytes)\n", *outputFlag, len(jsonBytes))

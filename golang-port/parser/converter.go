@@ -208,11 +208,18 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 	if term.Call != nil {
 		return c.convertCallExpr(term.Call)
 	}
-	if term.Boolean != nil {
+	if term.True != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
-			Value:    *term.Boolean,
-			Raw:      fmt.Sprintf("%v", *term.Boolean),
+			Value:    true,
+			Raw:      "true",
+		}, nil
+	}
+	if term.False != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    false,
+			Raw:      "false",
 		}, nil
 	}
 	if term.Ident != nil {
@@ -358,11 +365,18 @@ func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
 			Computed: false,
 		}, nil
 	}
-	if val.Boolean != nil {
+	if val.True != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
-			Value:    *val.Boolean,
-			Raw:      fmt.Sprintf("%v", *val.Boolean),
+			Value:    true,
+			Raw:      "true",
+		}, nil
+	}
+	if val.False != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    false,
+			Raw:      "false",
 		}, nil
 	}
 	if val.Ident != nil {
@@ -623,11 +637,19 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 		}, nil
 	}
 
-	if factor.Boolean != nil {
+	if factor.True != nil {
 		return &ast.Literal{
 			NodeType: ast.TypeLiteral,
-			Value:    *factor.Boolean,
-			Raw:      fmt.Sprintf("%t", *factor.Boolean),
+			Value:    true,
+			Raw:      "true",
+		}, nil
+	}
+
+	if factor.False != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    false,
+			Raw:      "false",
 		}, nil
 	}
 

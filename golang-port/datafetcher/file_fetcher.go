@@ -39,10 +39,21 @@ func (f *FileFetcher) Fetch(symbol, timeframe string, limit int) ([]context.OHLC
 		return nil, fmt.Errorf("failed to read %s: %w", filename, err)
 	}
 
-	/* Parse OHLCV array */
+	/* Parse OHLCV data - support both formats */
 	var bars []context.OHLCV
-	if err := json.Unmarshal(data, &bars); err != nil {
-		return nil, fmt.Errorf("failed to parse %s: %w", filename, err)
+
+	/* Try parsing as object with timezone metadata first */
+	var dataWithMetadata struct {
+		Timezone string          `json:"timezone"`
+		Bars     []context.OHLCV `json:"bars"`
+	}
+	if err := json.Unmarshal(data, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
+		bars = dataWithMetadata.Bars
+	} else {
+		/* Fallback: parse as plain array */
+		if err := json.Unmarshal(data, &bars); err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %w", filename, err)
+		}
 	}
 
 	/* Limit bars if requested */

@@ -81,7 +81,12 @@ class ProviderManager {
           this.logger.log(
             `Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`,
           );
-          return { provider: name, data: marketData, instance };
+          return { 
+            provider: name, 
+            data: marketData, 
+            instance,
+            timezone: instance.timezone || 'UTC' // Include timezone from provider
+          };
         }
 
         this.logger.log(`No data:\t${name} > ${symbol}`);

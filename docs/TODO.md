@@ -139,11 +139,23 @@
 - [x] Variable subscript indexing `src[variable]` where variable is computed
 - [x] Named parameter extraction: `input.float(defval=1.4, title="X")` fully supported
 - [x] Comprehensive test coverage: input_handler_test.go (6 tests), math_handler_test.go (6 tests), subscript_resolver_test.go (8 tests)
-- [ ] `input.session()` for time range inputs
-- [ ] `barstate.isfirst` built-in variable
-- [ ] `syminfo.tickerid` built-in variable
-- [ ] `fixnan()` function for forward-filling NaN values
-- [ ] `change()` function for detecting value changes
+- [x] Frontend config loading fix: metadata.strategy uses source filename instead of title
+
+## Phase 4.5: BB7 Strategy Prerequisites (2 weeks)
+- [x] `input.session()` for time range inputs (entry_time, trading_session)
+- [x] `time()` function for session filtering
+- [x] Session timezone support (America/New_York, Europe/Moscow, UTC)
+- [ ] `syminfo.tickerid` built-in variable (for security() calls)
+- [ ] `fixnan()` function for forward-filling NaN values (pivothigh/pivotlow results)
+- [ ] `pivothigh()` function for resistance detection
+- [ ] `pivotlow()` function for support detection
+- [ ] `barmerge.lookahead_on` constant for security() lookahead parameter
+- [ ] `security()` with lookahead parameter support
+- [ ] `wma()` weighted moving average function
+- [ ] `dev()` function for deviation detection
+- [ ] `strategy.position_avg_price` built-in variable
+- [ ] Multi-condition strategy logic with session management
+- [ ] Visualization config system integration with BB7
 
 ## Phase 5: Strategy Validation
 - [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully
@@ -152,7 +164,11 @@
 - [x] Extended dataset: BTCUSDT_1D.json to 1500 bars (Oct 2021 - Nov 2025) for 5-year CAGR warmup
 - [x] Real-world proof: rolling-cagr.pine with 5-year period produces 240 valid CAGR values (16% of 1500 bars), 1260 warmup nulls
 - [x] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations (requires: same as above + ta.ema on calculated variables)
+- [x] Visualization config system: filename-based config loading (metadata.strategy = source filename)
+- [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
+- [ ] Parse bb-strategy-7-rus.pine successfully (all 13 prerequisites)
 - [ ] `./bin/strategy` on BB7 produces 9 trades (requires: all input types, security() with complex expressions, fixnan, pivothigh/pivotlow)
+- [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
 - [ ] `./bin/strategy` on BB8 produces expected trades
 - [ ] `./bin/strategy` on BB9 produces expected trades
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
@@ -170,7 +186,9 @@
 - **Strategy**: entry/close/close_all, if statements, ternary operators, Series historical access (var[offset])
 - **Binary**: test-simple.pine → 2.9MB static binary (49µs execution for 30 bars)
 - **Output**: Unified chart format (metadata + candlestick + indicators + strategy + ui sections)
-- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md
+- **Visualization**: Config system with filename-based loading (metadata.strategy = source filename)
+- **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
+- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
 - **Test Suite**: 140 tests (preprocessor: 21, chartdata: 16, builder: 18, codegen: 8+11 handlers, validation: 28/41, integration, runtime, datafetcher: 5, security: 27, security_inject: 4) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
@@ -178,3 +196,4 @@
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
 - **security() Module**: Complete disk-based prefetch architecture (31/31 tests) - analyzer, file_fetcher, cache, evaluator, prefetcher, codegen injection - ready for builder integration
+- **Next Target**: BB7 strategy - 13 prerequisites required (input.session, time(), syminfo.tickerid, fixnan, pivothigh/pivotlow, wma, dev, strategy.position_avg_price, lookahead parameter)

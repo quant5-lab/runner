@@ -33,6 +33,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Pre-parse transformation: Convert V4 input(..., type=input.X) to V5 input.X()
+	sourceStr := string(sourceContent)
+	pineVersion := detectPineVersion(sourceStr)
+	if pineVersion < 5 {
+		sourceStr = transformInputTypeParameters(sourceStr)
+	}
+
 	pineParser, err := parser.NewParser()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create parser: %v\n", err)
@@ -40,13 +47,12 @@ func main() {
 	}
 
 	sourceFilename := filepath.Base(*inputFlag)
-	parsedAST, err := pineParser.ParseString(sourceFilename, string(sourceContent))
+	parsedAST, err := pineParser.ParseString(sourceFilename, sourceStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
 		os.Exit(1)
 	}
 
-	pineVersion := detectPineVersion(string(sourceContent))
 	if pineVersion < 5 {
 		fmt.Printf("Detected Pine v%d - applying v4→v5 preprocessing\n", pineVersion)
 		preprocessingPipeline := preprocessor.NewV4ToV5Pipeline()
@@ -135,4 +141,44 @@ func detectPineVersion(content string) int {
 
 	const defaultPineVersion = 4
 	return defaultPineVersion
+}
+
+// transformInputTypeParameters converts V4 input(..., type=input.X) to V5 input.X()
+func transformInputTypeParameters(source string) string {
+	// Pattern: input(defval, ..., type=input.session, ...)
+	// Target:  input.session(defval, ...)
+	inputPattern := regexp.MustCompile(`input\s*\(\s*([^,)]+)\s*,\s*([^)]*?)\btype\s*=\s*input\.(\w+)\b\s*([^)]*)\)`)
+
+	return inputPattern.ReplaceAllStringFunc(source, func(match string) string {
+		submatches := inputPattern.FindStringSubmatch(match)
+		if len(submatches) < 4 {
+			return match
+		}
+
+		defval := submatches[1]
+		beforeType := submatches[2]
+		inputType := submatches[3] // session, string, float, etc.
+		afterType := submatches[4]
+
+		// Build argument list without the type parameter
+		args := defval
+
+		// Add other parameters, filtering out empty strings and lone commas
+		if beforeType != "" {
+			// Remove trailing comma from beforeType if present
+			beforeType = regexp.MustCompile(`,\s*$`).ReplaceAllString(beforeType, "")
+			if beforeType != "" {
+				args += ", " + beforeType
+			}
+		}
+		if afterType != "" {
+			// Remove leading comma from afterType if present
+			afterType = regexp.MustCompile(`^\s*,\s*`).ReplaceAllString(afterType, "")
+			if afterType != "" {
+				args += ", " + afterType
+			}
+		}
+
+		return "input." + inputType + "(" + args + ")"
+	})
 }

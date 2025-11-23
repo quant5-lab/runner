@@ -30,7 +30,7 @@ func (ih *InputHandler) DetectInputFunction(call *ast.CallExpression) bool {
 	funcName := extractFunctionNameFromCall(call)
 	return funcName == "input.float" || funcName == "input.int" ||
 		funcName == "input.bool" || funcName == "input.string" ||
-		funcName == "input.source"
+		funcName == "input.session" || funcName == "input.source"
 }
 
 /*
@@ -156,6 +156,29 @@ func (ih *InputHandler) extractStringFromObject(obj *ast.ObjectExpression, key s
 		return val
 	}
 	return defaultVal
+}
+
+/*
+GenerateInputSession generates code for input.session(defval, title, ...).
+Session format: "HHMM-HHMM" (e.g., "0950-1345").
+Returns const declaration.
+*/
+func (ih *InputHandler) GenerateInputSession(call *ast.CallExpression, varName string) (string, error) {
+	defval := "0000-2359" // Default: full day
+
+	if len(call.Arguments) > 0 {
+		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
+			if val, ok := lit.Value.(string); ok {
+				defval = val
+			}
+		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+			defval = ih.extractStringFromObject(obj, "defval", "0000-2359")
+		}
+	}
+
+	code := fmt.Sprintf("const %s = %q\n", varName, defval)
+	ih.inputConstants[varName] = code
+	return code, nil
 }
 
 func (ih *InputHandler) GenerateInputSource(call *ast.CallExpression, varName string) (string, error) {

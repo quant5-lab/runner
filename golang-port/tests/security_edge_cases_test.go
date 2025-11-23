@@ -173,13 +173,32 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		t.Fatal("No indicators in output")
 	}
 
-	/* Same-TF must produce 1:1 mapping - all 200 bars mapped */
+	/* Same-TF must produce 1:1 mapping - all bars mapped */
 	sameTF, ok := result.Indicators["Same-TF Close"]
 	if !ok {
 		t.Fatalf("Expected 'Same-TF Close' indicator, got: %v", result.Indicators)
 	}
-	if len(sameTF.Data) != 200 {
-		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected 200", len(sameTF.Data))
+
+	/* Get expected bar count from data file */
+	dataBytes, err := os.ReadFile(dataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dataWithMetadata struct {
+		Bars []interface{} `json:"bars"`
+	}
+	expectedBars := 0
+	if err := json.Unmarshal(dataBytes, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
+		expectedBars = len(dataWithMetadata.Bars)
+	} else {
+		var plainBars []interface{}
+		if err := json.Unmarshal(dataBytes, &plainBars); err == nil {
+			expectedBars = len(plainBars)
+		}
+	}
+
+	if len(sameTF.Data) != expectedBars {
+		t.Errorf("Same-timeframe mapping incorrect: got %d values, expected %d", len(sameTF.Data), expectedBars)
 	}
 
 	/* All values should be non-null (direct 1:1 copy) */
@@ -190,8 +209,8 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		}
 	}
 
-	if nonNullCount != 200 {
-		t.Errorf("Same-timeframe should have 200 non-null values, got %d", nonNullCount)
+	if nonNullCount != expectedBars {
+		t.Errorf("Same-timeframe should have %d non-null values, got %d", expectedBars, nonNullCount)
 	}
 }
 

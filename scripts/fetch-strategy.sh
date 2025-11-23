@@ -50,17 +50,19 @@ DATA_FILE="$TEMP_DIR/data.json"
 echo ""
 echo "[1/4] 📡 Fetching market data..."
 BINANCE_FILE="$TEMP_DIR/binance.json"
+METADATA_FILE="$TEMP_DIR/metadata.json"
 node -e "
 import('./src/container.js').then(({ createContainer }) => {
   import('./src/config.js').then(({ createProviderChain, DEFAULTS }) => {
     const container = createContainer(createProviderChain, DEFAULTS);
     const providerManager = container.resolve('providerManager');
     
-    providerManager.getMarketData('$SYMBOL', '$TIMEFRAME', $BARS)
-      .then(bars => {
+    providerManager.fetchMarketData('$SYMBOL', '$TIMEFRAME', $BARS)
+      .then(result => {
         const fs = require('fs');
-        fs.writeFileSync('$BINANCE_FILE', JSON.stringify(bars, null, 2));
-        console.log('✓ Fetched ' + bars.length + ' bars');
+        fs.writeFileSync('$BINANCE_FILE', JSON.stringify(result.data, null, 2));
+        fs.writeFileSync('$METADATA_FILE', JSON.stringify({ timezone: result.timezone, provider: result.provider }, null, 2));
+        console.log('✓ Fetched ' + result.data.length + ' bars from ' + result.provider + ' (timezone: ' + result.timezone + ')');
       })
       .catch(err => {
         console.error('Error fetching data:', err.message);
@@ -75,7 +77,7 @@ import('./src/container.js').then(({ createContainer }) => {
 
 # Convert Binance format to standard OHLCV format
 echo "  Converting to standard format..."
-node scripts/convert-binance-to-standard.cjs "$BINANCE_FILE" "$DATA_FILE" > /dev/null || {
+node scripts/convert-binance-to-standard.cjs "$BINANCE_FILE" "$DATA_FILE" "$METADATA_FILE" > /dev/null || {
     echo "❌ Failed to convert data format"
     exit 1
 }
@@ -131,11 +133,11 @@ import('./src/container.js').then(({ createContainer }) => {
     const container = createContainer(createProviderChain, DEFAULTS);
     const providerManager = container.resolve('providerManager');
     
-    providerManager.getMarketData('$SYMBOL', '$NORM_TF', $SEC_BARS)
-      .then(bars => {
+    providerManager.fetchMarketData('$SYMBOL', '$NORM_TF', $SEC_BARS)
+      .then(result => {
         const fs = require('fs');
-        fs.writeFileSync('$SEC_TEMP', JSON.stringify(bars, null, 2));
-        console.log('  ✓ Fetched ' + bars.length + ' ' + '$NORM_TF' + ' bars');
+        fs.writeFileSync('$SEC_TEMP', JSON.stringify(result.data, null, 2));
+        console.log('  ✓ Fetched ' + result.data.length + ' ' + '$NORM_TF' + ' bars');
       })
       .catch(err => {
         console.error('  Warning: Could not fetch $NORM_TF data:', err.message);

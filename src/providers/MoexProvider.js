@@ -10,6 +10,7 @@ class MoexProvider {
     this.cache = new Map();
     this.cacheDuration = 5 * 60 * 1000;
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.MOEX;
+    this.timezone = 'Europe/Moscow'; // MOEX exchange timezone
   }
 
   /* Convert timeframe - throws TimeframeError if invalid */
