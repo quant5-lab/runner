@@ -13,6 +13,7 @@ export class YahooFinanceProvider {
     this.logger = logger;
     this.stats = statsCollector;
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.YAHOO;
+    this.timezone = 'America/New_York'; // NYSE/NASDAQ exchange timezone
   }
 
   /* Convert PineTS timeframe to Yahoo interval */

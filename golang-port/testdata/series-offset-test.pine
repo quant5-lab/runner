@@ -1,0 +1,15 @@
+//@version=5
+indicator("Series Offset Test", overlay=false)
+
+// Test builtin series with offsets
+prev_close = close[1]
+two_bars_ago = close[2]
+
+// Test user variable with offset
+sma20 = ta.sma(close, 20)
+prev_sma = sma20[1]
+
+// Test in condition
+signal = close > close[1] ? 1 : 0
+
+plot(signal, "signal", color=color.blue)
