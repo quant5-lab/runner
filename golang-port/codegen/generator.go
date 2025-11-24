@@ -718,41 +718,8 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 
 		case "time":
 			// time() function returns timestamp or NaN
-			// Generate inline call: session.TimeFunc(...)
-			if len(e.Arguments) < 2 {
-				// time() without session parameter
-				return "float64(ctx.Data[ctx.BarIndex].Time)", nil
-			}
-
-			// Extract session string
-			sessionArg := e.Arguments[1]
-			sessionStr := ""
-
-			if lit, ok := sessionArg.(*ast.Literal); ok {
-				if s, ok := lit.Value.(string); ok {
-					sessionStr = strings.Trim(s, "'\"")
-					return fmt.Sprintf("session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %q, ctx.Timezone)", sessionStr), nil
-				}
-			}
-
-			if ident, ok := sessionArg.(*ast.Identifier); ok {
-				return fmt.Sprintf("session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %s, ctx.Timezone)", ident.Name), nil
-			}
-
-			// Handle parser-wrapped variables: MemberExpression[0]
-			if mem, ok := sessionArg.(*ast.MemberExpression); ok {
-				if mem.Computed {
-					if obj, ok := mem.Object.(*ast.Identifier); ok {
-						if lit, ok := mem.Property.(*ast.Literal); ok {
-							if idx, ok := lit.Value.(int); ok && idx == 0 {
-								return fmt.Sprintf("session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %s, ctx.Timezone)", obj.Name), nil
-							}
-						}
-					}
-				}
-			}
-
-			return "math.NaN()", nil
+			handler := NewTimeHandler(g.ind())
+			return handler.HandleInlineExpression(e.Arguments), nil
 
 		default:
 			// For other functions, try to generate inline expression
@@ -1167,82 +1134,8 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		 * Usage: entry_time = time(timeframe.period, "0950-1345")
 		 * Check: is_entry_time = na(entry_time) ? false : true
 		 */
-
-		// DEBUG: Check argument count
-		argCount := len(call.Arguments)
-		if argCount == 0 {
-			// time() with no arguments
-			return g.ind() + fmt.Sprintf("%sSeries.Set(float64(ctx.Data[ctx.BarIndex].Time))\n", varName), nil
-		}
-
-		if argCount == 1 {
-			// time(session) - single argument might be session string
-			// Or time(timeframe) without session
-			// For now, treat as no session filtering
-			return g.ind() + fmt.Sprintf("%sSeries.Set(float64(ctx.Data[ctx.BarIndex].Time))\n", varName), nil
-		}
-
-		// Two or more arguments: time(timeframe, session, ...)
-		// Extract timeframe (usually timeframe.period, ignored for now)
-		timeframeArg := call.Arguments[0]
-		_ = timeframeArg // Not used yet - assumes chart timeframe
-
-		// Extract session string (second argument)
-		sessionArg := call.Arguments[1]
-		sessionStr := ""
-		isVariable := false
-
-		// Handle direct string literal: time(timeframe.period, "0950-1645")
-		if lit, ok := sessionArg.(*ast.Literal); ok {
-			if s, ok := lit.Value.(string); ok {
-				sessionStr = strings.Trim(s, "'\"")
-				isVariable = false
-			}
-		} else if ident, ok := sessionArg.(*ast.Identifier); ok {
-			// Handle simple identifier: time(timeframe.period, entry_time_input)
-			sessionStr = ident.Name
-			isVariable = true
-		} else if mem, ok := sessionArg.(*ast.MemberExpression); ok {
-			// Parser wraps variables as MemberExpression[0]: my_session → MemberExpression(my_session, Literal(0), computed=true)
-			// Unwrap to get identifier name
-			if mem.Computed {
-				if obj, ok := mem.Object.(*ast.Identifier); ok {
-					if lit, ok := mem.Property.(*ast.Literal); ok {
-						if idx, ok := lit.Value.(int); ok && idx == 0 {
-							// Parser-wrapped variable: my_session[0]
-							sessionStr = obj.Name
-							isVariable = true
-						}
-					}
-				}
-			} else {
-				// Non-computed member expression: obj.prop
-				return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // time() member expression not supported for session\n", varName), nil
-			}
-		} else {
-			// Unknown argument type
-			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // time() unsupported session argument\n", varName), nil
-		}
-
-		if sessionStr == "" {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // time() invalid session\n", varName), nil
-		}
-
-		// Generate runtime session filtering
-		code := ""
-		if isVariable {
-			// Variable/constant reference (no quotes)
-			code += g.ind() + fmt.Sprintf("/* time(timeframe.period, %s) */\n", sessionStr)
-			code += g.ind() + fmt.Sprintf("%s_result := session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %s, ctx.Timezone)\n", varName, sessionStr)
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(%s_result)\n", varName, varName)
-		} else {
-			// String literal (with quotes)
-			code += g.ind() + fmt.Sprintf("/* time(timeframe.period, %q) */\n", sessionStr)
-			code += g.ind() + fmt.Sprintf("%s_result := session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %q, ctx.Timezone)\n", varName, sessionStr)
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(%s_result)\n", varName, varName)
-		}
-
-		return code, nil
+		handler := NewTimeHandler(g.ind())
+		return handler.HandleVariableInit(varName, call), nil
 	}
 }
 

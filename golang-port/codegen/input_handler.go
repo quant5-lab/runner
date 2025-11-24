@@ -12,14 +12,18 @@ InputHandler manages Pine Script input.* function code generation.
 Design: Input values are compile-time constants (don't change per bar).
 Exception: input.source returns a runtime series reference.
 Rationale: Aligns with Pine Script's input semantics.
+
+Reusability: Delegates argument parsing to unified ArgumentParser framework.
 */
 type InputHandler struct {
 	inputConstants map[string]string // varName -> constant value
+	argParser      *ArgumentParser   // Unified parsing infrastructure
 }
 
 func NewInputHandler() *InputHandler {
 	return &InputHandler{
 		inputConstants: make(map[string]string),
+		argParser:      NewArgumentParser(),
 	}
 }
 
@@ -37,16 +41,17 @@ func (ih *InputHandler) DetectInputFunction(call *ast.CallExpression) bool {
 GenerateInputFloat generates code for input.float(defval, title, ...).
 Extracts defval from positional OR named parameter.
 Returns const declaration.
+
+Reusability: Uses ArgumentParser.ParseFloat for type-safe extraction.
 */
 func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName string) (string, error) {
 	defval := 0.0
 
-	// Try positional argument first
+	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
-		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				defval = val
-			}
+		result := ih.argParser.ParseFloat(call.Arguments[0])
+		if result.IsValid {
+			defval = result.MustBeFloat()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
 			// Named parameters in first argument
 			defval = ih.extractFloatFromObject(obj, "defval", 0.0)
@@ -62,16 +67,17 @@ func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName str
 GenerateInputInt generates code for input.int(defval, title, ...).
 Extracts defval from positional OR named parameter.
 Returns const declaration.
+
+Reusability: Uses ArgumentParser.ParseInt for type-safe extraction.
 */
 func (ih *InputHandler) GenerateInputInt(call *ast.CallExpression, varName string) (string, error) {
 	defval := 0
 
-	// Try positional argument first
+	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
-		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				defval = int(val)
-			}
+		result := ih.argParser.ParseInt(call.Arguments[0])
+		if result.IsValid {
+			defval = result.MustBeInt()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
 			// Named parameters in first argument
 			defval = int(ih.extractFloatFromObject(obj, "defval", 0.0))
@@ -87,16 +93,17 @@ func (ih *InputHandler) GenerateInputInt(call *ast.CallExpression, varName strin
 GenerateInputBool generates code for input.bool(defval, title, ...).
 Extracts defval from positional OR named parameter.
 Returns const declaration.
+
+Reusability: Uses ArgumentParser.ParseBool for type-safe extraction.
 */
 func (ih *InputHandler) GenerateInputBool(call *ast.CallExpression, varName string) (string, error) {
 	defval := false
 
-	// Try positional argument first
+	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
-		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-			if val, ok := lit.Value.(bool); ok {
-				defval = val
-			}
+		result := ih.argParser.ParseBool(call.Arguments[0])
+		if result.IsValid {
+			defval = result.MustBeBool()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
 			// Named parameters in first argument
 			defval = ih.extractBoolFromObject(obj, "defval", false)
@@ -112,16 +119,17 @@ func (ih *InputHandler) GenerateInputBool(call *ast.CallExpression, varName stri
 GenerateInputString generates code for input.string(defval, title, ...).
 Extracts defval from positional OR named parameter.
 Returns const declaration.
+
+Reusability: Uses ArgumentParser.ParseString for type-safe extraction.
 */
 func (ih *InputHandler) GenerateInputString(call *ast.CallExpression, varName string) (string, error) {
 	defval := ""
 
-	// Try positional argument first
+	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
-		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-			if val, ok := lit.Value.(string); ok {
-				defval = val
-			}
+		result := ih.argParser.ParseString(call.Arguments[0])
+		if result.IsValid {
+			defval = result.MustBeString()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
 			// Named parameters in first argument
 			defval = ih.extractStringFromObject(obj, "defval", "")
@@ -162,15 +170,17 @@ func (ih *InputHandler) extractStringFromObject(obj *ast.ObjectExpression, key s
 GenerateInputSession generates code for input.session(defval, title, ...).
 Session format: "HHMM-HHMM" (e.g., "0950-1345").
 Returns const declaration.
+
+Reusability: Uses ArgumentParser.ParseString for type-safe extraction.
 */
 func (ih *InputHandler) GenerateInputSession(call *ast.CallExpression, varName string) (string, error) {
 	defval := "0000-2359" // Default: full day
 
+	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
-		if lit, ok := call.Arguments[0].(*ast.Literal); ok {
-			if val, ok := lit.Value.(string); ok {
-				defval = val
-			}
+		result := ih.argParser.ParseString(call.Arguments[0])
+		if result.IsValid {
+			defval = result.MustBeString()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
 			defval = ih.extractStringFromObject(obj, "defval", "0000-2359")
 		}

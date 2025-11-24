@@ -2,19 +2,20 @@ package codegen
 
 import "github.com/quant5-lab/runner/ast"
 
+/*
+PropertyParser extracts typed values from ObjectExpression properties.
+
+Reusability: Delegates parsing to unified ArgumentParser framework.
+Design: Provides high-level API for object property extraction while
+leveraging ArgumentParser for type-safe value parsing.
+*/
 type PropertyParser struct {
-	extractors map[string]PropertyExtractor
+	argParser *ArgumentParser // Unified parsing infrastructure
 }
 
 func NewPropertyParser() *PropertyParser {
 	return &PropertyParser{
-		extractors: map[string]PropertyExtractor{
-			"string":     StringExtractor{},
-			"int":        IntExtractor{},
-			"float":      FloatExtractor{},
-			"bool":       BoolExtractor{},
-			"identifier": IdentifierExtractor{},
-		},
+		argParser: NewArgumentParser(),
 	}
 }
 
@@ -24,11 +25,11 @@ func (p *PropertyParser) ParseString(obj *ast.ObjectExpression, key string) (str
 		return "", false
 	}
 
-	result, ok := p.extractors["string"].Extract(value)
-	if !ok {
+	result := p.argParser.ParseString(value)
+	if !result.IsValid {
 		return "", false
 	}
-	return result.(string), true
+	return result.MustBeString(), true
 }
 
 func (p *PropertyParser) ParseInt(obj *ast.ObjectExpression, key string) (int, bool) {
@@ -37,11 +38,11 @@ func (p *PropertyParser) ParseInt(obj *ast.ObjectExpression, key string) (int, b
 		return 0, false
 	}
 
-	result, ok := p.extractors["int"].Extract(value)
-	if !ok {
+	result := p.argParser.ParseInt(value)
+	if !result.IsValid {
 		return 0, false
 	}
-	return result.(int), true
+	return result.MustBeInt(), true
 }
 
 func (p *PropertyParser) ParseFloat(obj *ast.ObjectExpression, key string) (float64, bool) {
@@ -50,11 +51,11 @@ func (p *PropertyParser) ParseFloat(obj *ast.ObjectExpression, key string) (floa
 		return 0, false
 	}
 
-	result, ok := p.extractors["float"].Extract(value)
-	if !ok {
+	result := p.argParser.ParseFloat(value)
+	if !result.IsValid {
 		return 0, false
 	}
-	return result.(float64), true
+	return result.MustBeFloat(), true
 }
 
 func (p *PropertyParser) ParseBool(obj *ast.ObjectExpression, key string) (bool, bool) {
@@ -63,11 +64,11 @@ func (p *PropertyParser) ParseBool(obj *ast.ObjectExpression, key string) (bool,
 		return false, false
 	}
 
-	result, ok := p.extractors["bool"].Extract(value)
-	if !ok {
+	result := p.argParser.ParseBool(value)
+	if !result.IsValid {
 		return false, false
 	}
-	return result.(bool), true
+	return result.MustBeBool(), true
 }
 
 func (p *PropertyParser) ParseIdentifier(obj *ast.ObjectExpression, key string) (string, bool) {
@@ -76,11 +77,11 @@ func (p *PropertyParser) ParseIdentifier(obj *ast.ObjectExpression, key string) 
 		return "", false
 	}
 
-	result, ok := p.extractors["identifier"].Extract(value)
-	if !ok {
+	result := p.argParser.ParseIdentifier(value)
+	if !result.IsValid {
 		return "", false
 	}
-	return result.(string), true
+	return result.Identifier, true
 }
 
 func (p *PropertyParser) findProperty(obj *ast.ObjectExpression, key string) ast.Expression {
