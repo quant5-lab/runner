@@ -145,7 +145,7 @@
 - [x] `input.session()` for time range inputs (entry_time, trading_session)
 - [x] `time()` function for session filtering
 - [x] Session timezone support (America/New_York, Europe/Moscow, UTC)
-- [ ] `syminfo.tickerid` built-in variable (for security() calls)
+- [x] `syminfo.tickerid` built-in variable (for security() calls) - Added to template
 - [ ] `fixnan()` function for forward-filling NaN values (pivothigh/pivotlow results)
 - [ ] `pivothigh()` function for resistance detection
 - [ ] `pivotlow()` function for support detection
@@ -156,6 +156,17 @@
 - [ ] `strategy.position_avg_price` built-in variable
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
+
+### BB7 Dissected Components Testing
+- [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
+- [ ] `bb7-dissect-sma.pine` - Blocked: Inline SMA comparison codegen issue
+- [ ] `bb7-dissect-bb.pine` - Blocked: Variable period support needed for ta.sma(source, var)
+- [ ] `bb7-dissect-vol.pine` - Blocked: TODO comment syntax error in codegen
+- [ ] `bb7-dissect-potential.pine` - Blocked: Needs fixnan(), pivothigh(), pivotlow()
+- [ ] `bb7-dissect-adx.pine` - Ready to test after fixnan() implementation
+- [ ] `bb7-dissect-sl.pine` - Blocked: Needs strategy.position_avg_price
+- [ ] `bb7-dissect-tp.pine` - Blocked: Needs wma(), dev(), fixnan()
+- [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
 ## Phase 5: Strategy Validation
 - [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully

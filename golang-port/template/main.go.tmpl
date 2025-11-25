@@ -97,6 +97,10 @@ func main() {
 		dataDir = filepath.Dir(*dataFlag)
 	}
 
+	/* Built-in variables */
+	var syminfo_tickerid string = *symbolFlag  // syminfo.tickerid
+	_ = syminfo_tickerid // Suppress unused warning if not referenced
+
 	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
 	startTime := clock.Now()
 	securityContexts := make(map[string]*context.Context)
