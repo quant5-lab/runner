@@ -1,0 +1,4 @@
+//@version=5
+indicator("Literal Symbol Test", overlay=true)
+btc_close = request.security("BTCUSDT", "D", close)
+plot(btc_close, title="BTC Daily Close")

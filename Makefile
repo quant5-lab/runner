@@ -128,15 +128,21 @@ test-series: ## Run Series tests only
 	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./runtime/series/...
 	@echo "✓ Series tests passed"
 
-integration: ## Run integration tests
+test-integration: ## Run integration tests (multi-component)
 	@echo "Running integration tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/integration/...
+	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
 	@echo "✓ Integration tests passed"
 
-e2e: ## Run end-to-end tests
-	@echo "Running E2E tests..."
-	@cd e2e && ./run-all.sh
-	@echo "✓ E2E tests passed"
+test-syminfo: ## Run syminfo.tickerid integration tests only
+	@echo "Running syminfo.tickerid tests..."
+	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./tests/test-integration -run Syminfo
+	@echo "✓ syminfo.tickerid tests passed"
+
+regression-syminfo: ## Run syminfo.tickerid regression test suite
+	@./golang-port/scripts/test-syminfo-regression.sh
+
+e2e: ## Run E2E tests (golang-port)
+	@./golang-port/scripts/e2e-runner.sh
 
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
@@ -166,6 +172,9 @@ coverage-show: coverage ## Generate and open coverage report
 
 check: fmt vet lint test ## Run all checks (format, vet, lint, test)
 	@echo "✓ All checks passed"
+
+ci: fmt vet lint test integration ## Run CI checks (format, vet, lint, test, integration)
+	@echo "✓ CI checks passed"
 
 ##@ Cleanup
 
@@ -330,28 +339,9 @@ all: clean build test ## Clean, build, and test everything
 
 quick: fmt test ## Quick check (format + test)
 
-install-hooks: ## Install/update git pre-commit hook
+install-hooks: ## Install git pre-commit hook
 	@echo "Installing pre-commit hook..."
-	@printf '#!/bin/sh\n\nset -e\n\necho "🔍 Running pre-commit checks..."\n\n' > .git/hooks/pre-commit
-	@printf '# SourceTree compatibility: Find go binary in common locations\n' >> .git/hooks/pre-commit
-	@printf 'if ! command -v go >/dev/null 2>&1; then\n' >> .git/hooks/pre-commit
-	@printf '    if [ -x "/usr/local/go/bin/go" ]; then\n' >> .git/hooks/pre-commit
-	@printf '        export PATH="/usr/local/go/bin:$$PATH"\n' >> .git/hooks/pre-commit
-	@printf '    elif [ -x "$$HOME/go/bin/go" ]; then\n' >> .git/hooks/pre-commit
-	@printf '        export PATH="$$HOME/go/bin:$$PATH"\n' >> .git/hooks/pre-commit
-	@printf '    elif [ -x "/opt/homebrew/bin/go" ]; then\n' >> .git/hooks/pre-commit
-	@printf '        export PATH="/opt/homebrew/bin:$$PATH"\n' >> .git/hooks/pre-commit
-	@printf '    else\n' >> .git/hooks/pre-commit
-	@printf '        echo "Error: go binary not found. Please install Go or add it to PATH."\n' >> .git/hooks/pre-commit
-	@printf '        exit 1\n' >> .git/hooks/pre-commit
-	@printf '    fi\nfi\n\n' >> .git/hooks/pre-commit
-	@printf '# Format\necho "  [1/3] Formatting Go code..."\n' >> .git/hooks/pre-commit
-	@printf 'cd golang-port && gofmt -s -w . && cd .. || exit 1\n\n' >> .git/hooks/pre-commit
-	@printf '# Lint\necho "  [2/3] Running linter..."\n' >> .git/hooks/pre-commit
-	@printf 'cd golang-port && go vet ./... && cd .. || exit 1\n\n' >> .git/hooks/pre-commit
-	@printf '# Test\necho "  [3/3] Running tests..."\n' >> .git/hooks/pre-commit
-	@printf 'cd golang-port && go test ./... -timeout 30m || exit 1\n\n' >> .git/hooks/pre-commit
-	@printf 'echo "✅ Pre-commit checks passed!"\nexit 0\n' >> .git/hooks/pre-commit
+	@cp golang-port/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
-	@echo "✓ Pre-commit hook installed"
+	@echo "✓ Pre-commit hook installed (runs: make ci)"
 

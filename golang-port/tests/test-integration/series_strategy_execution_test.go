@@ -15,7 +15,7 @@ func TestSeriesStrategyExecution(t *testing.T) {
 
 	// Build strategy binary from Series test strategy
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", "testdata/strategy-sma-crossover-series.pine",
+		"-input", "testdata/fixtures/strategy-sma-crossover-series.pine",
 		"-output", "/tmp/test-series-strategy")
 
 	buildOutput, err := buildCmd.CombinedOutput()

@@ -15,7 +15,7 @@ func TestCrossoverExecution(t *testing.T) {
 
 	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", "testdata/crossover-builtin-test.pine",
+		"-input", "testdata/fixtures/crossover-builtin-test.pine",
 		"-output", "/tmp/test-crossover-exec")
 
 	buildOutput, err := buildCmd.CombinedOutput()

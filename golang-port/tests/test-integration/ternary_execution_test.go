@@ -15,7 +15,7 @@ func TestTernaryExecution(t *testing.T) {
 
 	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", "testdata/ternary-test.pine",
+		"-input", "testdata/fixtures/ternary-test.pine",
 		"-output", "/tmp/test-ternary-exec")
 
 	buildOutput, err := buildCmd.CombinedOutput()
