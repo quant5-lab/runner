@@ -1507,6 +1507,25 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 	switch e := expr.(type) {
 	case *ast.MemberExpression:
+		// Handle subscript after function call: func()[offset]
+		if call, ok := e.Object.(*ast.CallExpression); ok && e.Computed {
+			funcName := g.extractFunctionName(call.Callee)
+			varName := strings.ReplaceAll(funcName, ".", "_")
+
+			// Extract offset from subscript
+			offset := 0
+			if lit, ok := e.Property.(*ast.Literal); ok {
+				switch v := lit.Value.(type) {
+				case float64:
+					offset = int(v)
+				case int:
+					offset = v
+				}
+			}
+
+			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
+		}
+
 		// Check for built-in namespaces like timeframe.*
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name

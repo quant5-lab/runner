@@ -110,11 +110,17 @@ func (v *functionRenamer) visitTerm(term *parser.Term) {
 }
 
 func (v *functionRenamer) visitFactor(factor *parser.Factor) {
-	if factor.Call != nil {
-		v.visitCallExpr(factor.Call)
+	if factor.Postfix != nil {
+		v.visitPostfixExpr(factor.Postfix)
 	}
-	if factor.Subscript != nil && factor.Subscript.Index != nil {
-		v.visitArithExpr(factor.Subscript.Index)
+}
+
+func (v *functionRenamer) visitPostfixExpr(postfix *parser.PostfixExpr) {
+	if postfix.Primary != nil && postfix.Primary.Call != nil {
+		v.visitCallExpr(postfix.Primary.Call)
+	}
+	if postfix.Subscript != nil {
+		v.visitArithExpr(postfix.Subscript)
 	}
 }
 
@@ -128,11 +134,8 @@ func (v *functionRenamer) visitComparison(comp *parser.Comparison) {
 }
 
 func (v *functionRenamer) visitComparisonTerm(term *parser.ComparisonTerm) {
-	if term.Call != nil {
-		v.visitCallExpr(term.Call)
-	}
-	if term.Subscript != nil && term.Subscript.Index != nil {
-		v.visitArithExpr(term.Subscript.Index)
+	if term.Postfix != nil {
+		v.visitPostfixExpr(term.Postfix)
 	}
 }
 
@@ -141,7 +144,7 @@ func (v *functionRenamer) visitValue(val *parser.Value) {
 		return
 	}
 
-	if val.Subscript != nil && val.Subscript.Index != nil {
-		v.visitArithExpr(val.Subscript.Index)
+	if val.Postfix != nil {
+		v.visitPostfixExpr(val.Postfix)
 	}
 }

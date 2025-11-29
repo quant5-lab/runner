@@ -80,14 +80,24 @@ type Term struct {
 type Factor struct {
 	Paren        *ArithExpr    `parser:"( '(' @@ ')' )"`
 	Unary        *UnaryExpr    `parser:"| @@"`
-	Call         *CallExpr     `parser:"| @@"`
-	Subscript    *Subscript    `parser:"| @@"`
-	MemberAccess *MemberAccess `parser:"| @@"`
 	True         *string       `parser:"| @'true'"`
 	False        *string       `parser:"| @'false'"`
+	Postfix      *PostfixExpr  `parser:"| @@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+}
+
+type PostfixExpr struct {
+	Primary   *PrimaryExpr `parser:"@@"`
+	Subscript *ArithExpr   `parser:"( '[' @@ ']' )?"`
+}
+
+type PrimaryExpr struct {
+	Call         *CallExpr     `parser:"@@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
+	Ident        *string       `parser:"| @Ident"`
 }
 
 type UnaryExpr struct {
@@ -107,11 +117,10 @@ type Comparison struct {
 }
 
 type ComparisonTerm struct {
-	Call         *CallExpr     `parser:"@@"`
-	Subscript    *Subscript    `parser:"| @@"`
-	MemberAccess *MemberAccess `parser:"| @@"`
-	True         *string       `parser:"| @'true'"`
+	True         *string       `parser:"@'true'"`
 	False        *string       `parser:"| @'false'"`
+	Postfix      *PostfixExpr  `parser:"| @@"`
+	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
@@ -138,8 +147,7 @@ type Argument struct {
 }
 
 type Value struct {
-	CallExpr     *CallExpr     `parser:"@@"`
-	Subscript    *Subscript    `parser:"| @@"`
+	Postfix      *PostfixExpr  `parser:"@@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	True         *string       `parser:"| @'true'"`
 	False        *string       `parser:"| @'false'"`
