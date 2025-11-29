@@ -53,8 +53,8 @@ if (signal)
 		t.Errorf("Expected Series.Set() assignment, got:\n%s", generated)
 	}
 	// Bool variable stored as float64 in Series, needs != 0 for if condition
-	if !strings.Contains(generated, "if signalSeries.Get(0) != 0") {
-		t.Errorf("Expected 'if signalSeries.Get(0) != 0', got:\n%s", generated)
+	if !strings.Contains(generated, "if signalSeries.GetCurrent() != 0") {
+		t.Errorf("Expected 'if signalSeries.GetCurrent() != 0', got:\n%s", generated)
 	}
 	if !strings.Contains(generated, "strat.Entry(") {
 		t.Errorf("Expected 'strat.Entry(', got:\n%s", generated)

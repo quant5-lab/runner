@@ -301,10 +301,10 @@ func TestSecurityConditionalExpression(t *testing.T) {
 	expectedPatterns := []string{
 		"origCtx := ctx",
 		"ctx = secCtx",
-		"if",                       // Conditional present
-		"} else",                   // Both branches present
-		"closeSeries.GetCurrent()", // Uses existing series (not inline identifiers in conditionals yet)
-		"openSeries.GetCurrent()",
+		"if",        // Conditional present
+		"} else",    // Both branches present
+		"bar.Close", // Built-in identifiers directly accessed
+		"bar.Open",
 	}
 
 	for _, pattern := range expectedPatterns {
@@ -436,12 +436,12 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
 		"ta.stdev(20)",
-		"sum := 0.0",                        // Mean calculation
-		"mean := sum / 20.0",                // Mean result
-		"variance := 0.0",                   // Variance calculation
-		"diff := closeSeries.Get(j) - mean", // Uses closeSeries.Get() with relative offset
-		"variance += diff * diff",           // Squared deviation
-		"math.Sqrt(variance)",               // Final STDEV
+		"sum := 0.0",         // Mean calculation
+		"mean := sum / 20.0", // Mean result
+		"variance := 0.0",    // Variance calculation
+		"diff := ctx.Data[ctx.BarIndex-j].Close - mean", // Uses built-in with relative offset
+		"variance += diff * diff",                       // Squared deviation
+		"math.Sqrt(variance)",                           // Final STDEV
 	}
 
 	for _, pattern := range expectedPatterns {

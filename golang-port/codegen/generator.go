@@ -703,8 +703,28 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		if e.Name == "na" {
 			return "math.NaN()", nil
 		}
-		// ALL variables use Series storage
 		varName := e.Name
+
+		// Check if it's a Pine built-in series variable
+		switch varName {
+		case "close":
+			return "bar.Close", nil
+		case "open":
+			return "bar.Open", nil
+		case "high":
+			return "bar.High", nil
+		case "low":
+			return "bar.Low", nil
+		case "volume":
+			return "bar.Volume", nil
+		}
+
+		// Check if it's an input constant
+		if _, isConstant := g.constants[varName]; isConstant {
+			return varName, nil
+		}
+
+		// User-defined variable (ALL use Series storage)
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
 
 	case *ast.Literal:
@@ -1636,6 +1656,20 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return "math.NaN()"
 		}
 		varName := e.Name
+
+		// Check if it's a Pine built-in series variable
+		switch varName {
+		case "close":
+			return "bar.Close"
+		case "open":
+			return "bar.Open"
+		case "high":
+			return "bar.High"
+		case "low":
+			return "bar.Low"
+		case "volume":
+			return "bar.Volume"
+		}
 
 		// Check if it's an input constant
 		if _, isConstant := g.constants[varName]; isConstant {

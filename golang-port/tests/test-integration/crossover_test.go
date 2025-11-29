@@ -71,7 +71,7 @@ if longCrossover
 	if !strings.Contains(goCode, "if i > 0") {
 		t.Error("Missing warmup check for crossover")
 	}
-	if !strings.Contains(goCode, "bar.Close > sma20Series.Get(0)") {
-		t.Error("Missing crossover condition with Series.Get(0)")
+	if !strings.Contains(goCode, "bar.Close > sma20Series.GetCurrent()") {
+		t.Error("Missing crossover condition with Series.GetCurrent()")
 	}
 }
