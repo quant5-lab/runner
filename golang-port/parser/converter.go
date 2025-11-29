@@ -593,8 +593,7 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	if factor.Paren != nil {
-		// Parenthesized expression - just pass through the inner expression
-		return c.convertArithExpr(factor.Paren)
+		return c.convertTernaryExpr(factor.Paren)
 	}
 
 	if factor.Unary != nil {

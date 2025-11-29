@@ -760,6 +760,12 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			handler := NewTimeHandler(g.ind())
 			return handler.HandleInlineExpression(e.Arguments), nil
 
+		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
+			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
+			// Math functions can be used inline in conditions/ternaries
+			mathHandler := NewMathHandler()
+			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
+
 		default:
 			// For other functions, try to generate inline expression
 			// This might fail for complex cases - fallback to error

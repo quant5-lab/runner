@@ -78,7 +78,7 @@ type Term struct {
 }
 
 type Factor struct {
-	Paren        *ArithExpr    `parser:"( '(' @@ ')' )"`
+	Paren        *TernaryExpr  `parser:"( '(' @@ ')' )"`
 	Unary        *UnaryExpr    `parser:"| @@"`
 	True         *string       `parser:"| @'true'"`
 	False        *string       `parser:"| @'false'"`
