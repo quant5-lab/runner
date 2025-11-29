@@ -189,7 +189,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 					funcName := g.extractFunctionName(callExpr.Callee)
 					if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
 						funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
-						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" {
+						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" ||
+						funcName == "fixnan" {
 						g.needsSeriesPreCalc = true
 						g.taFunctions = append(g.taFunctions, taFunctionCall{
 							varName:  declarator.ID.Name,
@@ -223,6 +224,24 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 		code += "\n"
+
+		// Declare state variables for fixnan
+		hasFixnan := false
+		for _, taFunc := range g.taFunctions {
+			if taFunc.funcName == "fixnan" {
+				hasFixnan = true
+				break
+			}
+		}
+		if hasFixnan {
+			code += g.ind() + "// State variables for fixnan forward-fill\n"
+			for _, taFunc := range g.taFunctions {
+				if taFunc.funcName == "fixnan" {
+					code += g.ind() + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", taFunc.varName)
+				}
+			}
+			code += "\n"
+		}
 
 		// Initialize ALL Series before bar loop
 		code += g.ind() + "// Initialize Series storage\n"
@@ -388,7 +407,7 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 	case "ta.crossover", "ta.crossunder":
 		// Crossover functions - handled in variable declaration
 		return "", nil
-	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow":
+	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow", "fixnan":
 		// TA functions - handled in variable declaration
 		return "", nil
 	case "valuewhen":

@@ -216,6 +216,32 @@ func (h *CrossunderHandler) GenerateCode(g *generator, varName string, call *ast
 	return generateCrossDetection(g, varName, call, true)
 }
 
+// FixnanHandler generates inline code for forward-filling NaN values
+type FixnanHandler struct{}
+
+func (h *FixnanHandler) CanHandle(funcName string) bool {
+	return funcName == "fixnan"
+}
+
+func (h *FixnanHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("fixnan requires 1 argument")
+	}
+
+	sourceExpr := g.extractSeriesExpression(call.Arguments[0])
+	stateVar := "fixnanState_" + varName
+
+	var code string
+	code += g.ind() + fmt.Sprintf("if !math.IsNaN(%s) {\n", sourceExpr)
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%s = %s\n", stateVar, sourceExpr)
+	g.indent--
+	code += g.ind() + "}\n"
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, stateVar)
+
+	return code, nil
+}
+
 // Helper functions
 
 // extractTAArguments extracts source and period from standard TA function arguments
