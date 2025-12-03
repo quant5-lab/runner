@@ -10,9 +10,8 @@ import (
 
 /* StrategyCode holds generated Go code for strategy execution */
 type StrategyCode struct {
-	FunctionBody       string // executeStrategy() function body
-	StrategyName       string // Pine Script strategy name
-	NeedsSeriesPreCalc bool   // Whether TA pre-calculation imports are needed
+	FunctionBody string // executeStrategy() function body
+	StrategyName string // Pine Script strategy name
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -38,30 +37,28 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	}
 
 	code := &StrategyCode{
-		FunctionBody:       body,
-		StrategyName:       gen.strategyName,
-		NeedsSeriesPreCalc: gen.needsSeriesPreCalc,
+		FunctionBody: body,
+		StrategyName: gen.strategyName,
 	}
 
 	return code, nil
 }
 
 type generator struct {
-	imports            map[string]bool
-	variables          map[string]string
-	constants          map[string]interface{} // Input constants (input.float, input.int, etc)
-	plots              []string               // Track plot variables
-	strategyName       string                 // Strategy name from indicator() or strategy()
-	indent             int
-	needsSeriesPreCalc bool             // Flag if we need series pre-calculation
-	taFunctions        []taFunctionCall // List of TA function calls to pre-calculate
-	inSecurityContext  bool             // Flag when generating code inside security() context
-	limits             CodeGenerationLimits
-	safetyGuard        RuntimeSafetyGuard
-	inputHandler       *InputHandler
-	mathHandler        *MathHandler
-	subscriptResolver  *SubscriptResolver
-	taRegistry         *TAFunctionRegistry // Registry for TA function handlers
+	imports           map[string]bool
+	variables         map[string]string
+	constants         map[string]interface{} // Input constants (input.float, input.int, etc)
+	plots             []string               // Track plot variables
+	strategyName      string                 // Strategy name from indicator() or strategy()
+	indent            int
+	taFunctions       []taFunctionCall // List of TA function calls to pre-calculate
+	inSecurityContext bool             // Flag when generating code inside security() context
+	limits            CodeGenerationLimits
+	safetyGuard       RuntimeSafetyGuard
+	inputHandler      *InputHandler
+	mathHandler       *MathHandler
+	subscriptResolver *SubscriptResolver
+	taRegistry        *TAFunctionRegistry // Registry for TA function handlers
 }
 
 type taFunctionCall struct {
@@ -166,7 +163,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 						g.constants[varName] = funcName
 						continue
 					}
+
+					// Collect nested function variables (fixnan(pivothigh()[1]))
+					g.collectNestedVariables(varName, callExpr)
 				}
+
+				// Scan ALL initializers for subscripted function calls: pivothigh()[1]
+				g.scanForSubscriptedCalls(declarator.Init)
 
 				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
@@ -189,8 +192,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 					funcName := g.extractFunctionName(callExpr.Callee)
 					if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
 						funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
-						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" {
-						g.needsSeriesPreCalc = true
+						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" ||
+						funcName == "fixnan" {
 						g.taFunctions = append(g.taFunctions, taFunctionCall{
 							varName:  declarator.ID.Name,
 							funcName: funcName,
@@ -223,6 +226,24 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 		code += "\n"
+
+		// Declare state variables for fixnan
+		hasFixnan := false
+		for _, taFunc := range g.taFunctions {
+			if taFunc.funcName == "fixnan" {
+				hasFixnan = true
+				break
+			}
+		}
+		if hasFixnan {
+			code += g.ind() + "// State variables for fixnan forward-fill\n"
+			for _, taFunc := range g.taFunctions {
+				if taFunc.funcName == "fixnan" {
+					code += g.ind() + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", taFunc.varName)
+				}
+			}
+			code += "\n"
+		}
 
 		// Initialize ALL Series before bar loop
 		code += g.ind() + "// Initialize Series storage\n"
@@ -388,7 +409,7 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 	case "ta.crossover", "ta.crossunder":
 		// Crossover functions - handled in variable declaration
 		return "", nil
-	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow":
+	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow", "fixnan":
 		// TA functions - handled in variable declaration
 		return "", nil
 	case "valuewhen":
@@ -684,8 +705,28 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		if e.Name == "na" {
 			return "math.NaN()", nil
 		}
-		// ALL variables use Series storage
 		varName := e.Name
+
+		// Check if it's a Pine built-in series variable
+		switch varName {
+		case "close":
+			return "bar.Close", nil
+		case "open":
+			return "bar.Open", nil
+		case "high":
+			return "bar.High", nil
+		case "low":
+			return "bar.Low", nil
+		case "volume":
+			return "bar.Volume", nil
+		}
+
+		// Check if it's an input constant
+		if _, isConstant := g.constants[varName]; isConstant {
+			return varName, nil
+		}
+
+		// User-defined variable (ALL use Series storage)
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
 
 	case *ast.Literal:
@@ -720,6 +761,12 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			// time() function returns timestamp or NaN
 			handler := NewTimeHandler(g.ind())
 			return handler.HandleInlineExpression(e.Arguments), nil
+
+		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
+			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
+			// Math functions can be used inline in conditions/ternaries
+			mathHandler := NewMathHandler()
+			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 
 		default:
 			// For other functions, try to generate inline expression
@@ -904,6 +951,20 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.MemberExpression:
 		// Member access like strategy.long or close[1] (use Series.Set())
 		memberCode := g.extractSeriesExpression(expr)
+
+		// Strategy constants (strategy.long, strategy.short) need numeric conversion for Series
+		if obj, ok := expr.Object.(*ast.Identifier); ok {
+			if obj.Name == "strategy" {
+				if prop, ok := expr.Property.(*ast.Identifier); ok {
+					if prop.Name == "long" {
+						return g.ind() + fmt.Sprintf("%sSeries.Set(1.0) // strategy.long\n", varName), nil
+					} else if prop.Name == "short" {
+						return g.ind() + fmt.Sprintf("%sSeries.Set(-1.0) // strategy.short\n", varName), nil
+					}
+				}
+			}
+		}
+
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
 	case *ast.BinaryExpression:
 		// Binary expression like sma20[1] > ema50[1] or SMA + EMA
@@ -1488,6 +1549,25 @@ func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
 func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 	switch e := expr.(type) {
 	case *ast.MemberExpression:
+		// Handle subscript after function call: func()[offset]
+		if call, ok := e.Object.(*ast.CallExpression); ok && e.Computed {
+			funcName := g.extractFunctionName(call.Callee)
+			varName := strings.ReplaceAll(funcName, ".", "_")
+
+			// Extract offset from subscript
+			offset := 0
+			if lit, ok := e.Property.(*ast.Literal); ok {
+				switch v := lit.Value.(type) {
+				case float64:
+					offset = int(v)
+				case int:
+					offset = v
+				}
+			}
+
+			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
+		}
+
 		// Check for built-in namespaces like timeframe.*
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
@@ -1546,29 +1626,37 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				if offset == 0 {
 					return "bar.Close"
 				}
-				// Historical builtin: use ctx.Data[i-offset]
-				return fmt.Sprintf("ctx.Data[i-%d].Close", offset)
+				// Historical builtin with bounds check
+				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Close }; return math.NaN() }()", offset, offset)
 			case "open":
 				if offset == 0 {
 					return "bar.Open"
 				}
-				return fmt.Sprintf("ctx.Data[i-%d].Open", offset)
+				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Open }; return math.NaN() }()", offset, offset)
 			case "high":
 				if offset == 0 {
 					return "bar.High"
 				}
-				return fmt.Sprintf("ctx.Data[i-%d].High", offset)
+				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].High }; return math.NaN() }()", offset, offset)
 			case "low":
 				if offset == 0 {
 					return "bar.Low"
 				}
-				return fmt.Sprintf("ctx.Data[i-%d].Low", offset)
+				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Low }; return math.NaN() }()", offset, offset)
 			case "volume":
 				if offset == 0 {
 					return "bar.Volume"
 				}
-				return fmt.Sprintf("ctx.Data[i-%d].Volume", offset)
+				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Volume }; return math.NaN() }()", offset, offset)
 			default:
+				// Check if it's a strategy constant (strategy.long, strategy.short)
+				if prop, ok := e.Property.(*ast.Identifier); ok {
+					if varName == "strategy" && (prop.Name == "long" || prop.Name == "short") {
+						// Return Go runtime constant
+						return g.extractMemberName(e)
+					}
+				}
+
 				// Check if it's an input constant (not input.source)
 				if funcName, isConstant := g.constants[varName]; isConstant {
 					if funcName == "input.source" {
@@ -1598,6 +1686,20 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return "math.NaN()"
 		}
 		varName := e.Name
+
+		// Check if it's a Pine built-in series variable
+		switch varName {
+		case "close":
+			return "bar.Close"
+		case "open":
+			return "bar.Open"
+		case "high":
+			return "bar.High"
+		case "low":
+			return "bar.Low"
+		case "volume":
+			return "bar.Volume"
+		}
 
 		// Check if it's an input constant
 		if _, isConstant := g.constants[varName]; isConstant {
@@ -1953,4 +2055,87 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 // TODO: Implement pivot inline generation
 func (g *generator) generatePivot(varName string, call *ast.CallExpression, isHigh bool) (string, error) {
 	return "", fmt.Errorf("ta.pivot inline generation not yet implemented")
+}
+
+// collectNestedVariables recursively scans CallExpression arguments for nested function calls
+func (g *generator) collectNestedVariables(parentVarName string, call *ast.CallExpression) {
+	funcName := g.extractFunctionName(call.Callee)
+
+	// Only collect nested variables for functions that support it (fixnan)
+	if funcName != "fixnan" {
+		return
+	}
+
+	// Scan arguments for nested CallExpression
+	for _, arg := range call.Arguments {
+		g.scanForNestedCalls(parentVarName, arg)
+	}
+}
+
+// scanForNestedCalls recursively searches for CallExpression in MemberExpression
+func (g *generator) scanForNestedCalls(parentVarName string, expr ast.Expression) {
+	switch e := expr.(type) {
+	case *ast.MemberExpression:
+		// Check if object is a CallExpression: pivothigh()[1]
+		if nestedCall, ok := e.Object.(*ast.CallExpression); ok {
+			nestedFuncName := g.extractFunctionName(nestedCall.Callee)
+			// Use funcName-based naming to match extractSeriesExpression
+			tempVarName := strings.ReplaceAll(nestedFuncName, ".", "_")
+
+			// Register nested variable for Series initialization
+			if _, exists := g.variables[tempVarName]; !exists {
+				g.variables[tempVarName] = "float"
+			}
+		}
+		// Recurse into object and property
+		g.scanForNestedCalls(parentVarName, e.Object)
+		g.scanForNestedCalls(parentVarName, e.Property)
+
+	case *ast.CallExpression:
+		// Recurse into arguments
+		for _, arg := range e.Arguments {
+			g.scanForNestedCalls(parentVarName, arg)
+		}
+	}
+}
+
+// scanForSubscriptedCalls scans any expression for subscripted function calls
+func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
+	if expr == nil {
+		return
+	}
+
+	switch e := expr.(type) {
+	case *ast.MemberExpression:
+		// Check if object is CallExpression with subscript: func()[offset]
+		if call, ok := e.Object.(*ast.CallExpression); ok && e.Computed {
+			funcName := g.extractFunctionName(call.Callee)
+			varName := strings.ReplaceAll(funcName, ".", "_")
+
+			// Register variable for Series initialization
+			if _, exists := g.variables[varName]; !exists {
+				g.variables[varName] = "float"
+			}
+		}
+		// Recurse
+		g.scanForSubscriptedCalls(e.Object)
+		g.scanForSubscriptedCalls(e.Property)
+
+	case *ast.CallExpression:
+		for _, arg := range e.Arguments {
+			g.scanForSubscriptedCalls(arg)
+		}
+
+	case *ast.BinaryExpression:
+		g.scanForSubscriptedCalls(e.Left)
+		g.scanForSubscriptedCalls(e.Right)
+
+	case *ast.UnaryExpression:
+		g.scanForSubscriptedCalls(e.Argument)
+
+	case *ast.ConditionalExpression:
+		g.scanForSubscriptedCalls(e.Test)
+		g.scanForSubscriptedCalls(e.Consequent)
+		g.scanForSubscriptedCalls(e.Alternate)
+	}
 }

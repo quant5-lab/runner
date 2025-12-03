@@ -212,16 +212,22 @@ func (t *TANamespaceTransformer) transformTerm(term *parser.Term) {
 }
 
 func (t *TANamespaceTransformer) transformFactor(factor *parser.Factor) {
-	if factor.Call != nil {
-		t.transformCallExpr(factor.Call)
+	if factor.Postfix != nil {
+		t.transformPostfixExpr(factor.Postfix)
 	}
 	if factor.MemberAccess != nil {
 		// Member accesses don't need transformation
 	}
-	if factor.Subscript != nil {
-		if factor.Subscript.Index != nil {
-			t.transformArithExpr(factor.Subscript.Index)
+}
+
+func (t *TANamespaceTransformer) transformPostfixExpr(postfix *parser.PostfixExpr) {
+	if postfix.Primary != nil {
+		if postfix.Primary.Call != nil {
+			t.transformCallExpr(postfix.Primary.Call)
 		}
+	}
+	if postfix.Subscript != nil {
+		t.transformArithExpr(postfix.Subscript)
 	}
 }
 
@@ -235,11 +241,8 @@ func (t *TANamespaceTransformer) transformComparison(comp *parser.Comparison) {
 }
 
 func (t *TANamespaceTransformer) transformComparisonTerm(term *parser.ComparisonTerm) {
-	if term.Call != nil {
-		t.transformCallExpr(term.Call)
-	}
-	if term.Subscript != nil && term.Subscript.Index != nil {
-		t.transformArithExpr(term.Subscript.Index)
+	if term.Postfix != nil {
+		t.transformPostfixExpr(term.Postfix)
 	}
 }
 
@@ -248,7 +251,7 @@ func (t *TANamespaceTransformer) transformValue(val *parser.Value) {
 		return
 	}
 
-	if val.Subscript != nil && val.Subscript.Index != nil {
-		t.transformArithExpr(val.Subscript.Index)
+	if val.Postfix != nil {
+		t.transformPostfixExpr(val.Postfix)
 	}
 }

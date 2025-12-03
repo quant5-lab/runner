@@ -173,22 +173,8 @@ func (c *Converter) convertComparison(comp *Comparison) (ast.Expression, error) 
 }
 
 func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression, error) {
-	if term.Subscript != nil {
-		// Convert subscript like close[1] to MemberExpression with Computed: true
-		indexExpr, err := c.convertArithExpr(term.Subscript.Index)
-		if err != nil {
-			return nil, err
-		}
-
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     term.Subscript.Object,
-			},
-			Property: indexExpr,
-			Computed: true,
-		}, nil
+	if term.Postfix != nil {
+		return c.convertPostfixExpr(term.Postfix)
 	}
 
 	if term.MemberAccess != nil {
@@ -204,9 +190,6 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 			},
 			Computed: false,
 		}, nil
-	}
-	if term.Call != nil {
-		return c.convertCallExpr(term.Call)
 	}
 	if term.True != nil {
 		return &ast.Literal{
@@ -327,28 +310,57 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	}, nil
 }
 
-func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
-	if val.CallExpr != nil {
-		// Handle nested function calls like sma(close, 20) inside security()
-		return c.convertCallExpr(val.CallExpr)
+func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, error) {
+	var baseExpr ast.Expression
+	var err error
+
+	if postfix.Primary.Call != nil {
+		baseExpr, err = c.convertCallExpr(postfix.Primary.Call)
+		if err != nil {
+			return nil, err
+		}
+	} else if postfix.Primary.MemberAccess != nil {
+		baseExpr = &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     postfix.Primary.MemberAccess.Object,
+			},
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     postfix.Primary.MemberAccess.Property,
+			},
+			Computed: false,
+		}
+	} else if postfix.Primary.Ident != nil {
+		baseExpr = &ast.Identifier{
+			NodeType: ast.TypeIdentifier,
+			Name:     *postfix.Primary.Ident,
+		}
+	} else {
+		return nil, fmt.Errorf("postfix primary must have call, member access, or ident")
 	}
 
-	if val.Subscript != nil {
-		// Convert subscript like close[1] to MemberExpression with Computed: true
-		indexExpr, err := c.convertArithExpr(val.Subscript.Index)
+	if postfix.Subscript != nil {
+		indexExpr, err := c.convertArithExpr(postfix.Subscript)
 		if err != nil {
 			return nil, err
 		}
 
 		return &ast.MemberExpression{
 			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     val.Subscript.Object,
-			},
+			Object:   baseExpr,
 			Property: indexExpr,
 			Computed: true,
 		}, nil
+	}
+
+	return baseExpr, nil
+}
+
+func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
+	if val.Postfix != nil {
+		return c.convertPostfixExpr(val.Postfix)
 	}
 
 	if val.MemberAccess != nil {
@@ -581,8 +593,7 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	if factor.Paren != nil {
-		// Parenthesized expression - just pass through the inner expression
-		return c.convertArithExpr(factor.Paren)
+		return c.convertTernaryExpr(factor.Paren)
 	}
 
 	if factor.Unary != nil {
@@ -600,26 +611,8 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 		}, nil
 	}
 
-	if factor.Call != nil {
-		return c.convertCallExpr(factor.Call)
-	}
-
-	if factor.Subscript != nil {
-		// Convert subscript like close[1] to MemberExpression with Computed: true
-		indexExpr, err := c.convertArithExpr(factor.Subscript.Index)
-		if err != nil {
-			return nil, err
-		}
-
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     factor.Subscript.Object,
-			},
-			Property: indexExpr,
-			Computed: true,
-		}, nil
+	if factor.Postfix != nil {
+		return c.convertPostfixExpr(factor.Postfix)
 	}
 
 	if factor.MemberAccess != nil {

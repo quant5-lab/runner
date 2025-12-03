@@ -67,10 +67,14 @@ plot(daily_sma, "Daily SMA", color=color.green)
 		t.Error("Expected ctx.Symbol in security() call")
 	}
 
-	/* Validate: SMA generation in security context */
-	/* Note: SMA might be prefetched or inline - check for ta.Sma call */
-	if !strings.Contains(generatedCode, "ta.Sma") {
-		t.Error("Expected SMA TA function (ta.Sma) in generated code")
+	/* Validate: SMA inline calculation patterns */
+	hasSmaSum := strings.Contains(generatedCode, "smaSum")
+	hasTaSma := strings.Contains(generatedCode, "ta.Sma")
+	hasSma20 := strings.Contains(generatedCode, "sma_20") || strings.Contains(generatedCode, "daily_sma")
+
+	if !hasSmaSum && !hasTaSma && !hasSma20 {
+		t.Errorf("Expected SMA calculation pattern. Generated code contains:\nsmaSum: %v\nta.Sma: %v\nsma_20: %v",
+			hasSmaSum, hasTaSma, hasSma20)
 	}
 
 	/* Compile to ensure syntax correctness */

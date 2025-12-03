@@ -45,6 +45,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&PivotLowHandler{},
 			&CrossoverHandler{},
 			&CrossunderHandler{},
+			&FixnanHandler{},
 		},
 	}
 }

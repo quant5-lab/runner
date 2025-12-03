@@ -119,7 +119,41 @@ for SEC_TF in $SECURITY_TFS; do
     fi
     
     SEC_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TF}.json"
+    
+    # Check if cached file exists and is recent enough
+    FETCH_NEEDED=false
     if [ ! -f "$SEC_FILE" ]; then
+        FETCH_NEEDED=true
+    else
+        # Check file age: refetch if older than 1 day for intraday/daily, 7 days for weekly/monthly
+        FILE_AGE_HOURS=$(( ($(date +%s) - $(stat -f %m "$SEC_FILE" 2>/dev/null || stat -c %Y "$SEC_FILE" 2>/dev/null || echo 0)) / 3600 ))
+        
+        case "$NORM_TF" in
+            *m|*h|D|1D)
+                # Intraday/daily: refetch if older than 24 hours
+                if [ "$FILE_AGE_HOURS" -gt 24 ]; then
+                    FETCH_NEEDED=true
+                    echo "  Cached $NORM_TF data is $FILE_AGE_HOURS hours old, refetching..."
+                fi
+                ;;
+            W|1W|*W)
+                # Weekly: refetch if older than 7 days (168 hours)
+                if [ "$FILE_AGE_HOURS" -gt 168 ]; then
+                    FETCH_NEEDED=true
+                    echo "  Cached $NORM_TF data is $FILE_AGE_HOURS hours old, refetching..."
+                fi
+                ;;
+            M|1M|*M)
+                # Monthly: refetch if older than 30 days (720 hours)
+                if [ "$FILE_AGE_HOURS" -gt 720 ]; then
+                    FETCH_NEEDED=true
+                    echo "  Cached $NORM_TF data is $FILE_AGE_HOURS hours old, refetching..."
+                fi
+                ;;
+        esac
+    fi
+    
+    if [ "$FETCH_NEEDED" = true ]; then
         # Calculate needed bars: base_bars * timeframe_ratio + 500 (conservative warmup)
         # For weekly base with 500 bars: 500 * 7 + 500 = 4000 daily bars needed
         SEC_BARS=$((BARS * 10 + 500))
@@ -154,8 +188,6 @@ import('./src/container.js').then(({ createContainer }) => {
                 echo "  Saved: $SEC_FILE"
             fi
         fi
-    else
-        echo "  Using cached: $SEC_FILE"
     fi
 done
 

@@ -54,7 +54,10 @@ func findCallInFactor(factor *parser.Factor) *parser.CallExpr {
 	if factor == nil {
 		return nil
 	}
-	return factor.Call
+	if factor.Postfix != nil && factor.Postfix.Primary != nil {
+		return factor.Postfix.Primary.Call
+	}
+	return nil
 }
 
 func TestTANamespaceTransformer_MultipleIndicators(t *testing.T) {
