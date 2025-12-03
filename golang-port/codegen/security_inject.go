@@ -232,9 +232,8 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 	updatedBody := injection.PrefetchCode + functionBody
 
 	return &StrategyCode{
-		FunctionBody:       updatedBody,
-		StrategyName:       code.StrategyName,
-		NeedsSeriesPreCalc: true, // Security requires imports
+		FunctionBody: updatedBody,
+		StrategyName: code.StrategyName,
 	}, nil
 }
 

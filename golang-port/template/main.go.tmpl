@@ -16,19 +16,16 @@ import (
 	"github.com/quant5-lab/runner/runtime/series"
 	"github.com/quant5-lab/runner/runtime/session"
 	"github.com/quant5-lab/runner/runtime/strategy"
-	"github.com/quant5-lab/runner/runtime/ta"
-	"github.com/quant5-lab/runner/security"
 	"github.com/quant5-lab/runner/datafetcher"
 	_ "github.com/quant5-lab/runner/runtime/value" // May be used by generated code
 )
 
-/* Prevent unused import errors - consumed by init() side effects */
+/* Prevent unused import errors */
 var (
 	_ = math.IsNaN
-	_ = datafetcher.NewFileFetcher
-	_ = ta.Sma
-	_ = security.AnalyzeAST
 	_ = session.Parse
+	_ = series.NewSeries
+	_ = datafetcher.NewFileFetcher
 )
 
 /* CLI flags */

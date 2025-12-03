@@ -146,9 +146,12 @@
 - [x] `time()` function for session filtering
 - [x] Session timezone support (America/New_York, Europe/Moscow, UTC)
 - [x] `syminfo.tickerid` built-in variable (for security() calls) - Added to template
-- [ ] `fixnan()` function for forward-filling NaN values (pivothigh/pivotlow results)
-- [ ] `pivothigh()` function for resistance detection
-- [ ] `pivotlow()` function for support detection
+- [x] `fixnan()` function for forward-filling NaN values (pivothigh/pivotlow results)
+- [x] `pivothigh()` function for resistance detection
+- [x] `pivotlow()` function for support detection
+- [x] Nested ternary expressions in parentheses (parser grammar fix)
+- [x] `math.min()` and `math.max()` inline in conditions/ternaries
+- [ ] `security()` with complex TA function chains (sma, pivothigh/pivotlow, fixnan combinations)
 - [ ] `barmerge.lookahead_on` constant for security() lookahead parameter
 - [ ] `security()` with lookahead parameter support
 - [ ] `wma()` weighted moving average function
@@ -162,10 +165,10 @@
 - [ ] `bb7-dissect-sma.pine` - Blocked: Inline SMA comparison codegen issue
 - [ ] `bb7-dissect-bb.pine` - Blocked: Variable period support needed for ta.sma(source, var)
 - [ ] `bb7-dissect-vol.pine` - Blocked: TODO comment syntax error in codegen
-- [ ] `bb7-dissect-potential.pine` - Blocked: Needs fixnan(), pivothigh(), pivotlow()
-- [ ] `bb7-dissect-adx.pine` - Ready to test after fixnan() implementation
+- [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
+- [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
 - [ ] `bb7-dissect-sl.pine` - Blocked: Needs strategy.position_avg_price
-- [ ] `bb7-dissect-tp.pine` - Blocked: Needs wma(), dev(), fixnan()
+- [ ] `bb7-dissect-tp.pine` - Blocked: Needs wma(), dev()
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
 ## Phase 5: Strategy Validation

@@ -135,6 +135,7 @@ dist/
 # Generated files
 out/chart-data.json
 out/chart-config.json
+out/e2e-*-output.json
 
 # Keep the output directory structure and template
 !out/
@@ -170,4 +171,9 @@ __pycache__/
 *$py.class
 *.so
 .pyc
-.github
+
+# GitHub - track CI workflows only
+.github/*
+!.github/workflows/
+.github/workflows/local-*.yaml
+.github/workflows/draft-*.yaml

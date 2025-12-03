@@ -140,9 +140,8 @@ func TestGenerateSecurityLookup(t *testing.T) {
 
 func TestInjectSecurityCode_NoSecurityCalls(t *testing.T) {
 	originalCode := &StrategyCode{
-		FunctionBody:       "\t// Original strategy code\n",
-		StrategyName:       "Test Strategy",
-		NeedsSeriesPreCalc: false,
+		FunctionBody: "\t// Original strategy code\n",
+		StrategyName: "Test Strategy",
 	}
 
 	program := &ast.Program{
@@ -162,9 +161,8 @@ func TestInjectSecurityCode_NoSecurityCalls(t *testing.T) {
 
 func TestInjectSecurityCode_WithSecurityCall(t *testing.T) {
 	originalCode := &StrategyCode{
-		FunctionBody:       "\t// Original strategy code\n",
-		StrategyName:       "Test Strategy",
-		NeedsSeriesPreCalc: false,
+		FunctionBody: "\t// Original strategy code\n",
+		StrategyName: "Test Strategy",
 	}
 
 	program := &ast.Program{
@@ -209,10 +207,5 @@ func TestInjectSecurityCode_WithSecurityCall(t *testing.T) {
 	/* Verify original code is still present */
 	if !contains(injectedCode.FunctionBody, "// Original strategy code") {
 		t.Error("Original strategy code should be preserved")
-	}
-
-	/* Verify NeedsSeriesPreCalc flag set */
-	if !injectedCode.NeedsSeriesPreCalc {
-		t.Error("Expected NeedsSeriesPreCalc to be true after security injection")
 	}
 }

@@ -1,7 +1,7 @@
 # Makefile for Runner - PineScript Go Port
 # Centralized build automation following Go project conventions
 
-.PHONY: help build test clean fmt vet bench coverage integration e2e cross-compile
+.PHONY: help build test test-unit test-integration test-e2e test-e2e-go test-e2e-node clean fmt vet bench coverage integration e2e cross-compile
 
 # Project configuration
 PROJECT_NAME := runner
@@ -73,7 +73,9 @@ _build_strategy_internal:
 	@echo "[1/3] Generating Go code from Pine Script..."
 	@OUTPUT_PATH="$(OUTPUT)"; \
 	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="../$(BUILD_DIR)/$(OUTPUT)";; esac; \
-	TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input ../$(STRATEGY) -output $$OUTPUT_PATH 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	STRATEGY_PATH="$(STRATEGY)"; \
+	case "$$STRATEGY_PATH" in /*) ;; *) STRATEGY_PATH="../$$STRATEGY_PATH";; esac; \
+	TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input $$STRATEGY_PATH -output $$OUTPUT_PATH 2>&1 | grep "Generated:" | awk '{print $$2}'); \
 	if [ -z "$$TEMP_FILE" ]; then echo "Failed to generate Go code"; exit 1; fi; \
 	echo "[2/3] Compiling binary..."; \
 	cd $(GOLANG_PORT) && $(GO) build -o $$OUTPUT_PATH $$TEMP_FILE
@@ -103,10 +105,23 @@ _cross_compile_platform:
 
 ##@ Testing
 
-test: ## Run all tests
-	@echo "Running tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) ./...
+test: test-unit test-integration test-e2e ## Run all tests (unit + integration + e2e)
 	@echo "✓ All tests passed"
+
+test-unit: ## Run Go unit tests only (excludes integration)
+	@echo "Running Go unit tests..."
+	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -short ./...
+	@echo "✓ Unit tests passed"
+
+test-integration: ## Run Go integration tests only
+	@echo "Running Go integration tests..."
+	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
+	@echo "✓ Integration tests passed"
+
+test-e2e: ## Run Go E2E tests (compile + execute)
+	@echo "Running Go E2E tests..."
+	@./golang-port/scripts/e2e-runner.sh
+	@echo "✓ Go E2E tests passed"
 
 test-parser: ## Run parser tests only
 	@echo "Running parser tests..."
@@ -128,11 +143,6 @@ test-series: ## Run Series tests only
 	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./runtime/series/...
 	@echo "✓ Series tests passed"
 
-test-integration: ## Run integration tests (multi-component)
-	@echo "Running integration tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
-	@echo "✓ Integration tests passed"
-
 test-syminfo: ## Run syminfo.tickerid integration tests only
 	@echo "Running syminfo.tickerid tests..."
 	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./tests/test-integration -run Syminfo
@@ -140,9 +150,6 @@ test-syminfo: ## Run syminfo.tickerid integration tests only
 
 regression-syminfo: ## Run syminfo.tickerid regression test suite
 	@./golang-port/scripts/test-syminfo-regression.sh
-
-e2e: ## Run E2E tests (golang-port)
-	@./golang-port/scripts/e2e-runner.sh
 
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
@@ -173,7 +180,7 @@ coverage-show: coverage ## Generate and open coverage report
 check: fmt vet lint test ## Run all checks (format, vet, lint, test)
 	@echo "✓ All checks passed"
 
-ci: fmt vet lint test integration ## Run CI checks (format, vet, lint, test, integration)
+ci: fmt vet lint test-unit test-integration ## Run CI checks (format, vet, lint, unit, integration)
 	@echo "✓ CI checks passed"
 
 ##@ Cleanup
