@@ -1,7 +1,7 @@
 # Makefile for Runner - PineScript Go Port
 # Centralized build automation following Go project conventions
 
-.PHONY: help build test test-unit test-integration test-e2e test-e2e-go test-e2e-node clean fmt vet bench coverage integration e2e cross-compile
+.PHONY: help build test test-unit test-integration test-e2e test-parser test-codegen test-runtime test-series test-syminfo regression-syminfo bench bench-series coverage coverage-show check ci clean clean-all cross-compile fmt vet lint build-strategy
 
 # Project configuration
 PROJECT_NAME := runner
@@ -35,7 +35,7 @@ PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 ##@ General
 
 help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
@@ -105,23 +105,24 @@ _cross_compile_platform:
 
 ##@ Testing
 
+# Main test target: runs all tests (unit + integration + e2e)
 test: test-unit test-integration test-e2e ## Run all tests (unit + integration + e2e)
 	@echo "✓ All tests passed"
 
-test-unit: ## Run Go unit tests only (excludes integration)
-	@echo "Running Go unit tests..."
+test-unit: ## Run unit tests (excludes integration)
+	@echo "Running unit tests..."
 	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -short ./...
 	@echo "✓ Unit tests passed"
 
-test-integration: ## Run Go integration tests only
-	@echo "Running Go integration tests..."
+test-integration: ## Run integration tests
+	@echo "Running integration tests..."
 	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
 	@echo "✓ Integration tests passed"
 
-test-e2e: ## Run Go E2E tests (compile + execute)
-	@echo "Running Go E2E tests..."
+test-e2e: ## Run E2E tests (compile + execute all Pine fixtures/strategies)
+	@echo "Running E2E tests..."
 	@./golang-port/scripts/e2e-runner.sh
-	@echo "✓ Go E2E tests passed"
+	@echo "✓ E2E tests passed"
 
 test-parser: ## Run parser tests only
 	@echo "Running parser tests..."

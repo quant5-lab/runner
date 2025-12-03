@@ -808,9 +808,9 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
 
-		// Skip string variables (not supported in Series storage)
+		// Skip string variables (Series storage is float64 only)
 		if varType == "string" {
-			code += g.ind() + fmt.Sprintf("// %s = string variable (not implemented in Series storage)\n", varName)
+			code += g.ind() + fmt.Sprintf("// %s = string variable (not implemented)\n", varName)
 			continue
 		}
 
@@ -834,7 +834,6 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 
 	switch e := expr.(type) {
 	case *ast.MemberExpression:
-		// Check for string-type member expressions
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			if obj.Name == "syminfo" {
 				if prop, ok := e.Property.(*ast.Identifier); ok {
@@ -1590,7 +1589,6 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
 
-			// Handle syminfo.* built-ins
 			if varName == "syminfo" {
 				if prop, ok := e.Property.(*ast.Identifier); ok {
 					switch prop.Name {
@@ -1832,12 +1830,11 @@ func (g *generator) generateMemberExpression(mem *ast.MemberExpression) (string,
 	if id, ok := mem.Property.(*ast.Identifier); ok {
 		prop = id.Name
 	}
-	
-	/* Handle syminfo.tickerid references - return actual variable */
+
 	if obj == "syminfo" && prop == "tickerid" {
 		return "syminfo_tickerid", nil
 	}
-	
+
 	return g.ind() + fmt.Sprintf("// %s.%s\n", obj, prop), nil
 }
 
