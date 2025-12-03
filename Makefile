@@ -311,14 +311,17 @@ clean-configs-force: ## Remove ALL configs without confirmation (use with cautio
 
 ##@ Information
 
+check-deps: ## Check if all dependencies are installed
+	@./scripts/check-deps.sh
+
 version: ## Show version information
 	@echo "Version:     $(VERSION)"
 	@echo "Build Time:  $(BUILD_TIME)"
 	@echo "Commit:      $(COMMIT_HASH)"
 	@echo "Go Version:  $(shell $(GO) version)"
 
-deps: ## Show dependencies
-	@echo "Project dependencies:"
+deps: ## Show Go module dependencies
+	@echo "Go modules:"
 	@cd $(GOLANG_PORT) && $(GO) list -m all
 
 mod-tidy: ## Tidy go.mod
@@ -344,4 +347,13 @@ install-hooks: ## Install git pre-commit hook
 	@cp golang-port/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 	@echo "✓ Pre-commit hook installed (runs: make ci)"
+
+install: ## Install Go to ~/.local (no sudo required)
+	@./scripts/install-deps.sh
+
+install-go-only: ## Alias for install (kept for compatibility)
+	@./scripts/install-deps.sh
+
+setup: ## Initialize project after dependency installation (download modules, build)
+	@./scripts/post-install.sh
 

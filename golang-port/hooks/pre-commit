@@ -1,8 +1,18 @@
 #!/bin/sh
-# Git pre-commit hook for golang-port
-# Runs centralized CI checks via Makefile
+# Git pre-commit hook - runs CI checks
 
 set -e
+
+# Ensure Go is in PATH
+export PATH="$HOME/.local/go/bin:/usr/local/go/bin:$PATH"
+export GOPATH="$HOME/go"
+export PATH="$PATH:$GOPATH/bin"
+
+# Verify Go available
+if ! command -v go >/dev/null 2>&1; then
+    echo "✗ Go not found. Run: make install"
+    exit 1
+fi
 
 echo "🔍 Running pre-commit checks..."
 make ci
