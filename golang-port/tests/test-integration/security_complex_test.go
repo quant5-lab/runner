@@ -295,8 +295,6 @@ plot(sma20, "SMA20")`
 		t.Fatal("NaN handling test failed")
 	}
 
-	/* Read generated code to validate NaN handling */
-	/* pine-gen writes to os.TempDir() by design */
 	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
@@ -335,7 +333,6 @@ func buildAndCompilePineInDir(t *testing.T, pineScript, tmpDir string) bool {
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	/* pine-gen writes to os.TempDir() by design */
 	compileCmd := exec.Command("go", "build", "-o", binaryPath,
 		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 

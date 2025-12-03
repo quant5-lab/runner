@@ -30,7 +30,6 @@ func TestSeriesStrategyExecution(t *testing.T) {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	// Compile the generated code
 	compileCmd := exec.Command("go", "build",
 		"-o", tempBinary,
 		tempGoFile)

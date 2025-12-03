@@ -263,7 +263,6 @@ func buildPineScript(t *testing.T, tmpDir, pineScript string) string {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	/* Read generated code */
 	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
 	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
