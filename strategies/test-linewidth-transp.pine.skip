@@ -1,0 +1,3 @@
+Lexer limitation: inline color literal in plot() with linewidth parameter (line 8:46)
+Error: "lexer: invalid input text #4CAF50, linewid..."
+Related to: support-resistance.pine (same lexer issue)

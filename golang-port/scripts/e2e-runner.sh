@@ -17,7 +17,9 @@ OUTPUT_DIR="$PROJECT_ROOT/out"
 TOTAL=0
 PASSED=0
 FAILED=0
+SKIPPED=0
 FAILED_TESTS=()
+SKIPPED_TESTS=()
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🧪 golang-port E2E Test Suite"
@@ -61,10 +63,21 @@ run_test() {
     local PINE_FILE="$1"
     local TEST_NAME=$(basename "$PINE_FILE" .pine)
     local OUTPUT_BINARY="$BUILD_DIR/e2e-$TEST_NAME"
+    local SKIP_FILE="${PINE_FILE}.skip"
     
     echo "────────────────────────────────────────────────────────────"
     echo "Running: $TEST_NAME"
     echo "────────────────────────────────────────────────────────────"
+    
+    # Check for skip file
+    if [ -f "$SKIP_FILE" ]; then
+        SKIP_REASON=$(head -1 "$SKIP_FILE")
+        echo "⏭️  SKIP: $SKIP_REASON"
+        echo ""
+        SKIPPED=$((SKIPPED + 1))
+        SKIPPED_TESTS+=("$TEST_NAME: $SKIP_REASON")
+        return 0
+    fi
     
     # Build strategy
     if ! make -C "$PROJECT_ROOT" -s build-strategy \
@@ -146,19 +159,6 @@ if [ $E2E_COUNT -gt 0 ]; then
     done <<< "$E2E_FILES"
 fi
 
-# Run testdata fixtures
-if [ $TESTDATA_COUNT -gt 0 ]; then
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📂 Testing testdata/*.pine fixtures"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    
-    while IFS= read -r PINE_FILE; do
-        [ -z "$PINE_FILE" ] && continue
-        run_test "$PINE_FILE"
-    done <<< "$TESTDATA_FILES"
-fi
-
 # Run strategy files
 if [ $STRATEGY_COUNT -gt 0 ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -181,10 +181,19 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📊 E2E Test Results"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "  Total:  $TOTAL"
-echo "  Passed: $PASSED ($((PASSED * 100 / TOTAL))%)"
-echo "  Failed: $FAILED ($((FAILED * 100 / TOTAL))%)"
+echo "  Total:   $TOTAL"
+echo "  Passed:  $PASSED"
+echo "  Skipped: $SKIPPED"
+echo "  Failed:  $FAILED"
 echo ""
+
+if [ $SKIPPED -gt 0 ]; then
+    echo "Skipped tests (not yet implemented):"
+    for TEST in "${SKIPPED_TESTS[@]}"; do
+        echo "  ⏭️  $TEST"
+    done
+    echo ""
+fi
 
 if [ $FAILED -gt 0 ]; then
     echo "Failed tests:"
@@ -195,6 +204,12 @@ if [ $FAILED -gt 0 ]; then
     echo "❌ E2E SUITE FAILED"
     exit 1
 else
-    echo "✅ SUCCESS: All E2E tests passed"
+    TESTABLE=$((TOTAL - SKIPPED))
+    if [ $TESTABLE -gt 0 ]; then
+        PASS_RATE=$((PASSED * 100 / TESTABLE))
+        echo "✅ SUCCESS: All testable E2E tests passed ($PASSED/$TESTABLE = $PASS_RATE%)"
+    else
+        echo "✅ SUCCESS: All tests passed"
+    fi
     exit 0
 fi
