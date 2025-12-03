@@ -42,15 +42,13 @@ plot(combined, "Combined", color=color.blue)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	/* Read generated code to validate inline TA */
-	generatedCode, err := os.ReadFile("/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
 
 	generatedStr := string(generatedCode)
 
-	/* Validate inline SMA and EMA present */
 	if !contains(generatedStr, "ta.sma") {
 		t.Error("Expected inline SMA generation in security context")
 	}
@@ -59,10 +57,9 @@ plot(combined, "Combined", color=color.blue)
 		t.Error("Expected inline EMA generation in security context")
 	}
 
-	/* Compile the generated code */
 	binaryPath := filepath.Join(tmpDir, "test_binary")
 	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -105,14 +102,13 @@ plot(volatility, "Volatility %", color=color.red)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile("/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
 
 	generatedStr := string(generatedCode)
 
-	/* Validate field access (high, low, close) */
 	requiredFields := []string{"High", "Low", "Close"}
 	for _, field := range requiredFields {
 		if !contains(generatedStr, field) {
@@ -120,10 +116,9 @@ plot(volatility, "Volatility %", color=color.red)
 		}
 	}
 
-	/* Compile the generated code */
 	binaryPath := filepath.Join(tmpDir, "test_binary")
 	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -166,7 +161,8 @@ plot(open_1d)`,
 
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePine(t, tc.script)
+			tmpDir := t.TempDir()
+			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
 			if !success {
 				t.Fatalf("Pattern '%s' failed", tc.name)
 			}
@@ -201,7 +197,8 @@ plot(bb_1d_dev)`,
 
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePine(t, tc.script)
+			tmpDir := t.TempDir()
+			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
 			if !success {
 				t.Fatalf("Pattern '%s' failed", tc.name)
 			}
@@ -271,7 +268,8 @@ plot(dev)`,
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePine(t, tc.script)
+			tmpDir := t.TempDir()
+			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
 			if !success {
 				t.Fatalf("'%s' failed: %s", tc.name, tc.description)
 			}
@@ -291,13 +289,15 @@ indicator("NaN Test", overlay=true)
 sma20 = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 plot(sma20, "SMA20")`
 
-	success := buildAndCompilePine(t, pineScript)
+	tmpDir := t.TempDir()
+	success := buildAndCompilePineInDir(t, pineScript, tmpDir)
 	if !success {
 		t.Fatal("NaN handling test failed")
 	}
 
 	/* Read generated code to validate NaN handling */
-	generatedCode, err := os.ReadFile("/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+	/* pine-gen writes to os.TempDir() by design */
+	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -310,8 +310,7 @@ plot(sma20, "SMA20")`
 }
 
 /* Helper function to build and compile Pine script using pine-gen */
-func buildAndCompilePine(t *testing.T, pineScript string) bool {
-	tmpDir := t.TempDir()
+func buildAndCompilePineInDir(t *testing.T, pineScript, tmpDir string) bool {
 	pineFile := filepath.Join(tmpDir, "test.pine")
 	outputBinary := filepath.Join(tmpDir, "test_binary")
 
@@ -336,8 +335,9 @@ func buildAndCompilePine(t *testing.T, pineScript string) bool {
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
+	/* pine-gen writes to os.TempDir() by design */
 	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {

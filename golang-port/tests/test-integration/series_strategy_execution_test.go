@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -13,10 +14,16 @@ func TestSeriesStrategyExecution(t *testing.T) {
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
-	// Build strategy binary from Series test strategy
+	tmpDir := t.TempDir()
+	tempBinary := filepath.Join(tmpDir, "test-series-strategy")
+	dataFile := filepath.Join(tmpDir, "series-test-data.json")
+	outputFile := filepath.Join(tmpDir, "series-strategy-result.json")
+	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
+
+	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/fixtures/strategy-sma-crossover-series.pine",
-		"-output", "/tmp/test-series-strategy")
+		"-output", tempBinary)
 
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
@@ -25,27 +32,21 @@ func TestSeriesStrategyExecution(t *testing.T) {
 
 	// Compile the generated code
 	compileCmd := exec.Command("go", "build",
-		"-o", "/tmp/test-series-strategy",
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		"-o", tempBinary,
+		tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
 	}
-	defer os.Remove("/tmp/test-series-strategy")
 
 	// Create test data with clear SMA crossover pattern
 	testData := createSMACrossoverTestData()
-	dataFile := "/tmp/series-test-data.json"
 	data, _ := json.Marshal(testData)
 	os.WriteFile(dataFile, data, 0644)
-	defer os.Remove(dataFile)
 
 	// Execute strategy
-	outputFile := "/tmp/series-strategy-result.json"
-	defer os.Remove(outputFile)
-
-	execCmd := exec.Command("/tmp/test-series-strategy",
+	execCmd := exec.Command(tempBinary,
 		"-symbol", "TEST",
 		"-data", dataFile,
 		"-output", outputFile)

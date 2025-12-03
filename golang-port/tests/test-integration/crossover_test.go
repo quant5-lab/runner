@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -48,12 +49,11 @@ if longCrossover
 	goCode := stratCode.FunctionBody
 
 	// Write to temp file
-	tmpFile := "/tmp/test_crossover.go"
+	tmpFile := filepath.Join(t.TempDir(), "test_crossover.go")
 	err = os.WriteFile(tmpFile, []byte(goCode), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write generated code: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
 	t.Logf("Generated code written to %s", tmpFile)
 	t.Logf("Generated code:\n%s", goCode)

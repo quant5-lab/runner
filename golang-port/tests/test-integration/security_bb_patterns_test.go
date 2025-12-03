@@ -232,7 +232,8 @@ plot(ema10_1d, "EMA")
 	}
 
 	/* Read generated code */
-	generatedCode, err := os.ReadFile("/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+	/* pine-gen writes to os.TempDir() by design */
+	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -293,8 +294,9 @@ func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
+	/* pine-gen writes to os.TempDir() by design */
 	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {

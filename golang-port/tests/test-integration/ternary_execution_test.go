@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -13,10 +14,14 @@ func TestTernaryExecution(t *testing.T) {
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
+	tmpDir := t.TempDir()
+	tempBinary := filepath.Join(tmpDir, "test-ternary-exec")
+	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
+
 	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/fixtures/ternary-test.pine",
-		"-output", "/tmp/test-ternary-exec")
+		"-output", tempBinary)
 
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
@@ -25,14 +30,13 @@ func TestTernaryExecution(t *testing.T) {
 
 	// Compile the generated code
 	compileCmd := exec.Command("go", "build",
-		"-o", "/tmp/test-ternary-exec",
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		"-o", tempBinary,
+		tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
 	}
-	defer os.Remove("/tmp/test-ternary-exec")
 
 	// Create test data - alternating close above/below SMA
 	testData := []map[string]interface{}{
@@ -62,8 +66,7 @@ func TestTernaryExecution(t *testing.T) {
 		{"time": 1700082800, "open": 104.0, "high": 109.0, "low": 99.0, "close": 106.0, "volume": 3300.0},
 	}
 
-	dataFile := "/tmp/ternary-test-bars.json"
-	defer os.Remove(dataFile)
+	dataFile := filepath.Join(tmpDir, "ternary-test-bars.json")
 	dataJSON, _ := json.Marshal(testData)
 	err = os.WriteFile(dataFile, dataJSON, 0644)
 	if err != nil {
@@ -71,10 +74,9 @@ func TestTernaryExecution(t *testing.T) {
 	}
 
 	// Execute strategy
-	outputFile := "/tmp/ternary-exec-result.json"
-	defer os.Remove(outputFile)
+	outputFile := filepath.Join(tmpDir, "ternary-exec-result.json")
 
-	execCmd := exec.Command("/tmp/test-ternary-exec",
+	execCmd := exec.Command(tempBinary,
 		"-symbol", "TEST",
 		"-data", dataFile,
 		"-output", outputFile)

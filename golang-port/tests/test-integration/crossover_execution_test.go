@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -13,10 +14,15 @@ func TestCrossoverExecution(t *testing.T) {
 	os.Chdir("../..")
 	defer os.Chdir(originalDir)
 
+	tmpDir := t.TempDir()
+	tempBinary := filepath.Join(tmpDir, "test-crossover-exec")
+	outputFile := filepath.Join(tmpDir, "crossover-exec-result.json")
+	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
+
 	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", "testdata/fixtures/crossover-builtin-test.pine",
-		"-output", "/tmp/test-crossover-exec")
+		"-output", tempBinary)
 
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
@@ -25,20 +31,16 @@ func TestCrossoverExecution(t *testing.T) {
 
 	// Compile the generated code
 	compileCmd := exec.Command("go", "build",
-		"-o", "/tmp/test-crossover-exec",
-		"/var/folders/ft/nyw_rm792qb2056vjlkzfj200000gn/T/pine_strategy_temp.go")
+		"-o", tempBinary,
+		tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
 	}
-	defer os.Remove("/tmp/test-crossover-exec")
 
 	// Execute strategy
-	outputFile := "/tmp/crossover-exec-result.json"
-	defer os.Remove(outputFile)
-
-	execCmd := exec.Command("/tmp/test-crossover-exec",
+	execCmd := exec.Command(tempBinary,
 		"-symbol", "TEST",
 		"-data", "testdata/crossover-bars.json",
 		"-output", outputFile)
