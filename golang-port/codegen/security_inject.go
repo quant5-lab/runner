@@ -42,22 +42,14 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	/* Build deduplicated map of symbol:timeframe → expressions */
 	dedupMap := make(map[string][]security.SecurityCall)
 	for _, call := range calls {
-		/* Normalize symbol for grouping: empty/"tickerid"/"syminfo.tickerid" → "%s" placeholder */
 		sym := call.Symbol
-		if sym == "" || sym == "tickerid" || sym == "syminfo.tickerid" {
-			sym = "%s" // Runtime placeholder
+		isRuntimeSymbol := sym == "" || sym == "tickerid" || sym == "syminfo.tickerid"
+
+		if isRuntimeSymbol {
+			sym = "%s"
 		}
 
-		/* Normalize timeframe */
-		tf := call.Timeframe
-		if tf == "D" {
-			tf = "1D"
-		} else if tf == "W" {
-			tf = "1W"
-		} else if tf == "M" {
-			tf = "1M"
-		}
-
+		tf := normalizeTimeframe(call.Timeframe)
 		key := fmt.Sprintf("%s:%s", sym, tf)
 		dedupMap[key] = append(dedupMap[key], call)
 	}
@@ -66,47 +58,29 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
-	codeBuilder.WriteString("\tvar secTimeframeSeconds int64 /* Reused for multiple security() calls */\n")
+	codeBuilder.WriteString("\tvar secTimeframeSeconds int64\n")
 
 	/* Generate fetch and store code for each unique symbol:timeframe */
 	for key, callsForKey := range dedupMap {
 		firstCall := callsForKey[0]
 
-		/* Extract normalized symbol and timeframe from key */
-		sym := "%s"
-		tf := ""
 		parts := strings.Split(key, ":")
-		if len(parts) == 2 {
-			sym = parts[0]
-			tf = parts[1]
+		tf := parts[len(parts)-1]
+		sym := strings.Join(parts[:len(parts)-1], ":")
+
+		isPlaceholder := sym == "%s"
+
+		symbolCode := "ctx.Symbol"
+		if !isPlaceholder {
+			symbolCode = fmt.Sprintf("%q", firstCall.Symbol)
 		}
 
-		/* Resolve symbol: use ctx.Symbol for runtime placeholders */
-		symbolCode := firstCall.Symbol
-		if symbolCode == "" || symbolCode == "tickerid" || symbolCode == "syminfo.tickerid" || sym == "%s" {
-			symbolCode = "ctx.Symbol"
-		} else {
-			symbolCode = fmt.Sprintf("%q", symbolCode)
-		}
+		timeframe := normalizeTimeframe(tf)
+		varName := generateContextVarName(key, isPlaceholder)
 
-		/* Normalize timeframe for fetcher */
-		timeframe := tf
-		if timeframe == "" {
-			timeframe = firstCall.Timeframe
-		}
-		if timeframe == "D" {
-			timeframe = "1D"
-		} else if timeframe == "W" {
-			timeframe = "1W"
-		} else if timeframe == "M" {
-			timeframe = "1M"
-		}
-
-		varName := sanitizeVarName(fmt.Sprintf("ctx_%s", tf))
-		/* Generate runtime key - if symbol is placeholder, use fmt.Sprintf at runtime */
 		runtimeKey := key
-		if sym == "%s" {
-			runtimeKey = fmt.Sprintf("%%s:%s", tf) // Will be formatted at runtime
+		if isPlaceholder {
+			runtimeKey = fmt.Sprintf("%%s:%s", tf)
 		}
 
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Fetch %s data */\n", key))
@@ -130,9 +104,9 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		}
 
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Dynamic warmup based on indicators: %d bars */\n", warmupBars))
+
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
 		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds {\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t\t/* Convert base timeframe bars to security timeframe bars + warmup */\n"))
 		codeBuilder.WriteString(fmt.Sprintf("\t\ttimeframeRatio := float64(secTimeframeSeconds) / float64(baseTimeframeSeconds)\n"))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = int(float64(len(ctx.Data)) * timeframeRatio) + %d\n", varName, warmupBars))
 		codeBuilder.WriteString("\t}\n")
@@ -148,15 +122,14 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")
 
-		/* Store in map with runtime key resolution */
-		if sym == "%s" {
+		if isPlaceholder {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n\n", runtimeKey, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n\n", key, varName))
 		}
 	}
 
-	codeBuilder.WriteString("\t_ = fetcher // Suppress unused warning\n")
+	codeBuilder.WriteString("\t_ = fetcher\n")
 	codeBuilder.WriteString("\t/* === End Prefetch === */\n\n")
 
 	/* Required imports */
@@ -235,6 +208,29 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 		FunctionBody: updatedBody,
 		StrategyName: code.StrategyName,
 	}, nil
+}
+
+/* normalizeTimeframe converts short forms to canonical format */
+func normalizeTimeframe(tf string) string {
+	switch tf {
+	case "D":
+		return "1D"
+	case "W":
+		return "1W"
+	case "M":
+		return "1M"
+	default:
+		return tf
+	}
+}
+
+/* generateContextVarName creates unique variable name for each symbol:timeframe */
+func generateContextVarName(key string, isPlaceholder bool) string {
+	if isPlaceholder {
+		parts := strings.Split(key, ":")
+		return sanitizeVarName(fmt.Sprintf("sec_%s", parts[1]))
+	}
+	return sanitizeVarName(key)
 }
 
 /* sanitizeVarName converts "SYMBOL:TIMEFRAME" to valid Go variable name */
