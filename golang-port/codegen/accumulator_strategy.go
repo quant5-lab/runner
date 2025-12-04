@@ -181,3 +181,62 @@ func (e *EMAAccumulator) NeedsNaNGuard() bool {
 func (e *EMAAccumulator) GetResultVariable() string {
 	return e.resultVar
 }
+
+// WeightedSumAccumulator accumulates values with linearly decreasing weights for WMA.
+//
+// WMA formula: WMA = (n*v0 + (n-1)*v1 + ... + 1*vn-1) / (n + (n-1) + ... + 1)
+// where n is the period and v0 is the most recent value
+//
+// Denominator: sum = n*(n+1)/2
+type WeightedSumAccumulator struct {
+	period int
+}
+
+func NewWeightedSumAccumulator(period int) *WeightedSumAccumulator {
+	return &WeightedSumAccumulator{period: period}
+}
+
+func (w *WeightedSumAccumulator) Initialize() string {
+	return "weightedSum := 0.0\nhasNaN := false"
+}
+
+func (w *WeightedSumAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("weight := float64(%d - j)\nweightedSum += weight * %s", w.period, value)
+}
+
+func (w *WeightedSumAccumulator) Finalize(period int) string {
+	denominator := period * (period + 1) / 2
+	return fmt.Sprintf("weightedSum / %d.0", denominator)
+}
+
+func (w *WeightedSumAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// DeviationAccumulator calculates mean absolute deviation (MAD).
+//
+// MAD formula: MAD = Σ|value - mean| / period
+// This requires a pre-calculated mean value (two-pass algorithm like STDEV).
+type DeviationAccumulator struct {
+	mean string // Variable name containing the pre-calculated mean
+}
+
+func NewDeviationAccumulator(mean string) *DeviationAccumulator {
+	return &DeviationAccumulator{mean: mean}
+}
+
+func (d *DeviationAccumulator) Initialize() string {
+	return "deviation := 0.0"
+}
+
+func (d *DeviationAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("diff := %s - %s\nif diff < 0 { diff = -diff }\ndeviation += diff", value, d.mean)
+}
+
+func (d *DeviationAccumulator) Finalize(period int) string {
+	return fmt.Sprintf("deviation / %d.0", period)
+}
+
+func (d *DeviationAccumulator) NeedsNaNGuard() bool {
+	return false // Mean calculation already filtered NaN values
+}

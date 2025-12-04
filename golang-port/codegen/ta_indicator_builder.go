@@ -176,6 +176,61 @@ func (b *TAIndicatorBuilder) Build() string {
 	return code
 }
 
+// BuildEMA generates EMA-specific code with backward loop and initial value handling
+func (b *TAIndicatorBuilder) BuildEMA() string {
+	b.indenter.IncreaseIndent() // Start at indent level 1
+
+	code := b.BuildHeader()
+	code += b.BuildWarmupCheck()
+
+	b.indenter.IncreaseIndent()
+
+	// Calculate alpha and initialize EMA with oldest value
+	code += b.indenter.Line(fmt.Sprintf("alpha := 2.0 / float64(%d+1)", b.period))
+	initialAccess := b.loopGen.accessor.GenerateInitialValueAccess(b.period)
+	code += b.indenter.Line(fmt.Sprintf("ema := %s", initialAccess))
+
+	// Check if initial value is NaN
+	code += b.indenter.Line("if math.IsNaN(ema) {")
+	b.indenter.IncreaseIndent()
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else {")
+	b.indenter.IncreaseIndent()
+
+	// Loop backwards from period-2 to 0
+	code += b.loopGen.GenerateBackwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+
+	valueAccess := b.loopGen.GenerateValueAccess()
+
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
+		code += b.indenter.Line("if math.IsNaN(val) {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line("ema = math.NaN()")
+		code += b.indenter.Line("break")
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+		code += b.indenter.Line("ema = alpha*val + (1-alpha)*ema")
+	} else {
+		code += b.indenter.Line(fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema", valueAccess))
+	}
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	// Set final result
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(ema)", b.varName))
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}") // end else (initial value check)
+
+	code += b.CloseBlock()
+
+	return code
+}
+
 // CodeIndenter implements Indenter interface
 type CodeIndenter struct {
 	level int
@@ -213,4 +268,148 @@ func (c *CodeIndenter) DecreaseIndent() {
 	if c.level > 0 {
 		c.level--
 	}
+}
+
+// BuildSTDEV generates STDEV-specific code with two-pass algorithm (mean then variance)
+func (b *TAIndicatorBuilder) BuildSTDEV() string {
+	b.indenter.IncreaseIndent() // Start at indent level 1
+
+	code := b.BuildHeader()
+	code += b.BuildWarmupCheck()
+
+	b.indenter.IncreaseIndent()
+
+	// Pass 1: Calculate mean
+	code += b.indenter.Line("sum := 0.0")
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("hasNaN := false")
+	}
+
+	// Forward loop for sum
+	code += b.loopGen.GenerateForwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+
+	valueAccess := b.loopGen.GenerateValueAccess()
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
+		code += b.indenter.Line("if math.IsNaN(val) {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line("hasNaN = true")
+		code += b.indenter.Line("break")
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+		code += b.indenter.Line("sum += val")
+	} else {
+		code += b.indenter.Line(fmt.Sprintf("sum += %s", valueAccess))
+	}
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	// Check for NaN and calculate mean
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("if hasNaN {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else {")
+		b.indenter.IncreaseIndent()
+	}
+
+	code += b.indenter.Line(fmt.Sprintf("mean := sum / %d.0", b.period))
+
+	// Pass 2: Calculate variance
+	code += b.indenter.Line("variance := 0.0")
+	code += b.loopGen.GenerateForwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+
+	code += b.indenter.Line(fmt.Sprintf("diff := %s - mean", valueAccess))
+	code += b.indenter.Line("variance += diff * diff")
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	code += b.indenter.Line(fmt.Sprintf("variance /= %d.0", b.period))
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))", b.varName))
+
+	if b.loopGen.RequiresNaNCheck() {
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+	}
+
+	code += b.CloseBlock()
+
+	return code
+}
+
+// BuildDEV generates DEV-specific code with two-pass algorithm (mean then absolute deviation)
+func (b *TAIndicatorBuilder) BuildDEV() string {
+	b.indenter.IncreaseIndent() // Start at indent level 1
+
+	code := b.BuildHeader()
+	code += b.BuildWarmupCheck()
+
+	b.indenter.IncreaseIndent()
+
+	// Pass 1: Calculate mean
+	code += b.indenter.Line("sum := 0.0")
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("hasNaN := false")
+	}
+
+	// Forward loop for sum
+	code += b.loopGen.GenerateForwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+
+	valueAccess := b.loopGen.GenerateValueAccess()
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
+		code += b.indenter.Line("if math.IsNaN(val) {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line("hasNaN = true")
+		code += b.indenter.Line("break")
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+		code += b.indenter.Line("sum += val")
+	} else {
+		code += b.indenter.Line(fmt.Sprintf("sum += %s", valueAccess))
+	}
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	// Check for NaN and calculate mean
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("if hasNaN {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else {")
+		b.indenter.IncreaseIndent()
+	}
+
+	code += b.indenter.Line(fmt.Sprintf("mean := sum / %d.0", b.period))
+
+	// Pass 2: Calculate absolute deviation
+	code += b.indenter.Line("deviation := 0.0")
+	code += b.loopGen.GenerateForwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+
+	code += b.indenter.Line(fmt.Sprintf("diff := %s - mean", valueAccess))
+	code += b.indenter.Line("if diff < 0 { diff = -diff }")
+	code += b.indenter.Line("deviation += diff")
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(deviation / %d.0)", b.varName, b.period))
+
+	if b.loopGen.RequiresNaNCheck() {
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+	}
+
+	code += b.CloseBlock()
+
+	return code
 }

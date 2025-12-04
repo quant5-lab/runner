@@ -58,6 +58,15 @@ func (f *TAIndicatorFactory) CreateBuilder(
 		builder.WithAccumulator(NewEMAAccumulator(period))
 		return builder, nil
 
+	case "ta.wma":
+		builder.WithAccumulator(NewWeightedSumAccumulator(period))
+		return builder, nil
+
+	case "ta.dev":
+		// DEV requires special handling like STDEV - return builder without accumulator
+		// Caller must handle two-pass calculation (mean then absolute deviation)
+		return builder, nil
+
 	case "ta.stdev":
 		// STDEV requires special handling - return builder without accumulator
 		// Caller must handle two-pass calculation (mean then variance)
@@ -118,6 +127,8 @@ func (f *TAIndicatorFactory) SupportedIndicators() []string {
 	return []string{
 		"ta.sma",
 		"ta.ema",
+		"ta.wma",
+		"ta.dev",
 		"ta.stdev",
 	}
 }

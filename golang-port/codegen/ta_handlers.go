@@ -48,7 +48,8 @@ func (h *EMAHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
 
-	return g.generateEMA(varName, period, accessGen, needsNaN)
+	builder := NewTAIndicatorBuilder("ta.ema", varName, period, accessGen, needsNaN)
+	return g.indentCode(builder.BuildEMA()), nil
 }
 
 // STDEVHandler generates inline code for Standard Deviation calculations
@@ -69,7 +70,8 @@ func (h *STDEVHandler) GenerateCode(g *generator, varName string, call *ast.Call
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
 
-	return g.generateSTDEV(varName, period, accessGen, needsNaN)
+	builder := NewTAIndicatorBuilder("ta.stdev", varName, period, accessGen, needsNaN)
+	return g.indentCode(builder.BuildSTDEV()), nil
 }
 
 // ATRHandler generates inline code for Average True Range calculations
@@ -339,4 +341,49 @@ func generateCrossDetection(g *generator, varName string, call *ast.CallExpressi
 	code += g.ind() + "}\n"
 
 	return code, nil
+}
+
+// WMAHandler generates inline code for Weighted Moving Average calculations
+type WMAHandler struct{}
+
+func (h *WMAHandler) CanHandle(funcName string) bool {
+	return funcName == "ta.wma" || funcName == "wma"
+}
+
+func (h *WMAHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	sourceExpr, period, err := extractTAArguments(g, call, "ta.wma")
+	if err != nil {
+		return "", err
+	}
+
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExpr)
+	accessGen := CreateAccessGenerator(sourceInfo)
+	needsNaN := sourceInfo.IsSeriesVariable()
+
+	builder := NewTAIndicatorBuilder("ta.wma", varName, period, accessGen, needsNaN)
+	builder.WithAccumulator(NewWeightedSumAccumulator(period))
+	return g.indentCode(builder.Build()), nil
+}
+
+// DEVHandler generates inline code for Mean Absolute Deviation calculations
+type DEVHandler struct{}
+
+func (h *DEVHandler) CanHandle(funcName string) bool {
+	return funcName == "ta.dev" || funcName == "dev"
+}
+
+func (h *DEVHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	sourceExpr, period, err := extractTAArguments(g, call, "ta.dev")
+	if err != nil {
+		return "", err
+	}
+
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExpr)
+	accessGen := CreateAccessGenerator(sourceInfo)
+	needsNaN := sourceInfo.IsSeriesVariable()
+
+	builder := NewTAIndicatorBuilder("ta.dev", varName, period, accessGen, needsNaN)
+	return g.indentCode(builder.BuildDEV()), nil
 }
