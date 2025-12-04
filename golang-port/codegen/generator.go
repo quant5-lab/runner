@@ -1278,7 +1278,6 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 	needsNaN := sourceInfo.IsSeriesVariable()
 
 	var code string
-	var err error
 
 	switch normalizedFunc {
 	case "ta.sma":
@@ -1287,16 +1286,12 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 		code = g.indentCode(builder.Build())
 
 	case "ta.ema":
-		code, err = g.generateEMA(varName, period, accessGen, needsNaN)
-		if err != nil {
-			return "", err
-		}
+		builder := NewTAIndicatorBuilder("ta.ema", varName, period, accessGen, needsNaN)
+		code = g.indentCode(builder.BuildEMA())
 
 	case "ta.stdev":
-		code, err = g.generateSTDEV(varName, period, accessGen, needsNaN)
-		if err != nil {
-			return "", err
-		}
+		builder := NewTAIndicatorBuilder("ta.stdev", varName, period, accessGen, needsNaN)
+		code = g.indentCode(builder.BuildSTDEV())
 
 	default:
 		return "", fmt.Errorf("inline TA not implemented for %s", funcName)
@@ -1923,145 +1918,6 @@ func (g *generator) indentCode(code string) string {
 	}
 
 	return strings.Join(indented, "\n")
-}
-
-// generateSTDEV generates STDEV calculation using two-pass algorithm.
-// Pass 1: Calculate mean, Pass 2: Calculate variance from mean.
-func (g *generator) generateSTDEV(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	var code strings.Builder
-
-	// Add header comment
-	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.stdev(%d) */\n", period))
-
-	// Warmup check
-	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-	g.indent--
-	code.WriteString(g.ind() + "} else {\n")
-	g.indent++
-
-	// Pass 1: Calculate mean (inline SMA calculation)
-	code.WriteString(g.ind() + "sum := 0.0\n")
-	if needsNaN {
-		code.WriteString(g.ind() + "hasNaN := false\n")
-	}
-	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
-	g.indent++
-
-	if needsNaN {
-		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
-		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
-		g.indent++
-		code.WriteString(g.ind() + "hasNaN = true\n")
-		code.WriteString(g.ind() + "break\n")
-		g.indent--
-		code.WriteString(g.ind() + "}\n")
-		code.WriteString(g.ind() + "sum += val\n")
-	} else {
-		code.WriteString(g.ind() + fmt.Sprintf("sum += %s\n", accessor.GenerateLoopValueAccess("j")))
-	}
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n")
-
-	// Check for NaN and calculate mean
-	if needsNaN {
-		code.WriteString(g.ind() + "if hasNaN {\n")
-		g.indent++
-		code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-		g.indent--
-		code.WriteString(g.ind() + "} else {\n")
-		g.indent++
-	}
-
-	code.WriteString(g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period))
-
-	// Pass 2: Calculate variance
-	code.WriteString(g.ind() + "variance := 0.0\n")
-	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("diff := %s - mean\n", accessor.GenerateLoopValueAccess("j")))
-	code.WriteString(g.ind() + "variance += diff * diff\n")
-	g.indent--
-	code.WriteString(g.ind() + "}\n")
-	code.WriteString(g.ind() + fmt.Sprintf("variance /= %d.0\n", period))
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName))
-
-	if needsNaN {
-		g.indent--
-		code.WriteString(g.ind() + "}\n") // close else (hasNaN check)
-	}
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n") // close else (warmup check)
-
-	return code.String(), nil
-}
-
-// generateEMA generates inline EMA (Exponential Moving Average) calculation.
-// EMA is different from SMA in that it:
-// - Initializes with the oldest value in the period
-// - Uses exponential smoothing with alpha = 2/(period+1)
-// - Iterates backwards from period-2 to 0
-func (g *generator) generateEMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	var code strings.Builder
-
-	// Header comment
-	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.ema(%d) */\n", period))
-
-	// Warmup check
-	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-	g.indent--
-	code.WriteString(g.ind() + "} else {\n")
-	g.indent++
-
-	// Calculate alpha and initialize EMA with oldest value
-	code.WriteString(g.ind() + fmt.Sprintf("alpha := 2.0 / float64(%d+1)\n", period))
-	code.WriteString(g.ind() + fmt.Sprintf("ema := %s\n", accessor.GenerateInitialValueAccess(period)))
-
-	// Check if initial value is NaN
-	code.WriteString(g.ind() + "if math.IsNaN(ema) {\n")
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-	g.indent--
-	code.WriteString(g.ind() + "} else {\n")
-	g.indent++
-
-	// Loop backwards from period-2 to 0
-	code.WriteString(g.ind() + fmt.Sprintf("for j := %d-2; j >= 0; j-- {\n", period))
-	g.indent++
-
-	if needsNaN {
-		// With NaN checking for Series variables
-		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
-		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
-		g.indent++
-		code.WriteString(g.ind() + "ema = math.NaN()\n")
-		code.WriteString(g.ind() + "break\n")
-		g.indent--
-		code.WriteString(g.ind() + "}\n")
-		code.WriteString(g.ind() + "ema = alpha*val + (1-alpha)*ema\n")
-	} else {
-		// Direct calculation for OHLCV fields
-		code.WriteString(g.ind() + fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema\n", accessor.GenerateLoopValueAccess("j")))
-	}
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n") // end for loop
-
-	// Set final result
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(ema)\n", varName))
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n") // end else (initial value check)
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n") // end else (warmup check)
-
-	return code.String(), nil
 }
 
 // generateRMA generates inline RMA (Relative Moving Average) calculation
