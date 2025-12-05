@@ -30,6 +30,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.mathHandler = NewMathHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.taRegistry = NewTAFunctionRegistry()
+	gen.plotExpressionHandler = NewPlotExpressionHandler(gen)
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -45,20 +46,21 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 }
 
 type generator struct {
-	imports           map[string]bool
-	variables         map[string]string
-	constants         map[string]interface{} // Input constants (input.float, input.int, etc)
-	plots             []string               // Track plot variables
-	strategyName      string                 // Strategy name from indicator() or strategy()
-	indent            int
-	taFunctions       []taFunctionCall // List of TA function calls to pre-calculate
-	inSecurityContext bool             // Flag when generating code inside security() context
-	limits            CodeGenerationLimits
-	safetyGuard       RuntimeSafetyGuard
-	inputHandler      *InputHandler
-	mathHandler       *MathHandler
-	subscriptResolver *SubscriptResolver
-	taRegistry        *TAFunctionRegistry // Registry for TA function handlers
+	imports               map[string]bool
+	variables             map[string]string
+	constants             map[string]interface{} // Input constants (input.float, input.int, etc)
+	plots                 []string               // Track plot variables
+	strategyName          string                 // Strategy name from indicator() or strategy()
+	indent                int
+	taFunctions           []taFunctionCall // List of TA function calls to pre-calculate
+	inSecurityContext     bool             // Flag when generating code inside security() context
+	limits                CodeGenerationLimits
+	safetyGuard           RuntimeSafetyGuard
+	inputHandler          *InputHandler
+	mathHandler           *MathHandler
+	subscriptResolver     *SubscriptResolver
+	taRegistry            *TAFunctionRegistry    // Registry for TA function handlers
+	plotExpressionHandler *PlotExpressionHandler // Handler for inline plot expressions
 }
 
 type taFunctionCall struct {
@@ -572,55 +574,9 @@ func (g *generator) generateNumericExpression(expr ast.Expression) (string, erro
 	return g.generateConditionExpression(expr)
 }
 
-// generatePlotExpression generates inline code for plot() argument expressions
-// Handles ternary expressions, identifiers, and literals as immediate values
+// generatePlotExpression delegates to PlotExpressionHandler for SOLID architecture
 func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) {
-	switch e := expr.(type) {
-	case *ast.ConditionalExpression:
-		// Handle ternary: test ? consequent : alternate
-		// Generate as inline func() float64 expression
-		condCode, err := g.generateConditionExpression(e.Test)
-		if err != nil {
-			return "", err
-		}
-		// Add != 0 conversion for Series variables used in boolean context
-		if _, ok := e.Test.(*ast.Identifier); ok {
-			condCode = condCode + " != 0"
-		} else if _, ok := e.Test.(*ast.MemberExpression); ok {
-			condCode = condCode + " != 0"
-		}
-
-		consequentCode, err := g.generateNumericExpression(e.Consequent)
-		if err != nil {
-			return "", err
-		}
-		alternateCode, err := g.generateNumericExpression(e.Alternate)
-		if err != nil {
-			return "", err
-		}
-
-		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
-			condCode, consequentCode, alternateCode), nil
-
-	case *ast.Identifier:
-		// Variable reference - use Series.Get(0)
-		return e.Name + "Series.Get(0)", nil
-
-	case *ast.MemberExpression:
-		// Member expression like close[0]
-		return g.extractSeriesExpression(e), nil
-
-	case *ast.Literal:
-		// Direct literal value
-		return g.generateNumericExpression(e)
-
-	case *ast.BinaryExpression, *ast.LogicalExpression:
-		// Mathematical or logical expression
-		return g.generateConditionExpression(expr)
-
-	default:
-		return "", fmt.Errorf("unsupported plot expression type: %T", expr)
-	}
+	return g.plotExpressionHandler.Generate(expr)
 }
 
 func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
@@ -742,12 +698,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 
 	case *ast.CallExpression:
-		// Handle inline function calls in conditions (e.g., na(time(...)))
 		funcName := g.extractFunctionName(e.Callee)
 
 		switch funcName {
 		case "na":
-			// na(expr) checks if value is NaN
 			if len(e.Arguments) >= 1 {
 				argCode, err := g.generateConditionExpression(e.Arguments[0])
 				if err != nil {
@@ -758,19 +712,18 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return "true", nil
 
 		case "time":
-			// time() function returns timestamp or NaN
 			handler := NewTimeHandler(g.ind())
 			return handler.HandleInlineExpression(e.Arguments), nil
 
 		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
 			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
-			// Math functions can be used inline in conditions/ternaries
 			mathHandler := NewMathHandler()
 			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 
 		default:
-			// For other functions, try to generate inline expression
-			// This might fail for complex cases - fallback to error
+			if g.plotExpressionHandler != nil && g.plotExpressionHandler.taRegistry.IsSupported(funcName) {
+				return g.plotExpressionHandler.HandleTAFunction(e, funcName)
+			}
 			return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 		}
 
