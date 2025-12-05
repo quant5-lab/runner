@@ -15,9 +15,10 @@ type VersionDirective struct {
 }
 
 type Statement struct {
-	Assignment *Assignment     `parser:"@@"`
-	If         *IfStatement    `parser:"| @@"`
-	Expression *ExpressionStmt `parser:"| @@"`
+	Assignment   *Assignment     `parser:"@@"`
+	Reassignment *Reassignment   `parser:"| @@"`
+	If           *IfStatement    `parser:"| @@"`
+	Expression   *ExpressionStmt `parser:"| @@"`
 }
 
 type IfStatement struct {
@@ -27,6 +28,11 @@ type IfStatement struct {
 
 type Assignment struct {
 	Name  string      `parser:"@Ident '='"`
+	Value *Expression `parser:"@@"`
+}
+
+type Reassignment struct {
+	Name  string      `parser:"@Ident ':='"`
 	Value *Expression `parser:"@@"`
 }
 
@@ -163,7 +169,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
+	{Name: "Punct", Pattern: `:=|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
 })
 
 func NewParser() (*participle.Parser[Script], error) {

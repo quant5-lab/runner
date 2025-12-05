@@ -55,6 +55,27 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 		}, nil
 	}
 
+	if stmt.Reassignment != nil {
+		init, err := c.convertExpression(stmt.Reassignment.Value)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.VariableDeclaration{
+			NodeType: ast.TypeVariableDeclaration,
+			Declarations: []ast.VariableDeclarator{
+				{
+					NodeType: ast.TypeVariableDeclarator,
+					ID: ast.Identifier{
+						NodeType: ast.TypeIdentifier,
+						Name:     stmt.Reassignment.Name,
+					},
+					Init: init,
+				},
+			},
+			Kind: "var",
+		}, nil
+	}
+
 	if stmt.If != nil {
 		test, err := c.convertComparison(stmt.If.Condition)
 		if err != nil {
