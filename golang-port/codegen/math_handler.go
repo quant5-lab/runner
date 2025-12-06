@@ -25,7 +25,6 @@ GenerateMathCall generates code for math.* functions.
 Returns: Go expression string that evaluates the math function
 */
 func (mh *MathHandler) GenerateMathCall(funcName string, args []ast.Expression, g *generator) (string, error) {
-	// Normalize function name
 	funcName = strings.ToLower(funcName)
 
 	switch funcName {

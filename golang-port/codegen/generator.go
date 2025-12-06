@@ -35,6 +35,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)       // Expression analysis for temp vars
 	gen.tempVarMgr = NewTempVariableManager(gen)        // ForwardSeriesBuffer temp var manager
 	gen.constEvaluator = validation.NewWarmupAnalyzer() // Compile-time constant evaluator
+	gen.plotExprHandler = NewPlotExpressionHandler(gen) // Inline TA/math in plot() expressions
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -68,6 +69,7 @@ type generator struct {
 	exprAnalyzer      *ExpressionAnalyzer        // Finds nested TA calls in expressions
 	tempVarMgr        *TempVariableManager       // Manages temp Series variables (ForwardSeriesBuffer)
 	constEvaluator    *validation.WarmupAnalyzer // Compile-time constant expression evaluator
+	plotExprHandler   *PlotExpressionHandler     // Handles inline TA/math in plot() expressions
 }
 
 type taFunctionCall struct {
@@ -685,6 +687,10 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 		// Mathematical or logical expression
 		return g.generateConditionExpression(expr)
 
+	case *ast.CallExpression:
+		// Inline TA/math functions: plot(sma(close, 20)), plot(math.max(high, low))
+		return g.plotExprHandler.Generate(expr)
+
 	default:
 		return "", fmt.Errorf("unsupported plot expression type: %T", expr)
 	}
@@ -1242,7 +1248,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			/* Handle TA function calls: ta.sma(close, 20), ta.ema(close, 10) */
 			/* Create temporary series variable for inline TA result */
 			secTempVar := fmt.Sprintf("secTmp_%s", varName)
-			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(secCtx.Data))\n", secTempVar)
 
 			/* Store original context, switch to security context */
 			code += g.ind() + "origCtx := ctx\n"
@@ -1272,7 +1278,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			/* Complex expression (BinaryExpression, ConditionalExpression, etc.) */
 			/* Create temporary series variable for expression result */
 			secTempVar := fmt.Sprintf("secTmp_%s", varName)
-			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(secCtx.Data))\n", secTempVar)
 
 			/* Store original context, switch to security context */
 			code += g.ind() + "origCtx := ctx\n"
@@ -1489,7 +1495,7 @@ func (g *generator) generateBinaryExpressionInSecurityContext(varName string, ex
 
 	/* Generate temp series for left operand */
 	leftVar := fmt.Sprintf("%s_left", varName)
-	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", leftVar)
+	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(ctx.Data))\n", leftVar)
 
 	leftInit, err := g.generateVariableInit(leftVar, expr.Left)
 	if err != nil {
@@ -1499,7 +1505,7 @@ func (g *generator) generateBinaryExpressionInSecurityContext(varName string, ex
 
 	/* Generate temp series for right operand */
 	rightVar := fmt.Sprintf("%s_right", varName)
-	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(1000)\n", rightVar)
+	code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(ctx.Data))\n", rightVar)
 
 	rightInit, err := g.generateVariableInit(rightVar, expr.Right)
 	if err != nil {

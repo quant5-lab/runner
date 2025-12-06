@@ -48,6 +48,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&CrossoverHandler{},
 			&CrossunderHandler{},
 			&FixnanHandler{},
+			&SumHandler{},
 		},
 	}
 }

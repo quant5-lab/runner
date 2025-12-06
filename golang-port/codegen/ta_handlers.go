@@ -398,3 +398,25 @@ func (h *DEVHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	builder := NewTAIndicatorBuilder("ta.dev", varName, period, accessGen, needsNaN)
 	return g.indentCode(builder.BuildDEV()), nil
 }
+
+type SumHandler struct{}
+
+func (h *SumHandler) CanHandle(funcName string) bool {
+	return funcName == "sum"
+}
+
+func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	sourceExpr, period, err := extractTAArguments(g, call, "sum")
+	if err != nil {
+		return "", err
+	}
+
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExpr)
+	accessGen := CreateAccessGenerator(sourceInfo)
+	needsNaN := sourceInfo.IsSeriesVariable()
+
+	builder := NewTAIndicatorBuilder("sum", varName, period, accessGen, needsNaN)
+	builder.WithAccumulator(NewSumAccumulator())
+	return g.indentCode(builder.Build()), nil
+}
