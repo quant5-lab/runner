@@ -37,6 +37,30 @@ func TestSeriesSourceClassifier_ClassifySeriesVariable(t *testing.T) {
 			wantType:    SourceTypeSeriesVariable,
 			wantVarName: "value123",
 		},
+		{
+			name:        "temp var with hash suffix using Get",
+			sourceExpr:  "min_b42d7077Series.Get(9-1)",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "min_b42d7077",
+		},
+		{
+			name:        "temp var with hash suffix using GetCurrent",
+			sourceExpr:  "min_b42d7077Series.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "min_b42d7077",
+		},
+		{
+			name:        "math max temp var using GetCurrent",
+			sourceExpr:  "math_max_b795b3caSeries.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "math_max_b795b3ca",
+		},
+		{
+			name:        "change temp var using GetCurrent",
+			sourceExpr:  "change_3ecb25e9Series.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "change_3ecb25e9",
+		},
 	}
 
 	for _, tt := range tests {

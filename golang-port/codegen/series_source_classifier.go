@@ -37,7 +37,7 @@ type SeriesSourceClassifier struct {
 // NewSeriesSourceClassifier creates a classifier for series source expressions.
 func NewSeriesSourceClassifier() *SeriesSourceClassifier {
 	return &SeriesSourceClassifier{
-		seriesVariablePattern: regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)Series\.Get`),
+		seriesVariablePattern: regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)Series\.Get(?:Current)?\(`),
 	}
 }
 
