@@ -852,14 +852,14 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			if len(e.Arguments) < 2 {
 				return "", fmt.Errorf("%s requires 2 arguments", funcName)
 			}
-			
+
 			arg1Call, isCall1 := e.Arguments[0].(*ast.CallExpression)
 			arg2Call, isCall2 := e.Arguments[1].(*ast.CallExpression)
-			
+
 			if !isCall1 || !isCall2 {
 				return "", fmt.Errorf("%s requires CallExpression arguments for inline generation", funcName)
 			}
-			
+
 			inline1, err := g.plotExprHandler.Generate(arg1Call)
 			if err != nil {
 				return "", fmt.Errorf("%s arg1 inline generation failed: %w", funcName, err)
@@ -868,12 +868,12 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			if err != nil {
 				return "", fmt.Errorf("%s arg2 inline generation failed: %w", funcName, err)
 			}
-			
+
 			if funcName == "ta.crossover" || funcName == "crossover" {
-				return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 > curr2 && prev1 <= prev2 }())", 
+				return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 > curr2 && prev1 <= prev2 }())",
 					inline1, inline2, inline1, inline2), nil
 			}
-			return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 < curr2 && prev1 >= prev2 }())", 
+			return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 < curr2 && prev1 >= prev2 }())",
 				inline1, inline2, inline1, inline2), nil
 
 		default:
@@ -996,10 +996,24 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 				continue
 			}
 
-			// Only create temp vars for TA functions (ta.sma, ta.ema, etc.)
-			// Math functions are handled inline by extractSeriesExpression
-			if !g.taRegistry.IsSupported(callInfo.FuncName) {
-				continue
+			// Create temp vars for:
+			// 1. TA functions (ta.sma, ta.ema, etc.)
+			// 2. Math functions that contain TA calls (e.g., max(change(x), 0))
+			isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
+			containsNestedTA := false
+			if !isTAFunction {
+				// Check if this math function contains TA calls
+				mathNestedCalls := g.exprAnalyzer.FindNestedCalls(callInfo.Call)
+				for _, mathNested := range mathNestedCalls {
+					if mathNested.Call != callInfo.Call && g.taRegistry.IsSupported(mathNested.FuncName) {
+						containsNestedTA = true
+						break
+					}
+				}
+			}
+			
+			if !isTAFunction && !containsNestedTA {
+				continue // Pure math function - inline OK
 			}
 
 			// Create temp var for this nested call

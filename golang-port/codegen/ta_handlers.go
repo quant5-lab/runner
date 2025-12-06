@@ -152,7 +152,7 @@ func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 type ChangeHandler struct{}
 
 func (h *ChangeHandler) CanHandle(funcName string) bool {
-	return funcName == "ta.change"
+	return funcName == "ta.change" || funcName == "change"
 }
 
 func (h *ChangeHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
