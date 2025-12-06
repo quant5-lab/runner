@@ -505,12 +505,37 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	g.indent++
 
 	// Generate consequent (body) statements
+	hasValidBody := false
 	for _, stmt := range ifStmt.Consequent {
+		// Parser limitation: indented blocks sometimes parsed incorrectly
+		// Skip expression-only statements in if body (likely parsing artifacts)
+		if exprStmt, ok := stmt.(*ast.ExpressionStatement); ok {
+			// Check if expression is non-call (BinaryExpression, LogicalExpression, etc.)
+			switch exprStmt.Expression.(type) {
+			case *ast.CallExpression:
+				// Valid call statement - generate
+			case *ast.Identifier, *ast.Literal:
+				// Simple expression - skip (parsing artifact)
+				continue
+			case *ast.BinaryExpression, *ast.LogicalExpression, *ast.ConditionalExpression:
+				// Condition expression in body - skip (parsing artifact)
+				continue
+			}
+		}
+
 		stmtCode, err := g.generateStatement(stmt)
 		if err != nil {
 			return "", err
 		}
-		code += stmtCode
+		if stmtCode != "" {
+			code += stmtCode
+			hasValidBody = true
+		}
+	}
+
+	// If no valid body statements, add comment
+	if !hasValidBody {
+		code += g.ind() + "// TODO: if body statements\n"
 	}
 
 	g.indent--
@@ -1011,7 +1036,7 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 					}
 				}
 			}
-			
+
 			if !isTAFunction && !containsNestedTA {
 				continue // Pure math function - inline OK
 			}

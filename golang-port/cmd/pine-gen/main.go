@@ -40,6 +40,14 @@ func main() {
 		sourceStr = transformInputTypeParameters(sourceStr)
 	}
 
+	// Normalize indented if blocks for parser (parser limitation workaround)
+	sourceStr = preprocessor.NormalizeIfBlocks(sourceStr)
+
+	// DEBUG: Show normalized source
+	if os.Getenv("DEBUG_NORMALIZE") == "1" {
+		fmt.Fprintf(os.Stderr, "=== NORMALIZED SOURCE ===\n%s\n=========================\n", sourceStr)
+	}
+
 	pineParser, err := parser.NewParser()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create parser: %v\n", err)

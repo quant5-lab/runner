@@ -113,8 +113,8 @@ func (t *TANamespaceTransformer) transformStatement(stmt *parser.Statement) {
 	}
 	if stmt.If != nil {
 		t.transformComparison(stmt.If.Condition)
-		if stmt.If.Body != nil {
-			t.transformStatement(stmt.If.Body)
+		for _, bodyStmt := range stmt.If.Body {
+			t.transformStatement(bodyStmt)
 		}
 	}
 	if stmt.Expression != nil {

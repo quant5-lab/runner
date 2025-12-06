@@ -9,10 +9,10 @@ import (
 
 func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 	tests := []struct {
-		name          string
-		varName       string
-		initExpr      ast.Expression
-		expectedCode  []string
+		name           string
+		varName        string
+		initExpr       ast.Expression
+		expectedCode   []string
 		unexpectedCode []string
 	}{
 		{
@@ -48,14 +48,14 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 				},
 			},
 			expectedCode: []string{
-				"ta_change",          // Temp var for change()
-				"Series.Set(",        // Temp var Series.Set()
-				"max_",               // Temp var for max() with hash
-				"sr_upSeries.Set(",   // Main variable Series.Set()
-				"GetCurrent()",       // Accessor for temp var
+				"ta_change",        // Temp var for change()
+				"Series.Set(",      // Temp var Series.Set()
+				"max_",             // Temp var for max() with hash
+				"sr_upSeries.Set(", // Main variable Series.Set()
+				"GetCurrent()",     // Accessor for temp var
 			},
 			unexpectedCode: []string{
-				"func() float64",     // Should not inline change() as IIFE
+				"func() float64",       // Should not inline change() as IIFE
 				"bar.Close - ctx.Data", // Should not inline change calculation
 			},
 		},
@@ -97,7 +97,7 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 			},
 			expectedCode: []string{
 				"ta_change",
-				"min_",               // Temp var with hash
+				"min_", // Temp var with hash
 				"sr_downSeries.Set(",
 			},
 		},
@@ -117,7 +117,7 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 				"math.Max(",
 			},
 			unexpectedCode: []string{
-				"math_max",          // No temp var for pure math (temp var names have hash)
+				"math_max", // No temp var for pure math (temp var names have hash)
 			},
 		},
 	}
@@ -125,11 +125,11 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gen := &generator{
-				variables:      make(map[string]string),
-				varInits:       make(map[string]ast.Expression),
-				constants:      make(map[string]interface{}),
-				taRegistry:     NewTAFunctionRegistry(),
-				mathHandler:    NewMathHandler(),
+				variables:   make(map[string]string),
+				varInits:    make(map[string]ast.Expression),
+				constants:   make(map[string]interface{}),
+				taRegistry:  NewTAFunctionRegistry(),
+				mathHandler: NewMathHandler(),
 			}
 			gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 			gen.tempVarMgr = NewTempVariableManager(gen)
@@ -162,11 +162,11 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 
 func TestTempVarRegistrationBeforeUsage(t *testing.T) {
 	gen := &generator{
-		variables:      make(map[string]string),
-		varInits:       make(map[string]ast.Expression),
-		constants:      make(map[string]interface{}),
-		taRegistry:     NewTAFunctionRegistry(),
-		mathHandler:    NewMathHandler(),
+		variables:   make(map[string]string),
+		varInits:    make(map[string]ast.Expression),
+		constants:   make(map[string]interface{}),
+		taRegistry:  NewTAFunctionRegistry(),
+		mathHandler: NewMathHandler(),
 	}
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)

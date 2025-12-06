@@ -14,8 +14,8 @@ func (v *functionRenamer) visitStatement(stmt *parser.Statement) {
 	}
 	if stmt.If != nil {
 		v.visitComparison(stmt.If.Condition)
-		if stmt.If.Body != nil {
-			v.visitStatement(stmt.If.Body)
+		for _, bodyStmt := range stmt.If.Body {
+			v.visitStatement(bodyStmt)
 		}
 	}
 	if stmt.Expression != nil {
