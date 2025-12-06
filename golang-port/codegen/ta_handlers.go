@@ -406,9 +406,66 @@ func (h *SumHandler) CanHandle(funcName string) bool {
 }
 
 func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "sum")
-	if err != nil {
-		return "", err
+	if len(call.Arguments) < 2 {
+		return "", fmt.Errorf("sum requires 2 arguments")
+	}
+
+	// Check if source is ConditionalExpression - needs temp var for accessor pattern
+	var code string
+	sourceArg := call.Arguments[0]
+	var sourceExpr string
+
+	if condExpr, ok := sourceArg.(*ast.ConditionalExpression); ok {
+		// Create temp var for ternary expression
+		tempVarName := g.tempVarMgr.GetOrCreate(CallInfo{
+			FuncName: "ternary",
+			Call:     call,
+			ArgHash:  fmt.Sprintf("%p", condExpr),
+		})
+
+		// Generate ternary as temp var
+		condCode, err := g.generateConditionExpression(condExpr.Test)
+		if err != nil {
+			return "", err
+		}
+		condCode = g.addBoolConversionIfNeeded(condExpr.Test, condCode)
+
+		consequentCode, err := g.generateNumericExpression(condExpr.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateNumericExpression(condExpr.Alternate)
+		if err != nil {
+			return "", err
+		}
+
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
+			tempVarName, condCode, consequentCode, alternateCode)
+
+		sourceExpr = tempVarName + "Series.GetCurrent()"
+	} else {
+		extracted, _, extractErr := extractTAArguments(g, call, "sum")
+		if extractErr != nil {
+			return "", extractErr
+		}
+		sourceExpr = extracted
+	}
+
+	// Extract period
+	periodArg := call.Arguments[1]
+	var period int
+	if periodLit, ok := periodArg.(*ast.Literal); ok {
+		p, err := extractPeriod(periodLit)
+		if err != nil {
+			return "", fmt.Errorf("sum: %w", err)
+		}
+		period = p
+	} else {
+		periodValue := g.constEvaluator.EvaluateConstant(periodArg)
+		if math.IsNaN(periodValue) || periodValue <= 0 {
+			return "", fmt.Errorf("sum period must be compile-time constant")
+		}
+		period = int(periodValue)
 	}
 
 	classifier := NewSeriesSourceClassifier()
@@ -418,5 +475,7 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 
 	builder := NewTAIndicatorBuilder("sum", varName, period, accessGen, needsNaN)
 	builder.WithAccumulator(NewSumAccumulator())
-	return g.indentCode(builder.Build()), nil
+	sumCode := g.indentCode(builder.Build())
+
+	return code + sumCode, nil
 }
