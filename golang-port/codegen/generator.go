@@ -2339,14 +2339,17 @@ func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
 	}
 }
 
-/* preAnalyzeSecurityCalls scans AST for security() calls with nested TA expressions,
+/* preAnalyzeSecurityCalls scans AST for ALL expressions with nested TA calls,
  * registers temp vars BEFORE declaration phase to prevent "undefined: ta_sma_XXX" errors.
  *
  * CRITICAL: Must run AFTER first pass (collects constants) but BEFORE code generation.
  *
- * Bug Fix: security(syminfo.tickerid, 'D', sma(close, 20)) generates inline TA code
+ * Bug Fix #1: security(syminfo.tickerid, 'D', sma(close, 20)) generates inline TA code
  * that references ta_sma_20_XXXSeries, but if temp var not pre-registered, declaration
  * phase misses it → compile error.
+ *
+ * Bug Fix #2: sma(close, 50) > sma(close, 200) in BinaryExpression also needs temp vars
+ * for both sma() calls to avoid "undefined: ta_sma_XXX" errors.
  *
  * FILTER: Only create temp vars for TA functions (ta.sma, ta.ema, etc.), not math functions.
  */
@@ -2354,22 +2357,15 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
-					funcName := g.extractFunctionName(callExpr.Callee)
-					if funcName == "security" || funcName == "request.security" {
-						// security(symbol, timeframe, expression) - analyze 3rd argument
-						if len(callExpr.Arguments) >= 3 {
-							exprArg := callExpr.Arguments[2]
-							// Find ALL nested TA calls in expression
-							nestedCalls := g.exprAnalyzer.FindNestedCalls(exprArg)
-							// Register temp vars in REVERSE order (innermost first)
-							for i := len(nestedCalls) - 1; i >= 0; i-- {
-								callInfo := nestedCalls[i]
-								// Only create temp vars for TA functions, not math functions
-								if g.taRegistry.IsSupported(callInfo.FuncName) {
-									g.tempVarMgr.GetOrCreate(callInfo)
-								}
-							}
+				if declarator.Init != nil {
+					// Scan ALL expressions for nested TA calls (not just security())
+					nestedCalls := g.exprAnalyzer.FindNestedCalls(declarator.Init)
+					// Register temp vars in REVERSE order (innermost first)
+					for i := len(nestedCalls) - 1; i >= 0; i-- {
+						callInfo := nestedCalls[i]
+						// Only create temp vars for TA functions, not math functions
+						if g.taRegistry.IsSupported(callInfo.FuncName) {
+							g.tempVarMgr.GetOrCreate(callInfo)
 						}
 					}
 				}
