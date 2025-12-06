@@ -151,24 +151,24 @@
 - [x] `pivotlow()` function for support detection
 - [x] Nested ternary expressions in parentheses (parser grammar fix)
 - [x] `math.min()` and `math.max()` inline in conditions/ternaries
-- [ ] `security()` with complex TA function chains (sma, pivothigh/pivotlow, fixnan combinations)
+- [x] `security()` with complex TA function chains (sma, pivothigh/pivotlow, fixnan combinations)
 - [ ] `barmerge.lookahead_on` constant for security() lookahead parameter
 - [ ] `security()` with lookahead parameter support
-- [ ] `wma()` weighted moving average function
-- [ ] `dev()` function for deviation detection
+- [x] `wma()` weighted moving average function (WMAHandler implemented and registered)
+- [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
 - [ ] `strategy.position_avg_price` built-in variable
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
-- [ ] `bb7-dissect-sma.pine` - Blocked: Inline SMA comparison codegen issue
+- [x] `bb7-dissect-sma.pine` - Inline SMA comparison with unique temp vars (ta_sma_50_XXX > ta_sma_200_YYY)
 - [ ] `bb7-dissect-bb.pine` - Blocked: Variable period support needed for ta.sma(source, var)
 - [ ] `bb7-dissect-vol.pine` - Blocked: TODO comment syntax error in codegen
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
 - [ ] `bb7-dissect-sl.pine` - Blocked: Needs strategy.position_avg_price
-- [ ] `bb7-dissect-tp.pine` - Blocked: Needs wma(), dev()
+- [ ] `bb7-dissect-tp.pine` - Blocked: Inline TA temp vars not generated for complex files (infrastructure exists but incomplete)
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
 ## Phase 5: Strategy Validation
@@ -204,7 +204,7 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 140 tests (preprocessor: 21, chartdata: 16, builder: 18, codegen: 8+11 handlers, validation: 28/41, integration, runtime, datafetcher: 5, security: 27, security_inject: 4) - 100% pass rate for core features
+- **Test Suite**: 158 tests (preprocessor: 21, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, validation: 28/41, integration, runtime, datafetcher: 5, security: 27, security_inject: 4) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
