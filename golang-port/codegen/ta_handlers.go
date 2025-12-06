@@ -402,7 +402,7 @@ func (h *DEVHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 type SumHandler struct{}
 
 func (h *SumHandler) CanHandle(funcName string) bool {
-	return funcName == "sum"
+	return funcName == "sum" || funcName == "math.sum"
 }
 
 func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {

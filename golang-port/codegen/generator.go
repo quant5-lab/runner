@@ -837,13 +837,46 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 
 		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
 			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
-			// Math functions can be used inline in conditions/ternaries
 			mathHandler := NewMathHandler()
 			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 
+		case "ta.dev", "dev":
+			if len(e.Arguments) < 2 {
+				return "", fmt.Errorf("dev requires 2 arguments (source, length)")
+			}
+			sourceExpr := g.extractSeriesExpression(e.Arguments[0])
+			lengthExpr := g.extractSeriesExpression(e.Arguments[1])
+			return fmt.Sprintf("(func() float64 { length := int(%s); if ctx.BarIndex < length-1 { return math.NaN() }; sum := 0.0; for j := 0; j < length; j++ { sum += %s }; mean := sum / float64(length); devSum := 0.0; for j := 0; j < length; j++ { devSum += math.Abs(%s - mean) }; return devSum / float64(length) }())", lengthExpr, sourceExpr, sourceExpr), nil
+
+		case "ta.crossover", "crossover", "ta.crossunder", "crossunder":
+			if len(e.Arguments) < 2 {
+				return "", fmt.Errorf("%s requires 2 arguments", funcName)
+			}
+			
+			arg1Call, isCall1 := e.Arguments[0].(*ast.CallExpression)
+			arg2Call, isCall2 := e.Arguments[1].(*ast.CallExpression)
+			
+			if !isCall1 || !isCall2 {
+				return "", fmt.Errorf("%s requires CallExpression arguments for inline generation", funcName)
+			}
+			
+			inline1, err := g.plotExprHandler.Generate(arg1Call)
+			if err != nil {
+				return "", fmt.Errorf("%s arg1 inline generation failed: %w", funcName, err)
+			}
+			inline2, err := g.plotExprHandler.Generate(arg2Call)
+			if err != nil {
+				return "", fmt.Errorf("%s arg2 inline generation failed: %w", funcName, err)
+			}
+			
+			if funcName == "ta.crossover" || funcName == "crossover" {
+				return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 > curr2 && prev1 <= prev2 }())", 
+					inline1, inline2, inline1, inline2), nil
+			}
+			return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 < curr2 && prev1 >= prev2 }())", 
+				inline1, inline2, inline1, inline2), nil
+
 		default:
-			// For other functions, try to generate inline expression
-			// This might fail for complex cases - fallback to error
 			return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 		}
 

@@ -31,7 +31,6 @@ func NewMathNamespaceTransformer() *MathNamespaceTransformer {
 			"sign":             "math.sign",
 			"sin":              "math.sin",
 			"sqrt":             "math.sqrt",
-			"sum":              "math.sum",
 			"tan":              "math.tan",
 			"todegrees":        "math.todegrees",
 			"toradians":        "math.toradians",
