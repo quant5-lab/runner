@@ -31,9 +31,9 @@ func (mh *MathHandler) GenerateMathCall(funcName string, args []ast.Expression, 
 	switch funcName {
 	case "math.pow":
 		return mh.generatePow(args, g)
-	case "math.abs", "math.sqrt", "math.floor", "math.ceil", "math.round", "math.log", "math.exp":
+	case "math.abs", "abs", "math.sqrt", "sqrt", "math.floor", "floor", "math.ceil", "ceil", "math.round", "round", "math.log", "log", "math.exp", "exp":
 		return mh.generateUnaryMath(funcName, args, g)
-	case "math.max", "math.min":
+	case "math.max", "max", "math.min", "min":
 		return mh.generateBinaryMath(funcName, args, g)
 	default:
 		return "", fmt.Errorf("unsupported math function: %s", funcName)
@@ -74,9 +74,16 @@ func (mh *MathHandler) generateBinaryMath(funcName string, args []ast.Expression
 	arg1 := g.extractSeriesExpression(args[0])
 	arg2 := g.extractSeriesExpression(args[1])
 
-	// Extract function name after "math." and capitalize
-	shortName := funcName[5:]
-	goFuncName := "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
+	// Normalize function name (Pine "max" → Go "math.Max")
+	var goFuncName string
+	if strings.HasPrefix(funcName, "math.") {
+		// Already has math. prefix (math.max → math.Max)
+		shortName := funcName[5:]
+		goFuncName = "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
+	} else {
+		// Pine function without prefix (max → math.Max)
+		goFuncName = "math." + strings.ToUpper(funcName[:1]) + funcName[1:]
+	}
 
 	return fmt.Sprintf("%s(%s, %s)", goFuncName, arg1, arg2), nil
 }

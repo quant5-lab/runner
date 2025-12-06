@@ -46,6 +46,11 @@ func NewWarmupAnalyzer() *WarmupAnalyzer {
 	}
 }
 
+// AddConstant adds a constant value for use in expression evaluation
+func (w *WarmupAnalyzer) AddConstant(name string, value float64) {
+	w.constants[name] = value
+}
+
 func (w *WarmupAnalyzer) AnalyzeScript(program *ast.Program) []WarmupRequirement {
 	w.requirements = []WarmupRequirement{}
 	w.constants = make(map[string]float64)
@@ -61,12 +66,14 @@ func (w *WarmupAnalyzer) AnalyzeScript(program *ast.Program) []WarmupRequirement
 	return w.requirements
 }
 
-func (w *WarmupAnalyzer) collectConstants(node ast.Node) {
+// CollectConstants extracts constant values from variable declarations
+// Public method for use by codegen package
+func (w *WarmupAnalyzer) CollectConstants(node ast.Node) {
 	switch n := node.(type) {
 	case *ast.VariableDeclaration:
 		for _, decl := range n.Declarations {
 			if decl.Init != nil {
-				if val := w.evaluateConstant(decl.Init); !math.IsNaN(val) {
+				if val := w.EvaluateConstant(decl.Init); !math.IsNaN(val) {
 					w.constants[decl.ID.Name] = val
 				}
 			}
@@ -74,7 +81,18 @@ func (w *WarmupAnalyzer) collectConstants(node ast.Node) {
 	}
 }
 
-// evaluateConstant attempts to evaluate an expression to a constant value
+// collectConstants is internal helper for AnalyzeScript
+func (w *WarmupAnalyzer) collectConstants(node ast.Node) {
+	w.CollectConstants(node)
+}
+
+// EvaluateConstant attempts to evaluate an expression to a constant value
+// Public method for use by codegen package
+func (w *WarmupAnalyzer) EvaluateConstant(expr ast.Expression) float64 {
+	return w.evaluateConstant(expr)
+}
+
+// evaluateConstant is internal implementation
 func (w *WarmupAnalyzer) evaluateConstant(expr ast.Expression) float64 {
 	switch e := expr.(type) {
 	case *ast.Literal:
@@ -112,7 +130,7 @@ func (w *WarmupAnalyzer) evaluateConstant(expr ast.Expression) float64 {
 			}
 		}
 	case *ast.CallExpression:
-		return w.evaluateMathPow(e)
+		return w.evaluateMathCall(e)
 	case *ast.ConditionalExpression:
 		return math.NaN()
 	}
@@ -142,33 +160,66 @@ func (w *WarmupAnalyzer) lookupConstant(e *ast.MemberExpression) float64 {
 	return math.NaN()
 }
 
+// evaluateMathCall handles math.pow(), round(), sqrt(), etc.
+func (w *WarmupAnalyzer) evaluateMathCall(e *ast.CallExpression) float64 {
+	// Extract function name
+	funcName := ""
+	if member, ok := e.Callee.(*ast.MemberExpression); ok {
+		if obj, ok := member.Object.(*ast.Identifier); ok && obj.Name == "math" {
+			if prop, ok := member.Property.(*ast.Identifier); ok {
+				funcName = prop.Name
+			}
+		}
+	} else if ident, ok := e.Callee.(*ast.Identifier); ok {
+		// Pine functions without math. prefix
+		funcName = ident.Name
+	}
+
+	// Evaluate based on function
+	switch funcName {
+	case "pow", "math.pow":
+		if len(e.Arguments) == 2 {
+			base := w.evaluateConstant(e.Arguments[0])
+			exp := w.evaluateConstant(e.Arguments[1])
+			if !math.IsNaN(base) && !math.IsNaN(exp) {
+				return math.Pow(base, exp)
+			}
+		}
+	case "round", "math.round":
+		if len(e.Arguments) >= 1 {
+			val := w.evaluateConstant(e.Arguments[0])
+			if !math.IsNaN(val) {
+				return math.Round(val)
+			}
+		}
+	case "sqrt", "math.sqrt":
+		if len(e.Arguments) == 1 {
+			val := w.evaluateConstant(e.Arguments[0])
+			if !math.IsNaN(val) {
+				return math.Sqrt(val)
+			}
+		}
+	case "floor", "math.floor":
+		if len(e.Arguments) == 1 {
+			val := w.evaluateConstant(e.Arguments[0])
+			if !math.IsNaN(val) {
+				return math.Floor(val)
+			}
+		}
+	case "ceil", "math.ceil":
+		if len(e.Arguments) == 1 {
+			val := w.evaluateConstant(e.Arguments[0])
+			if !math.IsNaN(val) {
+				return math.Ceil(val)
+			}
+		}
+	}
+	return math.NaN()
+}
+
 func (w *WarmupAnalyzer) evaluateMathPow(e *ast.CallExpression) float64 {
-	member, ok := e.Callee.(*ast.MemberExpression)
-	if !ok {
-		return math.NaN()
-	}
-
-	obj, ok := member.Object.(*ast.Identifier)
-	if !ok || obj.Name != "math" {
-		return math.NaN()
-	}
-
-	prop, ok := member.Property.(*ast.Identifier)
-	if !ok || prop.Name != "pow" {
-		return math.NaN()
-	}
-
-	if len(e.Arguments) != 2 {
-		return math.NaN()
-	}
-
-	base := w.evaluateConstant(e.Arguments[0])
-	exp := w.evaluateConstant(e.Arguments[1])
-	if math.IsNaN(base) || math.IsNaN(exp) {
-		return math.NaN()
-	}
-
-	return math.Pow(base, exp)
+	// Legacy method - delegate to evaluateMathCall
+	return w.evaluateMathCall(e)
 }
 
 func (w *WarmupAnalyzer) scanNode(node ast.Node) {

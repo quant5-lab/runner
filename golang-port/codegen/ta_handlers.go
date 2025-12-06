@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
@@ -71,6 +72,9 @@ func (h *STDEVHandler) GenerateCode(g *generator, varName string, call *ast.Call
 	needsNaN := sourceInfo.IsSeriesVariable()
 
 	builder := NewTAIndicatorBuilder("ta.stdev", varName, period, accessGen, needsNaN)
+	if builder.loopGen == nil {
+		return "", fmt.Errorf("FATAL: loopGen is nil after NewTAIndicatorBuilder (period=%d, accessGen=%+v)", period, accessGen)
+	}
 	return g.indentCode(builder.BuildSTDEV()), nil
 }
 
@@ -267,24 +271,31 @@ func (h *FixnanHandler) GenerateCode(g *generator, varName string, call *ast.Cal
 // Helper functions
 
 // extractTAArguments extracts source and period from standard TA function arguments
+// Supports: literals (14), variables (sr_len), expressions (round(sr_n / 2))
 func extractTAArguments(g *generator, call *ast.CallExpression, funcName string) (string, int, error) {
 	if len(call.Arguments) < 2 {
 		return "", 0, fmt.Errorf("%s requires at least 2 arguments", funcName)
 	}
 
 	sourceExpr := g.extractSeriesExpression(call.Arguments[0])
+	periodArg := call.Arguments[1]
 
-	periodArg, ok := call.Arguments[1].(*ast.Literal)
-	if !ok {
-		return "", 0, fmt.Errorf("%s period must be literal", funcName)
+	// Try literal period first (fast path)
+	if periodLit, ok := periodArg.(*ast.Literal); ok {
+		period, err := extractPeriod(periodLit)
+		if err != nil {
+			return "", 0, fmt.Errorf("%s: %w", funcName, err)
+		}
+		return sourceExpr, period, nil
 	}
 
-	period, err := extractPeriod(periodArg)
-	if err != nil {
-		return "", 0, fmt.Errorf("%s: %w", funcName, err)
+	// Try compile-time constant evaluation (handles variables + expressions)
+	periodValue := g.constEvaluator.EvaluateConstant(periodArg)
+	if !math.IsNaN(periodValue) && periodValue > 0 {
+		return sourceExpr, int(periodValue), nil
 	}
 
-	return sourceExpr, period, nil
+	return "", 0, fmt.Errorf("%s period must be compile-time constant (got %T that evaluates to NaN)", funcName, periodArg)
 }
 
 // extractPeriod converts a literal to an integer period value

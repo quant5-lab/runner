@@ -179,7 +179,7 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			},
 			expectedCode: []string{
 				"ta.stdev(20)",
-				"math.Sqrt(variance)",
+				"math.Sqrt(variance / float64(20))",
 				"secTmp_test_val_leftSeries := series.NewSeries(1000)",  // Temp series for STDEV
 				"secTmp_test_val_rightSeries := series.NewSeries(1000)", // Temp series for multiplier
 				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()",
@@ -436,12 +436,12 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
 		"ta.stdev(20)",
-		"sum := 0.0",         // Mean calculation
-		"mean := sum / 20.0", // Mean result
-		"variance := 0.0",    // Variance calculation
+		"sum := 0.0",                // Mean calculation
+		"mean := sum / float64(20)", // Mean result
+		"variance := 0.0",           // Variance calculation
 		"diff := ctx.Data[ctx.BarIndex-j].Close - mean", // Uses built-in with relative offset
 		"variance += diff * diff",                       // Squared deviation
-		"math.Sqrt(variance)",                           // Final STDEV
+		"math.Sqrt(variance / float64(20))",             // Final STDEV
 	}
 
 	for _, pattern := range expectedPatterns {

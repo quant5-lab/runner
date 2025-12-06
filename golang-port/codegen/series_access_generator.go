@@ -2,11 +2,9 @@ package codegen
 
 import "fmt"
 
-// SeriesAccessCodeGenerator generates Go code for accessing series data sources.
-type SeriesAccessCodeGenerator interface {
-	GenerateInitialValueAccess(period int) string
-	GenerateLoopValueAccess(loopVar string) string
-}
+// SeriesAccessCodeGenerator is an alias for AccessGenerator (legacy compatibility)
+// Both interfaces have identical method signatures
+type SeriesAccessCodeGenerator = AccessGenerator
 
 // SeriesVariableAccessGenerator generates access code for user-defined Series variables.
 type SeriesVariableAccessGenerator struct {

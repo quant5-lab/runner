@@ -288,7 +288,8 @@ func TestCodeIndenter(t *testing.T) {
 
 // MockAccessGenerator for testing
 type MockAccessGenerator struct {
-	loopAccessFn func(loopVar string) string
+	loopAccessFn    func(loopVar string) string
+	initialAccessFn func(period int) string
 }
 
 func (m *MockAccessGenerator) GenerateLoopValueAccess(loopVar string) string {
@@ -299,5 +300,8 @@ func (m *MockAccessGenerator) GenerateLoopValueAccess(loopVar string) string {
 }
 
 func (m *MockAccessGenerator) GenerateInitialValueAccess(period int) string {
+	if m.initialAccessFn != nil {
+		return m.initialAccessFn(period)
+	}
 	return "mockInitialAccess"
 }

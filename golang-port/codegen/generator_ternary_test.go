@@ -39,9 +39,14 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		varInits:   make(map[string]ast.Expression),
+		constants:  make(map[string]interface{}),
+		taRegistry: NewTAFunctionRegistry(),
 	}
+	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 
 	code, err := gen.generateProgram(program)
 	if err != nil {
@@ -102,9 +107,14 @@ func TestTernaryWithArithmetic(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		varInits:   make(map[string]ast.Expression),
+		constants:  make(map[string]interface{}),
+		taRegistry: NewTAFunctionRegistry(),
 	}
+	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 
 	code, err := gen.generateProgram(program)
 	if err != nil {
@@ -169,9 +179,14 @@ func TestTernaryWithLogicalOperators(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:   make(map[string]bool),
-		variables: make(map[string]string),
+		imports:    make(map[string]bool),
+		variables:  make(map[string]string),
+		varInits:   make(map[string]ast.Expression),
+		constants:  make(map[string]interface{}),
+		taRegistry: NewTAFunctionRegistry(),
 	}
+	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 
 	code, err := gen.generateProgram(program)
 	if err != nil {

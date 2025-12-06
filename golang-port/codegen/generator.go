@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
 /* StrategyCode holds generated Go code for strategy execution */
@@ -19,6 +20,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen := &generator{
 		imports:      make(map[string]bool),
 		variables:    make(map[string]string),
+		varInits:     make(map[string]ast.Expression),
 		constants:    make(map[string]interface{}),
 		strategyName: "Generated Strategy",
 		limits:       NewCodeGenerationLimits(),
@@ -30,7 +32,9 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.mathHandler = NewMathHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.taRegistry = NewTAFunctionRegistry()
-	gen.plotExpressionHandler = NewPlotExpressionHandler(gen)
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)       // Expression analysis for temp vars
+	gen.tempVarMgr = NewTempVariableManager(gen)        // ForwardSeriesBuffer temp var manager
+	gen.constEvaluator = validation.NewWarmupAnalyzer() // Compile-time constant evaluator
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -46,21 +50,24 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 }
 
 type generator struct {
-	imports               map[string]bool
-	variables             map[string]string
-	constants             map[string]interface{} // Input constants (input.float, input.int, etc)
-	plots                 []string               // Track plot variables
-	strategyName          string                 // Strategy name from indicator() or strategy()
-	indent                int
-	taFunctions           []taFunctionCall // List of TA function calls to pre-calculate
-	inSecurityContext     bool             // Flag when generating code inside security() context
-	limits                CodeGenerationLimits
-	safetyGuard           RuntimeSafetyGuard
-	inputHandler          *InputHandler
-	mathHandler           *MathHandler
-	subscriptResolver     *SubscriptResolver
-	taRegistry            *TAFunctionRegistry    // Registry for TA function handlers
-	plotExpressionHandler *PlotExpressionHandler // Handler for inline plot expressions
+	imports           map[string]bool
+	variables         map[string]string
+	varInits          map[string]ast.Expression // Variable init expressions for constant resolution
+	constants         map[string]interface{}    // Input constants (input.float, input.int, etc)
+	plots             []string                  // Track plot variables
+	strategyName      string                    // Strategy name from indicator() or strategy()
+	indent            int
+	taFunctions       []taFunctionCall // List of TA function calls to pre-calculate
+	inSecurityContext bool             // Flag when generating code inside security() context
+	limits            CodeGenerationLimits
+	safetyGuard       RuntimeSafetyGuard
+	inputHandler      *InputHandler
+	mathHandler       *MathHandler
+	subscriptResolver *SubscriptResolver
+	taRegistry        *TAFunctionRegistry        // Registry for TA function handlers
+	exprAnalyzer      *ExpressionAnalyzer        // Finds nested TA calls in expressions
+	tempVarMgr        *TempVariableManager       // Manages temp Series variables (ForwardSeriesBuffer)
+	constEvaluator    *validation.WarmupAnalyzer // Compile-time constant expression evaluator
 }
 
 type taFunctionCall struct {
@@ -78,6 +85,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.limits.MaxStatementsPerPass == 0 {
 		g.limits = NewCodeGenerationLimits()
 		g.safetyGuard = NewRuntimeSafetyGuard()
+	}
+
+	// PRE-PASS: Collect AST constants for expression evaluator
+	for _, stmt := range program.Body {
+		g.constEvaluator.CollectConstants(stmt)
 	}
 
 	// First pass: collect variables, analyze Series requirements, extract strategy name
@@ -133,29 +145,52 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 					// Generate input constants immediately (if handler exists)
 					if g.inputHandler != nil {
+						// Handle Pine v4 generic input() - infer type from first arg
+						if funcName == "input" && len(callExpr.Arguments) > 0 {
+							if lit, ok := callExpr.Arguments[0].(*ast.Literal); ok {
+								// Check if value is float or int
+								switch v := lit.Value.(type) {
+								case float64:
+									if v == float64(int(v)) {
+										funcName = "input.int"
+									} else {
+										funcName = "input.float"
+									}
+								case int:
+									funcName = "input.int"
+								}
+							}
+						}
+
 						if funcName == "input.float" {
-							g.inputHandler.GenerateInputFloat(callExpr, varName)
-							g.constants[varName] = funcName
+							code, _ := g.inputHandler.GenerateInputFloat(callExpr, varName)
+							if code != "" {
+								// Extract value from generated code: "const varName = 1.23"
+								if val := extractConstValue(code); val != nil {
+									g.constants[varName] = val
+								}
+							}
 							continue
 						}
 						if funcName == "input.int" {
-							g.inputHandler.GenerateInputInt(callExpr, varName)
-							g.constants[varName] = funcName
+							code, _ := g.inputHandler.GenerateInputInt(callExpr, varName)
+							if code != "" {
+								if val := extractConstValue(code); val != nil {
+									g.constants[varName] = val
+								}
+							}
 							continue
 						}
 						if funcName == "input.bool" {
 							g.inputHandler.GenerateInputBool(callExpr, varName)
-							g.constants[varName] = funcName
 							continue
 						}
 						if funcName == "input.string" {
 							g.inputHandler.GenerateInputString(callExpr, varName)
-							g.constants[varName] = funcName
 							continue
 						}
 						if funcName == "input.session" {
 							g.inputHandler.GenerateInputSession(callExpr, varName)
-							g.constants[varName] = funcName
 							continue
 						}
 					}
@@ -178,6 +213,18 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			}
 		}
 	}
+
+	// Sync input constants to constEvaluator AFTER first pass collects them
+	for varName, value := range g.constants {
+		if floatVal, ok := value.(float64); ok {
+			g.constEvaluator.AddConstant(varName, floatVal)
+		} else if intVal, ok := value.(int); ok {
+			g.constEvaluator.AddConstant(varName, float64(intVal))
+		}
+	}
+
+	// Pre-analyze security() calls to register temp vars BEFORE declarations
+	g.preAnalyzeSecurityCalls(program)
 
 	// Second pass: No longer needed (ALL variables use Series storage)
 	// Kept for future optimizations if needed
@@ -229,6 +276,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		code += "\n"
 
+		// Declare temp variables for nested TA calls (managed by TempVariableManager)
+		tempVarDecls := g.tempVarMgr.GenerateDeclarations()
+		if tempVarDecls != "" {
+			code += tempVarDecls + "\n"
+		}
+
 		// Declare state variables for fixnan
 		hasFixnan := false
 		for _, taFunc := range g.taFunctions {
@@ -251,6 +304,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "// Initialize Series storage\n"
 		for varName := range g.variables {
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
+		}
+
+		// Initialize temp variable Series (ForwardSeriesBuffer paradigm)
+		tempVarInits := g.tempVarMgr.GenerateInitializations()
+		if tempVarInits != "" {
+			code += tempVarInits
 		}
 		code += "\n"
 	}
@@ -294,6 +353,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code += "\n" + g.ind() + "// Advance Series cursors\n"
 	for varName := range g.variables {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
+	}
+
+	// Advance temp variable Series cursors (ForwardSeriesBuffer paradigm)
+	tempVarNextCalls := g.tempVarMgr.GenerateNextCalls()
+	if tempVarNextCalls != "" {
+		code += tempVarNextCalls
 	}
 
 	g.indent--
@@ -574,9 +639,55 @@ func (g *generator) generateNumericExpression(expr ast.Expression) (string, erro
 	return g.generateConditionExpression(expr)
 }
 
-// generatePlotExpression delegates to PlotExpressionHandler for SOLID architecture
+// generatePlotExpression generates inline code for plot() argument expressions
+// Handles ternary expressions, identifiers, and literals as immediate values
 func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) {
-	return g.plotExpressionHandler.Generate(expr)
+	switch e := expr.(type) {
+	case *ast.ConditionalExpression:
+		// Handle ternary: test ? consequent : alternate
+		// Generate as inline func() float64 expression
+		condCode, err := g.generateConditionExpression(e.Test)
+		if err != nil {
+			return "", err
+		}
+		// Add != 0 conversion for Series variables used in boolean context
+		if _, ok := e.Test.(*ast.Identifier); ok {
+			condCode = condCode + " != 0"
+		} else if _, ok := e.Test.(*ast.MemberExpression); ok {
+			condCode = condCode + " != 0"
+		}
+
+		consequentCode, err := g.generateNumericExpression(e.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateNumericExpression(e.Alternate)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
+			condCode, consequentCode, alternateCode), nil
+
+	case *ast.Identifier:
+		// Variable reference - use Series.Get(0)
+		return e.Name + "Series.Get(0)", nil
+
+	case *ast.MemberExpression:
+		// Member expression like close[0]
+		return g.extractSeriesExpression(e), nil
+
+	case *ast.Literal:
+		// Direct literal value
+		return g.generateNumericExpression(e)
+
+	case *ast.BinaryExpression, *ast.LogicalExpression:
+		// Mathematical or logical expression
+		return g.generateConditionExpression(expr)
+
+	default:
+		return "", fmt.Errorf("unsupported plot expression type: %T", expr)
+	}
 }
 
 func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
@@ -698,10 +809,12 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 
 	case *ast.CallExpression:
+		// Handle inline function calls in conditions (e.g., na(time(...)))
 		funcName := g.extractFunctionName(e.Callee)
 
 		switch funcName {
 		case "na":
+			// na(expr) checks if value is NaN
 			if len(e.Arguments) >= 1 {
 				argCode, err := g.generateConditionExpression(e.Arguments[0])
 				if err != nil {
@@ -712,18 +825,19 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return "true", nil
 
 		case "time":
+			// time() function returns timestamp or NaN
 			handler := NewTimeHandler(g.ind())
 			return handler.HandleInlineExpression(e.Arguments), nil
 
 		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
 			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
+			// Math functions can be used inline in conditions/ternaries
 			mathHandler := NewMathHandler()
 			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 
 		default:
-			if g.plotExpressionHandler != nil && g.plotExpressionHandler.taRegistry.IsSupported(funcName) {
-				return g.plotExpressionHandler.HandleTAFunction(e, funcName)
-			}
+			// For other functions, try to generate inline expression
+			// This might fail for complex cases - fallback to error
 			return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 		}
 
@@ -760,6 +874,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		// Determine variable type based on init expression
 		varType := g.inferVariableType(declarator.Init)
 		g.variables[varName] = varType
+		g.varInits[varName] = declarator.Init // Store for constant resolution in extractTAArguments
 
 		// Skip string variables (Series storage is float64 only)
 		if varType == "string" {
@@ -822,10 +937,50 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 }
 
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
+	// STEP 1: Detect nested TA calls and generate temp vars INLINE (same statement)
+	// Example: rma(max(change(x), 0), 9) →
+	//   1. Generate change_xxxSeries.Set()
+	//   2. Generate max_yyySeries.Set()
+	//   3. Generate rma using max_yyySeries reference
+	nestedCalls := g.exprAnalyzer.FindNestedCalls(initExpr)
+
+	tempVarCode := ""
+	if len(nestedCalls) > 0 {
+		// Process nested calls in REVERSE order (innermost first)
+		// Example: rma(max(change(x), 0), 9) returns [rma, max, change]
+		//   Must process change → max → rma so dependencies exist when referenced
+		for i := len(nestedCalls) - 1; i >= 0; i-- {
+			callInfo := nestedCalls[i]
+
+			// Skip the outermost call (that's the main variable being generated)
+			if callInfo.Call == initExpr {
+				continue
+			}
+
+			// Only create temp vars for TA functions (ta.sma, ta.ema, etc.)
+			// Math functions are handled inline by extractSeriesExpression
+			if !g.taRegistry.IsSupported(callInfo.FuncName) {
+				continue
+			}
+
+			// Create temp var for this nested call
+			tempVarName := g.tempVarMgr.GetOrCreate(callInfo)
+
+			// Generate calculation code for temp var
+			tempCode, err := g.generateVariableFromCall(tempVarName, callInfo.Call)
+			if err != nil {
+				return "", fmt.Errorf("failed to generate temp var %s: %w", tempVarName, err)
+			}
+			tempVarCode += tempCode
+		}
+	}
+
+	// STEP 2: Process the main expression (extractSeriesExpression now uses temp var refs)
 	switch expr := initExpr.(type) {
 	case *ast.CallExpression:
 		// Handle function calls like ta.sma(close, 20)
-		return g.generateVariableFromCall(varName, expr)
+		mainCode, err := g.generateVariableFromCall(varName, expr)
+		return tempVarCode + mainCode, err
 	case *ast.ConditionalExpression:
 		// Handle ternary: test ? consequent : alternate
 		condCode, err := g.generateConditionExpression(expr.Test)
@@ -970,6 +1125,12 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	// Try TA function registry first
 	if g.taRegistry.IsSupported(funcName) {
 		return g.taRegistry.GenerateInlineTA(g, varName, funcName, call)
+	}
+
+	// Handle math functions that need Series storage (have TA dependencies)
+	mathHandler := NewMathFunctionHandler()
+	if mathHandler.CanHandle(funcName) {
+		return mathHandler.GenerateCode(g, varName, call)
 	}
 
 	switch funcName {
@@ -1707,8 +1868,21 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// Function call like math.pow(x, y) or ta.sma(close, 20)
 		funcName := g.extractFunctionName(e.Callee)
 
-		// Handle math.* functions
-		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
+		// PRIORITY 1: Check if temp var exists (even for math functions)
+		// This handles cases where math functions have TA dependencies:
+		// max(change(x), 0) needs temp var because change() is TA
+		existingVar := g.tempVarMgr.GetVarNameForCall(e)
+		if existingVar != "" {
+			// Temp var already generated, use it
+			return fmt.Sprintf("%sSeries.GetCurrent()", existingVar)
+		}
+
+		// PRIORITY 2: Try inline math (only if no TA dependencies)
+		// Pure math functions like max(2, 3) or abs(-5) can be inlined
+		if (strings.HasPrefix(funcName, "math.") ||
+			funcName == "max" || funcName == "min" || funcName == "abs" ||
+			funcName == "sqrt" || funcName == "floor" || funcName == "ceil" ||
+			funcName == "round" || funcName == "log" || funcName == "exp") && g.mathHandler != nil {
 			mathCode, err := g.mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 			if err != nil {
 				// Return error placeholder
@@ -1717,8 +1891,9 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return mathCode
 		}
 
-		// For other functions (TA, etc), return series access
-		// This assumes the function result is stored in a series variable
+		// PRIORITY 3: Legacy fallback for TA functions
+		// Assume function result stored in series variable
+		// (This will fail if variable doesn't exist - needs temp var generation)
 		varName := strings.ReplaceAll(funcName, ".", "_")
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	}
@@ -1873,10 +2048,85 @@ func (g *generator) indentCode(code string) string {
 	return strings.Join(indented, "\n")
 }
 
+// generateSTDEV generates STDEV calculation using two-pass algorithm.
+// Pass 1: Calculate mean, Pass 2: Calculate variance from mean.
+func (g *generator) generateSTDEV(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
+	var code strings.Builder
+
+	// Add header comment
+	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.stdev(%d) */\n", period))
+
+	// Warmup check
+	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+	g.indent--
+	code.WriteString(g.ind() + "} else {\n")
+	g.indent++
+
+	// Pass 1: Calculate mean (inline SMA calculation)
+	code.WriteString(g.ind() + "sum := 0.0\n")
+	if needsNaN {
+		code.WriteString(g.ind() + "hasNaN := false\n")
+	}
+	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
+	g.indent++
+
+	if needsNaN {
+		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
+		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
+		g.indent++
+		code.WriteString(g.ind() + "hasNaN = true\n")
+		code.WriteString(g.ind() + "break\n")
+		g.indent--
+		code.WriteString(g.ind() + "}\n")
+		code.WriteString(g.ind() + "sum += val\n")
+	} else {
+		code.WriteString(g.ind() + fmt.Sprintf("sum += %s\n", accessor.GenerateLoopValueAccess("j")))
+	}
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n")
+
+	// Check for NaN and calculate mean
+	if needsNaN {
+		code.WriteString(g.ind() + "if hasNaN {\n")
+		g.indent++
+		code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
+		g.indent--
+		code.WriteString(g.ind() + "} else {\n")
+		g.indent++
+	}
+
+	code.WriteString(g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period))
+
+	// Pass 2: Calculate variance
+	code.WriteString(g.ind() + "variance := 0.0\n")
+	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
+	g.indent++
+	code.WriteString(g.ind() + fmt.Sprintf("diff := %s - mean\n", accessor.GenerateLoopValueAccess("j")))
+	code.WriteString(g.ind() + "variance += diff * diff\n")
+	g.indent--
+	code.WriteString(g.ind() + "}\n")
+	code.WriteString(g.ind() + fmt.Sprintf("variance /= %d.0\n", period))
+	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName))
+
+	if needsNaN {
+		g.indent--
+		code.WriteString(g.ind() + "}\n") // close else (hasNaN check)
+	}
+
+	g.indent--
+	code.WriteString(g.ind() + "}\n") // close else (warmup check)
+
+	return code.String(), nil
+}
+
 // generateRMA generates inline RMA (Relative Moving Average) calculation
-// TODO: Implement RMA inline generation
+// RMA uses alpha = 1/period (vs EMA's 2/(period+1))
 func (g *generator) generateRMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	return "", fmt.Errorf("ta.rma inline generation not yet implemented")
+	builder := NewTAIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN)
+	return g.indentCode(builder.BuildRMA()), nil
 }
 
 // generateRSI generates inline RSI (Relative Strength Index) calculation
@@ -1886,9 +2136,40 @@ func (g *generator) generateRSI(varName string, period int, accessor AccessGener
 }
 
 // generateChange generates inline change calculation
-// TODO: Implement change inline generation
+// change(source, offset) = source[0] - source[offset]
 func (g *generator) generateChange(varName string, sourceExpr string, offset int) (string, error) {
-	return "", fmt.Errorf("ta.change inline generation not yet implemented")
+	code := g.ind() + fmt.Sprintf("/* Inline ta.change(%s, %d) */\n", sourceExpr, offset)
+	code += g.ind() + fmt.Sprintf("if i >= %d {\n", offset)
+	g.indent++
+
+	// Calculate difference: current - previous
+	code += g.ind() + fmt.Sprintf("current := %s\n", sourceExpr)
+
+	// Access previous value - need to adjust sourceExpr for offset
+	// If sourceExpr is "bar.Close", previous is "ctx.Data[i-%d].Close"
+	// If sourceExpr is "xSeries.GetCurrent()", previous is "xSeries.Get(%d)"
+	prevExpr := ""
+	if strings.Contains(sourceExpr, "bar.") {
+		field := strings.TrimPrefix(sourceExpr, "bar.")
+		prevExpr = fmt.Sprintf("ctx.Data[i-%d].%s", offset, field)
+	} else if strings.Contains(sourceExpr, "Series.GetCurrent()") {
+		seriesName := strings.TrimSuffix(sourceExpr, "Series.GetCurrent()")
+		prevExpr = fmt.Sprintf("%sSeries.Get(%d)", seriesName, offset)
+	} else {
+		// Fallback for complex expressions
+		prevExpr = fmt.Sprintf("(/* previous value of %s */0.0)", sourceExpr)
+	}
+
+	code += g.ind() + fmt.Sprintf("previous := %s\n", prevExpr)
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(current - previous)\n", varName)
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+
+	return code, nil
 }
 
 // generatePivot generates inline pivot high/low detection
@@ -1978,4 +2259,59 @@ func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
 		g.scanForSubscriptedCalls(e.Consequent)
 		g.scanForSubscriptedCalls(e.Alternate)
 	}
+}
+
+/* preAnalyzeSecurityCalls scans AST for security() calls with nested TA expressions,
+ * registers temp vars BEFORE declaration phase to prevent "undefined: ta_sma_XXX" errors.
+ *
+ * CRITICAL: Must run AFTER first pass (collects constants) but BEFORE code generation.
+ *
+ * Bug Fix: security(syminfo.tickerid, 'D', sma(close, 20)) generates inline TA code
+ * that references ta_sma_20_XXXSeries, but if temp var not pre-registered, declaration
+ * phase misses it → compile error.
+ *
+ * FILTER: Only create temp vars for TA functions (ta.sma, ta.ema, etc.), not math functions.
+ */
+func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+					funcName := g.extractFunctionName(callExpr.Callee)
+					if funcName == "security" || funcName == "request.security" {
+						// security(symbol, timeframe, expression) - analyze 3rd argument
+						if len(callExpr.Arguments) >= 3 {
+							exprArg := callExpr.Arguments[2]
+							// Find ALL nested TA calls in expression
+							nestedCalls := g.exprAnalyzer.FindNestedCalls(exprArg)
+							// Register temp vars in REVERSE order (innermost first)
+							for i := len(nestedCalls) - 1; i >= 0; i-- {
+								callInfo := nestedCalls[i]
+								// Only create temp vars for TA functions, not math functions
+								if g.taRegistry.IsSupported(callInfo.FuncName) {
+									g.tempVarMgr.GetOrCreate(callInfo)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// extractConstValue parses "const varName = VALUE" to extract VALUE
+func extractConstValue(code string) interface{} {
+	// Parse: "const bblenght = 46\n"
+	var varName string
+	var floatVal float64
+	var intVal int
+
+	if _, err := fmt.Sscanf(code, "const %s = %f", &varName, &floatVal); err == nil {
+		return floatVal
+	}
+	if _, err := fmt.Sscanf(code, "const %s = %d", &varName, &intVal); err == nil {
+		return intVal
+	}
+	return nil
 }

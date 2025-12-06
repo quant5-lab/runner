@@ -100,6 +100,47 @@ func TestTAIndicatorBuilder_EMA(t *testing.T) {
 	}
 }
 
+func TestTAIndicatorBuilder_RMA(t *testing.T) {
+	mockAccessor := &MockAccessGenerator{
+		loopAccessFn: func(loopVar string) string {
+			return "closeSeries.Get(" + loopVar + ")"
+		},
+		initialAccessFn: func(period int) string {
+			return "closeSeries.Get(20-1)"
+		},
+	}
+
+	builder := NewTAIndicatorBuilder("RMA", "rma20", 20, mockAccessor, false)
+
+	code := builder.BuildRMA()
+
+	requiredElements := []string{
+		"/* Inline RMA(20) */",
+		"if ctx.BarIndex < 20-1",
+		"rma20Series.Set(math.NaN())",
+		"} else {",
+		"alpha := 1.0 / float64(20)",
+		"rma := closeSeries.Get(20-1)",
+		"for j := 20-2; j >= 0; j--",
+		"rma = alpha*closeSeries.Get(j) + (1-alpha)*rma",
+		"rma20Series.Set(rma)",
+	}
+
+	for _, elem := range requiredElements {
+		if !strings.Contains(code, elem) {
+			t.Errorf("RMA builder missing %q\nGenerated code:\n%s", elem, code)
+		}
+	}
+
+	if strings.Count(code, "if ctx.BarIndex") != 1 {
+		t.Error("RMA should have exactly one warmup check")
+	}
+
+	if strings.Count(code, "for j :=") != 1 {
+		t.Error("RMA should have exactly one backward loop")
+	}
+}
+
 func TestTAIndicatorBuilder_STDEV(t *testing.T) {
 	mockAccessor := &MockAccessGenerator{
 		loopAccessFn: func(loopVar string) string {
