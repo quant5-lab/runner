@@ -1,0 +1,6 @@
+//@version=5
+indicator("Multi Security Test", overlay=true)
+daily_close = request.security(syminfo.tickerid, "1D", close)
+weekly_close = request.security(syminfo.tickerid, "1W", close)
+plot(daily_close, title="Daily")
+plot(weekly_close, title="Weekly")

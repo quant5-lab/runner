@@ -1,0 +1,4 @@
+//@version=5
+indicator("Complex Expression", overlay=true)
+price_change_pct = request.security(syminfo.tickerid, "1D", (close - open) / open * 100)
+plot(price_change_pct, title="Daily % Change")

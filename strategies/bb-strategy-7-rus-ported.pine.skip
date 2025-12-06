@@ -1,0 +1,2 @@
+Parser limitation: long strategy() parameter list (line 2:224)
+Related to: bb-strategy-7-rus.pine (same parser issue)

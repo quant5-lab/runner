@@ -8,6 +8,7 @@ class BinanceProvider {
     this.stats = statsCollector;
     this.binanceProvider = Provider.Binance;
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.BINANCE;
+    this.timezone = 'UTC'; // Binance uses UTC for all symbols
   }
 
   async getMarketData(symbol, timeframe, limit = 100, sDate, eDate) {

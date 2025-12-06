@@ -2,11 +2,52 @@
 
 ![Coverage](https://img.shields.io/badge/coverage-86.6%25-brightgreen)
 
-Node.js application for Pine Script strategy transpilation and execution across multiple exchanges with dynamic provider fallback and real-time chart visualization.e Script Trading Analysis Runner
+Node.js + Go application for PineScript strategy transpilation and execution across multiple exchanges with real-time chart visualization.
 
-![Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen)
+## Quick Start
 
-Node.js application for Pine Script strategy transpilation and execution across multiple exchanges with dynamic provider fallback and real-time chart visualization.
+### Option 1: Using Go Port (Recommended - 50x faster)
+
+```bash
+# Install dependencies (no sudo)
+make install
+
+# Reload shell
+source ~/.bashrc
+
+# Setup project
+make setup
+
+# Build and run
+make build
+make test
+```
+
+### Option 2: Using Node.js (Legacy)
+
+```bash
+# Install pnpm globally
+npm install -g pnpm
+
+# Install dependencies
+pnpm install
+
+# Run tests
+pnpm test
+
+# Run strategy
+pnpm start AAPL 1h 100 strategies/test.pine
+```
+
+Visit: http://localhost:8080/chart.html
+
+## Developer Setup
+
+New to this project? See **[DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md)** for:
+- Dependency installation (`make install`)
+- Platform-specific setup (Ubuntu/macOS/Fedora)
+- Troubleshooting common issues
+- IDE configuration
 
 ## Supported Exchanges
 
@@ -14,18 +55,28 @@ Node.js application for Pine Script strategy transpilation and execution across 
 - **Binance** - Cryptocurrency exchange (native PineTS provider)
 - **Yahoo Finance** - US stocks NYSE/NASDAQ/AMEX (free API)
 
-## Quick Start
+## Configuration Parameters
+
+### Go Port Development
 
 ```bash
-# Install pnpm globally (if not already installed)
-npm install -g pnpm
+# Build tools
+make build                    # Build pine-gen code generator
+make test                     # Run all tests
+make fmt                      # Format code
+make ci                       # Run CI checks
 
-# Install dependencies
-pnpm install
+# Strategy development
+make build-strategy STRATEGY=strategies/my-strategy.pine OUTPUT=runner-name
+make run-strategy STRATEGY=strategies/my-strategy.pine DATA=testdata/BTCUSDT_1D.json
 
-# Run tests before starting
-pnpm test
+# All available commands
+make help
+```
 
+### Node.js Development (Legacy)
+
+```bash
 # Run E2E tests
 docker compose run --rm runner sh e2e/run-all.sh
 

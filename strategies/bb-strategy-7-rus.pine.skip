@@ -1,0 +1,3 @@
+Parser limitation: long strategy() parameter list (line 2:228)
+TODO: Enhance parser to support extended function argument lists
+Blocked by: golang-port/parser token handling for long expressions

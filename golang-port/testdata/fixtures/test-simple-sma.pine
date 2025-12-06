@@ -1,0 +1,4 @@
+//@version=4
+strategy("Simple SMA", overlay=true)
+sma20 = sma(close, 20)
+plot(sma20)
