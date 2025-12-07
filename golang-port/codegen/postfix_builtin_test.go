@@ -143,6 +143,77 @@ x = high - low > 10 ? 1 : 0
 	}
 }
 
+// TestBuiltinIdentifiers_InArithmetic verifies built-ins generate correct code in standalone arithmetic
+func TestBuiltinIdentifiers_InArithmetic(t *testing.T) {
+	tests := []struct {
+		name     string
+		script   string
+		expected string
+	}{
+		{
+			name: "close plus constant",
+			script: `//@version=5
+indicator("Test")
+x = close + 10
+`,
+			expected: "bar.Close + 10",
+		},
+		{
+			name: "close multiplied",
+			script: `//@version=5
+indicator("Test")
+x = close * 1.5
+`,
+			expected: "bar.Close * 1.5",
+		},
+		{
+			name: "complex arithmetic with multiple builtins",
+			script: `//@version=5
+indicator("Test")
+x = (close + open) / 2
+`,
+			expected: "bar.Close + bar.Open",
+		},
+		{
+			name: "builtin in parentheses",
+			script: `//@version=5
+indicator("Test")
+x = (close) + 10
+`,
+			expected: "bar.Close",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := parser.NewParser()
+			if err != nil {
+				t.Fatalf("Failed to create parser: %v", err)
+			}
+
+			script, err := p.ParseBytes("test.pine", []byte(tt.script))
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+
+			converter := parser.NewConverter()
+			program, err := converter.ToESTree(script)
+			if err != nil {
+				t.Fatalf("Conversion failed: %v", err)
+			}
+
+			result, err := GenerateStrategyCodeFromAST(program)
+			if err != nil {
+				t.Fatalf("Codegen failed: %v", err)
+			}
+
+			if !strings.Contains(result.FunctionBody, tt.expected) {
+				t.Errorf("Expected arithmetic %q not found in:\n%s", tt.expected, result.FunctionBody)
+			}
+		})
+	}
+}
+
 // TestPostfixExpr_Codegen verifies codegen for function()[subscript] pattern
 func TestPostfixExpr_Codegen(t *testing.T) {
 	script := `//@version=5
@@ -262,7 +333,7 @@ x = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 indicator("Test")
 x = close
 `,
-			mustHave: []string{"closeSeries.GetCurrent()"},
+			mustHave: []string{"bar.Close"},
 		},
 	}
 

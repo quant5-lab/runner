@@ -31,6 +31,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inputHandler = NewInputHandler()
 	gen.mathHandler = NewMathHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
+	gen.builtinHandler = NewBuiltinIdentifierHandler()
 	gen.taRegistry = NewTAFunctionRegistry()
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)       // Expression analysis for temp vars
 	gen.tempVarMgr = NewTempVariableManager(gen)        // ForwardSeriesBuffer temp var manager
@@ -65,6 +66,7 @@ type generator struct {
 	inputHandler      *InputHandler
 	mathHandler       *MathHandler
 	subscriptResolver *SubscriptResolver
+	builtinHandler    *BuiltinIdentifierHandler  // Resolves Pine built-in identifiers
 	taRegistry        *TAFunctionRegistry        // Registry for TA function handlers
 	exprAnalyzer      *ExpressionAnalyzer        // Finds nested TA calls in expressions
 	tempVarMgr        *TempVariableManager       // Manages temp Series variables (ForwardSeriesBuffer)
@@ -986,6 +988,13 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 	case *ast.LogicalExpression:
 		// and/or produce bool
 		return "bool"
+	case *ast.UnaryExpression:
+		// Boolean negation produces bool
+		if e.Operator == "not" || e.Operator == "!" {
+			return "bool"
+		}
+		// Numeric unary preserves operand type
+		return g.inferVariableType(e.Argument)
 	case *ast.CallExpression:
 		funcName := g.extractFunctionName(e.Callee)
 		if funcName == "ta.crossover" || funcName == "ta.crossunder" {
@@ -1124,28 +1133,16 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			return g.ind() + fmt.Sprintf("// ERROR: unsupported literal type\n"), nil
 		}
 	case *ast.Identifier:
-		// Reference to another variable or Pine built-in
 		refName := expr.Name
 
-		// Special built-in identifiers
-		if refName == "na" {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
+		// Try builtin identifier resolution first
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(expr, g.inSecurityContext); resolved {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, code), nil
 		}
 
-		/* In security context, built-ins need direct field access */
-		if g.inSecurityContext {
-			switch refName {
-			case "close":
-				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Close)\n", varName), nil
-			case "open":
-				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Open)\n", varName), nil
-			case "high":
-				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].High)\n", varName), nil
-			case "low":
-				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Low)\n", varName), nil
-			case "volume":
-				return g.ind() + fmt.Sprintf("%sSeries.Set(ctx.Data[ctx.BarIndex].Volume)\n", varName), nil
-			}
+		// Check if it's an input constant
+		if _, isConstant := g.constants[refName]; isConstant {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, refName), nil
 		}
 
 		// User-defined variable (ALL use Series)
@@ -1772,6 +1769,11 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}
 
+		// Try builtin member expression resolution (close[1], strategy.position_avg_price, etc.)
+		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
+			return code
+		}
+
 		// Check for built-in namespaces like timeframe.* and syminfo.*
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
@@ -1801,126 +1803,77 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				}
 			}
 
-			// Handle series subscript like close[0], close[1], sma20[0], sma20[1]
+			// Handle series subscript with variable offset
+			if e.Computed {
+				if _, ok := e.Property.(*ast.Literal); !ok {
+					// Variable offset like [nA], [length]
+					if g.subscriptResolver != nil {
+						return g.subscriptResolver.ResolveSubscript(varName, e.Property, g)
+					}
+					return fmt.Sprintf("%sSeries.Get(0)", varName)
+				}
+			}
 
-			// Extract offset from subscript
+			// Check if it's a strategy constant (strategy.long, strategy.short)
+			if prop, ok := e.Property.(*ast.Identifier); ok {
+				if varName == "strategy" && (prop.Name == "long" || prop.Name == "short") {
+					return g.extractMemberName(e)
+				}
+			}
+
+			// Check if it's an input constant with subscript
+			if funcName, isConstant := g.constants[varName]; isConstant {
+				if funcName == "input.source" {
+					// input.source defaults to close
+					offset := 0
+					if e.Computed {
+						if lit, ok := e.Property.(*ast.Literal); ok {
+							switch v := lit.Value.(type) {
+							case float64:
+								offset = int(v)
+							case int:
+								offset = v
+							}
+						}
+					}
+					if offset == 0 {
+						return "bar.Close"
+					}
+					return fmt.Sprintf("ctx.Data[i-%d].Close", offset)
+				}
+				// Other input constants
+				return varName
+			}
+
+			// User-defined variable with subscript
 			offset := 0
-			isVariableOffset := false
-			var variableOffsetCode string
 			if e.Computed {
 				if lit, ok := e.Property.(*ast.Literal); ok {
-					// Literal offset like [0], [1], [5]
 					switch v := lit.Value.(type) {
 					case float64:
 						offset = int(v)
 					case int:
 						offset = v
 					}
-				} else {
-					// Variable offset like [nA], [length]
-					isVariableOffset = true
-					if g.subscriptResolver != nil {
-						variableOffsetCode = g.subscriptResolver.ResolveSubscript(varName, e.Property, g)
-					} else {
-						// Fallback if no resolver
-						variableOffsetCode = fmt.Sprintf("%sSeries.Get(0)", varName)
-					}
 				}
 			}
-
-			// If variable offset, return the resolved code
-			if isVariableOffset {
-				return variableOffsetCode
-			}
-
-			// Check if it's a Pine built-in series (literal offset)
-			switch varName {
-			case "close":
-				if offset == 0 {
-					return "bar.Close"
-				}
-				// Historical builtin with bounds check
-				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Close }; return math.NaN() }()", offset, offset)
-			case "open":
-				if offset == 0 {
-					return "bar.Open"
-				}
-				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Open }; return math.NaN() }()", offset, offset)
-			case "high":
-				if offset == 0 {
-					return "bar.High"
-				}
-				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].High }; return math.NaN() }()", offset, offset)
-			case "low":
-				if offset == 0 {
-					return "bar.Low"
-				}
-				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Low }; return math.NaN() }()", offset, offset)
-			case "volume":
-				if offset == 0 {
-					return "bar.Volume"
-				}
-				return fmt.Sprintf("func() float64 { if i-%d >= 0 { return ctx.Data[i-%d].Volume }; return math.NaN() }()", offset, offset)
-			default:
-				// Check if it's a strategy constant (strategy.long, strategy.short)
-				if prop, ok := e.Property.(*ast.Identifier); ok {
-					if varName == "strategy" && (prop.Name == "long" || prop.Name == "short") {
-						// Return Go runtime constant
-						return g.extractMemberName(e)
-					}
-				}
-
-				// Check if it's an input constant (not input.source)
-				if funcName, isConstant := g.constants[varName]; isConstant {
-					if funcName == "input.source" {
-						// For input.source, treat it as an alias to close (default)
-						// TODO: Extract actual source from input.source defval
-						if offset == 0 {
-							return "bar.Close"
-						}
-						return fmt.Sprintf("ctx.Data[i-%d].Close", offset)
-					}
-					// For other input constants (input.float, input.int, etc), if offset is 0, just return the constant name
-					if offset == 0 {
-						return varName
-					}
-					// Non-zero offset doesn't make sense for constants, but handle it
-					return varName
-				}
-
-				// User-defined variable (ALL use Series storage)
-				return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
-			}
+			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}
+
 		return g.extractMemberName(e)
 	case *ast.Identifier:
-		// Special built-in identifiers
-		if e.Name == "na" {
-			return "math.NaN()"
-		}
-		varName := e.Name
-
-		// Check if it's a Pine built-in series variable
-		switch varName {
-		case "close":
-			return "bar.Close"
-		case "open":
-			return "bar.Open"
-		case "high":
-			return "bar.High"
-		case "low":
-			return "bar.Low"
-		case "volume":
-			return "bar.Volume"
-		}
-
 		// Check if it's an input constant
-		if _, isConstant := g.constants[varName]; isConstant {
-			return varName // Use constant value directly
+		if _, isConstant := g.constants[e.Name]; isConstant {
+			return e.Name
 		}
 
-		// User-defined variable (ALL use Series storage)
-		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
+		// Try builtin identifier resolution first
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+			return code
+		}
+
+		// User-defined variables use Series storage (ForwardSeriesBuffer paradigm)
+		return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
 	case *ast.Literal:
 		// Numeric literal
 		switch v := e.Value.(type) {
@@ -2363,8 +2316,24 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 					// Register temp vars in REVERSE order (innermost first)
 					for i := len(nestedCalls) - 1; i >= 0; i-- {
 						callInfo := nestedCalls[i]
-						// Only create temp vars for TA functions, not math functions
-						if g.taRegistry.IsSupported(callInfo.FuncName) {
+
+						// Create temp vars for:
+						// 1. TA functions (ta.sma, ta.ema, etc.)
+						isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
+
+						// 2. Math functions that contain TA calls (e.g., max(change(x), 0))
+						containsNestedTA := false
+						if !isTAFunction {
+							mathNestedCalls := g.exprAnalyzer.FindNestedCalls(callInfo.Call)
+							for _, mathNested := range mathNestedCalls {
+								if mathNested.Call != callInfo.Call && g.taRegistry.IsSupported(mathNested.FuncName) {
+									containsNestedTA = true
+									break
+								}
+							}
+						}
+
+						if isTAFunction || containsNestedTA {
 							g.tempVarMgr.GetOrCreate(callInfo)
 						}
 					}

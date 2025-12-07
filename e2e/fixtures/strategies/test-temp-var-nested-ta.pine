@@ -1,0 +1,8 @@
+//@version=4
+study("Test RMA Max", overlay=true)
+
+// Exact pattern from bb7-dissect-tp
+sr_src1 = close
+sr_len = 9
+sr_up1 = rma(max(change(sr_src1), 0), sr_len)
+plot(sr_up1, color=color.red)

@@ -9,9 +9,10 @@ import (
 
 func TestExtractSeriesExpression(t *testing.T) {
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:        make(map[string]bool),
+		variables:      make(map[string]string),
+		taRegistry:     NewTAFunctionRegistry(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {
@@ -24,6 +25,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true,
 			},
 			expected: "bar.Close",
 		},
@@ -32,6 +34,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "open"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true,
 			},
 			expected: "bar.Open",
 		},
@@ -69,6 +72,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 				Left: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "close"},
 					Property: &ast.Literal{Value: 0},
+					Computed: true,
 				},
 				Right: &ast.BinaryExpression{
 					Operator: "*",
@@ -155,10 +159,12 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 			&ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true,
 			},
 			&ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "sma20"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true,
 			},
 		},
 	}
@@ -173,6 +179,8 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generateVariableFromCall failed: %v", err)
 	}
+
+	t.Logf("Generated code:\n%s", code)
 
 	// Verify generated code structure (ForwardSeriesBuffer paradigm)
 	if !strings.Contains(code, "longCrossSeries.Set(0.0)") {
@@ -209,6 +217,7 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 			&ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true,
 			},
 			&ast.Identifier{Name: "sma50"},
 		},
@@ -257,6 +266,7 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 			&ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
+				Computed: true, // Mark as array subscript access
 			},
 			&ast.BinaryExpression{
 				Operator: "*",
@@ -276,6 +286,8 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generateVariableFromCall failed: %v", err)
 	}
+
+	t.Logf("Generated code:\n%s", code)
 
 	// Verify arithmetic expression in generated code (ForwardSeriesBuffer paradigm)
 	if !strings.Contains(code, "(sma20Series.GetCurrent() * 1.02)") {

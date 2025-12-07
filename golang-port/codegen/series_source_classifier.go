@@ -47,14 +47,25 @@ func (c *SeriesSourceClassifier) Classify(sourceExpr string) SourceInfo {
 		OriginalExpr: sourceExpr,
 	}
 
-	if varName := c.extractSeriesVariableName(sourceExpr); varName != "" {
+	// Strip unary operators (-, +, !) from the beginning
+	cleanExpr := sourceExpr
+	for len(cleanExpr) > 0 && (cleanExpr[0] == '-' || cleanExpr[0] == '+' || cleanExpr[0] == '!') {
+		cleanExpr = cleanExpr[1:]
+	}
+
+	// Remove outer parentheses if present after stripping operators
+	if len(cleanExpr) > 2 && cleanExpr[0] == '(' && cleanExpr[len(cleanExpr)-1] == ')' {
+		cleanExpr = cleanExpr[1 : len(cleanExpr)-1]
+	}
+
+	if varName := c.extractSeriesVariableName(cleanExpr); varName != "" {
 		info.Type = SourceTypeSeriesVariable
 		info.VariableName = varName
 		return info
 	}
 
 	info.Type = SourceTypeOHLCVField
-	info.FieldName = c.extractOHLCVFieldName(sourceExpr)
+	info.FieldName = c.extractOHLCVFieldName(cleanExpr)
 	return info
 }
 

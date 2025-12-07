@@ -177,6 +177,68 @@ func TestSeriesSourceClassifier_EdgeCases(t *testing.T) {
 	}
 }
 
+func TestSeriesSourceClassifier_UnaryOperators(t *testing.T) {
+	classifier := NewSeriesSourceClassifier()
+
+	tests := []struct {
+		name        string
+		sourceExpr  string
+		wantType    SourceType
+		wantVarName string
+	}{
+		{
+			name:        "negated series variable",
+			sourceExpr:  "-min_b42d7077Series.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "min_b42d7077",
+		},
+		{
+			name:        "positive series variable",
+			sourceExpr:  "+valueSeries.Get(0)",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "value",
+		},
+		{
+			name:        "logical not series variable",
+			sourceExpr:  "!conditionSeries.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "condition",
+		},
+		{
+			name:        "multiple unary operators",
+			sourceExpr:  "--xSeries.Get(1)",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "x",
+		},
+		{
+			name:        "negated with parentheses",
+			sourceExpr:  "-(cagr5Series.GetCurrent())",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "cagr5",
+		},
+		{
+			name:        "negated temp var in RMA context",
+			sourceExpr:  "-min_b42d7077Series.GetCurrent()",
+			wantType:    SourceTypeSeriesVariable,
+			wantVarName: "min_b42d7077",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := classifier.Classify(tt.sourceExpr)
+
+			if result.Type != tt.wantType {
+				t.Errorf("Classify(%q) type = %v, want %v", tt.sourceExpr, result.Type, tt.wantType)
+			}
+
+			if result.VariableName != tt.wantVarName {
+				t.Errorf("Classify(%q) variableName = %q, want %q", tt.sourceExpr, result.VariableName, tt.wantVarName)
+			}
+		})
+	}
+}
+
 func TestSeriesVariableAccessGenerator(t *testing.T) {
 	gen := NewSeriesVariableAccessGenerator("myVar")
 
