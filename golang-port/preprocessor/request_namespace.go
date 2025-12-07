@@ -2,29 +2,26 @@ package preprocessor
 
 import "github.com/quant5-lab/runner/parser"
 
-// RequestNamespaceTransformer adds request. prefix to data request functions
-// Examples: security() → request.security(), financial() → request.financial()
+/* Pine v4→v5: security() → request.security() */
 type RequestNamespaceTransformer struct {
-	mappings map[string]string
+	base *NamespaceTransformer
 }
 
 func NewRequestNamespaceTransformer() *RequestNamespaceTransformer {
+	mappings := map[string]string{
+		"security":  "request.security",
+		"financial": "request.financial",
+		"quandl":    "request.quandl",
+		"splits":    "request.splits",
+		"dividends": "request.dividends",
+		"earnings":  "request.earnings",
+	}
+
 	return &RequestNamespaceTransformer{
-		mappings: map[string]string{
-			"security":  "request.security",
-			"financial": "request.financial",
-			"quandl":    "request.quandl",
-			"splits":    "request.splits",
-			"dividends": "request.dividends",
-			"earnings":  "request.earnings",
-		},
+		base: NewNamespaceTransformer(mappings),
 	}
 }
 
 func (t *RequestNamespaceTransformer) Transform(script *parser.Script) (*parser.Script, error) {
-	visitor := &functionRenamer{mappings: t.mappings}
-	for _, stmt := range script.Statements {
-		visitor.visitStatement(stmt)
-	}
-	return script, nil
+	return t.base.Transform(script)
 }

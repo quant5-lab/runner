@@ -41,12 +41,7 @@ func TestTANamespaceTransformer_SimpleAssignment(t *testing.T) {
 	if call == nil {
 		t.Fatal("Expected call expression in nested structure")
 	}
-	if call.Callee == nil || call.Callee.Ident == nil {
-		t.Fatal("Expected callee identifier")
-	}
-	if *call.Callee.Ident != "ta.sma" {
-		t.Errorf("Expected callee 'ta.sma', got '%s'", *call.Callee.Ident)
-	}
+	assertMemberAccessCallee(t, call, "ta", "sma")
 }
 
 // Helper to extract Call from Factor
@@ -58,6 +53,26 @@ func findCallInFactor(factor *parser.Factor) *parser.CallExpr {
 		return factor.Postfix.Primary.Call
 	}
 	return nil
+}
+
+/* Helper to check CallCallee MemberAccess (namespace.function pattern) */
+func assertMemberAccessCallee(t *testing.T, call *parser.CallExpr, expectedObject, expectedProperty string) {
+	t.Helper()
+	if call == nil {
+		t.Fatal("Call is nil")
+	}
+	if call.Callee == nil {
+		t.Fatal("Callee is nil")
+	}
+	if call.Callee.MemberAccess == nil {
+		t.Fatalf("Expected MemberAccess, got Ident=%v", call.Callee.Ident)
+	}
+	if call.Callee.MemberAccess.Object != expectedObject {
+		t.Errorf("Expected object '%s', got '%s'", expectedObject, call.Callee.MemberAccess.Object)
+	}
+	if call.Callee.MemberAccess.Property != expectedProperty {
+		t.Errorf("Expected property '%s', got '%s'", expectedProperty, call.Callee.MemberAccess.Property)
+	}
 }
 
 func TestTANamespaceTransformer_MultipleIndicators(t *testing.T) {
@@ -84,19 +99,15 @@ rsiVal = rsi(close, 14)
 	}
 
 	// Check all three were transformed
-	expectedCallees := []string{"ta.sma", "ta.ema", "ta.rsi"}
+	expectedCallees := []struct{ obj, prop string }{
+		{"ta", "sma"},
+		{"ta", "ema"},
+		{"ta", "rsi"},
+	}
 	for i, expected := range expectedCallees {
 		expr := result.Statements[i].Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-		if call == nil {
-			t.Fatalf("Statement %d: expected call expression", i)
-		}
-		if call.Callee == nil || call.Callee.Ident == nil {
-			t.Fatalf("Statement %d: expected callee identifier", i)
-		}
-		if *call.Callee.Ident != expected {
-			t.Errorf("Statement %d: expected callee '%s', got '%s'", i, expected, *call.Callee.Ident)
-		}
+		assertMemberAccessCallee(t, call, expected.obj, expected.prop)
 	}
 }
 
@@ -121,15 +132,7 @@ func TestTANamespaceTransformer_Crossover(t *testing.T) {
 
 	expr := result.Statements[0].Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-	if call == nil {
-		t.Fatal("Expected call expression")
-	}
-	if call.Callee == nil || call.Callee.Ident == nil {
-		t.Fatal("Expected callee identifier")
-	}
-	if *call.Callee.Ident != "ta.crossover" {
-		t.Errorf("Expected callee 'ta.crossover', got '%s'", *call.Callee.Ident)
-	}
+	assertMemberAccessCallee(t, call, "ta", "crossover")
 }
 
 func TestTANamespaceTransformer_DailyLinesSimple(t *testing.T) {
@@ -160,15 +163,7 @@ ma200 = sma(close, 200)
 	for i := 0; i < 3; i++ {
 		expr := result.Statements[i].Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-		if call == nil {
-			t.Fatalf("Statement %d: expected call expression", i)
-		}
-		if call.Callee == nil || call.Callee.Ident == nil {
-			t.Fatalf("Statement %d: expected callee identifier", i)
-		}
-		if *call.Callee.Ident != "ta.sma" {
-			t.Errorf("Statement %d: expected callee 'ta.sma', got '%s'", i, *call.Callee.Ident)
-		}
+		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
 }
 
@@ -196,11 +191,12 @@ func TestStudyToIndicatorTransformer(t *testing.T) {
 	if call == nil {
 		t.Fatal("Expected call expression")
 	}
+	/* study() → indicator() should be simple Ident rename */
 	if call.Callee == nil || call.Callee.Ident == nil {
-		t.Fatal("Expected callee identifier")
+		t.Fatalf("Expected Ident, got '%v'", call.Callee)
 	}
 	if *call.Callee.Ident != "indicator" {
-		t.Errorf("Expected callee 'indicator', got '%s'", *call.Callee.Ident)
+		t.Errorf("Expected 'indicator', got '%s'", *call.Callee.Ident)
 	}
 }
 
@@ -250,11 +246,6 @@ ma200 = sma(close, 200)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call expression", i)
 		}
-		if call.Callee == nil || call.Callee.Ident == nil {
-			t.Fatalf("Statement %d: expected callee identifier", i)
-		}
-		if *call.Callee.Ident != "ta.sma" {
-			t.Errorf("Statement %d: expected callee 'ta.sma', got '%s'", i, *call.Callee.Ident)
-		}
+		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
 }

@@ -51,8 +51,12 @@ func TestIntegration_DailyLinesSimple(t *testing.T) {
 	if studyCall == nil {
 		t.Fatal("Expected call expression for study/indicator")
 	}
-	if studyCall.Callee.Ident == nil || *studyCall.Callee.Ident != "indicator" {
-		t.Errorf("Expected 'indicator', got '%v'", studyCall.Callee.Ident)
+	/* study() → indicator() is simple Ident rename */
+	if studyCall.Callee.Ident == nil {
+		t.Errorf("Expected Ident, got '%v'", studyCall.Callee)
+	}
+	if *studyCall.Callee.Ident != "indicator" {
+		t.Errorf("Expected 'indicator', got '%s'", *studyCall.Callee.Ident)
 	}
 
 	// Statements 1-3: sma() → ta.sma()
@@ -68,12 +72,7 @@ func TestIntegration_DailyLinesSimple(t *testing.T) {
 
 		expr := stmt.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-		if call == nil {
-			t.Fatalf("Statement %d: expected call expression", i+1)
-		}
-		if call.Callee.Ident == nil || *call.Callee.Ident != "ta.sma" {
-			t.Errorf("Statement %d: expected 'ta.sma', got '%v'", i+1, call.Callee.Ident)
-		}
+		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
 }
 
@@ -164,15 +163,25 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 	// Verify all transformations
 	expectedTransformations := []struct {
 		stmtIndex int
-		expected  string
+		obj       string
+		prop      string
 	}{
-		{0, "indicator"},        // study → indicator
-		{1, "ta.sma"},           // sma → ta.sma
-		{2, "ta.stdev"},         // stdev → ta.stdev
-		{3, "math.abs"},         // abs → math.abs
-		{4, "request.security"}, // security → request.security
+		{1, "ta", "sma"},           // sma → ta.sma
+		{2, "ta", "stdev"},         // stdev → ta.stdev
+		{3, "math", "abs"},         // abs → math.abs
+		{4, "request", "security"}, // security → request.security
 	}
 
+	/* Statement 0: study → indicator (simple Ident rename) */
+	studyCall := findCallInFactor(result.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	if studyCall == nil || studyCall.Callee.Ident == nil {
+		t.Errorf("Statement 0: expected Ident, got '%v'", studyCall.Callee)
+	}
+	if *studyCall.Callee.Ident != "indicator" {
+		t.Errorf("Statement 0: expected 'indicator', got '%s'", *studyCall.Callee.Ident)
+	}
+
+	/* Statements 1-4: namespace transformations (use MemberAccess) */
 	for _, exp := range expectedTransformations {
 		var call *parser.CallExpr
 
@@ -183,13 +192,7 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 			call = findCallInFactor(stmt.Assignment.Value.Ternary.Condition.Left.Left.Left.Left.Left)
 		}
 
-		if call == nil {
-			t.Fatalf("Statement %d: expected call expression", exp.stmtIndex)
-		}
-
-		if call.Callee.Ident == nil || *call.Callee.Ident != exp.expected {
-			t.Errorf("Statement %d: expected '%s', got '%v'", exp.stmtIndex, exp.expected, call.Callee.Ident)
-		}
+		assertMemberAccessCallee(t, call, exp.obj, exp.prop)
 	}
 }
 
@@ -249,8 +252,6 @@ func TestIntegration_LargeFile(t *testing.T) {
 	for _, idx := range []int{1, 50, 100} {
 		expr := result.Statements[idx].Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-		if call == nil || call.Callee.Ident == nil || *call.Callee.Ident != "ta.sma" {
-			t.Errorf("Statement %d: expected ta.sma transformation", idx)
-		}
+		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
 }

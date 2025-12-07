@@ -71,12 +71,7 @@ my_sma = sma(close, 20)
 	// Should transform built-in sma to ta.sma
 	expr := result.Statements[0].Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-	if call == nil {
-		t.Fatal("Expected call expression")
-	}
-	if call.Callee.Ident == nil || *call.Callee.Ident != "ta.sma" {
-		t.Error("Built-in sma should be transformed to ta.sma")
-	}
+	assertMemberAccessCallee(t, call, "ta", "sma")
 }
 
 // Test empty file
@@ -152,12 +147,13 @@ func TestTANamespaceTransformer_UnknownFunction(t *testing.T) {
 		t.Fatalf("Transform failed: %v", err)
 	}
 
-	// Should remain unchanged
+	// Should remain unchanged (custom function, not a builtin)
 	expr := result.Statements[0].Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {
 		t.Fatal("Expected call expression")
 	}
+	/* Custom function should NOT be transformed - still uses Ident */
 	if call.Callee.Ident == nil || *call.Callee.Ident != "myCustomFunction" {
 		t.Error("Custom function should not be transformed")
 	}
@@ -220,26 +216,25 @@ val = abs(5)
 		t.Fatalf("Pipeline failed: %v", err)
 	}
 
-	// Check study → indicator
+	// Check study → indicator (simple Ident rename)
 	studyExpr := result.Statements[0].Expression.Expr
 	studyCall := findCallInFactor(studyExpr.Ternary.Condition.Left.Left.Left.Left.Left)
-	if studyCall == nil || studyCall.Callee.Ident == nil || *studyCall.Callee.Ident != "indicator" {
-		t.Error("study should be transformed to indicator")
+	if studyCall == nil || studyCall.Callee.Ident == nil {
+		t.Error("study should be transformed to indicator (Ident)")
+	}
+	if *studyCall.Callee.Ident != "indicator" {
+		t.Errorf("Expected 'indicator', got '%s'", *studyCall.Callee.Ident)
 	}
 
-	// Check sma → ta.sma
+	// Check sma → ta.sma (namespace transform, uses MemberAccess)
 	smaExpr := result.Statements[1].Assignment.Value
 	smaCall := findCallInFactor(smaExpr.Ternary.Condition.Left.Left.Left.Left.Left)
-	if smaCall == nil || smaCall.Callee.Ident == nil || *smaCall.Callee.Ident != "ta.sma" {
-		t.Error("sma should be transformed to ta.sma")
-	}
+	assertMemberAccessCallee(t, smaCall, "ta", "sma")
 
-	// Check abs → math.abs
+	// Check abs → math.abs (namespace transform, uses MemberAccess)
 	absExpr := result.Statements[2].Assignment.Value
 	absCall := findCallInFactor(absExpr.Ternary.Condition.Left.Left.Left.Left.Left)
-	if absCall == nil || absCall.Callee.Ident == nil || *absCall.Callee.Ident != "math.abs" {
-		t.Error("abs should be transformed to math.abs")
-	}
+	assertMemberAccessCallee(t, absCall, "math", "abs")
 }
 
 // Test nil pointer safety
@@ -301,11 +296,12 @@ rsi14 = rsi(close, 14)
 		}
 
 		// For already-transformed ema, check it doesn't double-transform
-		if i == 1 && call.Callee.MemberAccess == nil {
-			// Parser saw "ta.ema" as MemberAccess
+		if i == 1 && call.Callee.MemberAccess != nil {
+			/* Parser saw "ta.ema" as MemberAccess - already correct */
 			continue
 		}
 
+		/* If still Ident (untransformed custom function), check name */
 		if call.Callee.Ident != nil && *call.Callee.Ident != expected {
 			t.Errorf("Statement %d: expected %s, got %s", i, expected, *call.Callee.Ident)
 		}
@@ -318,37 +314,43 @@ func TestAllTransformers_Coverage(t *testing.T) {
 		name        string
 		input       string
 		transformer Transformer
-		checkFunc   string
+		checkObj    string
+		checkProp   string
 	}{
 		{
 			name:        "TANamespace - crossover",
 			input:       `signal = crossover(fast, slow)`,
 			transformer: NewTANamespaceTransformer(),
-			checkFunc:   "ta.crossover",
+			checkObj:    "ta",
+			checkProp:   "crossover",
 		},
 		{
 			name:        "TANamespace - stdev",
 			input:       `stddev = stdev(close, 20)`,
 			transformer: NewTANamespaceTransformer(),
-			checkFunc:   "ta.stdev",
+			checkObj:    "ta",
+			checkProp:   "stdev",
 		},
 		{
 			name:        "MathNamespace - sqrt",
 			input:       `root = sqrt(x)`,
 			transformer: NewMathNamespaceTransformer(),
-			checkFunc:   "math.sqrt",
+			checkObj:    "math",
+			checkProp:   "sqrt",
 		},
 		{
 			name:        "MathNamespace - max",
 			input:       `maximum = max(a, b)`,
 			transformer: NewMathNamespaceTransformer(),
-			checkFunc:   "math.max",
+			checkObj:    "math",
+			checkProp:   "max",
 		},
 		{
 			name:        "RequestNamespace - security",
 			input:       `daily = security(tickerid, "D", close)`,
 			transformer: NewRequestNamespaceTransformer(),
-			checkFunc:   "request.security",
+			checkObj:    "request",
+			checkProp:   "security",
 		},
 	}
 
@@ -371,9 +373,7 @@ func TestAllTransformers_Coverage(t *testing.T) {
 
 			expr := result.Statements[0].Assignment.Value
 			call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
-			if call == nil || call.Callee.Ident == nil || *call.Callee.Ident != tc.checkFunc {
-				t.Errorf("Expected %s transformation", tc.checkFunc)
-			}
+			assertMemberAccessCallee(t, call, tc.checkObj, tc.checkProp)
 		})
 	}
 }
