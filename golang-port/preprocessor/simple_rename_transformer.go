@@ -212,4 +212,3 @@ func (t *SimpleRenameTransformer) visitComparisonTerm(term *parser.ComparisonTer
 		t.visitPostfixExpr(term.Postfix)
 	}
 }
-
