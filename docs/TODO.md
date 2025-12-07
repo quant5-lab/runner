@@ -79,9 +79,9 @@
 - [x] Forward-only sliding window
 - [x] 7/7 tests PASS
 - [x] 82KB → 0B, O(N) → O(1)
-- [ ] 8/13 TA functions O(1)
-- [ ] SMA circular buffer optimization
-- [ ] Keep O(period) for window scans
+- [x] 8/13 TA functions O(1)
+- [x] SMA circular buffer optimization
+- [x] Keep O(period) for window scans
 
 ### Complex Expressions
 - [x] BinaryExpression in security
