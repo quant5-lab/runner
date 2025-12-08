@@ -7,23 +7,20 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/*
-MathHandler generates code for math.* function calls with expression arguments.
-
-Design: Evaluate each argument expression, then call runtime math function.
-Rationale: Reuses existing expression evaluation, no special cases needed.
-*/
 type MathHandler struct{}
 
 func NewMathHandler() *MathHandler {
 	return &MathHandler{}
 }
 
-/*
-GenerateMathCall generates code for math.* functions.
+func (mh *MathHandler) normalizeToGoMathFunc(pineFuncName string) string {
+	if strings.HasPrefix(pineFuncName, "math.") {
+		shortName := pineFuncName[5:]
+		return "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
+	}
+	return "math." + strings.ToUpper(pineFuncName[:1]) + pineFuncName[1:]
+}
 
-Returns: Go expression string that evaluates the math function
-*/
 func (mh *MathHandler) GenerateMathCall(funcName string, args []ast.Expression, g *generator) (string, error) {
 	funcName = strings.ToLower(funcName)
 
@@ -56,11 +53,7 @@ func (mh *MathHandler) generateUnaryMath(funcName string, args []ast.Expression,
 	}
 
 	arg := g.extractSeriesExpression(args[0])
-
-	// Extract function name after "math." and capitalize
-	// "math.abs" -> "Abs"
-	shortName := funcName[5:] // Remove "math."
-	goFuncName := "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
+	goFuncName := mh.normalizeToGoMathFunc(funcName)
 
 	return fmt.Sprintf("%s(%s)", goFuncName, arg), nil
 }
@@ -72,17 +65,7 @@ func (mh *MathHandler) generateBinaryMath(funcName string, args []ast.Expression
 
 	arg1 := g.extractSeriesExpression(args[0])
 	arg2 := g.extractSeriesExpression(args[1])
-
-	// Normalize function name (Pine "max" → Go "math.Max")
-	var goFuncName string
-	if strings.HasPrefix(funcName, "math.") {
-		// Already has math. prefix (math.max → math.Max)
-		shortName := funcName[5:]
-		goFuncName = "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
-	} else {
-		// Pine function without prefix (max → math.Max)
-		goFuncName = "math." + strings.ToUpper(funcName[:1]) + funcName[1:]
-	}
+	goFuncName := mh.normalizeToGoMathFunc(funcName)
 
 	return fmt.Sprintf("%s(%s, %s)", goFuncName, arg1, arg2), nil
 }

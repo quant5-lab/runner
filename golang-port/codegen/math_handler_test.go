@@ -228,3 +228,298 @@ func TestMathHandler_UnsupportedFunction(t *testing.T) {
 		t.Error("expected error for unsupported function, got nil")
 	}
 }
+
+func TestMathHandler_NormalizationEdgeCases(t *testing.T) {
+	mh := NewMathHandler()
+	g := &generator{
+		variables: make(map[string]string),
+		constants: make(map[string]interface{}),
+	}
+
+	tests := []struct {
+		name        string
+		funcName    string
+		args        []ast.Expression
+		expectFunc  string
+		description string
+	}{
+		{
+			name:        "unprefixed abs normalized",
+			funcName:    "abs",
+			args:        []ast.Expression{&ast.Literal{Value: -5.0}},
+			expectFunc:  "math.Abs",
+			description: "Pine 'abs' → Go 'math.Abs'",
+		},
+		{
+			name:        "prefixed math.abs normalized",
+			funcName:    "math.abs",
+			args:        []ast.Expression{&ast.Literal{Value: -5.0}},
+			expectFunc:  "math.Abs",
+			description: "Pine 'math.abs' → Go 'math.Abs'",
+		},
+		{
+			name:        "unprefixed sqrt normalized",
+			funcName:    "sqrt",
+			args:        []ast.Expression{&ast.Literal{Value: 16.0}},
+			expectFunc:  "math.Sqrt",
+			description: "Pine 'sqrt' → Go 'math.Sqrt'",
+		},
+		{
+			name:        "prefixed math.sqrt normalized",
+			funcName:    "math.sqrt",
+			args:        []ast.Expression{&ast.Literal{Value: 16.0}},
+			expectFunc:  "math.Sqrt",
+			description: "Pine 'math.sqrt' → Go 'math.Sqrt'",
+		},
+		{
+			name:        "unprefixed max normalized",
+			funcName:    "max",
+			args:        []ast.Expression{&ast.Literal{Value: 5.0}, &ast.Literal{Value: 10.0}},
+			expectFunc:  "math.Max",
+			description: "Pine 'max' → Go 'math.Max'",
+		},
+		{
+			name:        "prefixed math.max normalized",
+			funcName:    "math.max",
+			args:        []ast.Expression{&ast.Literal{Value: 5.0}, &ast.Literal{Value: 10.0}},
+			expectFunc:  "math.Max",
+			description: "Pine 'math.max' → Go 'math.Max'",
+		},
+		{
+			name:        "unprefixed min normalized",
+			funcName:    "min",
+			args:        []ast.Expression{&ast.Literal{Value: 5.0}, &ast.Literal{Value: 10.0}},
+			expectFunc:  "math.Min",
+			description: "Pine 'min' → Go 'math.Min'",
+		},
+		{
+			name:        "prefixed math.min normalized",
+			funcName:    "math.min",
+			args:        []ast.Expression{&ast.Literal{Value: 5.0}, &ast.Literal{Value: 10.0}},
+			expectFunc:  "math.Min",
+			description: "Pine 'math.min' → Go 'math.Min'",
+		},
+		{
+			name:        "unprefixed floor normalized",
+			funcName:    "floor",
+			args:        []ast.Expression{&ast.Literal{Value: 3.7}},
+			expectFunc:  "math.Floor",
+			description: "Pine 'floor' → Go 'math.Floor'",
+		},
+		{
+			name:        "unprefixed ceil normalized",
+			funcName:    "ceil",
+			args:        []ast.Expression{&ast.Literal{Value: 3.2}},
+			expectFunc:  "math.Ceil",
+			description: "Pine 'ceil' → Go 'math.Ceil'",
+		},
+		{
+			name:        "unprefixed round normalized",
+			funcName:    "round",
+			args:        []ast.Expression{&ast.Literal{Value: 3.5}},
+			expectFunc:  "math.Round",
+			description: "Pine 'round' → Go 'math.Round'",
+		},
+		{
+			name:        "unprefixed log normalized",
+			funcName:    "log",
+			args:        []ast.Expression{&ast.Literal{Value: 10.0}},
+			expectFunc:  "math.Log",
+			description: "Pine 'log' → Go 'math.Log'",
+		},
+		{
+			name:        "unprefixed exp normalized",
+			funcName:    "exp",
+			args:        []ast.Expression{&ast.Literal{Value: 2.0}},
+			expectFunc:  "math.Exp",
+			description: "Pine 'exp' → Go 'math.Exp'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mh.GenerateMathCall(tt.funcName, tt.args, g)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.HasPrefix(result, tt.expectFunc+"(") {
+				t.Errorf("%s: expected result to start with %q, got %q", tt.description, tt.expectFunc+"(", result)
+			}
+		})
+	}
+}
+
+func TestMathHandler_CaseInsensitiveMatching(t *testing.T) {
+	mh := NewMathHandler()
+	g := &generator{
+		variables: make(map[string]string),
+		constants: make(map[string]interface{}),
+	}
+
+	tests := []struct {
+		name        string
+		funcName    string
+		args        []ast.Expression
+		expectStart string
+	}{
+		{
+			name:        "uppercase ABS normalized",
+			funcName:    "ABS",
+			args:        []ast.Expression{&ast.Literal{Value: -5.0}},
+			expectStart: "math.Abs(",
+		},
+		{
+			name:        "mixed case Sqrt normalized",
+			funcName:    "Sqrt",
+			args:        []ast.Expression{&ast.Literal{Value: 16.0}},
+			expectStart: "math.Sqrt(",
+		},
+		{
+			name:        "uppercase MATH.MAX normalized",
+			funcName:    "MATH.MAX",
+			args:        []ast.Expression{&ast.Literal{Value: 5.0}, &ast.Literal{Value: 10.0}},
+			expectStart: "math.Max(",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mh.GenerateMathCall(tt.funcName, tt.args, g)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.HasPrefix(result, tt.expectStart) {
+				t.Errorf("expected result to start with %q, got %q", tt.expectStart, result)
+			}
+		})
+	}
+}
+
+func TestMathHandler_ArgumentCountValidation(t *testing.T) {
+	mh := NewMathHandler()
+	g := &generator{
+		variables: make(map[string]string),
+		constants: make(map[string]interface{}),
+	}
+
+	tests := []struct {
+		name     string
+		funcName string
+		argCount int
+		wantErr  bool
+	}{
+		{
+			name:     "pow with 1 arg fails",
+			funcName: "math.pow",
+			argCount: 1,
+			wantErr:  true,
+		},
+		{
+			name:     "pow with 3 args fails",
+			funcName: "math.pow",
+			argCount: 3,
+			wantErr:  true,
+		},
+		{
+			name:     "abs with 0 args fails",
+			funcName: "abs",
+			argCount: 0,
+			wantErr:  true,
+		},
+		{
+			name:     "abs with 2 args fails",
+			funcName: "abs",
+			argCount: 2,
+			wantErr:  true,
+		},
+		{
+			name:     "max with 1 arg fails",
+			funcName: "max",
+			argCount: 1,
+			wantErr:  true,
+		},
+		{
+			name:     "max with 3 args fails",
+			funcName: "max",
+			argCount: 3,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := make([]ast.Expression, tt.argCount)
+			for i := 0; i < tt.argCount; i++ {
+				args[i] = &ast.Literal{Value: float64(i)}
+			}
+
+			_, err := mh.GenerateMathCall(tt.funcName, args, g)
+			if tt.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestMathHandler_ComplexExpressionArguments(t *testing.T) {
+	mh := NewMathHandler()
+	g := &generator{
+		variables:   make(map[string]string),
+		constants:   make(map[string]interface{}),
+		tempVarMgr:  NewTempVariableManager(nil),
+		builtinHandler: NewBuiltinIdentifierHandler(),
+	}
+	g.tempVarMgr.gen = g
+
+	tests := []struct {
+		name        string
+		funcName    string
+		args        []ast.Expression
+		expectStart string
+	}{
+		{
+			name:     "abs with binary expression",
+			funcName: "abs",
+			args: []ast.Expression{
+				&ast.BinaryExpression{
+					Operator: "-",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Identifier{Name: "open"},
+				},
+			},
+			expectStart: "math.Abs(",
+		},
+		{
+			name:     "max with literals",
+			funcName: "max",
+			args: []ast.Expression{
+				&ast.Literal{Value: 5.0},
+				&ast.Literal{Value: 0.0},
+			},
+			expectStart: "math.Max(",
+		},
+		{
+			name:     "sqrt with identifier",
+			funcName: "sqrt",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "value"},
+			},
+			expectStart: "math.Sqrt(",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mh.GenerateMathCall(tt.funcName, tt.args, g)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.HasPrefix(result, tt.expectStart) {
+				t.Errorf("expected result to start with %q, got %q", tt.expectStart, result)
+			}
+		})
+	}
+}
