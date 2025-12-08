@@ -17,26 +17,32 @@ type StrategyCode struct {
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
 func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
+	constantRegistry := NewConstantRegistry()
+	typeSystem := NewTypeInferenceEngine()
+	boolConverter := NewBooleanConverter(typeSystem)
+
 	gen := &generator{
-		imports:      make(map[string]bool),
-		variables:    make(map[string]string),
-		varInits:     make(map[string]ast.Expression),
-		constants:    make(map[string]interface{}),
-		strategyName: "Generated Strategy",
-		limits:       NewCodeGenerationLimits(),
-		safetyGuard:  NewRuntimeSafetyGuard(),
+		imports:          make(map[string]bool),
+		variables:        make(map[string]string),
+		varInits:         make(map[string]ast.Expression),
+		constants:        make(map[string]interface{}),
+		strategyName:     "Generated Strategy",
+		limits:           NewCodeGenerationLimits(),
+		safetyGuard:      NewRuntimeSafetyGuard(),
+		constantRegistry: constantRegistry,
+		typeSystem:       typeSystem,
+		boolConverter:    boolConverter,
 	}
 
-	// Initialize handlers
 	gen.inputHandler = NewInputHandler()
 	gen.mathHandler = NewMathHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
 	gen.taRegistry = NewTAFunctionRegistry()
-	gen.exprAnalyzer = NewExpressionAnalyzer(gen)       // Expression analysis for temp vars
-	gen.tempVarMgr = NewTempVariableManager(gen)        // ForwardSeriesBuffer temp var manager
-	gen.constEvaluator = validation.NewWarmupAnalyzer() // Compile-time constant evaluator
-	gen.plotExprHandler = NewPlotExpressionHandler(gen) // Inline TA/math in plot() expressions
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
+	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.constEvaluator = validation.NewWarmupAnalyzer()
+	gen.plotExprHandler = NewPlotExpressionHandler(gen)
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -54,24 +60,29 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 type generator struct {
 	imports           map[string]bool
 	variables         map[string]string
-	varInits          map[string]ast.Expression // Variable init expressions for constant resolution
-	constants         map[string]interface{}    // Input constants (input.float, input.int, etc)
-	plots             []string                  // Track plot variables
-	strategyName      string                    // Strategy name from indicator() or strategy()
+	varInits          map[string]ast.Expression
+	constants         map[string]interface{}
+	plots             []string
+	strategyName      string
 	indent            int
-	taFunctions       []taFunctionCall // List of TA function calls to pre-calculate
-	inSecurityContext bool             // Flag when generating code inside security() context
+	taFunctions       []taFunctionCall
+	inSecurityContext bool
 	limits            CodeGenerationLimits
 	safetyGuard       RuntimeSafetyGuard
+
+	constantRegistry *ConstantRegistry
+	typeSystem       *TypeInferenceEngine
+	boolConverter    *BooleanConverter
+
 	inputHandler      *InputHandler
 	mathHandler       *MathHandler
 	subscriptResolver *SubscriptResolver
-	builtinHandler    *BuiltinIdentifierHandler  // Resolves Pine built-in identifiers
-	taRegistry        *TAFunctionRegistry        // Registry for TA function handlers
-	exprAnalyzer      *ExpressionAnalyzer        // Finds nested TA calls in expressions
-	tempVarMgr        *TempVariableManager       // Manages temp Series variables (ForwardSeriesBuffer)
-	constEvaluator    *validation.WarmupAnalyzer // Compile-time constant expression evaluator
-	plotExprHandler   *PlotExpressionHandler     // Handles inline TA/math in plot() expressions
+	builtinHandler    *BuiltinIdentifierHandler
+	taRegistry        *TAFunctionRegistry
+	exprAnalyzer      *ExpressionAnalyzer
+	tempVarMgr        *TempVariableManager
+	constEvaluator    *validation.WarmupAnalyzer
+	plotExprHandler   *PlotExpressionHandler
 }
 
 type taFunctionCall struct {
@@ -169,9 +180,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 						if funcName == "input.float" {
 							code, _ := g.inputHandler.GenerateInputFloat(callExpr, varName)
 							if code != "" {
-								// Extract value from generated code: "const varName = 1.23"
-								if val := extractConstValue(code); val != nil {
+								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
 									g.constants[varName] = val
+									g.constantRegistry.Register(varName, val)
 								}
 							}
 							continue
@@ -179,14 +190,21 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 						if funcName == "input.int" {
 							code, _ := g.inputHandler.GenerateInputInt(callExpr, varName)
 							if code != "" {
-								if val := extractConstValue(code); val != nil {
+								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
 									g.constants[varName] = val
+									g.constantRegistry.Register(varName, val)
 								}
 							}
 							continue
 						}
 						if funcName == "input.bool" {
-							g.inputHandler.GenerateInputBool(callExpr, varName)
+							code, _ := g.inputHandler.GenerateInputBool(callExpr, varName)
+							if code != "" {
+								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
+									g.constants[varName] = val
+									g.constantRegistry.Register(varName, val)
+								}
+							}
 							continue
 						}
 						if funcName == "input.string" {
@@ -214,12 +232,15 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
+				g.typeSystem.RegisterVariable(varName, varType)
 			}
 		}
 	}
 
-	// Sync input constants to constEvaluator AFTER first pass collects them
+	// Sync constants to typeSystem and constEvaluator
 	for varName, value := range g.constants {
+		g.typeSystem.RegisterConstant(varName, value)
+
 		if floatVal, ok := value.(float64); ok {
 			g.constEvaluator.AddConstant(varName, floatVal)
 		} else if intVal, ok := value.(int); ok {
@@ -627,34 +648,14 @@ func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpre
 // addBoolConversionIfNeeded checks if the expression accesses a bool Series variable
 // and wraps the code with != 0 conversion for use in boolean contexts
 func (g *generator) addBoolConversionIfNeeded(expr ast.Expression, code string) string {
-	needsConversion := false
-
-	// Check if this is a simple identifier that maps to a bool variable
-	if ident, ok := expr.(*ast.Identifier); ok {
-		if varType, exists := g.variables[ident.Name]; exists && varType == "bool" {
-			needsConversion = true
-		}
-	}
-
-	// Check if this is a member expression (e.g., signal[0]) that accesses a bool Series
-	if member, ok := expr.(*ast.MemberExpression); ok {
-		if ident, ok := member.Object.(*ast.Identifier); ok {
-			if varType, exists := g.variables[ident.Name]; exists && varType == "bool" {
-				needsConversion = true
-			}
-		}
-	}
-
-	if needsConversion {
-		return fmt.Sprintf("%s != 0", code)
-	}
-	return code
+	return g.boolConverter.ConvertBoolSeriesForIfStatement(expr, code)
 }
 
-// generateNumericExpression generates code for expressions that must produce float64 values
-// Converts boolean literals to 1.0 (true) or 0.0 (false)
+func (g *generator) ensureBooleanOperand(expr ast.Expression, code string) string {
+	return g.boolConverter.EnsureBooleanOperand(expr, code)
+}
+
 func (g *generator) generateNumericExpression(expr ast.Expression) (string, error) {
-	// Special handling for boolean literals: convert to float
 	if lit, ok := expr.(*ast.Literal); ok {
 		if boolVal, ok := lit.Value.(bool); ok {
 			if boolVal {
@@ -765,6 +766,11 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		if err != nil {
 			return "", err
 		}
+
+		// Convert float64 Series values to bool for logical operations
+		leftCode = g.ensureBooleanOperand(e.Left, leftCode)
+		rightCode = g.ensureBooleanOperand(e.Right, rightCode)
+
 		op := e.Operator
 		switch op {
 		case "and":
@@ -961,65 +967,16 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	return code, nil
 }
 
+// inferVariableType delegates to TypeInferenceEngine
 func (g *generator) inferVariableType(expr ast.Expression) string {
-	if expr == nil {
-		return "float64"
-	}
-
-	switch e := expr.(type) {
-	case *ast.MemberExpression:
-		if obj, ok := e.Object.(*ast.Identifier); ok {
-			if obj.Name == "syminfo" {
-				if prop, ok := e.Property.(*ast.Identifier); ok {
-					if prop.Name == "tickerid" {
-						return "string"
-					}
-				}
-			}
-		}
-		return "float64"
-	case *ast.BinaryExpression:
-		// Comparison operators produce bool
-		if e.Operator == ">" || e.Operator == "<" || e.Operator == ">=" ||
-			e.Operator == "<=" || e.Operator == "==" || e.Operator == "!=" {
-			return "bool"
-		}
-		return "float64"
-	case *ast.LogicalExpression:
-		// and/or produce bool
-		return "bool"
-	case *ast.UnaryExpression:
-		// Boolean negation produces bool
-		if e.Operator == "not" || e.Operator == "!" {
-			return "bool"
-		}
-		// Numeric unary preserves operand type
-		return g.inferVariableType(e.Argument)
-	case *ast.CallExpression:
-		funcName := g.extractFunctionName(e.Callee)
-		if funcName == "ta.crossover" || funcName == "ta.crossunder" {
-			return "bool"
-		}
-		return "float64"
-	case *ast.ConditionalExpression:
-		// Ternary type depends on consequent/alternate
-		return g.inferVariableType(e.Consequent)
-	default:
-		return "float64"
-	}
+	return g.typeSystem.InferType(expr)
 }
 
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
-	// STEP 1: Detect nested TA calls and generate temp vars INLINE (same statement)
-	// Example: rma(max(change(x), 0), 9) →
-	//   1. Generate change_xxxSeries.Set()
-	//   2. Generate max_yyySeries.Set()
-	//   3. Generate rma using max_yyySeries reference
 	nestedCalls := g.exprAnalyzer.FindNestedCalls(initExpr)
 
 	tempVarCode := ""
 	if len(nestedCalls) > 0 {
-		// Process nested calls in REVERSE order (innermost first)
 		// Example: rma(max(change(x), 0), 9) returns [rma, max, change]
 		//   Must process change → max → rma so dependencies exist when referenced
 		for i := len(nestedCalls) - 1; i >= 0; i-- {
@@ -2344,17 +2301,21 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 }
 
 // extractConstValue parses "const varName = VALUE" to extract VALUE
+// Deprecated: Use ConstantRegistry.ExtractFromGeneratedCode
 func extractConstValue(code string) interface{} {
-	// Parse: "const bblenght = 46\n"
 	var varName string
 	var floatVal float64
 	var intVal int
+	var boolVal bool
 
 	if _, err := fmt.Sscanf(code, "const %s = %f", &varName, &floatVal); err == nil {
 		return floatVal
 	}
 	if _, err := fmt.Sscanf(code, "const %s = %d", &varName, &intVal); err == nil {
 		return intVal
+	}
+	if _, err := fmt.Sscanf(code, "const %s = %t", &varName, &boolVal); err == nil {
+		return boolVal
 	}
 	return nil
 }

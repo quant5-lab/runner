@@ -339,11 +339,14 @@ func TestBooleanTypeTracking(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		varInits:   make(map[string]ast.Expression),
-		constants:  make(map[string]interface{}),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:          make(map[string]bool),
+		variables:        make(map[string]string),
+		varInits:         make(map[string]ast.Expression),
+		constants:        make(map[string]interface{}),
+		taRegistry:       NewTAFunctionRegistry(),
+		typeSystem:       NewTypeInferenceEngine(),
+		boolConverter:    NewBooleanConverter(NewTypeInferenceEngine()),
+		constantRegistry: NewConstantRegistry(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
