@@ -67,6 +67,10 @@ func (h *PlotExpressionHandler) handleConditional(expr *ast.ConditionalExpressio
 func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (string, error) {
 	funcName := h.generator.extractFunctionName(call.Callee)
 
+	if funcName == "ta.atr" || funcName == "atr" {
+		return h.HandleATRFunction(call, funcName)
+	}
+
 	if h.taRegistry.IsSupported(funcName) {
 		return h.HandleTAFunction(call, funcName)
 	}
@@ -108,6 +112,33 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 	}
 
 	return code, nil
+}
+
+func (h *PlotExpressionHandler) HandleATRFunction(call *ast.CallExpression, funcName string) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("%s requires 1 argument (period)", funcName)
+	}
+
+	periodArg, ok := call.Arguments[0].(*ast.Literal)
+	if !ok {
+		return "", fmt.Errorf("%s period must be literal", funcName)
+	}
+
+	_, err := h.extractPeriod(periodArg)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", funcName, err)
+	}
+
+	argHash := h.generator.exprAnalyzer.ComputeArgHash(call)
+
+	callInfo := CallInfo{
+		Call:     call,
+		FuncName: "ta.atr",
+		ArgHash:  argHash,
+	}
+
+	tempVarName := h.generator.tempVarMgr.GetOrCreate(callInfo)
+	return fmt.Sprintf("%sSeries.Get(0)", tempVarName), nil
 }
 
 func (h *PlotExpressionHandler) extractPeriod(arg *ast.Literal) (int, error) {

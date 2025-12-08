@@ -173,8 +173,8 @@ func TestExpressionAnalyzer_HashUniqueness(t *testing.T) {
 		},
 	}
 
-	hash1 := analyzer.computeArgHash(call1)
-	hash2 := analyzer.computeArgHash(call2)
+	hash1 := analyzer.ComputeArgHash(call1)
+	hash2 := analyzer.ComputeArgHash(call2)
 
 	if hash1 == hash2 {
 		t.Error("Expected different hashes for sma(close,50) vs sma(close,200)")
@@ -206,8 +206,8 @@ func TestExpressionAnalyzer_HashConsistency(t *testing.T) {
 	call1 := createCall()
 	call2 := createCall()
 
-	hash1 := analyzer.computeArgHash(call1)
-	hash2 := analyzer.computeArgHash(call2)
+	hash1 := analyzer.ComputeArgHash(call1)
+	hash2 := analyzer.ComputeArgHash(call2)
 
 	if hash1 != hash2 {
 		t.Errorf("Expected consistent hash for identical calls, got %q vs %q", hash1, hash2)

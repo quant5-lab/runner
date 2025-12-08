@@ -467,9 +467,9 @@ func TestMathHandler_ArgumentCountValidation(t *testing.T) {
 func TestMathHandler_ComplexExpressionArguments(t *testing.T) {
 	mh := NewMathHandler()
 	g := &generator{
-		variables:   make(map[string]string),
-		constants:   make(map[string]interface{}),
-		tempVarMgr:  NewTempVariableManager(nil),
+		variables:      make(map[string]string),
+		constants:      make(map[string]interface{}),
+		tempVarMgr:     NewTempVariableManager(nil),
 		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 	g.tempVarMgr.gen = g

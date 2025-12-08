@@ -50,7 +50,7 @@ func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 	case *ast.CallExpression:
 		// Found TA function call - extract metadata
 		funcName := ea.gen.extractFunctionName(e.Callee)
-		argHash := ea.computeArgHash(e)
+		argHash := ea.ComputeArgHash(e)
 		*calls = append(*calls, CallInfo{
 			Call:     e,
 			FuncName: funcName,
@@ -91,11 +91,11 @@ func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 	}
 }
 
-// computeArgHash creates unique identifier for call based on arguments
+// ComputeArgHash creates unique identifier for call based on arguments
 //
 // Purpose: Differentiate sma(close,50) from sma(close,200)
 // Method: Hash function name + argument string representations
-func (ea *ExpressionAnalyzer) computeArgHash(call *ast.CallExpression) string {
+func (ea *ExpressionAnalyzer) ComputeArgHash(call *ast.CallExpression) string {
 	h := sha256.New()
 
 	// Include function name in hash

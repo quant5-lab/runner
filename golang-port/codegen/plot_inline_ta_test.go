@@ -22,3 +22,59 @@ func TestPlotInlineTA_MathMax(t *testing.T) {
 		"math.Max",
 	)
 }
+
+func TestPlotInlineTA_ATR_BasicPeriod(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 14))
+
+	NewCodeVerifier(code, t).MustContain(
+		"ta_atr_",
+		"Series.Get(0)",
+		"collector.Add",
+	)
+}
+
+func TestPlotInlineTA_ATR_ShortPeriod(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 2))
+
+	NewCodeVerifier(code, t).MustContain(
+		"ta_atr_",
+		"Series.Get(0)",
+		"collector.Add",
+	)
+}
+
+func TestPlotInlineTA_ATR_MinimalPeriod(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 1))
+
+	NewCodeVerifier(code, t).MustContain(
+		"ta_atr_",
+		"Series.Get(0)",
+		"collector.Add",
+	)
+}
+
+func TestPlotInlineTA_ATR_LargePeriod(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 100))
+
+	NewCodeVerifier(code, t).MustContain(
+		"ta_atr_",
+		"Series.Get(0)",
+		"collector.Add",
+	)
+}
+
+func TestPlotInlineTA_ATR_GeneratesTempVariable(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 14))
+
+	NewCodeVerifier(code, t).
+		MustContain("ta_atr_").
+		MustContain("Series.Next()")
+}
+
+func TestPlotInlineTA_ATR_NoIIFEGeneration(t *testing.T) {
+	code := generatePlotExpression(t, TACallPeriodOnly("atr", 14))
+
+	NewCodeVerifier(code, t).
+		MustNotContain("func()").
+		MustNotContain("return func")
+}

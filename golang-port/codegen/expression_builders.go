@@ -31,6 +31,18 @@ func TACall(method string, source ast.Expression, period float64) *ast.CallExpre
 	}
 }
 
+func TACallPeriodOnly(method string, period float64) *ast.CallExpression {
+	return &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   Ident("ta"),
+			Property: Ident(method),
+		},
+		Arguments: []ast.Expression{
+			Lit(period),
+		},
+	}
+}
+
 func MathCall(method string, args ...ast.Expression) *ast.CallExpression {
 	return &ast.CallExpression{
 		Callee: &ast.MemberExpression{
