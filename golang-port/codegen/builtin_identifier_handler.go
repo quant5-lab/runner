@@ -107,15 +107,13 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		offset, offset, field)
 }
 
-// GenerateStrategyRuntimeAccess generates code for strategy runtime values.
-//
-// Why separate: These are NOT Series variables, they're strategy state queries.
+// GenerateStrategyRuntimeAccess generates Series.Get(0) access for strategy runtime values
 func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string) string {
 	switch property {
 	case "position_avg_price":
-		return "strat.GetPositionAvgPrice()"
+		return "strategy_position_avg_priceSeries.Get(0)"
 	case "position_size":
-		return "strat.GetPositionSize()"
+		return "strategy_position_sizeSeries.Get(0)"
 	case "position_entry_name":
 		return "strat.GetPositionEntryName()"
 	default:

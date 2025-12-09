@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"math"
 )
 
 /* Direction constants */
@@ -350,7 +351,7 @@ func (s *Strategy) GetPositionSize() float64 {
 func (s *Strategy) GetPositionAvgPrice() float64 {
 	avgPrice := s.positionTracker.GetAvgPrice()
 	if avgPrice == 0 {
-		return 0 // Return 0 instead of NaN for simplicity
+		return math.NaN()
 	}
 	return avgPrice
 }

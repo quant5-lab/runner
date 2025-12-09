@@ -47,6 +47,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.plotExprHandler = NewPlotExpressionHandler(gen)
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
+	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -62,19 +63,20 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 }
 
 type generator struct {
-	imports              map[string]bool
-	variables            map[string]string
-	varInits             map[string]ast.Expression
-	constants            map[string]interface{}
-	plots                []string
-	strategyName         string
-	indent               int
-	taFunctions          []taFunctionCall
-	inSecurityContext    bool
-	hasSecurityCalls     bool // Track if security() calls exist
-	hasSecurityExprEvals bool // Track if security() calls with complex expressions exist
-	limits               CodeGenerationLimits
-	safetyGuard          RuntimeSafetyGuard
+	imports                  map[string]bool
+	variables                map[string]string
+	varInits                 map[string]ast.Expression
+	constants                map[string]interface{}
+	plots                    []string
+	strategyName             string
+	indent                   int
+	taFunctions              []taFunctionCall
+	inSecurityContext        bool
+	hasSecurityCalls         bool // Track if security() calls exist
+	hasSecurityExprEvals     bool // Track if security() calls with complex expressions exist
+	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
+	limits                   CodeGenerationLimits
+	safetyGuard              RuntimeSafetyGuard
 
 	constantRegistry *ConstantRegistry
 	typeSystem       *TypeInferenceEngine
@@ -351,6 +353,17 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
+	// StateManager for strategy.* runtime values (Series storage)
+	if g.hasStrategyRuntimeAccess {
+		code += g.ind() + "sm := strategy.NewStateManager(len(ctx.Data))\n"
+		code += g.ind() + "strategy_position_avg_priceSeries := sm.PositionAvgPriceSeries()\n"
+		code += g.ind() + "strategy_position_sizeSeries := sm.PositionSizeSeries()\n"
+		code += g.ind() + "strategy_equitySeries := sm.EquitySeries()\n"
+		code += g.ind() + "strategy_netprofitSeries := sm.NetProfitSeries()\n"
+		code += g.ind() + "strategy_closedtradesSeries := sm.ClosedTradesSeries()\n"
+		code += "\n"
+	}
+
 	// Bar loop for strategy execution
 	code += g.ind() + "const maxBars = 1000000\n"
 	code += g.ind() + "barCount := len(ctx.Data)\n"
@@ -380,10 +393,21 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += stmtCode
 	}
 
+	if g.hasStrategyRuntimeAccess {
+		code += "\n" + g.ind() + "sm.SampleCurrentBar(strat, bar.Close)\n"
+	}
+
 	// Suppress unused variable warnings
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
 	if g.hasSecurityCalls {
 		code += g.ind() + "_ = secBarEvaluator\n"
+	}
+	if g.hasStrategyRuntimeAccess {
+		code += g.ind() + "_ = strategy_position_avg_priceSeries\n"
+		code += g.ind() + "_ = strategy_position_sizeSeries\n"
+		code += g.ind() + "_ = strategy_equitySeries\n"
+		code += g.ind() + "_ = strategy_netprofitSeries\n"
+		code += g.ind() + "_ = strategy_closedtradesSeries\n"
 	}
 	for varName := range g.variables {
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
@@ -399,6 +423,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	tempVarNextCalls := g.tempVarMgr.GenerateNextCalls()
 	if tempVarNextCalls != "" {
 		code += tempVarNextCalls
+	}
+
+	if g.hasStrategyRuntimeAccess {
+		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { sm.AdvanceCursors() }\n", iterVar)
 	}
 
 	g.indent--
@@ -2479,6 +2507,86 @@ func hasSecurityInExpression(expr ast.Expression) bool {
 		return hasSecurityInExpression(e.Left) || hasSecurityInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasSecurityInExpression(e.Test) || hasSecurityInExpression(e.Consequent) || hasSecurityInExpression(e.Alternate)
+	}
+	return false
+}
+
+/* detectStrategyRuntimeAccess walks AST to detect strategy.* runtime value access */
+func detectStrategyRuntimeAccess(program *ast.Program) bool {
+	if program == nil {
+		return false
+	}
+
+	for _, node := range program.Body {
+		if hasStrategyRuntimeInNode(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStrategyRuntimeInNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.VariableDeclaration:
+		for _, decl := range n.Declarations {
+			if hasStrategyRuntimeInExpression(decl.Init) {
+				return true
+			}
+		}
+	case *ast.ExpressionStatement:
+		return hasStrategyRuntimeInExpression(n.Expression)
+	case *ast.IfStatement:
+		if hasStrategyRuntimeInExpression(n.Test) {
+			return true
+		}
+		for _, consequent := range n.Consequent {
+			if hasStrategyRuntimeInNode(consequent) {
+				return true
+			}
+		}
+		for _, alternate := range n.Alternate {
+			if hasStrategyRuntimeInNode(alternate) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.MemberExpression:
+		if obj, ok := e.Object.(*ast.Identifier); ok {
+			if obj.Name == "strategy" {
+				if prop, ok := e.Property.(*ast.Identifier); ok {
+					runtimeProps := map[string]bool{
+						"position_avg_price": true,
+						"position_size":      true,
+						"equity":             true,
+						"netprofit":          true,
+						"closedtrades":       true,
+					}
+					if runtimeProps[prop.Name] {
+						return true
+					}
+				}
+			}
+		}
+		return hasStrategyRuntimeInExpression(e.Object)
+	case *ast.CallExpression:
+		for _, arg := range e.Arguments {
+			if hasStrategyRuntimeInExpression(arg) {
+				return true
+			}
+		}
+	case *ast.BinaryExpression:
+		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
+	case *ast.ConditionalExpression:
+		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
 	}
 	return false
 }

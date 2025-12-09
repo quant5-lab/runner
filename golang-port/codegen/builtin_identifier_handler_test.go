@@ -158,8 +158,8 @@ func TestBuiltinIdentifierHandler_GenerateStrategyRuntimeAccess(t *testing.T) {
 		property string
 		expected string
 	}{
-		{"position_avg_price", "position_avg_price", "strat.GetPositionAvgPrice()"},
-		{"position_size", "position_size", "strat.GetPositionSize()"},
+		{"position_avg_price", "position_avg_price", "strategy_position_avg_priceSeries.Get(0)"},
+		{"position_size", "position_size", "strategy_position_sizeSeries.Get(0)"},
 		{"position_entry_name", "position_entry_name", "strat.GetPositionEntryName()"},
 		{"unknown property", "unknown", ""},
 	}
@@ -222,7 +222,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			false,
 			0,
 			false,
-			"strat.GetPositionAvgPrice()",
+			"strategy_position_avg_priceSeries.Get(0)",
 			true,
 		},
 		{
