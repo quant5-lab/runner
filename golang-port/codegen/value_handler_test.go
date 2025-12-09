@@ -253,9 +253,12 @@ func TestValueHandlerGenerateInlineCall(t *testing.T) {
 
 func TestValueHandlerComplexExpressionArguments(t *testing.T) {
 	handler := NewValueHandler()
+	typeSystem := NewTypeInferenceEngine()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:     make(map[string]string),
+		varInits:      make(map[string]ast.Expression),
+		typeSystem:    typeSystem,
+		boolConverter: NewBooleanConverter(typeSystem),
 	}
 
 	tests := []struct {

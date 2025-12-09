@@ -1,22 +1,29 @@
 package codegen
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/quant5-lab/runner/ast"
 )
 
-// BooleanConverter handles type conversions between Go bool and Pine float64 boolean model.
-// Pine boolean model: 1.0 = true, 0.0 = false (float64)
-// Go control flow: true/false (bool)
 type BooleanConverter struct {
-	typeSystem *TypeInferenceEngine
+	typeSystem            *TypeInferenceEngine
+	skipComparisonRule    ConversionRule
+	seriesAccessRule      ConversionRule
+	typeBasedRule         ConversionRule
+	notEqualZeroTransform CodeTransformer
+	parenthesesTransform  CodeTransformer
 }
 
 func NewBooleanConverter(typeSystem *TypeInferenceEngine) *BooleanConverter {
+	comparisonMatcher := NewComparisonPattern()
+	seriesMatcher := NewSeriesAccessPattern()
+
 	return &BooleanConverter{
-		typeSystem: typeSystem,
+		typeSystem:            typeSystem,
+		skipComparisonRule:    NewSkipComparisonRule(comparisonMatcher),
+		seriesAccessRule:      NewConvertSeriesAccessRule(seriesMatcher),
+		typeBasedRule:         NewTypeBasedRule(typeSystem),
+		notEqualZeroTransform: NewAddNotEqualZeroTransformer(),
+		parenthesesTransform:  NewAddParenthesesTransformer(),
 	}
 }
 
@@ -25,12 +32,16 @@ func (bc *BooleanConverter) EnsureBooleanOperand(expr ast.Expression, generatedC
 		return generatedCode
 	}
 
-	if bc.IsFloat64SeriesAccess(generatedCode) {
-		return fmt.Sprintf("(%s != 0)", generatedCode)
+	if bc.seriesAccessRule.ShouldConvert(expr, generatedCode) {
+		return bc.parenthesesTransform.Transform(
+			bc.notEqualZeroTransform.Transform(generatedCode),
+		)
 	}
 
 	if bc.typeSystem.IsBoolVariable(expr) {
-		return fmt.Sprintf("(%s != 0)", generatedCode)
+		return bc.parenthesesTransform.Transform(
+			bc.notEqualZeroTransform.Transform(generatedCode),
+		)
 	}
 
 	return generatedCode
@@ -66,28 +77,21 @@ func (bc *BooleanConverter) IsBooleanFunction(call *ast.CallExpression) bool {
 }
 
 func (bc *BooleanConverter) IsFloat64SeriesAccess(code string) bool {
-	return strings.Contains(code, ".GetCurrent()")
+	return bc.seriesAccessRule.ShouldConvert(nil, code)
 }
 
 func (bc *BooleanConverter) ConvertBoolSeriesForIfStatement(expr ast.Expression, generatedCode string) string {
-	needsConversion := false
-
-	if ident, ok := expr.(*ast.Identifier); ok {
-		if bc.typeSystem.IsBoolVariableByName(ident.Name) {
-			needsConversion = true
-		}
+	if !bc.skipComparisonRule.ShouldConvert(expr, generatedCode) {
+		return generatedCode
 	}
 
-	if member, ok := expr.(*ast.MemberExpression); ok {
-		if ident, ok := member.Object.(*ast.Identifier); ok {
-			if bc.typeSystem.IsBoolVariableByName(ident.Name) {
-				needsConversion = true
-			}
-		}
+	if bc.seriesAccessRule.ShouldConvert(expr, generatedCode) {
+		return bc.notEqualZeroTransform.Transform(generatedCode)
 	}
 
-	if needsConversion {
-		return fmt.Sprintf("%s != 0", generatedCode)
+	if bc.typeBasedRule.ShouldConvert(expr, generatedCode) {
+		return bc.notEqualZeroTransform.Transform(generatedCode)
 	}
+
 	return generatedCode
 }

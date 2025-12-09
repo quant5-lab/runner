@@ -60,12 +60,15 @@ func TestSumWithConditionalExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			typeSystem := NewTypeInferenceEngine()
 			gen := &generator{
-				variables:   make(map[string]string),
-				varInits:    make(map[string]ast.Expression),
-				constants:   make(map[string]interface{}),
-				taRegistry:  NewTAFunctionRegistry(),
-				mathHandler: NewMathHandler(),
+				variables:     make(map[string]string),
+				varInits:      make(map[string]ast.Expression),
+				constants:     make(map[string]interface{}),
+				taRegistry:    NewTAFunctionRegistry(),
+				mathHandler:   NewMathHandler(),
+				typeSystem:    typeSystem,
+				boolConverter: NewBooleanConverter(typeSystem),
 			}
 			gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 			gen.tempVarMgr = NewTempVariableManager(gen)

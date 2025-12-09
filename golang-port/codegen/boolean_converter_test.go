@@ -276,20 +276,20 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement(t *testing.T) {
 			expected:      "enabledSeries.GetCurrent() != 0",
 		},
 		{
-			name:          "float64 variable not converted",
+			name:          "float64 variable converted (Pine bool model)",
 			generatedCode: "priceSeries.GetCurrent()",
 			expr:          &ast.Identifier{Name: "price"},
 			varName:       "price",
 			varType:       "float64",
-			expected:      "priceSeries.GetCurrent()",
+			expected:      "priceSeries.GetCurrent() != 0",
 		},
 		{
-			name:          "unregistered variable not converted",
+			name:          "unregistered variable converted (pattern-based)",
 			generatedCode: "unknownSeries.GetCurrent()",
 			expr:          &ast.Identifier{Name: "unknown"},
 			varName:       "unknown",
 			varType:       "",
-			expected:      "unknownSeries.GetCurrent()",
+			expected:      "unknownSeries.GetCurrent() != 0",
 		},
 	}
 

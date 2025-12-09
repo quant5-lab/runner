@@ -667,7 +667,15 @@ func (g *generator) generateNumericExpression(expr ast.Expression) (string, erro
 		}
 	}
 
-	// For all other expressions, use generateConditionExpression which produces values
+	if g.boolConverter.IsAlreadyBoolean(expr) {
+		boolCode, err := g.generateConditionExpression(expr)
+		if err != nil {
+			return "", err
+		}
+		boolCode = g.addBoolConversionIfNeeded(expr, boolCode)
+		return fmt.Sprintf("func() float64 { if %s { return 1.0 } else { return 0.0 } }()", boolCode), nil
+	}
+
 	return g.generateConditionExpression(expr)
 }
 
@@ -729,11 +737,12 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 func (g *generator) generateConditionExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.ConditionalExpression:
-		// Handle ternary expressions in condition context
 		testCode, err := g.generateConditionExpression(e.Test)
 		if err != nil {
 			return "", err
 		}
+		testCode = g.addBoolConversionIfNeeded(e.Test, testCode)
+
 		consequentCode, err := g.generateConditionExpression(e.Consequent)
 		if err != nil {
 			return "", err
@@ -746,7 +755,6 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			testCode, consequentCode, alternateCode), nil
 
 	case *ast.UnaryExpression:
-		// Handle unary expressions (-x, +x, !x, not x)
 		operandCode, err := g.generateConditionExpression(e.Argument)
 		if err != nil {
 			return "", err
@@ -1015,20 +1023,15 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	// STEP 2: Process the main expression (extractSeriesExpression now uses temp var refs)
 	switch expr := initExpr.(type) {
 	case *ast.CallExpression:
-		// Handle function calls like ta.sma(close, 20)
 		mainCode, err := g.generateVariableFromCall(varName, expr)
 		return tempVarCode + mainCode, err
 	case *ast.ConditionalExpression:
-		// Handle ternary: test ? consequent : alternate
 		condCode, err := g.generateConditionExpression(expr.Test)
 		if err != nil {
 			return "", err
 		}
-		// If the test accesses a bool Series variable, add != 0 conversion
 		condCode = g.addBoolConversionIfNeeded(expr.Test, condCode)
 
-		// For consequent and alternate: generate as numeric expressions
-		// Convert boolean literals to float: true→1.0, false→0.0
 		consequentCode, err := g.generateNumericExpression(expr.Consequent)
 		if err != nil {
 			return "", err
@@ -1037,7 +1040,6 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		if err != nil {
 			return "", err
 		}
-		// Generate inline conditional with Series.Set() (ALL variables use Series)
 		return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.UnaryExpression:
