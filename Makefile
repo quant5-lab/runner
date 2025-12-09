@@ -178,10 +178,7 @@ coverage-show: coverage ## Generate and open coverage report
 
 ##@ Verification
 
-check: fmt vet lint test ## Run all checks (format, vet, lint, test)
-	@echo "✓ All checks passed"
-
-ci: fmt vet lint test-unit test-integration ## Run CI checks (format, vet, lint, unit, integration)
+ci: fmt vet lint build test ## CI pipeline (format, vet, lint, build, all tests)
 	@echo "✓ CI checks passed"
 
 ##@ Cleanup
@@ -346,15 +343,13 @@ mod-update: ## Update all dependencies
 
 ##@ Quick Commands
 
-all: clean build test ## Clean, build, and test everything
-
-quick: fmt test ## Quick check (format + test)
+all: ci ## Full validation (format, vet, lint, build, all tests)
 
 install-hooks: ## Install git pre-commit hook
 	@echo "Installing pre-commit hook..."
 	@cp golang-port/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
-	@echo "✓ Pre-commit hook installed (runs: make ci)"
+	@echo "✓ Pre-commit hook installed (runs: make all)"
 
 install: ## Install Go to ~/.local (no sudo required)
 	@./scripts/install-deps.sh
