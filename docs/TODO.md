@@ -152,8 +152,8 @@
 - [x] Nested ternary expressions in parentheses (parser grammar fix)
 - [x] `math.min()` and `math.max()` inline in conditions/ternaries
 - [x] `security()` with complex TA function chains (sma, pivothigh/pivotlow, fixnan combinations)
-- [ ] `barmerge.lookahead_on` constant for security() lookahead parameter
-- [ ] `security()` with lookahead parameter support
+- [x] `barmerge.lookahead_on` constant for security() lookahead parameter
+- [x] `security()` with lookahead parameter support
 - [x] `wma()` weighted moving average function (WMAHandler implemented and registered)
 - [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
 - [ ] `strategy.position_avg_price` built-in variable
@@ -163,7 +163,7 @@
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison with unique temp vars (ta_sma_50_XXX > ta_sma_200_YYY)
-- [ ] `bb7-dissect-bb.pine` - Blocked: Variable period support needed for ta.sma(source, var)
+- [ ] `bb7-dissect-bb.pine` - Blocked: Boolean operators return float64 (not bool), valuewhen() not implemented, missing input Series declarations
 - [x] `bb7-dissect-vol.pine` - Inline ATR in plot() (981µs for 500 bars)
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
