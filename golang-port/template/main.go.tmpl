@@ -16,8 +16,8 @@ import (
 	"github.com/quant5-lab/runner/runtime/series"
 	"github.com/quant5-lab/runner/runtime/session"
 	"github.com/quant5-lab/runner/runtime/strategy"
+	"github.com/quant5-lab/runner/runtime/value"
 	"github.com/quant5-lab/runner/datafetcher"
-	_ "github.com/quant5-lab/runner/runtime/value" // May be used by generated code
 )
 
 /* Prevent unused import errors */
@@ -26,6 +26,7 @@ var (
 	_ = session.Parse
 	_ = series.NewSeries
 	_ = datafetcher.NewFileFetcher
+	_ = value.Nz
 )
 
 /* CLI flags */

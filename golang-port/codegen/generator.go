@@ -36,6 +36,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 
 	gen.inputHandler = NewInputHandler()
 	gen.mathHandler = NewMathHandler()
+	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
 	gen.taRegistry = NewTAFunctionRegistry()
@@ -76,6 +77,7 @@ type generator struct {
 
 	inputHandler      *InputHandler
 	mathHandler       *MathHandler
+	valueHandler      *ValueHandler
 	subscriptResolver *SubscriptResolver
 	builtinHandler    *BuiltinIdentifierHandler
 	taRegistry        *TAFunctionRegistry
@@ -848,23 +850,14 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 
 	case *ast.CallExpression:
-		// Handle inline function calls in conditions (e.g., na(time(...)))
 		funcName := g.extractFunctionName(e.Callee)
 
-		switch funcName {
-		case "na":
-			// na(expr) checks if value is NaN
-			if len(e.Arguments) >= 1 {
-				argCode, err := g.generateConditionExpression(e.Arguments[0])
-				if err != nil {
-					return "", err
-				}
-				return fmt.Sprintf("math.IsNaN(%s)", argCode), nil
-			}
-			return "true", nil
+		if g.valueHandler.CanHandle(funcName) {
+			return g.valueHandler.GenerateInlineCall(funcName, e.Arguments, g)
+		}
 
+		switch funcName {
 		case "time":
-			// time() function returns timestamp or NaN
 			handler := NewTimeHandler(g.ind())
 			return handler.HandleInlineExpression(e.Arguments), nil
 
