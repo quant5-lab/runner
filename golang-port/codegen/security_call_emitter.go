@@ -7,12 +7,14 @@ import (
 )
 
 type SecurityCallEmitter struct {
-	gen *generator
+	gen      *generator
+	resolver *ConstantResolver
 }
 
 func NewSecurityCallEmitter(gen *generator) *SecurityCallEmitter {
 	return &SecurityCallEmitter{
-		gen: gen,
+		gen:      gen,
+		resolver: NewConstantResolver(),
 	}
 }
 
@@ -27,9 +29,20 @@ func (e *SecurityCallEmitter) EmitSecurityCall(varName string, call *ast.CallExp
 
 	lookahead := false
 	if len(call.Arguments) >= 4 {
-		if lit, ok := call.Arguments[3].(*ast.Literal); ok {
-			if b, ok := lit.Value.(bool); ok {
-				lookahead = b
+		fourthArg := call.Arguments[3]
+
+		if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
+			for _, prop := range objExpr.Properties {
+				if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
+					if resolved, ok := e.resolver.ResolveToBool(prop.Value); ok {
+						lookahead = resolved
+					}
+					break
+				}
+			}
+		} else {
+			if resolved, ok := e.resolver.ResolveToBool(fourthArg); ok {
+				lookahead = resolved
 			}
 		}
 	}
@@ -87,7 +100,11 @@ func (e *SecurityCallEmitter) emitStreamingEvaluation(varName, symbolCode, timef
 	code += e.gen.ind() + "} else {\n"
 	e.gen.indent++
 
-	code += e.gen.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+	if lookahead {
+		code += e.gen.ind() + "secBarIdx := context.FindBarIndexByTimestampWithLookahead(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+	} else {
+		code += e.gen.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+	}
 	code += e.gen.ind() + "if secBarIdx < 0 {\n"
 	e.gen.indent++
 	code += e.gen.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)

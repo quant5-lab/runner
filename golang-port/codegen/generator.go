@@ -1250,7 +1250,32 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		code += g.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		lookahead := false
+		if len(call.Arguments) >= 4 {
+			fourthArg := call.Arguments[3]
+			resolver := NewConstantResolver()
+
+			if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
+				for _, prop := range objExpr.Properties {
+					if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
+						if resolved, ok := resolver.ResolveToBool(prop.Value); ok {
+							lookahead = resolved
+						}
+						break
+					}
+				}
+			} else {
+				if resolved, ok := resolver.ResolveToBool(fourthArg); ok {
+					lookahead = resolved
+				}
+			}
+		}
+
+		if lookahead {
+			code += g.ind() + "secBarIdx := context.FindBarIndexByTimestampWithLookahead(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		} else {
+			code += g.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		}
 		code += g.ind() + "if secBarIdx < 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)

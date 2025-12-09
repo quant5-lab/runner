@@ -32,6 +32,24 @@ func FindBarIndexByTimestamp(secCtx *Context, targetTimestamp int64) int {
 	return result
 }
 
+/* FindBarIndexByTimestampWithLookahead finds security bar with lookahead enabled
+ * Lookahead allows referencing future bars (next bar after timestamp match)
+ * Returns -1 if no matching bar or lookahead bar unavailable
+ */
+func FindBarIndexByTimestampWithLookahead(secCtx *Context, targetTimestamp int64) int {
+	baseIdx := FindBarIndexByTimestamp(secCtx, targetTimestamp)
+	if baseIdx < 0 {
+		return -1
+	}
+
+	lookaheadIdx := baseIdx + 1
+	if lookaheadIdx >= len(secCtx.Data) {
+		return -1
+	}
+
+	return lookaheadIdx
+}
+
 /* GetSecurityValue retrieves value from security context at matched bar index
  * Returns NaN if bar not found or index out of range
  */
