@@ -87,7 +87,7 @@ make fmt
 make vet
 
 # Run all checks
-make check
+make ci
 ```
 
 ### Build Commands
@@ -209,7 +209,7 @@ make cross-compile
 make coverage
 
 # 9. Full verification
-make check
+make ci
 ```
 
 ### Advanced Testing
@@ -240,12 +240,9 @@ go tool pprof mem.prof
 ### Quick Commands
 
 ```bash
-# Build and test everything
+# Full validation
 make all
 
-# Quick iteration
-make quick  # fmt + test
-
 # Complete verification
-make check  # fmt + vet + lint + test
+make ci  # fmt + vet + lint + build + test
 ```
