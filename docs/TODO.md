@@ -156,7 +156,7 @@
 - [x] `security()` with lookahead parameter support
 - [x] `wma()` weighted moving average function (WMAHandler implemented and registered)
 - [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
-- [ ] `strategy.position_avg_price` built-in variable
+- [x] `strategy.position_avg_price` built-in variable (StateManager + codegen sampling order fixed)
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
@@ -167,7 +167,7 @@
 - [x] `bb7-dissect-vol.pine` - Inline ATR in plot() (981µs for 500 bars)
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
-- [ ] `bb7-dissect-sl.pine` - Blocked: Needs strategy.position_avg_price
+- [ ] `bb7-dissect-sl.pine` - Blocked: Boolean comparison errors, undefined notSeries/bblenghtSeries/bbstdevSeries
 - [ ] `bb7-dissect-tp.pine` - Blocked: Inline TA temp vars not generated for complex files (infrastructure exists but incomplete)
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
@@ -210,4 +210,4 @@
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
 - **security() Module**: Complete disk-based prefetch architecture (31/31 tests) - analyzer, file_fetcher, cache, evaluator, prefetcher, codegen injection - ready for builder integration
-- **Next Target**: BB7 strategy - 13 prerequisites required (input.session, time(), syminfo.tickerid, fixnan, pivothigh/pivotlow, wma, dev, strategy.position_avg_price, lookahead parameter)
+- **Next Target**: BB7 strategy - 12 prerequisites required (input.session, time(), syminfo.tickerid, fixnan, pivothigh/pivotlow, wma, dev, lookahead parameter)
