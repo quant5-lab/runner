@@ -378,7 +378,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	g.indent++
 	code += g.ind() + fmt.Sprintf("ctx.BarIndex = %s\n", iterVar)
 	code += g.ind() + fmt.Sprintf("bar := ctx.Data[%s]\n", iterVar)
-	code += g.ind() + "strat.OnBarUpdate(i, bar.Open, bar.Time)\n\n"
+	code += g.ind() + "strat.OnBarUpdate(i, bar.Open, bar.Time)\n"
+
+	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
+	if g.hasStrategyRuntimeAccess {
+		code += g.ind() + "sm.SampleCurrentBar(strat, bar.Close)\n"
+	}
+	code += "\n"
 
 	// Generate statements inside bar loop
 	statementCounter.Reset()
@@ -391,10 +397,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			return "", err
 		}
 		code += stmtCode
-	}
-
-	if g.hasStrategyRuntimeAccess {
-		code += "\n" + g.ind() + "sm.SampleCurrentBar(strat, bar.Close)\n"
 	}
 
 	// Suppress unused variable warnings
