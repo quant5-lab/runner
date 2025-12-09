@@ -434,8 +434,8 @@ func TestStreamingBarEvaluator_SingleBarContext(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed: %v", err)
 		}
-		if value != 0.0 {
-			t.Errorf("expected warmup 0.0, got %.2f", value)
+		if !math.IsNaN(value) {
+			t.Errorf("expected warmup NaN, got %.2f", value)
 		}
 	})
 }

@@ -2,6 +2,7 @@ package security
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
@@ -94,7 +95,7 @@ func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	for s.computed <= barIdx {
 		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
 		if err != nil {
-			return 0.0, err
+			return math.NaN(), err
 		}
 
 		idx := s.computed % s.period
@@ -103,7 +104,7 @@ func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	}
 
 	if barIdx < s.period-1 {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
 
 	sum := 0.0
@@ -118,7 +119,7 @@ func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	for s.computed <= barIdx {
 		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
 		if err != nil {
-			return 0.0, err
+			return math.NaN(), err
 		}
 
 		if s.computed == 0 {
@@ -133,7 +134,7 @@ func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	}
 
 	if barIdx < s.period-1 {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
 
 	return s.prevEMA, nil
@@ -143,7 +144,7 @@ func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	for s.computed <= barIdx {
 		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
 		if err != nil {
-			return 0.0, err
+			return math.NaN(), err
 		}
 
 		if s.computed == 0 {
@@ -159,7 +160,7 @@ func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 	}
 
 	if barIdx < s.period-1 {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
 
 	return s.prevRMA, nil
@@ -167,21 +168,21 @@ func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 
 func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
 	if barIdx < s.period {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
 
 	var prevSource float64
 	if barIdx > 0 {
 		val, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-1)
 		if err != nil {
-			return 0.0, err
+			return math.NaN(), err
 		}
 		prevSource = val
 	}
 
 	currentSource, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx)
 	if err != nil {
-		return 0.0, err
+		return math.NaN(), err
 	}
 
 	change := currentSource - prevSource
