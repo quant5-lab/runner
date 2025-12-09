@@ -18,10 +18,10 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 
 	// Check if files exist
 	if _, err := os.Stat(strategy); os.IsNotExist(err) {
-		t.Skip("rolling-cagr.pine not found, skipping test")
+		t.Fatalf("rolling-cagr.pine not found (required test fixture): %v", err)
 	}
 	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
-		t.Skip("SPY_1M.json not found, skipping test")
+		t.Fatalf("SPY_1M.json not found (required test data): %v", err)
 	}
 
 	// Read data to check bar count

@@ -18,8 +18,7 @@ func TestParseSimplePine(t *testing.T) {
 	strategyPath := "../../../strategies/test-simple.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
-		t.Skipf("Skipping: test-simple.pine not found: %v", err)
-		return
+		t.Fatalf("test-simple.pine not found (required test fixture): %v", err)
 	}
 
 	p, err := parser.NewParser()
@@ -55,17 +54,19 @@ func TestParseSimplePine(t *testing.T) {
 		t.Fatalf("Failed to parse AST JSON: %v", err)
 	}
 
+	if len(jsonBytes) == 0 {
+		t.Fatal("Generated JSON should not be empty")
+	}
+
 	t.Logf("Parsed %d bytes from test-simple.pine", len(jsonBytes))
 }
 
-/* Test parsing e2e fixture strategy */
+/* Test parsing e2e fixture strategy - validates parser handles known limitations */
 func TestParseFixtureStrategy(t *testing.T) {
-	t.Skip("Skipping: lexer limitations prevent parsing complex Pine strategies (expected for PoC)")
 	strategyPath := "../../../e2e/fixtures/strategies/test-strategy.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
-		t.Skipf("Skipping: test-strategy.pine not found: %v", err)
-		return
+		t.Fatalf("test-strategy.pine not found: %v", err)
 	}
 
 	p, err := parser.NewParser()
@@ -74,12 +75,19 @@ func TestParseFixtureStrategy(t *testing.T) {
 	}
 
 	ast, err := p.ParseString("test-strategy.pine", string(content))
+
+	// Known limitation: Parser cannot handle user-defined functions with `=>` syntax
+	// This is expected behavior for current PoC phase
 	if err != nil {
-		t.Fatalf("Failed to parse test-strategy.pine: %v", err)
+		if containsSubstr(err.Error(), "unexpected token") {
+			t.Logf("EXPECTED LIMITATION: Parser rejects user-defined function syntax: %v", err)
+			return
+		}
+		t.Fatalf("Unexpected parse error: %v", err)
 	}
 
 	if ast == nil {
-		t.Fatal("AST should not be nil")
+		t.Fatal("AST should not be nil when parse succeeds")
 	}
 
 	converter := parser.NewConverter()
@@ -94,6 +102,15 @@ func TestParseFixtureStrategy(t *testing.T) {
 	}
 
 	t.Logf("Parsed %d bytes from test-strategy.pine", len(jsonBytes))
+}
+
+func containsSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 /* Test chart data generation with mock runtime */
@@ -170,8 +187,7 @@ func TestParseAllFixtures(t *testing.T) {
 
 	entries, err := os.ReadDir(fixturesDir)
 	if err != nil {
-		t.Skipf("Skipping: fixtures directory not found: %v", err)
-		return
+		t.Fatalf("fixtures directory not found (required test fixtures): %v", err)
 	}
 
 	p, err := parser.NewParser()
@@ -181,6 +197,14 @@ func TestParseAllFixtures(t *testing.T) {
 
 	successCount := 0
 	failCount := 0
+	knownLimitations := map[string]string{
+		"test-builtin-function.pine": "user-defined functions with => syntax",
+		"test-function-scoping.pine": "user-defined functions with => syntax",
+		"test-strategy.pine":         "user-defined functions with => syntax",
+		"test-tr-adx.pine":           "user-defined functions with => syntax",
+		"test-tr-bb7-adx.pine":       "user-defined functions with => syntax",
+		"test-tr-function.pine":      "user-defined functions with => syntax",
+	}
 
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".pine" {
@@ -190,19 +214,23 @@ func TestParseAllFixtures(t *testing.T) {
 		filePath := filepath.Join(fixturesDir, entry.Name())
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			t.Logf("Warning: Could not read %s: %v", entry.Name(), err)
-			continue
+			t.Fatalf("Could not read fixture %s: %v", entry.Name(), err)
 		}
 
 		ast, err := p.ParseString(entry.Name(), string(content))
 		if err != nil {
-			t.Logf("FAIL: %s - %v", entry.Name(), err)
-			failCount++
+			if reason, isKnown := knownLimitations[entry.Name()]; isKnown {
+				t.Logf("KNOWN LIMITATION: %s - %s", entry.Name(), reason)
+				failCount++
+			} else {
+				t.Errorf("UNEXPECTED FAILURE: %s - %v", entry.Name(), err)
+				failCount++
+			}
 			continue
 		}
 
 		if ast == nil {
-			t.Logf("FAIL: %s - AST is nil", entry.Name())
+			t.Errorf("FAIL: %s - AST is nil despite no parse error", entry.Name())
 			failCount++
 			continue
 		}
@@ -213,8 +241,9 @@ func TestParseAllFixtures(t *testing.T) {
 
 	t.Logf("Results: %d passed, %d failed", successCount, failCount)
 
-	if failCount > 0 {
-		t.Logf("Warning: %d fixtures failed to parse (expected for PoC)", failCount)
+	expectedFails := len(knownLimitations)
+	if failCount != expectedFails {
+		t.Errorf("Expected %d known failures, got %d failures", expectedFails, failCount)
 	}
 }
 
