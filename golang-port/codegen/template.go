@@ -29,7 +29,24 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)
 	output = strings.Replace(output, "{{STRATEGY_NAME}}", code.StrategyName, 1)
 
-	/* Write output file */
+	if len(code.AdditionalImports) > 0 {
+		importMarker := "\t\"github.com/quant5-lab/runner/datafetcher\""
+		if strings.Contains(output, importMarker) {
+			additionalImportsStr := ""
+			for _, imp := range code.AdditionalImports {
+				if imp != "github.com/quant5-lab/runner/datafetcher" {
+					if imp == "github.com/quant5-lab/runner/ast" {
+						if !strings.Contains(code.FunctionBody, "&ast.") {
+							continue
+						}
+					}
+					additionalImportsStr += fmt.Sprintf("\t\"%s\"\n", imp)
+				}
+			}
+			output = strings.Replace(output, importMarker, importMarker+"\n"+additionalImportsStr, 1)
+		}
+	}
+
 	err = os.WriteFile(outputPath, []byte(output), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write output: %w", err)

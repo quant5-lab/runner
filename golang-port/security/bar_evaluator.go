@@ -25,6 +25,15 @@ func (e *StreamingBarEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *conte
 		return evaluateOHLCVAtBar(exp, secCtx, barIdx)
 	case *ast.CallExpression:
 		return e.evaluateTACallAtBar(exp, secCtx, barIdx)
+	case *ast.BinaryExpression:
+		return e.evaluateBinaryExpressionAtBar(exp, secCtx, barIdx)
+	case *ast.ConditionalExpression:
+		return e.evaluateConditionalExpressionAtBar(exp, secCtx, barIdx)
+	case *ast.Literal:
+		if val, ok := exp.Value.(float64); ok {
+			return val, nil
+		}
+		return 0.0, newUnsupportedExpressionError(exp)
 	case *ast.MemberExpression:
 		return 0.0, newUnsupportedExpressionError(exp)
 	default:
@@ -128,4 +137,30 @@ func (e *StreamingBarEvaluator) getOrCreateTAState(cacheKey string, period int, 
 	state := NewTAStateManager(cacheKey, period, len(secCtx.Data))
 	e.taStateCache[cacheKey] = state
 	return state
+}
+
+func (e *StreamingBarEvaluator) evaluateBinaryExpressionAtBar(expr *ast.BinaryExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	leftValue, err := e.EvaluateAtBar(expr.Left, secCtx, barIdx)
+	if err != nil {
+		return 0.0, err
+	}
+
+	rightValue, err := e.EvaluateAtBar(expr.Right, secCtx, barIdx)
+	if err != nil {
+		return 0.0, err
+	}
+
+	return applyBinaryOperator(expr.Operator, leftValue, rightValue)
+}
+
+func (e *StreamingBarEvaluator) evaluateConditionalExpressionAtBar(expr *ast.ConditionalExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	testValue, err := e.EvaluateAtBar(expr.Test, secCtx, barIdx)
+	if err != nil {
+		return 0.0, err
+	}
+
+	if testValue != 0.0 {
+		return e.EvaluateAtBar(expr.Consequent, secCtx, barIdx)
+	}
+	return e.EvaluateAtBar(expr.Alternate, secCtx, barIdx)
 }

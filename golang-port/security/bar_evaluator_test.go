@@ -356,10 +356,9 @@ func TestStreamingBarEvaluator_UnsupportedExpression(t *testing.T) {
 	ctx := createTestContext()
 	evaluator := NewStreamingBarEvaluator()
 
-	unsupportedExpr := &ast.BinaryExpression{
-		Left:     &ast.Identifier{Name: "close"},
-		Operator: "+",
-		Right:    &ast.Literal{Value: 10.0},
+	unsupportedExpr := &ast.MemberExpression{
+		Object:   &ast.Identifier{Name: "syminfo"},
+		Property: &ast.Identifier{Name: "tickerid"},
 	}
 
 	_, err := evaluator.EvaluateAtBar(unsupportedExpr, ctx, 0)

@@ -18,54 +18,54 @@ func TestSecurityBinaryExpression(t *testing.T) {
 			name:       "SMA + EMA addition",
 			expression: BinaryExpr("+", TACall("sma", Ident("close"), 20), TACall("ema", Ident("close"), 10)),
 			expect: []string{
-				"Inline ta.sma(20)",
-				"Inline ta.ema(10)",
-				"origCtx := ctx",
-				"ctx = secCtx",
-				"ctx.BarIndex = secBarIdx",
-				"ctx = origCtx",
-				"Series.GetCurrent() +",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"+\"",
+				"secBarIdx",
 			},
 			reject: []string{
-				"cache.GetExpression",
-				"[]float64",
+				"origCtx := ctx",
+				"secTmp_test_val_leftSeries",
+				"secTmp_test_val_rightSeries",
 			},
 		},
 		{
 			name:       "SMA * constant multiplication",
 			expression: BinaryExpr("*", TACall("sma", Ident("close"), 20), Lit(2.0)),
 			expect: []string{
-				"ta.sma(20)",
-				"origCtx := ctx",
-				"secTmp_test_val_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries.Set(2.00)",
-				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"*\"",
+				"&ast.Literal{Value: 2.0}",
+			},
+			reject: []string{
+				"secTmp_test_val_leftSeries",
+				"secTmp_test_val_rightSeries",
 			},
 		},
 		{
 			name:       "Identifier subtraction (high - low)",
 			expression: BinaryExpr("-", Ident("high"), Ident("low")),
 			expect: []string{
-				"ctx.Data[ctx.BarIndex].High",
-				"ctx.Data[ctx.BarIndex].Low",
-				"secTmp_test_val_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_leftSeries.GetCurrent() - secTmp_test_val_rightSeries.GetCurrent()",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"-\"",
+				"&ast.Identifier{Name: \"high\"}",
+				"&ast.Identifier{Name: \"low\"}",
 			},
 			reject: []string{
-				"ta.sma",
+				"secTmp_test_val_leftSeries",
+				"secTmp_test_val_rightSeries",
 			},
 		},
 		{
 			name:       "Division (close / open) for returns",
 			expression: BinaryExpr("/", Ident("close"), Ident("open")),
 			expect: []string{
-				"ctx.Data[ctx.BarIndex].Close",
-				"ctx.Data[ctx.BarIndex].Open",
-				"secTmp_test_val_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_leftSeries.GetCurrent() / secTmp_test_val_rightSeries.GetCurrent()",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"/\"",
+				"&ast.Identifier{Name: \"close\"}",
+				"&ast.Identifier{Name: \"open\"}",
+			},
+			reject: []string{
+				"secTmp_test_val_leftSeries",
 			},
 		},
 		{
@@ -75,23 +75,26 @@ func TestSecurityBinaryExpression(t *testing.T) {
 				TACall("sma", Ident("close"), 20),
 			),
 			expect: []string{
-				"Inline ta.sma(20)",
-				"Inline ta.ema(20)",
-				"secTmp_test_val_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_left_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_left_rightSeries := series.NewSeries(len(ctx.Data))",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"/\"",
+				"Left: &ast.BinaryExpression{Operator: \"-\"",
+			},
+			reject: []string{
+				"secTmp_test_val_leftSeries",
+				"secTmp_test_val_left_leftSeries",
 			},
 		},
 		{
 			name:       "STDEV * multiplier (BB deviation pattern)",
 			expression: BinaryExpr("*", TACall("stdev", Ident("close"), 20), Lit(2.0)),
 			expect: []string{
-				"ta.stdev(20)",
-				"math.Sqrt(variance / float64(20))",
-				"secTmp_test_val_leftSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_rightSeries := series.NewSeries(len(ctx.Data))",
-				"secTmp_test_val_leftSeries.GetCurrent() * secTmp_test_val_rightSeries.GetCurrent()",
+				"secBarEvaluator.EvaluateAtBar",
+				"&ast.BinaryExpression{Operator: \"*\"",
+				"&ast.CallExpression{Callee: &ast.MemberExpression",
+				"&ast.Literal{Value: 2.0}",
+			},
+			reject: []string{
+				"secTmp_test_val_leftSeries",
 			},
 		},
 	}
@@ -156,12 +159,10 @@ func TestSecurityConditionalExpression(t *testing.T) {
 
 	/* Verify conditional code generation */
 	expectedPatterns := []string{
-		"origCtx := ctx",
-		"ctx = secCtx",
-		"if",        // Conditional present
-		"} else",    // Both branches present
-		"bar.Close", // Built-in identifiers directly accessed
-		"bar.Open",
+		"secBarEvaluator.EvaluateAtBar",
+		"&ast.ConditionalExpression",
+		"Test: &ast.BinaryExpression{Operator: \">\"",
+		"secBarIdx",
 	}
 
 	for _, pattern := range expectedPatterns {
@@ -315,11 +316,15 @@ func TestSecurityContextIsolation(t *testing.T) {
 	})
 
 	NewCodeVerifier(code, t).
-		CountOccurrences("origCtx := ctx", 2).
-		CountOccurrences("ctx = origCtx", 2).
-		MustNotContain("secTimeframeSeconds :=").
+		CountOccurrences("secBarEvaluator.EvaluateAtBar", 2).
+		MustNotContain(
+			"origCtx := ctx",
+			"ctx = origCtx",
+			"secTmp_dailySeries",
+			"secTmp_weeklySeries",
+		).
 		MustContain(
-			"secTmp_dailySeries := series.NewSeries(len(secCtx.Data))",
-			"secTmp_weeklySeries := series.NewSeries(len(secCtx.Data))",
+			"&ast.BinaryExpression{Operator: \"+\"",
+			"&ast.BinaryExpression{Operator: \"*\"",
 		)
 }

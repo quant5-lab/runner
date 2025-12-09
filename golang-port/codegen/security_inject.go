@@ -135,6 +135,8 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	/* Required imports */
 	imports := []string{
 		"github.com/quant5-lab/runner/datafetcher",
+		"github.com/quant5-lab/runner/security",
+		"github.com/quant5-lab/runner/ast",
 	}
 
 	return &SecurityInjection{
@@ -205,8 +207,9 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 	updatedBody := injection.PrefetchCode + functionBody
 
 	return &StrategyCode{
-		FunctionBody: updatedBody,
-		StrategyName: code.StrategyName,
+		FunctionBody:      updatedBody,
+		StrategyName:      code.StrategyName,
+		AdditionalImports: injection.ImportPaths,
 	}, nil
 }
 

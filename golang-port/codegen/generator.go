@@ -11,8 +11,9 @@ import (
 
 /* StrategyCode holds generated Go code for strategy execution */
 type StrategyCode struct {
-	FunctionBody string // executeStrategy() function body
-	StrategyName string // Pine Script strategy name
+	FunctionBody      string   // executeStrategy() function body
+	StrategyName      string   // Pine Script strategy name
+	AdditionalImports []string // Additional imports needed for security() streaming evaluation
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -45,6 +46,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
 	gen.plotExprHandler = NewPlotExpressionHandler(gen)
 
+	gen.hasSecurityCalls = detectSecurityCalls(program)
+
 	body, err := gen.generateProgram(program)
 	if err != nil {
 		return nil, err
@@ -59,17 +62,19 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 }
 
 type generator struct {
-	imports           map[string]bool
-	variables         map[string]string
-	varInits          map[string]ast.Expression
-	constants         map[string]interface{}
-	plots             []string
-	strategyName      string
-	indent            int
-	taFunctions       []taFunctionCall
-	inSecurityContext bool
-	limits            CodeGenerationLimits
-	safetyGuard       RuntimeSafetyGuard
+	imports              map[string]bool
+	variables            map[string]string
+	varInits             map[string]ast.Expression
+	constants            map[string]interface{}
+	plots                []string
+	strategyName         string
+	indent               int
+	taFunctions          []taFunctionCall
+	inSecurityContext    bool
+	hasSecurityCalls     bool // Track if security() calls exist
+	hasSecurityExprEvals bool // Track if security() calls with complex expressions exist
+	limits               CodeGenerationLimits
+	safetyGuard          RuntimeSafetyGuard
 
 	constantRegistry *ConstantRegistry
 	typeSystem       *TypeInferenceEngine
@@ -295,13 +300,18 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
-	// Declare ALL variables as Series (ForwardSeriesBuffer paradigm)
 	if len(g.variables) > 0 {
-		code += g.ind() + "// ALL variables use Series storage (ForwardSeriesBuffer paradigm)\n"
+		code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
 		for varName := range g.variables {
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 		code += "\n"
+
+		if g.hasSecurityCalls {
+			code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
+			code += g.ind() + "var secBarEvaluator *security.StreamingBarEvaluator\n"
+			code += "\n"
+		}
 
 		// Declare temp variables for nested TA calls (managed by TempVariableManager)
 		tempVarDecls := g.tempVarMgr.GenerateDeclarations()
@@ -372,6 +382,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	// Suppress unused variable warnings
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
+	if g.hasSecurityCalls {
+		code += g.ind() + "_ = secBarEvaluator\n"
+	}
 	for varName := range g.variables {
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
@@ -1211,8 +1224,10 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		}
 
 		if symbolStr == "" || timeframeStr == "" {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // security() unresolved symbol/timeframe\n", varName), nil
+			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
 		}
+
+		g.hasSecurityCalls = true
 
 		/* Build cache key using normalized timeframe */
 		cacheKey := fmt.Sprintf("%%s:%s", timeframeStr)
@@ -1222,7 +1237,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			cacheKey = fmt.Sprintf("%s:%s", strings.Trim(symbolStr, `"`), timeframeStr)
 		}
 
-		/* Generate runtime lookup and evaluation */
 		code := g.ind() + fmt.Sprintf("/* security(%s, %s, ...) */\n", symbolStr, timeframeStr)
 		code += g.ind() + "{\n"
 		g.indent++
@@ -1236,7 +1250,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		/* Find bar index using timestamp */
 		code += g.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
 		code += g.ind() + "if secBarIdx < 0 {\n"
 		g.indent++
@@ -1245,10 +1258,8 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		/* Evaluate expression directly in security context (O(1) per-bar access) */
 		exprArg := call.Arguments[2]
 
-		/* Handle simple identifier access: close, open, high, low, volume */
 		if ident, ok := exprArg.(*ast.Identifier); ok {
 			fieldName := ident.Name
 			switch fieldName {
@@ -1263,68 +1274,54 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			case "volume":
 				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Volume)\n", varName)
 			default:
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // Unknown identifier: %s\n", varName, fieldName)
+				code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 			}
 		} else if callExpr, ok := exprArg.(*ast.CallExpression); ok {
-			/* Handle TA function calls: ta.sma(close, 20), ta.ema(close, 10) */
-			/* Create temporary series variable for inline TA result */
-			secTempVar := fmt.Sprintf("secTmp_%s", varName)
-			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(secCtx.Data))\n", secTempVar)
+			g.hasSecurityExprEvals = true
+			code += g.ind() + "if secBarEvaluator == nil {\n"
+			g.indent++
+			code += g.ind() + "secBarEvaluator = security.NewStreamingBarEvaluator()\n"
+			g.indent--
+			code += g.ind() + "}\n"
 
-			/* Store original context, switch to security context */
-			code += g.ind() + "origCtx := ctx\n"
-			code += g.ind() + "ctx = secCtx\n"
-			code += g.ind() + "ctx.BarIndex = secBarIdx\n"
-
-			/* Set security context flag for inline TA */
-			g.inSecurityContext = true
-
-			/* Generate inline TA calculation */
-			exprInit, err := g.generateVariableInit(secTempVar, callExpr)
+			exprJSON, err := g.serializeExpressionForRuntime(callExpr)
 			if err != nil {
-				return "", fmt.Errorf("failed to generate security expression: %w", err)
+				return "", fmt.Errorf("failed to serialize security expression: %w", err)
 			}
-			code += exprInit
 
-			/* Clear security context flag */
-			g.inSecurityContext = false
-
-			/* Restore original context */
-			code += g.ind() + "ctx = origCtx\n"
-
-			/* Extract value from temporary series */
-			code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("secValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON)
+			code += g.ind() + "if err != nil {\n"
+			g.indent++
+			code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+			g.indent--
+			code += g.ind() + "} else {\n"
+			g.indent++
 			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
+			g.indent--
+			code += g.ind() + "}\n"
 		} else {
-			/* Complex expression (BinaryExpression, ConditionalExpression, etc.) */
-			/* Create temporary series variable for expression result */
-			secTempVar := fmt.Sprintf("secTmp_%s", varName)
-			code += g.ind() + fmt.Sprintf("%sSeries := series.NewSeries(len(secCtx.Data))\n", secTempVar)
+			g.hasSecurityExprEvals = true
+			code += g.ind() + "if secBarEvaluator == nil {\n"
+			g.indent++
+			code += g.ind() + "secBarEvaluator = security.NewStreamingBarEvaluator()\n"
+			g.indent--
+			code += g.ind() + "}\n"
 
-			/* Store original context, switch to security context */
-			code += g.ind() + "origCtx := ctx\n"
-			code += g.ind() + "ctx = secCtx\n"
-			code += g.ind() + "ctx.BarIndex = secBarIdx\n"
-
-			/* Set security context flag */
-			g.inSecurityContext = true
-
-			/* Generate expression evaluation using full generateVariableInit */
-			exprInit, err := g.generateVariableInit(secTempVar, exprArg)
+			exprJSON, err := g.serializeExpressionForRuntime(exprArg)
 			if err != nil {
-				return "", fmt.Errorf("failed to generate security expression: %w", err)
+				return "", fmt.Errorf("failed to serialize security expression: %w", err)
 			}
-			code += exprInit
 
-			/* Clear security context flag */
-			g.inSecurityContext = false
-
-			/* Restore original context */
-			code += g.ind() + "ctx = origCtx\n"
-
-			/* Extract value from temporary series */
-			code += g.ind() + fmt.Sprintf("secValue := %sSeries.GetCurrent()\n", secTempVar)
+			code += g.ind() + fmt.Sprintf("secValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON)
+			code += g.ind() + "if err != nil {\n"
+			g.indent++
+			code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+			g.indent--
+			code += g.ind() + "} else {\n"
+			g.indent++
 			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
+			g.indent--
+			code += g.ind() + "}\n"
 		}
 
 		g.indent--
@@ -2295,6 +2292,81 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 	}
 }
 
+func (g *generator) serializeExpressionForRuntime(expr ast.Expression) (string, error) {
+	switch exp := expr.(type) {
+	case *ast.Identifier:
+		return fmt.Sprintf("&ast.Identifier{Name: %q}", exp.Name), nil
+	case *ast.Literal:
+		if val, ok := exp.Value.(float64); ok {
+			return fmt.Sprintf("&ast.Literal{Value: %.1f}", val), nil
+		}
+		if val, ok := exp.Value.(string); ok {
+			return fmt.Sprintf("&ast.Literal{Value: %q}", val), nil
+		}
+		if val, ok := exp.Value.(bool); ok {
+			return fmt.Sprintf("&ast.Literal{Value: %t}", val), nil
+		}
+		return "", fmt.Errorf("unsupported literal type: %T", exp.Value)
+	case *ast.CallExpression:
+		funcName := g.extractFunctionName(exp.Callee)
+		parts := strings.Split(funcName, ".")
+		if len(parts) == 1 {
+			parts = []string{"ta", parts[0]}
+		}
+		if len(parts) != 2 {
+			return "", fmt.Errorf("unsupported function name format: %s", funcName)
+		}
+
+		args := ""
+		for i, arg := range exp.Arguments {
+			argCode, err := g.serializeExpressionForRuntime(arg)
+			if err != nil {
+				return "", err
+			}
+			if i > 0 {
+				args += ", "
+			}
+			args += argCode
+		}
+
+		return fmt.Sprintf("&ast.CallExpression{Callee: &ast.MemberExpression{Object: &ast.Identifier{Name: %q}, Property: &ast.Identifier{Name: %q}}, Arguments: []ast.Expression{%s}}",
+			parts[0], parts[1], args), nil
+	case *ast.BinaryExpression:
+		leftCode, err := g.serializeExpressionForRuntime(exp.Left)
+		if err != nil {
+			return "", err
+		}
+
+		rightCode, err := g.serializeExpressionForRuntime(exp.Right)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("&ast.BinaryExpression{Operator: %q, Left: %s, Right: %s}",
+			exp.Operator, leftCode, rightCode), nil
+	case *ast.ConditionalExpression:
+		testCode, err := g.serializeExpressionForRuntime(exp.Test)
+		if err != nil {
+			return "", err
+		}
+
+		consequentCode, err := g.serializeExpressionForRuntime(exp.Consequent)
+		if err != nil {
+			return "", err
+		}
+
+		alternateCode, err := g.serializeExpressionForRuntime(exp.Alternate)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("&ast.ConditionalExpression{Test: %s, Consequent: %s, Alternate: %s}",
+			testCode, consequentCode, alternateCode), nil
+	default:
+		return "", fmt.Errorf("unsupported expression type for runtime serialization: %T", expr)
+	}
+}
+
 // extractConstValue parses "const varName = VALUE" to extract VALUE
 // Deprecated: Use ConstantRegistry.ExtractFromGeneratedCode
 func extractConstValue(code string) interface{} {
@@ -2313,4 +2385,75 @@ func extractConstValue(code string) interface{} {
 		return boolVal
 	}
 	return nil
+}
+
+/* detectSecurityCalls walks AST to detect if security() calls exist */
+func detectSecurityCalls(program *ast.Program) bool {
+	if program == nil {
+		return false
+	}
+
+	for _, node := range program.Body {
+		if hasSecurityInNode(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSecurityInNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.VariableDeclaration:
+		for _, decl := range n.Declarations {
+			if hasSecurityInExpression(decl.Init) {
+				return true
+			}
+		}
+	case *ast.ExpressionStatement:
+		return hasSecurityInExpression(n.Expression)
+	case *ast.IfStatement:
+		if hasSecurityInExpression(n.Test) {
+			return true
+		}
+		for _, consequent := range n.Consequent {
+			if hasSecurityInNode(consequent) {
+				return true
+			}
+		}
+		for _, alternate := range n.Alternate {
+			if hasSecurityInNode(alternate) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasSecurityInExpression(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.CallExpression:
+		if member, ok := e.Callee.(*ast.MemberExpression); ok {
+			if obj, ok := member.Object.(*ast.Identifier); ok {
+				if prop, ok := member.Property.(*ast.Identifier); ok {
+					if obj.Name == "request" && prop.Name == "security" {
+						return true
+					}
+				}
+			}
+		}
+		for _, arg := range e.Arguments {
+			if hasSecurityInExpression(arg) {
+				return true
+			}
+		}
+	case *ast.BinaryExpression:
+		return hasSecurityInExpression(e.Left) || hasSecurityInExpression(e.Right)
+	case *ast.ConditionalExpression:
+		return hasSecurityInExpression(e.Test) || hasSecurityInExpression(e.Consequent) || hasSecurityInExpression(e.Alternate)
+	}
+	return false
 }

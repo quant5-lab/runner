@@ -92,21 +92,27 @@ func TestAnalyzeAndGeneratePrefetch_WithSecurityCall(t *testing.T) {
 		}
 	}
 
-	/* Verify imports - only datafetcher needed now */
-	if len(injection.ImportPaths) != 1 {
-		t.Errorf("Expected 1 import, got %d", len(injection.ImportPaths))
+	/* Verify imports - datafetcher, security, ast needed for streaming evaluation */
+	if len(injection.ImportPaths) != 3 {
+		t.Errorf("Expected 3 imports, got %d", len(injection.ImportPaths))
 	}
 
-	expectedImport := "github.com/quant5-lab/runner/datafetcher"
-	found := false
-	for _, imp := range injection.ImportPaths {
-		if imp == expectedImport {
-			found = true
-			break
-		}
+	expectedImports := []string{
+		"github.com/quant5-lab/runner/datafetcher",
+		"github.com/quant5-lab/runner/security",
+		"github.com/quant5-lab/runner/ast",
 	}
-	if !found {
-		t.Errorf("Missing import: %q", expectedImport)
+	for _, expected := range expectedImports {
+		found := false
+		for _, imp := range injection.ImportPaths {
+			if imp == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Missing import: %q", expected)
+		}
 	}
 }
 

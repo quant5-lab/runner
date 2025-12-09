@@ -109,11 +109,18 @@ plot(volatility, "Volatility %", color=color.red)
 
 	generatedStr := string(generatedCode)
 
-	requiredFields := []string{"High", "Low", "Close"}
-	for _, field := range requiredFields {
-		if !contains(generatedStr, field) {
-			t.Errorf("Expected field '%s' access in generated code", field)
-		}
+	/* Verify expression evaluation using StreamingBarEvaluator */
+	if !contains(generatedStr, "secBarEvaluator") {
+		t.Error("Expected StreamingBarEvaluator for complex arithmetic expression")
+	}
+
+	if !contains(generatedStr, "EvaluateAtBar") {
+		t.Error("Expected EvaluateAtBar() call for expression evaluation")
+	}
+
+	/* Verify AST expression serialization includes operators and identifiers */
+	if !contains(generatedStr, "BinaryExpression") {
+		t.Error("Expected BinaryExpression AST node in serialized expression")
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")

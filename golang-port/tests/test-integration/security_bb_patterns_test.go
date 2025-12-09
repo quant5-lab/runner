@@ -246,12 +246,13 @@ plot(ema10_1d, "EMA")
 		t.Error("Expected inline EMA generation (not runtime lookup)")
 	}
 
-	if !containsSubstring(generatedStr, "origCtx := ctx") {
-		t.Error("Expected context switching code (origCtx := ctx)")
+	/* Updated expectations for streaming evaluation (no context switching) */
+	if !containsSubstring(generatedStr, "secBarEvaluator") {
+		t.Error("Expected StreamingBarEvaluator for security() expressions")
 	}
 
-	if !containsSubstring(generatedStr, "ctx = secCtx") {
-		t.Error("Expected context assignment (ctx = secCtx)")
+	if !containsSubstring(generatedStr, "EvaluateAtBar") {
+		t.Error("Expected EvaluateAtBar() call for streaming evaluation")
 	}
 
 	if !containsSubstring(generatedStr, "math.NaN()") {

@@ -9,6 +9,20 @@ import (
 	"testing"
 )
 
+/* setupGoMod creates go.mod in generated code directory for standalone compilation */
+func setupGoMod(generatedFilePath, projectRoot string) error {
+	goModContent := `module testprog
+
+go 1.23
+
+replace github.com/quant5-lab/runner => ` + projectRoot + `
+
+require github.com/quant5-lab/runner v0.0.0
+`
+	goModPath := filepath.Join(filepath.Dir(generatedFilePath), "go.mod")
+	return os.WriteFile(goModPath, []byte(goModContent), 0644)
+}
+
 /* TestSecurityDownsampling_1h_to_1D_WithWarmup verifies downsampling adds 500 warmup bars */
 func TestSecurityDownsampling_1h_to_1D_WithWarmup(t *testing.T) {
 	strategyCode := `
@@ -48,8 +62,30 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 		t.Fatalf("Failed to parse generated file path from output: %s", buildOutput)
 	}
 
+	/* Copy generated file to testDir where we can create go.mod */
+	localGenPath := filepath.Join(testDir, "main.go")
+	generatedData, err := os.ReadFile(generatedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(localGenPath, generatedData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := setupGoMod(localGenPath, projectRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	/* Run go mod tidy in testDir */
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = testDir
+	if output, err := tidyCmd.CombinedOutput(); err != nil {
+		t.Fatalf("go mod tidy failed: %v\nOutput: %s", err, output)
+	}
+
 	binPath := filepath.Join(testDir, "test-bin")
-	compileCmd := exec.Command("go", "build", "-o", binPath, generatedFile)
+	compileCmd := exec.Command("go", "build", "-o", binPath, localGenPath)
+	compileCmd.Dir = testDir
 	if output, err := compileCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
@@ -139,6 +175,10 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 	}
 	if generatedFile == "" {
 		t.Fatalf("Failed to parse generated file path from output: %s", buildOutput)
+	}
+
+	if err := setupGoMod(generatedFile, projectRoot); err != nil {
+		t.Fatal(err)
 	}
 
 	binPath := filepath.Join(testDir, "test-bin")
@@ -252,6 +292,10 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 	}
 	if generatedFile == "" {
 		t.Fatalf("Failed to parse generated file path from output: %s", buildOutput)
+	}
+
+	if err := setupGoMod(generatedFile, projectRoot); err != nil {
+		t.Fatal(err)
 	}
 
 	binPath := filepath.Join(testDir, "test-bin")
