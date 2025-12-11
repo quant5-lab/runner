@@ -157,13 +157,14 @@
 - [x] `wma()` weighted moving average function (WMAHandler implemented and registered)
 - [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
 - [x] `strategy.position_avg_price` built-in variable (StateManager + codegen sampling order fixed)
+- [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison with unique temp vars (ta_sma_50_XXX > ta_sma_200_YYY)
-- [ ] `bb7-dissect-bb.pine` - Blocked: Boolean operators return float64 (not bool), valuewhen() not implemented, missing input Series declarations
+- [ ] `bb7-dissect-bb.pine` - Blocked: Boolean operators return float64 (not bool), missing input Series declarations (valuewhen implemented but other blockers remain)
 - [x] `bb7-dissect-vol.pine` - Inline ATR in plot() (981µs for 500 bars)
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
@@ -195,7 +196,7 @@
 - **Parser**: 18/37 Pine fixtures parse successfully
 - **Runtime**: 15 packages (codegen, parser, chartdata, context, input, math, output, request, series, strategy, ta, value, visual, integration, validation)
 - **Codegen**: ForwardSeriesBuffer paradigm (ALL variables → Series storage, cursor-based, forward-only, immutable history, O(1) advance)
-- **TA Functions**: ta.sma/ema/rma/rsi/atr/bbands/macd/stoch/crossover/crossunder/stdev/change/pivothigh/pivotlow, valuewhen
+- **TA Functions**: ta.sma/ema/rma/rsi/atr/bbands/macd/stoch/crossover/crossunder/stdev/change/pivothigh/pivotlow/valuewhen, wma, dev
 - **TA Execution**: Inline calculation per bar using ForwardSeriesBuffer, O(1) per-bar overhead
 - **Strategy**: entry/close/close_all, if statements, ternary operators, Series historical access (var[offset])
 - **Binary**: test-simple.pine → 2.9MB static binary (49µs execution for 30 bars)
