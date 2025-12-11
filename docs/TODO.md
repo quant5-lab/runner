@@ -164,7 +164,7 @@
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison with unique temp vars (ta_sma_50_XXX > ta_sma_200_YYY)
-- [ ] `bb7-dissect-bb.pine` - Blocked: Boolean operators return float64 (not bool), missing input Series declarations (valuewhen implemented but other blockers remain)
+- [ ] `bb7-dissect-bb.pine` - Blocked: undefined bbstdevSeries/bblenghtSeries (input variables not generating Series declarations)
 - [x] `bb7-dissect-vol.pine` - Inline ATR in plot() (981µs for 500 bars)
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
