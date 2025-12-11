@@ -1965,6 +1965,25 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	return "0.0"
 }
 
+func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar string) string {
+	if strings.HasPrefix(seriesCode, "bar.") {
+		field := strings.TrimPrefix(seriesCode, "bar.")
+		return fmt.Sprintf("ctx.Data[i-%s].%s", offsetVar, field)
+	}
+
+	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
+		seriesName := strings.TrimSuffix(seriesCode, "Series.GetCurrent()")
+		return fmt.Sprintf("%sSeries.Get(%s)", seriesName, offsetVar)
+	}
+
+	if strings.Contains(seriesCode, "Series.Get(") {
+		base := strings.Split(seriesCode, "Series.Get(")[0]
+		return fmt.Sprintf("%sSeries.Get(%s)", base, offsetVar)
+	}
+
+	return seriesCode
+}
+
 func (g *generator) generateLiteral(lit *ast.Literal) (string, error) {
 	switch v := lit.Value.(type) {
 	case float64:
@@ -2203,6 +2222,42 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 	g.indent--
 	code += g.ind() + "}\n"
+
+	return code, nil
+}
+
+func (g *generator) generateValuewhen(varName string, conditionExpr string, sourceExpr string, occurrence int) (string, error) {
+	code := g.ind() + fmt.Sprintf("/* Inline valuewhen(%s, %s, %d) */\n", conditionExpr, sourceExpr, occurrence)
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 {\n", varName)
+	g.indent++
+
+	code += g.ind() + "occurrenceCount := 0\n"
+	code += g.ind() + "for lookbackOffset := 0; lookbackOffset <= i; lookbackOffset++ {\n"
+	g.indent++
+
+	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
+	code += g.ind() + fmt.Sprintf("if %s != 0 {\n", conditionAccess)
+	g.indent++
+
+	code += g.ind() + fmt.Sprintf("if occurrenceCount == %d {\n", occurrence)
+	g.indent++
+
+	sourceAccess := g.convertSeriesAccessToOffset(sourceExpr, "lookbackOffset")
+	code += g.ind() + fmt.Sprintf("return %s\n", sourceAccess)
+
+	g.indent--
+	code += g.ind() + "}\n"
+	code += g.ind() + "occurrenceCount++\n"
+
+	g.indent--
+	code += g.ind() + "}\n"
+
+	g.indent--
+	code += g.ind() + "}\n"
+	code += g.ind() + "return math.NaN()\n"
+
+	g.indent--
+	code += g.ind() + "}())\n"
 
 	return code, nil
 }
