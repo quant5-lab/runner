@@ -45,6 +45,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
 	gen.plotExprHandler = NewPlotExpressionHandler(gen)
+	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -92,6 +93,7 @@ type generator struct {
 	tempVarMgr        *TempVariableManager
 	constEvaluator    *validation.WarmupAnalyzer
 	plotExprHandler   *PlotExpressionHandler
+	barFieldRegistry  *BarFieldSeriesRegistry
 }
 
 type taFunctionCall struct {
@@ -302,56 +304,64 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
+	/* OHLCV bar fields always declared (unconditionally populated in bar loop) */
+	code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
+	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
+		code += g.ind() + fmt.Sprintf("var %s *series.Series\n", seriesName)
+	}
+
 	if len(g.variables) > 0 {
-		code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
 		for varName := range g.variables {
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
+	}
+	code += "\n"
+
+	if g.hasSecurityCalls {
+		code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
+		code += g.ind() + "var secBarEvaluator *security.StreamingBarEvaluator\n"
 		code += "\n"
+	}
 
-		if g.hasSecurityCalls {
-			code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
-			code += g.ind() + "var secBarEvaluator *security.StreamingBarEvaluator\n"
-			code += "\n"
+	tempVarDecls := g.tempVarMgr.GenerateDeclarations()
+	if tempVarDecls != "" {
+		code += tempVarDecls + "\n"
+	}
+
+	hasFixnan := false
+	for _, taFunc := range g.taFunctions {
+		if taFunc.funcName == "fixnan" {
+			hasFixnan = true
+			break
 		}
-
-		// Declare temp variables for nested TA calls (managed by TempVariableManager)
-		tempVarDecls := g.tempVarMgr.GenerateDeclarations()
-		if tempVarDecls != "" {
-			code += tempVarDecls + "\n"
-		}
-
-		// Declare state variables for fixnan
-		hasFixnan := false
+	}
+	if hasFixnan {
+		code += g.ind() + "// State variables for fixnan forward-fill\n"
 		for _, taFunc := range g.taFunctions {
 			if taFunc.funcName == "fixnan" {
-				hasFixnan = true
-				break
+				code += g.ind() + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", taFunc.varName)
 			}
 		}
-		if hasFixnan {
-			code += g.ind() + "// State variables for fixnan forward-fill\n"
-			for _, taFunc := range g.taFunctions {
-				if taFunc.funcName == "fixnan" {
-					code += g.ind() + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", taFunc.varName)
-				}
-			}
-			code += "\n"
-		}
+		code += "\n"
+	}
 
-		// Initialize ALL Series before bar loop
-		code += g.ind() + "// Initialize Series storage\n"
+	/* OHLCV bar fields always initialized (unconditionally populated in bar loop) */
+	code += g.ind() + "// Initialize Series storage\n"
+	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
+		code += g.ind() + fmt.Sprintf("%s = series.NewSeries(len(ctx.Data))\n", seriesName)
+	}
+
+	if len(g.variables) > 0 {
 		for varName := range g.variables {
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
 		}
 
-		// Initialize temp variable Series (ForwardSeriesBuffer paradigm)
 		tempVarInits := g.tempVarMgr.GenerateInitializations()
 		if tempVarInits != "" {
 			code += tempVarInits
 		}
-		code += "\n"
 	}
+	code += "\n"
 
 	// StateManager for strategy.* runtime values (Series storage)
 	if g.hasStrategyRuntimeAccess {
@@ -379,6 +389,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code += g.ind() + fmt.Sprintf("ctx.BarIndex = %s\n", iterVar)
 	code += g.ind() + fmt.Sprintf("bar := ctx.Data[%s]\n", iterVar)
 	code += g.ind() + "strat.OnBarUpdate(i, bar.Open, bar.Time)\n"
+
+	code += g.ind() + "closeSeries.Set(bar.Close)\n"
+	code += g.ind() + "highSeries.Set(bar.High)\n"
+	code += g.ind() + "lowSeries.Set(bar.Low)\n"
+	code += g.ind() + "openSeries.Set(bar.Open)\n"
+	code += g.ind() + "volumeSeries.Set(bar.Volume)\n"
+	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
 	if g.hasStrategyRuntimeAccess {
@@ -417,6 +434,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	// Advance Series cursors at end of bar loop
 	code += "\n" + g.ind() + "// Advance Series cursors\n"
+
+	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
+		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %s.Next() }\n", iterVar, seriesName)
+	}
+
 	for varName := range g.variables {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
 	}
@@ -1968,6 +1990,9 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar string) string {
 	if strings.HasPrefix(seriesCode, "bar.") {
 		field := strings.TrimPrefix(seriesCode, "bar.")
+		if seriesName, exists := g.barFieldRegistry.GetSeriesName("bar." + field); exists {
+			return fmt.Sprintf("%s.Get(%s)", seriesName, offsetVar)
+		}
 		return fmt.Sprintf("ctx.Data[i-%s].%s", offsetVar, field)
 	}
 

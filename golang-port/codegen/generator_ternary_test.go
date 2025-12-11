@@ -17,6 +17,7 @@ func newTestGenerator() *generator {
 		typeSystem:       NewTypeInferenceEngine(),
 		boolConverter:    NewBooleanConverter(NewTypeInferenceEngine()),
 		constantRegistry: NewConstantRegistry(),
+		barFieldRegistry: NewBarFieldSeriesRegistry(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
