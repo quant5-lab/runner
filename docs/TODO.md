@@ -61,18 +61,16 @@
 - [x] AST scanner (5/5 tests)
 - [x] JSON reader (5/5 tests)
 - [x] Context cache (8/8 tests)
-- [x] Array evaluation (6/6 tests)
 - [x] Expression prefetch (3/3 tests)
 - [x] Code injection (4/4 tests)
 - [x] BB pattern tests (7/7 PASS)
 
-### Context-Only Cache
-- [x] Remove expression arrays
-- [x] Remove batch processing
+### ForwardSeriesBuffer Alignment
+- [x] Extract AST utilities (SRP)
 - [x] Fetch contexts only
 - [x] Direct OHLCV access
-- [x] 7/7 tests PASS
-- [x] 40KB → 0B allocation
+- [x] Comprehensive edge case tests
+- [x] 256/256 tests PASS
 
 ### Inline TA States
 - [x] Circular buffer warmup
@@ -205,10 +203,10 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 185 tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, validation: 28/41, integration, runtime, datafetcher: 5, security: 27, security_inject: 4) - 100% pass rate for core features
+- **Test Suite**: 417 tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, validation: 28/41, integration, runtime, datafetcher: 5, security: 256) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
-- **security() Module**: Complete disk-based prefetch architecture (31/31 tests) - analyzer, file_fetcher, cache, evaluator, prefetcher, codegen injection - ready for builder integration
+- **security() Module**: ForwardSeriesBuffer alignment complete (256/256 tests) - dead code removed, AST utilities extracted, comprehensive edge case coverage
 - **Next Target**: BB7 strategy - 12 prerequisites required (input.session, time(), syminfo.tickerid, fixnan, pivothigh/pivotlow, wma, dev, lookahead parameter)
