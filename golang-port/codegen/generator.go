@@ -3,6 +3,7 @@ package codegen
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
@@ -2002,8 +2003,11 @@ func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar str
 	}
 
 	if strings.Contains(seriesCode, "Series.Get(") {
-		base := strings.Split(seriesCode, "Series.Get(")[0]
-		return fmt.Sprintf("%sSeries.Get(%s)", base, offsetVar)
+		// Handle expressions with multiple series references (e.g., "(closeSeries.Get(0) > openSeries.Get(0))")
+		// Use regex to replace all Series.Get(...) patterns
+		re := regexp.MustCompile(`(\w+Series)\.Get\([^)]*\)`)
+		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetVar))
+		return result
 	}
 
 	return seriesCode
@@ -2261,7 +2265,15 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	g.indent++
 
 	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
-	code += g.ind() + fmt.Sprintf("if %s != 0 {\n", conditionAccess)
+	// Check if condition is boolean expression (contains comparison/logical operators)
+	isBoolExpr := strings.ContainsAny(conditionAccess, "><!=") && !strings.Contains(conditionAccess, ".Get(")
+	if isBoolExpr {
+		// Wrap boolean expression in float conversion for condition check
+		code += g.ind() + fmt.Sprintf("if (func() float64 { if %s { return 1.0 } else { return 0.0 } }() != 0) {\n", conditionAccess)
+	} else {
+		// Series value comparison (already float64)
+		code += g.ind() + fmt.Sprintf("if %s != 0 {\n", conditionAccess)
+	}
 	g.indent++
 
 	code += g.ind() + fmt.Sprintf("if occurrenceCount == %d {\n", occurrence)
