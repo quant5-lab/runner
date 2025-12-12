@@ -1056,23 +1056,17 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 	tempVarCode := ""
 	if len(nestedCalls) > 0 {
-		// Example: rma(max(change(x), 0), 9) returns [rma, max, change]
-		//   Must process change → max → rma so dependencies exist when referenced
+		/* Process nested calls in reverse order to resolve dependencies first */
 		for i := len(nestedCalls) - 1; i >= 0; i-- {
 			callInfo := nestedCalls[i]
 
-			// Skip the outermost call (that's the main variable being generated)
 			if callInfo.Call == initExpr {
 				continue
 			}
 
-			// Create temp vars for:
-			// 1. TA functions (ta.sma, ta.ema, etc.)
-			// 2. Math functions that contain TA calls (e.g., max(change(x), 0))
 			isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
 			containsNestedTA := false
 			if !isTAFunction {
-				// Check if this math function contains TA calls
 				mathNestedCalls := g.exprAnalyzer.FindNestedCalls(callInfo.Call)
 				for _, mathNested := range mathNestedCalls {
 					if mathNested.Call != callInfo.Call && g.taRegistry.IsSupported(mathNested.FuncName) {
@@ -1083,13 +1077,11 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			}
 
 			if !isTAFunction && !containsNestedTA {
-				continue // Pure math function - inline OK
+				continue
 			}
 
-			// Create temp var for this nested call
 			tempVarName := g.tempVarMgr.GetOrCreate(callInfo)
 
-			// Generate calculation code for temp var
 			tempCode, err := g.generateVariableFromCall(tempVarName, callInfo.Call)
 			if err != nil {
 				return "", fmt.Errorf("failed to generate temp var %s: %w", tempVarName, err)
@@ -1098,7 +1090,6 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		}
 	}
 
-	// STEP 2: Process the main expression (extractSeriesExpression now uses temp var refs)
 	switch expr := initExpr.(type) {
 	case *ast.CallExpression:
 		mainCode, err := g.generateVariableFromCall(varName, expr)
@@ -1118,7 +1109,7 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		if err != nil {
 			return "", err
 		}
-		return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.UnaryExpression:
 		// Handle unary expressions: not x, -x, +x
@@ -1130,14 +1121,14 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			}
 			// Convert boolean expression to float: true→1.0, false→0.0
 			boolToFloatExpr := fmt.Sprintf("func() float64 { if !(%s) { return 1.0 } else { return 0.0 } }()", operandCode)
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, boolToFloatExpr), nil
+			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, boolToFloatExpr), nil
 		} else {
 			// Numeric unary: -x, +x (get numeric value, not condition)
 			operandCode, err := g.generateExpression(expr.Argument)
 			if err != nil {
 				return "", err
 			}
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s(%s))\n", varName, expr.Operator, operandCode), nil
+			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s(%s))\n", varName, expr.Operator, operandCode), nil
 		}
 	case *ast.Literal:
 		// Simple literal assignment
@@ -1187,15 +1178,15 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			if obj.Name == "strategy" {
 				if prop, ok := expr.Property.(*ast.Identifier); ok {
 					if prop.Name == "long" {
-						return g.ind() + fmt.Sprintf("%sSeries.Set(1.0) // strategy.long\n", varName), nil
+						return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(1.0) // strategy.long\n", varName), nil
 					} else if prop.Name == "short" {
-						return g.ind() + fmt.Sprintf("%sSeries.Set(-1.0) // strategy.short\n", varName), nil
+						return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(-1.0) // strategy.short\n", varName), nil
 					}
 				}
 			}
 		}
 
-		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
 	case *ast.BinaryExpression:
 		// Binary expression like sma20[1] > ema50[1] or SMA + EMA
 		/* In security context, need to generate temp series for operands */
@@ -1208,9 +1199,9 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		varType := g.inferVariableType(expr)
 		if varType == "bool" {
 			// Convert bool to float64 for Series storage
-			return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, binaryCode), nil
+			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, binaryCode), nil
 		}
-		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
 	case *ast.LogicalExpression:
 		// Logical expression like (a and b) or (c and d) → bool needs float64 conversion
 		logicalCode, err := g.generateConditionExpression(expr)
@@ -1218,7 +1209,7 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			return "", err
 		}
 		// Convert bool to float64 for Series storage
-		return g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, logicalCode), nil
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, logicalCode), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
 	}
@@ -1935,35 +1926,24 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		}
 		return fmt.Sprintf("%s%s", op, operand)
 	case *ast.CallExpression:
-		// Function call like math.pow(x, y) or ta.sma(close, 20)
 		funcName := g.extractFunctionName(e.Callee)
 
-		// PRIORITY 1: Check if temp var exists (even for math functions)
-		// This handles cases where math functions have TA dependencies:
-		// max(change(x), 0) needs temp var because change() is TA
 		existingVar := g.tempVarMgr.GetVarNameForCall(e)
 		if existingVar != "" {
-			// Temp var already generated, use it
 			return fmt.Sprintf("%sSeries.GetCurrent()", existingVar)
 		}
 
-		// PRIORITY 2: Try inline math (only if no TA dependencies)
-		// Pure math functions like max(2, 3) or abs(-5) can be inlined
 		if (strings.HasPrefix(funcName, "math.") ||
 			funcName == "max" || funcName == "min" || funcName == "abs" ||
 			funcName == "sqrt" || funcName == "floor" || funcName == "ceil" ||
 			funcName == "round" || funcName == "log" || funcName == "exp") && g.mathHandler != nil {
 			mathCode, err := g.mathHandler.GenerateMathCall(funcName, e.Arguments, g)
 			if err != nil {
-				// Return error placeholder
 				return "0.0"
 			}
 			return mathCode
 		}
 
-		// PRIORITY 3: Legacy fallback for TA functions
-		// Assume function result stored in series variable
-		// (This will fail if variable doesn't exist - needs temp var generation)
 		varName := strings.ReplaceAll(funcName, ".", "_")
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	}
