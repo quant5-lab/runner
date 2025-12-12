@@ -160,10 +160,10 @@
 - [ ] Visualization config system integration with BB7
 
 ### BB7 Dissected Components Testing
-- [x] `bb7-dissect-session.pine` - Session filtering (500 bars, 17ms execution)
-- [x] `bb7-dissect-sma.pine` - Inline SMA comparison with unique temp vars (ta_sma_50_XXX > ta_sma_200_YYY)
-- [ ] `bb7-dissect-bb.pine` - Blocked: undefined bbstdevSeries/bblenghtSeries (input variables not generating Series declarations)
-- [x] `bb7-dissect-vol.pine` - Inline ATR in plot() (981µs for 500 bars)
+- [x] `bb7-dissect-session.pine` - Session filtering (100µs for 500 bars, 2 indicators)
+- [x] `bb7-dissect-sma.pine` - Inline SMA comparison (1.3ms for 500 bars, 8 indicators, 268 bullish signals)
+- [x] `bb7-dissect-bb.pine` - Input constant isolation (301µs for 500 bars, 5 indicators, 455 BB values)
+- [ ] `bb7-dissect-vol.pine` - Blocked: ATR(2) produces all zeros, derived indicators have zero triggers
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
 - [ ] `bb7-dissect-sl.pine` - Blocked: Boolean comparison errors, undefined notSeries/bblenghtSeries/bbstdevSeries
