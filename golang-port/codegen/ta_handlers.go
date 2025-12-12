@@ -16,17 +16,13 @@ func (h *SMAHandler) CanHandle(funcName string) bool {
 }
 
 func (h *SMAHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.sma")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.sma")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	builder := NewTAIndicatorBuilder("ta.sma", varName, period, accessGen, needsNaN)
+	builder := NewTAIndicatorBuilder("ta.sma", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 	builder.WithAccumulator(NewSumAccumulator())
 	return g.indentCode(builder.Build()), nil
 }
@@ -39,17 +35,13 @@ func (h *EMAHandler) CanHandle(funcName string) bool {
 }
 
 func (h *EMAHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.ema")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.ema")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	builder := NewTAIndicatorBuilder("ta.ema", varName, period, accessGen, needsNaN)
+	builder := NewTAIndicatorBuilder("ta.ema", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 	return g.indentCode(builder.BuildEMA()), nil
 }
 
@@ -61,20 +53,13 @@ func (h *STDEVHandler) CanHandle(funcName string) bool {
 }
 
 func (h *STDEVHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.stdev")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.stdev")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	builder := NewTAIndicatorBuilder("ta.stdev", varName, period, accessGen, needsNaN)
-	if builder.loopGen == nil {
-		return "", fmt.Errorf("FATAL: loopGen is nil after NewTAIndicatorBuilder (period=%d, accessGen=%+v)", period, accessGen)
-	}
+	builder := NewTAIndicatorBuilder("ta.stdev", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 	return g.indentCode(builder.BuildSTDEV()), nil
 }
 
@@ -111,20 +96,13 @@ func (h *RMAHandler) CanHandle(funcName string) bool {
 }
 
 func (h *RMAHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	// RMA is an exponentially weighted moving average with alpha = 1/period
-	// Same as EMA but with different smoothing factor
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.rma")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.rma")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	// For RMA, use inline generation similar to EMA but with alpha = 1/period
-	return g.generateRMA(varName, period, accessGen, needsNaN)
+	return g.generateRMA(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 }
 
 // RSIHandler generates inline code for Relative Strength Index calculations
@@ -135,17 +113,13 @@ func (h *RSIHandler) CanHandle(funcName string) bool {
 }
 
 func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.rsi")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.rsi")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	return g.generateRSI(varName, period, accessGen, needsNaN)
+	return g.generateRSI(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 }
 
 // ChangeHandler generates inline code for change calculations
@@ -270,7 +244,37 @@ func (h *FixnanHandler) GenerateCode(g *generator, varName string, call *ast.Cal
 
 // Helper functions
 
+// extractTAArgumentsAST extracts source AST expression and period from standard TA function arguments.
+// Returns AST node directly for use with ClassifyAST() to avoid code generation artifacts.
+// Supports: literals (14), variables (sr_len), expressions (round(sr_n / 2))
+func extractTAArgumentsAST(g *generator, call *ast.CallExpression, funcName string) (ast.Expression, int, error) {
+	if len(call.Arguments) < 2 {
+		return nil, 0, fmt.Errorf("%s requires at least 2 arguments", funcName)
+	}
+
+	sourceASTExpr := call.Arguments[0]
+	periodArg := call.Arguments[1]
+
+	// Try literal period first (fast path)
+	if periodLit, ok := periodArg.(*ast.Literal); ok {
+		period, err := extractPeriod(periodLit)
+		if err != nil {
+			return nil, 0, fmt.Errorf("%s: %w", funcName, err)
+		}
+		return sourceASTExpr, period, nil
+	}
+
+	// Try compile-time constant evaluation (handles variables + expressions)
+	periodValue := g.constEvaluator.EvaluateConstant(periodArg)
+	if !math.IsNaN(periodValue) && periodValue > 0 {
+		return sourceASTExpr, int(periodValue), nil
+	}
+
+	return nil, 0, fmt.Errorf("%s period must be compile-time constant (got %T that evaluates to NaN)", funcName, periodArg)
+}
+
 // extractTAArguments extracts source and period from standard TA function arguments
+// Deprecated: Use extractTAArgumentsAST for new code to avoid string-based classification issues
 // Supports: literals (14), variables (sr_len), expressions (round(sr_n / 2))
 func extractTAArguments(g *generator, call *ast.CallExpression, funcName string) (string, int, error) {
 	if len(call.Arguments) < 2 {
@@ -362,18 +366,14 @@ func (h *WMAHandler) CanHandle(funcName string) bool {
 }
 
 func (h *WMAHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.wma")
+	extractor := NewTAArgumentExtractor(g)
+	comp, err := extractor.Extract(call, "ta.wma")
 	if err != nil {
 		return "", err
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessGen := CreateAccessGenerator(sourceInfo)
-	needsNaN := sourceInfo.IsSeriesVariable()
-
-	builder := NewTAIndicatorBuilder("ta.wma", varName, period, accessGen, needsNaN)
-	builder.WithAccumulator(NewWeightedSumAccumulator(period))
+	builder := NewTAIndicatorBuilder("ta.wma", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	builder.WithAccumulator(NewWeightedSumAccumulator(comp.Period))
 	return g.indentCode(builder.Build()), nil
 }
 
@@ -385,13 +385,13 @@ func (h *DEVHandler) CanHandle(funcName string) bool {
 }
 
 func (h *DEVHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	sourceExpr, period, err := extractTAArguments(g, call, "ta.dev")
+	sourceASTExpr, period, err := extractTAArgumentsAST(g, call, "ta.dev")
 	if err != nil {
 		return "", err
 	}
 
 	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
+	sourceInfo := classifier.ClassifyAST(sourceASTExpr)
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
 
@@ -410,20 +410,18 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		return "", fmt.Errorf("sum requires 2 arguments")
 	}
 
-	// Check if source is ConditionalExpression - needs temp var for accessor pattern
 	var code string
 	sourceArg := call.Arguments[0]
-	var sourceExpr string
+	var sourceInfo SourceInfo
+	var period int
 
 	if condExpr, ok := sourceArg.(*ast.ConditionalExpression); ok {
-		// Create temp var for ternary expression
 		tempVarName := g.tempVarMgr.GetOrCreate(CallInfo{
 			FuncName: "ternary",
 			Call:     call,
 			ArgHash:  fmt.Sprintf("%p", condExpr),
 		})
 
-		// Generate ternary as temp var
 		condCode, err := g.generateConditionExpression(condExpr.Test)
 		if err != nil {
 			return "", err
@@ -442,34 +440,27 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 			tempVarName, condCode, consequentCode, alternateCode)
 
-		sourceExpr = tempVarName + "Series.GetCurrent()"
-	} else {
-		extracted, _, extractErr := extractTAArguments(g, call, "sum")
-		if extractErr != nil {
-			return "", extractErr
+		sourceInfo = SourceInfo{
+			Type:         SourceTypeSeriesVariable,
+			VariableName: tempVarName,
 		}
-		sourceExpr = extracted
-	}
 
-	// Extract period
-	periodArg := call.Arguments[1]
-	var period int
-	if periodLit, ok := periodArg.(*ast.Literal); ok {
-		p, err := extractPeriod(periodLit)
+		extractor := NewTAArgumentExtractor(g)
+		extractedPeriod, err := extractor.extractPeriod(call.Arguments[1], "sum")
 		if err != nil {
-			return "", fmt.Errorf("sum: %w", err)
+			return "", err
 		}
-		period = p
+		period = extractedPeriod
 	} else {
-		periodValue := g.constEvaluator.EvaluateConstant(periodArg)
-		if math.IsNaN(periodValue) || periodValue <= 0 {
-			return "", fmt.Errorf("sum period must be compile-time constant")
+		extractor := NewTAArgumentExtractor(g)
+		comp, err := extractor.Extract(call, "sum")
+		if err != nil {
+			return "", err
 		}
-		period = int(periodValue)
+		sourceInfo = comp.SourceInfo
+		period = comp.Period
 	}
 
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
 
