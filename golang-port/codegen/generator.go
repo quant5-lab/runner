@@ -242,6 +242,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				// Scan ALL initializers for subscripted function calls: pivothigh()[1]
 				g.scanForSubscriptedCalls(declarator.Init)
 
+				// Skip if already registered as constant (input.float/int/bool/string/session)
+				if g.constantRegistry.IsConstant(varName) {
+					continue
+				}
+
 				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
 				g.typeSystem.RegisterVariable(varName, varType)
@@ -1008,6 +1013,11 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 				code += g.ind() + fmt.Sprintf("// %s = input.source() - using source directly\n", varName)
 				continue
 			}
+		}
+
+		// Skip if already registered as constant (handled in first pass)
+		if g.constantRegistry.IsConstant(varName) {
+			continue
 		}
 
 		// Determine variable type based on init expression
