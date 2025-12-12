@@ -47,6 +47,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
 	gen.plotExprHandler = NewPlotExpressionHandler(gen)
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
+	gen.inlineRegistry = NewInlineFunctionRegistry()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -95,6 +96,7 @@ type generator struct {
 	constEvaluator    *validation.WarmupAnalyzer
 	plotExprHandler   *PlotExpressionHandler
 	barFieldRegistry  *BarFieldSeriesRegistry
+	inlineRegistry    *InlineFunctionRegistry
 }
 
 type taFunctionCall struct {
@@ -2422,6 +2424,11 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 					// Register temp vars in REVERSE order (innermost first)
 					for i := len(nestedCalls) - 1; i >= 0; i-- {
 						callInfo := nestedCalls[i]
+
+						// Skip inline-only functions (generate inline code, not Series)
+						if g.inlineRegistry != nil && g.inlineRegistry.IsInlineOnly(callInfo.FuncName) {
+							continue
+						}
 
 						// Create temp vars for:
 						// 1. TA functions (ta.sma, ta.ema, etc.)

@@ -1,6 +1,10 @@
 package codegen
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/quant5-lab/runner/ast"
+)
 
 // SourceType represents the category of data source for technical analysis calculations.
 type SourceType int
@@ -41,19 +45,72 @@ func NewSeriesSourceClassifier() *SeriesSourceClassifier {
 	}
 }
 
-// Classify analyzes a source expression and returns its classification.
+// ClassifyAST analyzes AST expression node directly, avoiding code generation artifacts.
+func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
+	info := SourceInfo{}
+
+	switch e := expr.(type) {
+	case *ast.Identifier:
+		if c.isBuiltinOHLCVField(e.Name) {
+			info.Type = SourceTypeOHLCVField
+			info.FieldName = c.capitalizeOHLCVField(e.Name)
+			return info
+		}
+		info.Type = SourceTypeSeriesVariable
+		info.VariableName = e.Name
+		return info
+
+	case *ast.MemberExpression:
+		if obj, ok := e.Object.(*ast.Identifier); ok && e.Computed {
+			if c.isBuiltinOHLCVField(obj.Name) {
+				info.Type = SourceTypeOHLCVField
+				info.FieldName = c.capitalizeOHLCVField(obj.Name)
+				return info
+			}
+			info.Type = SourceTypeSeriesVariable
+			info.VariableName = obj.Name
+			return info
+		}
+	}
+
+	info.Type = SourceTypeOHLCVField
+	info.FieldName = "Close"
+	return info
+}
+
+func (c *SeriesSourceClassifier) isBuiltinOHLCVField(name string) bool {
+	return name == "close" || name == "open" || name == "high" || name == "low" || name == "volume"
+}
+
+func (c *SeriesSourceClassifier) capitalizeOHLCVField(name string) string {
+	switch name {
+	case "close":
+		return "Close"
+	case "open":
+		return "Open"
+	case "high":
+		return "High"
+	case "low":
+		return "Low"
+	case "volume":
+		return "Volume"
+	default:
+		return "Close"
+	}
+}
+
+// Classify analyzes a source expression string and returns its classification.
+// Deprecated: Use ClassifyAST for AST-based analysis to avoid code generation artifacts.
 func (c *SeriesSourceClassifier) Classify(sourceExpr string) SourceInfo {
 	info := SourceInfo{
 		OriginalExpr: sourceExpr,
 	}
 
-	// Strip unary operators (-, +, !) from the beginning
 	cleanExpr := sourceExpr
 	for len(cleanExpr) > 0 && (cleanExpr[0] == '-' || cleanExpr[0] == '+' || cleanExpr[0] == '!') {
 		cleanExpr = cleanExpr[1:]
 	}
 
-	// Remove outer parentheses if present after stripping operators
 	if len(cleanExpr) > 2 && cleanExpr[0] == '(' && cleanExpr[len(cleanExpr)-1] == ')' {
 		cleanExpr = cleanExpr[1 : len(cleanExpr)-1]
 	}
