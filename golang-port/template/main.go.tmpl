@@ -1,0 +1,140 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"math"
+	"os"
+	"path/filepath"
+	"time"
+	"github.com/quant5-lab/runner/runtime/clock"
+	"encoding/json"
+
+	"github.com/quant5-lab/runner/runtime/chartdata"
+	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/output"
+	"github.com/quant5-lab/runner/runtime/series"
+	"github.com/quant5-lab/runner/runtime/session"
+	"github.com/quant5-lab/runner/runtime/strategy"
+	"github.com/quant5-lab/runner/runtime/value"
+	"github.com/quant5-lab/runner/datafetcher"
+)
+
+/* Prevent unused import errors */
+var (
+	_ = math.IsNaN
+	_ = session.Parse
+	_ = series.NewSeries
+	_ = datafetcher.NewFileFetcher
+	_ = value.Nz
+)
+
+/* CLI flags */
+var (
+	symbolFlag    = flag.String("symbol", "", "Trading symbol (e.g., BTCUSDT)")
+	timeframeFlag = flag.String("timeframe", "1h", "Timeframe (e.g., 1m, 5m, 1h, 1D)")
+	dataFlag      = flag.String("data", "", "Path to OHLCV data JSON file")
+	dataDirFlag   = flag.String("datadir", "", "Directory containing security() data files (optional)")
+	outputFlag    = flag.String("output", "chart-data.json", "Output file path")
+)
+
+/* Strategy execution function - INJECTED BY CODEGEN */
+{{STRATEGY_FUNC}}
+
+func main() {
+	flag.Parse()
+
+	if *symbolFlag == "" || *dataFlag == "" {
+		fmt.Fprintf(os.Stderr, "Usage: %s -symbol SYMBOL -data DATA.json [-timeframe 1h] [-output chart-data.json]\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	/* Load OHLCV data from standard JSON format */
+	dataBytes, err := os.ReadFile(*dataFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to read data file: %v\n", err)
+		os.Exit(1)
+	}
+
+	/* Parse JSON - support both array format and object with timezone */
+	var bars []context.OHLCV
+	var timezone string = "UTC" // default
+	
+	/* Try parsing as object with timezone metadata first */
+	var dataWithMetadata struct {
+		Timezone string           `json:"timezone"`
+		Bars     []context.OHLCV `json:"bars"`
+	}
+	if err := json.Unmarshal(dataBytes, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
+		bars = dataWithMetadata.Bars
+		timezone = dataWithMetadata.Timezone
+	} else {
+		/* Fallback: parse as plain array */
+		if err := json.Unmarshal(dataBytes, &bars); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if len(bars) == 0 {
+		fmt.Fprintf(os.Stderr, "No bars in data file\n")
+		os.Exit(1)
+	}
+
+	/* Create runtime context with timezone from data source */
+	ctx := context.New(*symbolFlag, *timeframeFlag, len(bars))
+	ctx.Timezone = timezone
+	for _, bar := range bars {
+		ctx.AddBar(bar)
+	}
+
+	/* Determine data directory for security() calls */
+	dataDir := *dataDirFlag
+	if dataDir == "" {
+		/* Default: same directory as main data file */
+		dataDir = filepath.Dir(*dataFlag)
+	}
+
+	/* Built-in variables */
+	var syminfo_tickerid string = *symbolFlag  // syminfo.tickerid
+	_ = syminfo_tickerid // Suppress unused warning if not referenced
+
+	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
+	startTime := clock.Now()
+	securityContexts := make(map[string]*context.Context)
+	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts)
+	executionTime := time.Since(startTime)
+
+	/* Generate chart data with metadata */
+	cd := chartdata.NewChartData(ctx, *symbolFlag, *timeframeFlag, "{{STRATEGY_NAME}}")
+	cd.AddPlots(plotCollector)
+	cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
+
+	/* Write output */
+	jsonBytes, err := cd.ToJSON()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to generate JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = os.WriteFile(*outputFlag, jsonBytes, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write output: %v\n", err)
+		os.Exit(1)
+	}
+
+	/* Print summary */
+	fmt.Printf("Symbol: %s\n", *symbolFlag)
+	fmt.Printf("Timeframe: %s\n", *timeframeFlag)
+	fmt.Printf("Timezone: %s\n", timezone)
+	fmt.Printf("Bars: %d\n", len(bars))
+	fmt.Printf("Execution time: %v\n", executionTime)
+	fmt.Printf("Output: %s (%d bytes)\n", *outputFlag, len(jsonBytes))
+
+	if strat != nil {
+		th := strat.GetTradeHistory()
+		closedTrades := th.GetClosedTrades()
+		fmt.Printf("Closed trades: %d\n", len(closedTrades))
+		fmt.Printf("Final equity: %.2f\n", strat.GetEquity(ctx.Data[len(ctx.Data)-1].Close))
+	}
+}

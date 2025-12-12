@@ -48,6 +48,15 @@ class TimeframeConverter {
       W: 'W',
       M: 'M',
     };
+    
+    /* Handle direct string inputs that are already in app format */
+    if (typeof pineTF === 'string' && /^\d+[mh]$/.test(pineTF)) {
+      return pineTF;
+    }
+    if (pineTF === 'D' || pineTF === 'W' || pineTF === 'M') {
+      return pineTF;
+    }
+    
     /* Fallback: assume numeric string is minutes */
     return mapping[pineTF] || `${pineTF}m`;
   }

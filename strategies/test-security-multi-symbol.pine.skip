@@ -1,0 +1,4 @@
+Test data limitation: requires BTCUSDT_60.json (60-minute timeframe) which doesn't exist
+Missing file: golang-port/testdata/ohlcv/BTCUSDT_60.json
+Error: "Failed to fetch BINANCE:BTCUSDT:60: failed to read ... no such file or directory"
+TODO: Add BTCUSDT_60.json test data or use only 1D timeframe in test script

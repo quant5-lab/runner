@@ -1,0 +1,7 @@
+//@version=5
+strategy("Simple If Test", overlay=true)
+
+if close > 130.0
+    strategy.entry("long", strategy.long)
+if close < 125.0
+    strategy.close("long")

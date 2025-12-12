@@ -1,0 +1,251 @@
+package preprocessor
+
+import (
+	"testing"
+
+	"github.com/quant5-lab/runner/parser"
+)
+
+func TestTANamespaceTransformer_SimpleAssignment(t *testing.T) {
+	input := `ma20 = sma(close, 20)`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	transformer := NewTANamespaceTransformer()
+	result, err := transformer.Transform(ast)
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+
+	// Check that sma was renamed to ta.sma
+	if result.Statements[0].Assignment == nil {
+		t.Fatal("Expected assignment statement")
+	}
+
+	// The Call is nested inside Ternary.Condition.Left...Left.Left.Call
+	expr := result.Statements[0].Assignment.Value
+	if expr.Ternary == nil || expr.Ternary.Condition == nil {
+		t.Fatal("Expected ternary with condition")
+	}
+
+	// Navigate through the nested structure to find the Call
+	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	if call == nil {
+		t.Fatal("Expected call expression in nested structure")
+	}
+	assertMemberAccessCallee(t, call, "ta", "sma")
+}
+
+// Helper to extract Call from Factor
+func findCallInFactor(factor *parser.Factor) *parser.CallExpr {
+	if factor == nil {
+		return nil
+	}
+	if factor.Postfix != nil && factor.Postfix.Primary != nil {
+		return factor.Postfix.Primary.Call
+	}
+	return nil
+}
+
+/* Helper to check CallCallee MemberAccess (namespace.function pattern) */
+func assertMemberAccessCallee(t *testing.T, call *parser.CallExpr, expectedObject, expectedProperty string) {
+	t.Helper()
+	if call == nil {
+		t.Fatal("Call is nil")
+	}
+	if call.Callee == nil {
+		t.Fatal("Callee is nil")
+	}
+	if call.Callee.MemberAccess == nil {
+		t.Fatalf("Expected MemberAccess, got Ident=%v", call.Callee.Ident)
+	}
+	if call.Callee.MemberAccess.Object != expectedObject {
+		t.Errorf("Expected object '%s', got '%s'", expectedObject, call.Callee.MemberAccess.Object)
+	}
+	if call.Callee.MemberAccess.Property != expectedProperty {
+		t.Errorf("Expected property '%s', got '%s'", expectedProperty, call.Callee.MemberAccess.Property)
+	}
+}
+
+func TestTANamespaceTransformer_MultipleIndicators(t *testing.T) {
+	input := `
+ma20 = sma(close, 20)
+ma50 = ema(close, 50)
+rsiVal = rsi(close, 14)
+`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	transformer := NewTANamespaceTransformer()
+	result, err := transformer.Transform(ast)
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+
+	// Check all three were transformed
+	expectedCallees := []struct{ obj, prop string }{
+		{"ta", "sma"},
+		{"ta", "ema"},
+		{"ta", "rsi"},
+	}
+	for i, expected := range expectedCallees {
+		expr := result.Statements[i].Assignment.Value
+		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+		assertMemberAccessCallee(t, call, expected.obj, expected.prop)
+	}
+}
+
+func TestTANamespaceTransformer_Crossover(t *testing.T) {
+	input := `bullish = crossover(fast, slow)`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	transformer := NewTANamespaceTransformer()
+	result, err := transformer.Transform(ast)
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+
+	expr := result.Statements[0].Assignment.Value
+	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	assertMemberAccessCallee(t, call, "ta", "crossover")
+}
+
+func TestTANamespaceTransformer_DailyLinesSimple(t *testing.T) {
+	// This is the actual daily-lines-simple.pine content
+	input := `
+ma20 = sma(close, 20)
+ma50 = sma(close, 50)
+ma200 = sma(close, 200)
+`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	transformer := NewTANamespaceTransformer()
+	result, err := transformer.Transform(ast)
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+
+	// All three sma calls should be transformed to ta.sma
+	for i := 0; i < 3; i++ {
+		expr := result.Statements[i].Assignment.Value
+		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+		assertMemberAccessCallee(t, call, "ta", "sma")
+	}
+}
+
+func TestStudyToIndicatorTransformer(t *testing.T) {
+	input := `study(title="Test", shorttitle="T", overlay=true)`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	transformer := NewStudyToIndicatorTransformer()
+	result, err := transformer.Transform(ast)
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+
+	expr := result.Statements[0].Expression.Expr
+	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	if call == nil {
+		t.Fatal("Expected call expression")
+	}
+	/* study() → indicator() should be simple Ident rename */
+	if call.Callee == nil || call.Callee.Ident == nil {
+		t.Fatalf("Expected Ident, got '%v'", call.Callee)
+	}
+	if *call.Callee.Ident != "indicator" {
+		t.Errorf("Expected 'indicator', got '%s'", *call.Callee.Ident)
+	}
+}
+
+func TestV4ToV5Pipeline(t *testing.T) {
+	// Full daily-lines-simple.pine (v4 syntax)
+	input := `
+study(title="20-50-200 SMA", shorttitle="SMA Lines", overlay=true)
+ma20 = sma(close, 20)
+ma50 = sma(close, 50)
+ma200 = sma(close, 200)
+`
+
+	p, err := parser.NewParser()
+	if err != nil {
+		t.Fatalf("Failed to create parser: %v", err)
+	}
+
+	ast, err := p.ParseString("test", input)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Run full pipeline
+	pipeline := NewV4ToV5Pipeline()
+	result, err := pipeline.Run(ast)
+	if err != nil {
+		t.Fatalf("Pipeline failed: %v", err)
+	}
+
+	// Check study → indicator
+	studyExpr := result.Statements[0].Expression.Expr
+	studyCall := findCallInFactor(studyExpr.Ternary.Condition.Left.Left.Left.Left.Left)
+	if studyCall == nil {
+		t.Fatal("Expected study call expression")
+	}
+	if studyCall.Callee == nil || studyCall.Callee.Ident == nil {
+		t.Fatal("Expected study callee identifier")
+	}
+	if *studyCall.Callee.Ident != "indicator" {
+		t.Errorf("Expected callee 'indicator', got '%s'", *studyCall.Callee.Ident)
+	}
+
+	// Check sma → ta.sma (3 occurrences)
+	for i := 1; i <= 3; i++ {
+		expr := result.Statements[i].Assignment.Value
+		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
+		if call == nil {
+			t.Fatalf("Statement %d: expected call expression", i)
+		}
+		assertMemberAccessCallee(t, call, "ta", "sma")
+	}
+}

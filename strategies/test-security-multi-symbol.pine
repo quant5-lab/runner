@@ -1,0 +1,31 @@
+//@version=5
+indicator("Multi-Symbol Security Test", overlay=true)
+
+// Official Pine Script documentation examples for security() with different symbols:
+// https://www.tradingview.com/pine-script-reference/v5/#fun_request.security
+
+// Example 1: Get close price from another symbol
+btc_close = request.security("BINANCE:BTCUSDT", "D", close)
+eth_close = request.security("BINANCE:ETHUSDT", "D", close)
+
+// Example 2: Calculate indicators on different symbols
+btc_sma20 = request.security("BINANCE:BTCUSDT", "D", ta.sma(close, 20))
+eth_sma50 = request.security("BINANCE:ETHUSDT", "D", ta.sma(close, 50))
+
+// Example 3: Mixed - different symbols and timeframes
+btc_1h_high = request.security("BINANCE:BTCUSDT", "60", high)
+btc_1d_low = request.security("BINANCE:BTCUSDT", "D", low)
+
+// Example 4: Same symbol, different timeframe (for comparison)
+current_symbol_daily = request.security(syminfo.tickerid, "D", close)
+
+// Plot results
+plot(btc_close, "BTC Daily Close", color.blue, 2)
+plot(eth_close, "ETH Daily Close", color.green, 2)
+plot(btc_sma20, "BTC SMA20", color.orange, 1)
+plot(current_symbol_daily, "Current Symbol Daily", color.purple, 1)
+
+// Example 5: Complex expression with different symbol
+// This demonstrates fixnan + pivothigh pattern on different symbol
+// btc_pivot_high = request.security("BINANCE:BTCUSDT", "D", fixnan(ta.pivothigh(high, 5, 5)[1]))
+// plot(btc_pivot_high, "BTC Pivot High", color.red, 2)

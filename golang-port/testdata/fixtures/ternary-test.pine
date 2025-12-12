@@ -1,0 +1,7 @@
+//@version=5
+indicator("Ternary Test", overlay=false)
+
+close_avg = ta.sma(close, 20)
+signal = close > close_avg ? 1 : 0
+
+plot(signal, "signal", color=color.blue)

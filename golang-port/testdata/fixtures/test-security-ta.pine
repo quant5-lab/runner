@@ -1,0 +1,4 @@
+//@version=5
+indicator("Security TA Test", overlay=true)
+dailySMA = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
+plot(dailySMA)

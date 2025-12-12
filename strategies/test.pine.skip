@@ -1,0 +1,3 @@
+Codegen bug: plot(close) generates closeSeries.Get(0) instead of bar.Close
+Error: "undefined: closeSeries" at line 58
+TODO: Generator should recognize built-in 'close' and map to bar.Close, not create Series variable

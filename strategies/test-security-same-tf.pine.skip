@@ -1,0 +1,4 @@
+Codegen bug: security(syminfo.tickerid, "", close) generates undefined closeSeries reference
+Error: "undefined: closeSeries" at line 104
+Related to: test.pine (same built-in variable mapping bug in security() expressions)
+TODO: Generator should map 'close' in security expressions to secCtx bar data, not create Series variable

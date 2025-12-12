@@ -1,0 +1,13 @@
+//@version=5
+strategy("Test Position Avg Price", overlay=true)
+
+// Simple entry logic
+sma20 = ta.sma(close, 20)
+
+// Use strategy.position_avg_price (declare at top level)
+posAvg = strategy.position_avg_price
+
+if close > sma20
+    strategy.entry("Long", strategy.long, 1.0)
+
+plot(posAvg, color=color.red, title="Avg Price")
