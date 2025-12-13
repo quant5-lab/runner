@@ -2291,10 +2291,13 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	return code, nil
 }
 
-// generatePivot generates inline pivot high/low detection
-// TODO: Implement pivot inline generation
+// generatePivot delegates to runtime pivot evaluation within security() context
+// Pivots require bidirectional window scan incompatible with ForwardSeriesBuffer
+// Solution: security() evaluates pivots using batch array processing
 func (g *generator) generatePivot(varName string, call *ast.CallExpression, isHigh bool) (string, error) {
-	return "", fmt.Errorf("ta.pivot inline generation not yet implemented")
+	// When pivot appears in security() call, runtime handles it via PivotEvaluator
+	// When used standalone (non-security context), must be implemented separately
+	return "", fmt.Errorf("ta.pivot outside security() context not yet supported - use security() wrapper for pivot functions")
 }
 
 // collectNestedVariables recursively scans CallExpression arguments for nested function calls
