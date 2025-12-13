@@ -659,13 +659,11 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 }
 
 func (g *generator) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (string, error) {
-	// Generate the operand
 	operandCode, err := g.generateConditionExpression(unaryExpr.Argument)
 	if err != nil {
 		return "", err
 	}
 
-	// Map Pine unary operators to Go operators
 	op := unaryExpr.Operator
 	switch op {
 	case "not":
@@ -676,19 +674,16 @@ func (g *generator) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (str
 }
 
 func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (string, error) {
-	// Generate left expression
 	leftCode, err := g.generateConditionExpression(logExpr.Left)
 	if err != nil {
 		return "", err
 	}
 
-	// Generate right expression
 	rightCode, err := g.generateConditionExpression(logExpr.Right)
 	if err != nil {
 		return "", err
 	}
 
-	// Map Pine logical operators to Go operators
 	op := logExpr.Operator
 	switch op {
 	case "and":
@@ -840,6 +835,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		if err != nil {
 			return "", err
 		}
+
+		/* Ensure Series values converted to bool before unary operator */
+		operandCode = g.ensureBooleanOperand(e.Argument, operandCode)
+
 		op := e.Operator
 		switch op {
 		case "not":

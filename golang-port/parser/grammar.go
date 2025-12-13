@@ -23,7 +23,7 @@ type Statement struct {
 }
 
 type IfStatement struct {
-	Condition *Comparison  `parser:"'if' ( '(' @@ ')' | @@ )"`
+	Condition *OrExpr      `parser:"'if' ( '(' @@ ')' | @@ )"`
 	Body      []*Statement `parser:"@@+"`
 }
 

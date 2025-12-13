@@ -31,7 +31,7 @@ func (t *SimpleRenameTransformer) visitStatement(stmt *parser.Statement) {
 	}
 
 	if stmt.If != nil {
-		t.visitComparison(stmt.If.Condition)
+		t.visitOrExpr(stmt.If.Condition)
 		for _, bodyStmt := range stmt.If.Body {
 			t.visitStatement(bodyStmt)
 		}

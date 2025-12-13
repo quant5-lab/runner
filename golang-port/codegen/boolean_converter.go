@@ -53,6 +53,8 @@ func (bc *BooleanConverter) IsAlreadyBoolean(expr ast.Expression) bool {
 		return bc.IsComparisonOperator(e.Operator)
 	case *ast.LogicalExpression:
 		return true
+	case *ast.UnaryExpression:
+		return e.Operator == "not" || e.Operator == "!"
 	case *ast.CallExpression:
 		return bc.IsBooleanFunction(e)
 	default:
@@ -73,6 +75,11 @@ func (bc *BooleanConverter) IsBooleanFunction(call *ast.CallExpression) bool {
 			}
 		}
 	}
+
+	if ident, ok := call.Callee.(*ast.Identifier); ok {
+		return ident.Name == "na"
+	}
+
 	return false
 }
 

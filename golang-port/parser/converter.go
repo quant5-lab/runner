@@ -107,7 +107,7 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 	}
 
 	if stmt.If != nil {
-		test, err := c.convertComparison(stmt.If.Condition)
+		test, err := c.convertOrExpr(stmt.If.Condition)
 		if err != nil {
 			return nil, err
 		}
