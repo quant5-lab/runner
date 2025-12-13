@@ -166,7 +166,7 @@
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
 - [ ] `bb7-dissect-potential.pine` - Blocked: Codegen error "ta.pivot outside security() context not yet supported"
 - [ ] `bb7-dissect-adx.pine` - Blocked: User-defined functions with `=>` syntax not supported
-- [ ] `bb7-dissect-sl.pine` - Blocked: Boolean comparison errors, undefined notSeries
+- [ ] `bb7-dissect-sl.pine` - Blocked: plot() output broken (compiles, executes, but indicators: {})
 - [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions, undefined notSeries/strategySeries
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
