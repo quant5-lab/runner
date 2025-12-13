@@ -62,13 +62,14 @@ func TestSumWithConditionalExpression(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			typeSystem := NewTypeInferenceEngine()
 			gen := &generator{
-				variables:     make(map[string]string),
-				varInits:      make(map[string]ast.Expression),
-				constants:     make(map[string]interface{}),
-				taRegistry:    NewTAFunctionRegistry(),
-				mathHandler:   NewMathHandler(),
-				typeSystem:    typeSystem,
-				boolConverter: NewBooleanConverter(typeSystem),
+				variables:         make(map[string]string),
+				varInits:          make(map[string]ast.Expression),
+				constants:         make(map[string]interface{}),
+				taRegistry:        NewTAFunctionRegistry(),
+				mathHandler:       NewMathHandler(),
+				typeSystem:        typeSystem,
+				boolConverter:     NewBooleanConverter(typeSystem),
+				runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
 			}
 			gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 			gen.tempVarMgr = NewTempVariableManager(gen)
@@ -130,11 +131,12 @@ func TestSumWithConditionalExpression(t *testing.T) {
 // TestSumWithoutConditionalExpression validates standard sum() behavior unchanged
 func TestSumWithoutConditionalExpression(t *testing.T) {
 	gen := &generator{
-		variables:   make(map[string]string),
-		varInits:    make(map[string]ast.Expression),
-		constants:   make(map[string]interface{}),
-		taRegistry:  NewTAFunctionRegistry(),
-		mathHandler: NewMathHandler(),
+		variables:         make(map[string]string),
+		varInits:          make(map[string]ast.Expression),
+		constants:         make(map[string]interface{}),
+		taRegistry:        NewTAFunctionRegistry(),
+		mathHandler:       NewMathHandler(),
+		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
 	}
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)

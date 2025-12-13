@@ -10,12 +10,14 @@ type BarEvaluator interface {
 }
 
 type StreamingBarEvaluator struct {
-	taStateCache map[string]TAStateManager
+	taStateCache     map[string]TAStateManager
+	fixnanStateCache map[string]*FixnanState
 }
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
-		taStateCache: make(map[string]TAStateManager),
+		taStateCache:     make(map[string]TAStateManager),
+		fixnanStateCache: make(map[string]*FixnanState),
 	}
 }
 
@@ -35,7 +37,7 @@ func (e *StreamingBarEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *conte
 		}
 		return 0.0, newUnsupportedExpressionError(exp)
 	case *ast.MemberExpression:
-		return 0.0, newUnsupportedExpressionError(exp)
+		return e.evaluateMemberExpressionAtBar(exp, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedExpressionError(exp)
 	}
@@ -76,6 +78,12 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateRMAAtBar(call, secCtx, barIdx)
 	case "ta.rsi":
 		return e.evaluateRSIAtBar(call, secCtx, barIdx)
+	case "ta.pivothigh":
+		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
+	case "ta.pivotlow":
+		return e.evaluatePivotLowAtBar(call, secCtx, barIdx)
+	case "fixnan":
+		return e.evaluateFixnanAtBar(call, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedFunctionError(funcName)
 	}
@@ -163,4 +171,48 @@ func (e *StreamingBarEvaluator) evaluateConditionalExpressionAtBar(expr *ast.Con
 		return e.EvaluateAtBar(expr.Consequent, secCtx, barIdx)
 	}
 	return e.EvaluateAtBar(expr.Alternate, secCtx, barIdx)
+}
+
+func (e *StreamingBarEvaluator) evaluatePivotHighAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, leftBars, rightBars, err := extractPivotArguments(call)
+	if err != nil {
+		return 0.0, err
+	}
+
+	detector := NewPivotDetector(leftBars, rightBars)
+	return detector.DetectHighAtBar(secCtx.Data, sourceID.Name, barIdx), nil
+}
+
+func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, leftBars, rightBars, err := extractPivotArguments(call)
+	if err != nil {
+		return 0.0, err
+	}
+
+	detector := NewPivotDetector(leftBars, rightBars)
+	return detector.DetectLowAtBar(secCtx.Data, sourceID.Name, barIdx), nil
+}
+
+func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	callExpr, ok := expr.Object.(*ast.CallExpression)
+	if !ok {
+		return 0.0, newUnsupportedExpressionError(expr)
+	}
+
+	propertyLit, ok := expr.Property.(*ast.Literal)
+	if !ok {
+		return 0.0, newUnsupportedExpressionError(expr)
+	}
+
+	offset, ok := propertyLit.Value.(float64)
+	if !ok {
+		return 0.0, newUnsupportedExpressionError(expr)
+	}
+
+	targetIdx := barIdx - int(offset)
+	if targetIdx < 0 || targetIdx >= len(secCtx.Data) {
+		return 0.0, newBarIndexOutOfRangeError(targetIdx, len(secCtx.Data))
+	}
+
+	return e.evaluateTACallAtBar(callExpr, secCtx, targetIdx)
 }

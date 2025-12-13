@@ -297,11 +297,12 @@ func TestTempVarCalculationOrdering(t *testing.T) {
 /* createTestGenerator initializes generator for testing */
 func createTestGenerator() *generator {
 	gen := &generator{
-		variables:   make(map[string]string),
-		varInits:    make(map[string]ast.Expression),
-		constants:   make(map[string]interface{}),
-		taRegistry:  NewTAFunctionRegistry(),
-		mathHandler: NewMathHandler(),
+		variables:         make(map[string]string),
+		varInits:          make(map[string]ast.Expression),
+		constants:         make(map[string]interface{}),
+		taRegistry:        NewTAFunctionRegistry(),
+		mathHandler:       NewMathHandler(),
+		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
 	}
 	gen.typeSystem = NewTypeInferenceEngine()
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

@@ -48,6 +48,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.plotExprHandler = NewPlotExpressionHandler(gen)
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
 	gen.inlineRegistry = NewInlineFunctionRegistry()
+	gen.runtimeOnlyFilter = NewRuntimeOnlyFunctionFilter()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -97,6 +98,7 @@ type generator struct {
 	plotExprHandler   *PlotExpressionHandler
 	barFieldRegistry  *BarFieldSeriesRegistry
 	inlineRegistry    *InlineFunctionRegistry
+	runtimeOnlyFilter *RuntimeOnlyFunctionFilter
 }
 
 type taFunctionCall struct {
@@ -1061,6 +1063,10 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			callInfo := nestedCalls[i]
 
 			if callInfo.Call == initExpr {
+				continue
+			}
+
+			if g.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {
 				continue
 			}
 
@@ -2319,13 +2325,15 @@ func (g *generator) collectNestedVariables(parentVarName string, call *ast.CallE
 func (g *generator) scanForNestedCalls(parentVarName string, expr ast.Expression) {
 	switch e := expr.(type) {
 	case *ast.MemberExpression:
-		// Check if object is a CallExpression: pivothigh()[1]
 		if nestedCall, ok := e.Object.(*ast.CallExpression); ok {
 			nestedFuncName := g.extractFunctionName(nestedCall.Callee)
-			// Use funcName-based naming to match extractSeriesExpression
+
+			if g.runtimeOnlyFilter.IsRuntimeOnly(nestedFuncName) {
+				return
+			}
+
 			tempVarName := strings.ReplaceAll(nestedFuncName, ".", "_")
 
-			// Register nested variable for Series initialization
 			if _, exists := g.variables[tempVarName]; !exists {
 				g.variables[tempVarName] = "float"
 			}
@@ -2385,17 +2393,7 @@ func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
 
 /* preAnalyzeSecurityCalls scans AST for ALL expressions with nested TA calls,
  * registers temp vars BEFORE declaration phase to prevent "undefined: ta_sma_XXX" errors.
- *
- * CRITICAL: Must run AFTER first pass (collects constants) but BEFORE code generation.
- *
- * Bug Fix #1: security(syminfo.tickerid, 'D', sma(close, 20)) generates inline TA code
- * that references ta_sma_20_XXXSeries, but if temp var not pre-registered, declaration
- * phase misses it → compile error.
- *
- * Bug Fix #2: sma(close, 50) > sma(close, 200) in BinaryExpression also needs temp vars
- * for both sma() calls to avoid "undefined: ta_sma_XXX" errors.
- *
- * FILTER: Only create temp vars for TA functions (ta.sma, ta.ema, etc.), not math functions.
+ * Skips pivot/fixnan (runtime-only evaluation) and inline-only functions.
  */
 func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 	for _, stmt := range program.Body {
@@ -2404,20 +2402,18 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 				if declarator.Init != nil {
 					// Scan ALL expressions for nested TA calls (not just security())
 					nestedCalls := g.exprAnalyzer.FindNestedCalls(declarator.Init)
-					// Register temp vars in REVERSE order (innermost first)
 					for i := len(nestedCalls) - 1; i >= 0; i-- {
 						callInfo := nestedCalls[i]
 
-						// Skip inline-only functions (generate inline code, not Series)
 						if g.inlineRegistry != nil && g.inlineRegistry.IsInlineOnly(callInfo.FuncName) {
 							continue
 						}
 
-						// Create temp vars for:
-						// 1. TA functions (ta.sma, ta.ema, etc.)
-						isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
+						if g.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {
+							continue
+						}
 
-						// 2. Math functions that contain TA calls (e.g., max(change(x), 0))
+						isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
 						containsNestedTA := false
 						if !isTAFunction {
 							mathNestedCalls := g.exprAnalyzer.FindNestedCalls(callInfo.Call)
@@ -2454,6 +2450,16 @@ func (g *generator) serializeExpressionForRuntime(expr ast.Expression) (string, 
 			return fmt.Sprintf("&ast.Literal{Value: %t}", val), nil
 		}
 		return "", fmt.Errorf("unsupported literal type: %T", exp.Value)
+	case *ast.MemberExpression:
+		objectCode, err := g.serializeExpressionForRuntime(exp.Object)
+		if err != nil {
+			return "", err
+		}
+		propertyCode, err := g.serializeExpressionForRuntime(exp.Property)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("&ast.MemberExpression{Object: %s, Property: %s}", objectCode, propertyCode), nil
 	case *ast.CallExpression:
 		funcName := g.extractFunctionName(exp.Callee)
 		parts := strings.Split(funcName, ".")
