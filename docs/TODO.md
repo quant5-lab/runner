@@ -162,12 +162,12 @@
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - Session filtering (100µs for 500 bars, 2 indicators)
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison (1.3ms for 500 bars, 8 indicators, 268 bullish signals)
-- [x] `bb7-dissect-bb.pine` - Input constant isolation (301µs for 500 bars, 5 indicators, 455 BB values)
-- [ ] `bb7-dissect-vol.pine` - Blocked: ATR(2) produces all zeros, derived indicators have zero triggers
+- [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
+- [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
 - [ ] `bb7-dissect-potential.pine` - Blocked: security() with complex TA chains (sma, pivothigh, pivotlow, fixnan)
 - [ ] `bb7-dissect-adx.pine` - Blocked: security() with TA functions
-- [ ] `bb7-dissect-sl.pine` - Blocked: Boolean comparison errors, undefined notSeries/bblenghtSeries/bbstdevSeries
-- [ ] `bb7-dissect-tp.pine` - Blocked: Inline TA temp vars not generated for complex files (infrastructure exists but incomplete)
+- [ ] `bb7-dissect-sl.pine` - Blocked: Boolean comparison errors, undefined notSeries
+- [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions, undefined notSeries/strategySeries
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
 ## Phase 5: Strategy Validation
@@ -203,7 +203,7 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 417 tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, validation: 28/41, integration, runtime, datafetcher: 5, security: 256) - 100% pass rate for core features
+- **Test Suite**: 567+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 256, valuewhen: 6) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
