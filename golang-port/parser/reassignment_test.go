@@ -39,8 +39,8 @@ x := 10.0`
 	if varDecl1.Kind != "let" {
 		t.Errorf("First statement Kind = %s, want 'let'", varDecl1.Kind)
 	}
-	if varDecl1.Declarations[0].ID.Name != "x" {
-		t.Errorf("First statement variable name = %s, want 'x'", varDecl1.Declarations[0].ID.Name)
+	if id, ok := varDecl1.Declarations[0].ID.(*ast.Identifier); !ok || id.Name != "x" {
+		t.Errorf("First statement variable name not 'x'")
 	}
 
 	// Second statement: reassignment (:=)
@@ -51,8 +51,8 @@ x := 10.0`
 	if varDecl2.Kind != "var" {
 		t.Errorf("Second statement Kind = %s, want 'var'", varDecl2.Kind)
 	}
-	if varDecl2.Declarations[0].ID.Name != "x" {
-		t.Errorf("Second statement variable name = %s, want 'x'", varDecl2.Declarations[0].ID.Name)
+	if id, ok := varDecl2.Declarations[0].ID.(*ast.Identifier); !ok || id.Name != "x" {
+		t.Errorf("Second statement variable name not 'x'")
 	}
 }
 
@@ -90,8 +90,8 @@ sr_xup := sr_sup ? low : sr_xup[1]`
 	if varDecl.Kind != "var" {
 		t.Errorf("Reassignment Kind = %s, want 'var'", varDecl.Kind)
 	}
-	if varDecl.Declarations[0].ID.Name != "sr_xup" {
-		t.Errorf("Variable name = %s, want 'sr_xup'", varDecl.Declarations[0].ID.Name)
+	if id, ok := varDecl.Declarations[0].ID.(*ast.Identifier); !ok || id.Name != "sr_xup" {
+		t.Errorf("Variable name not 'sr_xup'")
 	}
 
 	// Verify the init is a ConditionalExpression

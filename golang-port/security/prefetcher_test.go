@@ -22,7 +22,7 @@ func TestPrefetcher_WithMockFetcher(t *testing.T) {
 				Declarations: []ast.VariableDeclarator{
 					{
 						NodeType: ast.TypeVariableDeclarator,
-						ID: ast.Identifier{
+						ID: &ast.Identifier{
 							NodeType: ast.TypeIdentifier,
 							Name:     "dailyClose",
 						},
@@ -150,7 +150,7 @@ func createSecurityDeclaration(varName, symbol, timeframe string, expr ast.Expre
 		Declarations: []ast.VariableDeclarator{
 			{
 				NodeType: ast.TypeVariableDeclarator,
-				ID: ast.Identifier{
+				ID: &ast.Identifier{
 					NodeType: ast.TypeIdentifier,
 					Name:     varName,
 				},

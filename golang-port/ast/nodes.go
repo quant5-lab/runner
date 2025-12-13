@@ -18,6 +18,7 @@ const (
 	TypeConditionalExpression NodeType = "ConditionalExpression"
 	TypeLogicalExpression     NodeType = "LogicalExpression"
 	TypeUnaryExpression       NodeType = "UnaryExpression"
+	TypeArrayPattern          NodeType = "ArrayPattern"
 )
 
 type Node interface {
@@ -62,11 +63,26 @@ func (v *VariableDeclaration) Type() NodeType { return TypeVariableDeclaration }
 
 type VariableDeclarator struct {
 	NodeType NodeType   `json:"type"`
-	ID       Identifier `json:"id"`
+	ID       Pattern    `json:"id"`
 	Init     Expression `json:"init,omitempty"`
 }
 
 func (v *VariableDeclarator) Type() NodeType { return TypeVariableDeclarator }
+
+type Pattern interface {
+	Node
+	patternNode()
+}
+
+type ArrayPattern struct {
+	NodeType NodeType     `json:"type"`
+	Elements []Identifier `json:"elements"`
+}
+
+func (a *ArrayPattern) Type() NodeType { return TypeArrayPattern }
+func (a *ArrayPattern) patternNode()   {}
+
+func (i *Identifier) patternNode() {}
 
 type MemberExpression struct {
 	NodeType NodeType   `json:"type"`

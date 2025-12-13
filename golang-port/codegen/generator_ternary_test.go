@@ -31,7 +31,7 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "signal"},
+						ID: &ast.Identifier{Name: "signal"},
 						Init: &ast.ConditionalExpression{
 							Test: &ast.BinaryExpression{
 								Operator: ">",
@@ -87,7 +87,7 @@ func TestTernaryWithArithmetic(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "volume_signal"},
+						ID: &ast.Identifier{Name: "volume_signal"},
 						Init: &ast.ConditionalExpression{
 							Test: &ast.BinaryExpression{
 								Operator: ">",
@@ -139,7 +139,7 @@ func TestTernaryWithLogicalOperators(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "signal"},
+						ID: &ast.Identifier{Name: "signal"},
 						Init: &ast.ConditionalExpression{
 							Test: &ast.LogicalExpression{
 								Operator: "and",

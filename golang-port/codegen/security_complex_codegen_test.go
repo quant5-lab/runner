@@ -136,7 +136,7 @@ func TestSecurityConditionalExpression(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "test_val"},
+						ID: &ast.Identifier{Name: "test_val"},
 						Init: &ast.CallExpression{
 							Callee: &ast.Identifier{Name: "security"},
 							Arguments: []ast.Expression{
@@ -197,7 +197,7 @@ func TestSecurityATRGeneration(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "atr_val"},
+						ID: &ast.Identifier{Name: "atr_val"},
 						Init: &ast.CallExpression{
 							Callee: &ast.Identifier{Name: "security"},
 							Arguments: []ast.Expression{
@@ -270,7 +270,7 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "stdev_val"},
+						ID: &ast.Identifier{Name: "stdev_val"},
 						Init: &ast.CallExpression{
 							Callee: &ast.Identifier{Name: "security"},
 							Arguments: []ast.Expression{

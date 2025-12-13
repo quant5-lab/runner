@@ -203,7 +203,7 @@ func TestBarFieldSeriesCodegen_Declarations(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "mySignal"},
+						ID: &ast.Identifier{Name: "mySignal"},
 						Init: &ast.BinaryExpression{
 							Operator: ">",
 							Left: &ast.MemberExpression{
@@ -248,7 +248,7 @@ func TestBarFieldSeriesCodegen_Initialization(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "signal"},
+						ID:   &ast.Identifier{Name: "signal"},
 						Init: &ast.Literal{Value: 1.0},
 					},
 				},
@@ -283,7 +283,7 @@ func TestBarFieldSeriesCodegen_Population(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "dummy"},
+						ID:   &ast.Identifier{Name: "dummy"},
 						Init: &ast.Literal{Value: 1.0},
 					},
 				},
@@ -318,7 +318,7 @@ func TestBarFieldSeriesCodegen_CursorAdvancement(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "value"},
+						ID:   &ast.Identifier{Name: "value"},
 						Init: &ast.Literal{Value: 1.0},
 					},
 				},
@@ -353,7 +353,7 @@ func TestBarFieldSeriesCodegen_OrderingLifecycle(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "test"},
+						ID:   &ast.Identifier{Name: "test"},
 						Init: &ast.Literal{Value: 1.0},
 					},
 				},
@@ -474,7 +474,7 @@ func TestBarFieldSeriesCodegen_WithSingleVariable(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "x"},
+						ID:   &ast.Identifier{Name: "x"},
 						Init: &ast.Literal{Value: 42.0},
 					},
 				},
@@ -504,7 +504,7 @@ func TestBarFieldSeriesCodegen_AllFieldsPresent(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "useClose"},
+						ID: &ast.Identifier{Name: "useClose"},
 						Init: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "bar"},
 							Property: &ast.Identifier{Name: "Close"},
@@ -628,7 +628,7 @@ func TestBarFieldSeries_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "signal"},
+								ID: &ast.Identifier{Name: "signal"},
 								Init: &ast.BinaryExpression{
 									Operator: "&&",
 									Left: &ast.BinaryExpression{
@@ -672,7 +672,7 @@ func TestBarFieldSeries_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "range"},
+								ID: &ast.Identifier{Name: "range"},
 								Init: &ast.BinaryExpression{
 									Operator: "-",
 									Left: &ast.MemberExpression{
@@ -705,7 +705,7 @@ func TestBarFieldSeries_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID:   ast.Identifier{Name: "myVar"},
+								ID:   &ast.Identifier{Name: "myVar"},
 								Init: &ast.Literal{Value: 1.0},
 							},
 						},
@@ -713,7 +713,7 @@ func TestBarFieldSeries_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "comparison"},
+								ID: &ast.Identifier{Name: "comparison"},
 								Init: &ast.BinaryExpression{
 									Operator: ">",
 									Left: &ast.MemberExpression{
@@ -772,7 +772,7 @@ func TestBarFieldSeries_Integration(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "sma20"},
+								ID: &ast.Identifier{Name: "sma20"},
 								Init: &ast.CallExpression{
 									Callee: &ast.MemberExpression{
 										Object:   &ast.Identifier{Name: "ta"},
@@ -807,7 +807,7 @@ func TestBarFieldSeries_Integration(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "signal"},
+								ID: &ast.Identifier{Name: "signal"},
 								Init: &ast.BinaryExpression{
 									Operator: "&&",
 									Left: &ast.BinaryExpression{

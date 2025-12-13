@@ -385,7 +385,7 @@ func TestInputConstants_NotConfusedWithBuiltins(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "myInput"},
+						ID: &ast.Identifier{Name: "myInput"},
 						Init: &ast.CallExpression{
 							Callee: &ast.MemberExpression{
 								Object:   &ast.Identifier{Name: "input"},
@@ -401,7 +401,7 @@ func TestInputConstants_NotConfusedWithBuiltins(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "x"},
+						ID: &ast.Identifier{Name: "x"},
 						Init: &ast.BinaryExpression{
 							Operator: "+",
 							Left:     &ast.Identifier{Name: "myInput"},

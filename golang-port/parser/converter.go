@@ -34,6 +34,36 @@ func (c *Converter) ToESTree(script *Script) (*ast.Program, error) {
 }
 
 func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
+	if stmt.TupleAssignment != nil {
+		init, err := c.convertExpression(stmt.TupleAssignment.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		elements := make([]ast.Identifier, len(stmt.TupleAssignment.Names))
+		for i, name := range stmt.TupleAssignment.Names {
+			elements[i] = ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     name,
+			}
+		}
+
+		return &ast.VariableDeclaration{
+			NodeType: ast.TypeVariableDeclaration,
+			Declarations: []ast.VariableDeclarator{
+				{
+					NodeType: ast.TypeVariableDeclarator,
+					ID: &ast.ArrayPattern{
+						NodeType: ast.TypeArrayPattern,
+						Elements: elements,
+					},
+					Init: init,
+				},
+			},
+			Kind: "let",
+		}, nil
+	}
+
 	if stmt.Assignment != nil {
 		init, err := c.convertExpression(stmt.Assignment.Value)
 		if err != nil {
@@ -44,7 +74,7 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 			Declarations: []ast.VariableDeclarator{
 				{
 					NodeType: ast.TypeVariableDeclarator,
-					ID: ast.Identifier{
+					ID: &ast.Identifier{
 						NodeType: ast.TypeIdentifier,
 						Name:     stmt.Assignment.Name,
 					},
@@ -65,7 +95,7 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 			Declarations: []ast.VariableDeclarator{
 				{
 					NodeType: ast.TypeVariableDeclarator,
-					ID: ast.Identifier{
+					ID: &ast.Identifier{
 						NodeType: ast.TypeIdentifier,
 						Name:     stmt.Reassignment.Name,
 					},

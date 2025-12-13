@@ -168,7 +168,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		// Collect variable declarations
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				varName := declarator.ID.Name
+				id, ok := declarator.ID.(*ast.Identifier)
+				if !ok {
+					continue
+				}
+				varName := id.Name
 
 				// Check if this is an input.* function call
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
@@ -289,11 +293,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 						funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
 						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" ||
 						funcName == "fixnan" {
-						g.taFunctions = append(g.taFunctions, taFunctionCall{
-							varName:  declarator.ID.Name,
-							funcName: funcName,
-							args:     callExpr.Arguments,
-						})
+						if id, ok := declarator.ID.(*ast.Identifier); ok {
+							g.taFunctions = append(g.taFunctions, taFunctionCall{
+								varName:  id.Name,
+								funcName: funcName,
+								args:     callExpr.Arguments,
+							})
+						}
 					}
 				}
 			}
@@ -997,7 +1003,16 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (string, error) {
 	code := ""
 	for _, declarator := range decl.Declarations {
-		varName := declarator.ID.Name
+		id, ok := declarator.ID.(*ast.Identifier)
+		if !ok {
+			initCode, err := g.generateExpression(declarator.Init)
+			if err != nil {
+				return "", err
+			}
+			code += fmt.Sprintf("\t%s %s = %s\n", decl.Kind, g.generatePattern(declarator.ID), initCode)
+			continue
+		}
+		varName := id.Name
 
 		// Check if this is an input.* function call
 		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
@@ -1727,6 +1742,22 @@ func (g *generator) extractStrategyName(args []ast.Expression) string {
 
 	return ""
 }
+
+func (g *generator) generatePattern(pattern ast.Pattern) string {
+	switch p := pattern.(type) {
+	case *ast.Identifier:
+		return p.Name
+	case *ast.ArrayPattern:
+		names := make([]string, len(p.Elements))
+		for i, elem := range p.Elements {
+			names[i] = elem.Name
+		}
+		return "[" + strings.Join(names, ", ") + "]"
+	default:
+		return "unknown"
+	}
+}
+
 func (g *generator) extractStringLiteral(expr ast.Expression) string {
 	if lit, ok := expr.(*ast.Literal); ok {
 		if val, ok := lit.Value.(string); ok {

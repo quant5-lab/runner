@@ -17,7 +17,7 @@ func securityVariableNode(varName string, expression ast.Expression) *ast.Variab
 	return &ast.VariableDeclaration{
 		Declarations: []ast.VariableDeclarator{
 			{
-				ID: ast.Identifier{Name: varName},
+				ID: &ast.Identifier{Name: varName},
 				Init: &ast.CallExpression{
 					Callee: &ast.Identifier{Name: "security"},
 					Arguments: []ast.Expression{

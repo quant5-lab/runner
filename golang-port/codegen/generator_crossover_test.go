@@ -304,7 +304,7 @@ func TestBooleanTypeTracking(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "longCross"},
+						ID: &ast.Identifier{Name: "longCross"},
 						Init: &ast.CallExpression{
 							Callee: &ast.MemberExpression{
 								Object:   &ast.Identifier{Name: "ta"},
@@ -321,7 +321,7 @@ func TestBooleanTypeTracking(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "sma50"},
+						ID: &ast.Identifier{Name: "sma50"},
 						Init: &ast.CallExpression{
 							Callee: &ast.MemberExpression{
 								Object:   &ast.Identifier{Name: "ta"},

@@ -36,7 +36,7 @@ func TestAnalyzeAST_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "x"},
+								ID: &ast.Identifier{Name: "x"},
 								Init: &ast.CallExpression{
 									Callee: &ast.MemberExpression{
 										Object:   &ast.Identifier{Name: "ta"},
@@ -61,7 +61,7 @@ func TestAnalyzeAST_EdgeCases(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "x"},
+								ID: &ast.Identifier{Name: "x"},
 								Init: &ast.BinaryExpression{
 									Operator: "+",
 									Left: &ast.CallExpression{

@@ -15,15 +15,21 @@ type VersionDirective struct {
 }
 
 type Statement struct {
-	Assignment   *Assignment     `parser:"@@"`
-	Reassignment *Reassignment   `parser:"| @@"`
-	If           *IfStatement    `parser:"| @@"`
-	Expression   *ExpressionStmt `parser:"| @@"`
+	TupleAssignment *TupleAssignment `parser:"@@"`
+	Assignment      *Assignment      `parser:"| @@"`
+	Reassignment    *Reassignment    `parser:"| @@"`
+	If              *IfStatement     `parser:"| @@"`
+	Expression      *ExpressionStmt  `parser:"| @@"`
 }
 
 type IfStatement struct {
 	Condition *Comparison  `parser:"'if' ( '(' @@ ')' | @@ )"`
 	Body      []*Statement `parser:"@@+"`
+}
+
+type TupleAssignment struct {
+	Names []string    `parser:"'[' @Ident ( ',' @Ident )* ']' '='"`
+	Value *Expression `parser:"@@"`
 }
 
 type Assignment struct {

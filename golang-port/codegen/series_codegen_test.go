@@ -14,7 +14,7 @@ func TestSeriesVariableDetection(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "sma20"},
+						ID: &ast.Identifier{Name: "sma20"},
 						Init: &ast.CallExpression{
 							Callee: &ast.MemberExpression{
 								Object:   &ast.Identifier{Name: "ta"},
@@ -35,7 +35,7 @@ func TestSeriesVariableDetection(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "prev_sma"},
+						ID: &ast.Identifier{Name: "prev_sma"},
 						Init: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "sma20"},
 							Property: &ast.Literal{Value: 1}, // Historical access [1]
@@ -85,7 +85,7 @@ func TestBuiltinSeriesHistoricalAccess(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "prev_close"},
+						ID: &ast.Identifier{Name: "prev_close"},
 						Init: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "close"},
 							Property: &ast.Literal{Value: 1},
@@ -120,7 +120,7 @@ func TestNoSeriesForSimpleVariable(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "simple_var"},
+						ID:   &ast.Identifier{Name: "simple_var"},
 						Init: &ast.Literal{Value: 100.0},
 					},
 				},
@@ -156,7 +156,7 @@ func TestSeriesInTernaryCondition(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "signal"},
+						ID: &ast.Identifier{Name: "signal"},
 						Init: &ast.ConditionalExpression{
 							Test: &ast.BinaryExpression{
 								Operator: ">",
@@ -201,7 +201,7 @@ func TestMultipleSeriesVariables(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "sma20"},
+						ID:   &ast.Identifier{Name: "sma20"},
 						Init: &ast.Literal{Value: 100.0},
 					},
 				},
@@ -209,7 +209,7 @@ func TestMultipleSeriesVariables(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID:   ast.Identifier{Name: "ema50"},
+						ID:   &ast.Identifier{Name: "ema50"},
 						Init: &ast.Literal{Value: 110.0},
 					},
 				},
@@ -217,7 +217,7 @@ func TestMultipleSeriesVariables(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "cross"},
+						ID: &ast.Identifier{Name: "cross"},
 						Init: &ast.BinaryExpression{
 							Operator: ">",
 							Left: &ast.MemberExpression{

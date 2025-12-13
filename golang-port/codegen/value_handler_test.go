@@ -339,7 +339,7 @@ func TestValueHandlerIntegrationWithGenerator(t *testing.T) {
 					&ast.VariableDeclaration{
 						Declarations: []ast.VariableDeclarator{
 							{
-								ID: ast.Identifier{Name: "test_var"},
+								ID: &ast.Identifier{Name: "test_var"},
 								Init: &ast.CallExpression{
 									Callee:    &ast.Identifier{Name: tt.funcName},
 									Arguments: tt.args,

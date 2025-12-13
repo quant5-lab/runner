@@ -20,7 +20,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "input.int inferred from plain input() with int literal",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "length"},
+					ID: &ast.Identifier{Name: "length"},
 					Init: &ast.CallExpression{
 						Callee:    &ast.Identifier{Name: "input"},
 						Arguments: []ast.Expression{&ast.Literal{Value: 20.0}},
@@ -35,7 +35,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "input.float inferred from plain input() with float literal",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "factor"},
+					ID: &ast.Identifier{Name: "factor"},
 					Init: &ast.CallExpression{
 						Callee:    &ast.Identifier{Name: "input"},
 						Arguments: []ast.Expression{&ast.Literal{Value: 1.5}},
@@ -50,14 +50,14 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "multiple input constants with different types",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "bblenght"},
+					ID: &ast.Identifier{Name: "bblenght"},
 					Init: &ast.CallExpression{
 						Callee:    &ast.Identifier{Name: "input"},
 						Arguments: []ast.Expression{&ast.Literal{Value: 46.0}},
 					},
 				},
 				{
-					ID: ast.Identifier{Name: "bbstdev"},
+					ID: &ast.Identifier{Name: "bbstdev"},
 					Init: &ast.CallExpression{
 						Callee:    &ast.Identifier{Name: "input"},
 						Arguments: []ast.Expression{&ast.Literal{Value: 0.35}},
@@ -72,7 +72,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "explicit input.float",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "mult"},
+					ID: &ast.Identifier{Name: "mult"},
 					Init: &ast.CallExpression{
 						Callee: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "input"},
@@ -90,7 +90,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "explicit input.int",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "period"},
+					ID: &ast.Identifier{Name: "period"},
 					Init: &ast.CallExpression{
 						Callee: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "input"},
@@ -108,7 +108,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 			name: "explicit input.bool",
 			declarations: []ast.VariableDeclarator{
 				{
-					ID: ast.Identifier{Name: "enabled"},
+					ID: &ast.Identifier{Name: "enabled"},
 					Init: &ast.CallExpression{
 						Callee: &ast.MemberExpression{
 							Object:   &ast.Identifier{Name: "input"},
@@ -194,7 +194,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "length"},
+							ID: &ast.Identifier{Name: "length"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -208,7 +208,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "result"},
+							ID: &ast.Identifier{Name: "result"},
 							Init: &ast.BinaryExpression{
 								Operator: "*",
 								Left: &ast.MemberExpression{
@@ -232,7 +232,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "factor"},
+							ID: &ast.Identifier{Name: "factor"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -246,7 +246,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "value1"},
+							ID: &ast.Identifier{Name: "value1"},
 							Init: &ast.BinaryExpression{
 								Operator: "*",
 								Left:     &ast.Identifier{Name: "factor"},
@@ -258,7 +258,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "value2"},
+							ID: &ast.Identifier{Name: "value2"},
 							Init: &ast.BinaryExpression{
 								Operator: "/",
 								Left:     &ast.Literal{Value: 50.0},
@@ -279,7 +279,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "useFilter"},
+							ID: &ast.Identifier{Name: "useFilter"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -293,7 +293,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "signal"},
+							ID: &ast.Identifier{Name: "signal"},
 							Init: &ast.ConditionalExpression{
 								Test:       &ast.Identifier{Name: "useFilter"},
 								Consequent: &ast.Literal{Value: 1.0},
@@ -366,7 +366,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "x"},
+							ID: &ast.Identifier{Name: "x"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -393,7 +393,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "a"},
+							ID: &ast.Identifier{Name: "a"},
 							Init: &ast.CallExpression{
 								Callee:    &ast.Identifier{Name: "input"},
 								Arguments: []ast.Expression{&ast.Literal{Value: 10.0}},
@@ -404,7 +404,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "b"},
+							ID: &ast.Identifier{Name: "b"},
 							Init: &ast.CallExpression{
 								Callee:    &ast.Identifier{Name: "input"},
 								Arguments: []ast.Expression{&ast.Literal{Value: 20.0}},
@@ -415,7 +415,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "c"},
+							ID: &ast.Identifier{Name: "c"},
 							Init: &ast.CallExpression{
 								Callee:    &ast.Identifier{Name: "input"},
 								Arguments: []ast.Expression{&ast.Literal{Value: 30.0}},
@@ -445,7 +445,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "unused_input"},
+							ID: &ast.Identifier{Name: "unused_input"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -459,7 +459,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID:   ast.Identifier{Name: "used_var"},
+							ID:   &ast.Identifier{Name: "used_var"},
 							Init: &ast.Literal{Value: 100.0},
 						},
 					},
@@ -480,7 +480,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				&ast.VariableDeclaration{
 					Declarations: []ast.VariableDeclarator{
 						{
-							ID: ast.Identifier{Name: "Close"},
+							ID: &ast.Identifier{Name: "Close"},
 							Init: &ast.CallExpression{
 								Callee: &ast.MemberExpression{
 									Object:   &ast.Identifier{Name: "input"},
@@ -533,7 +533,7 @@ func TestInputConstants_ConstantRegistryConsistency(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "period"},
+						ID: &ast.Identifier{Name: "period"},
 						Init: &ast.CallExpression{
 							Callee:    &ast.Identifier{Name: "input"},
 							Arguments: []ast.Expression{&ast.Literal{Value: 14.0}},
@@ -544,7 +544,7 @@ func TestInputConstants_ConstantRegistryConsistency(t *testing.T) {
 			&ast.VariableDeclaration{
 				Declarations: []ast.VariableDeclarator{
 					{
-						ID: ast.Identifier{Name: "sma_val"},
+						ID: &ast.Identifier{Name: "sma_val"},
 						Init: &ast.CallExpression{
 							Callee: &ast.MemberExpression{
 								Object:   &ast.Identifier{Name: "ta"},

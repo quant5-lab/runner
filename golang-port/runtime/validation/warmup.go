@@ -73,8 +73,10 @@ func (w *WarmupAnalyzer) CollectConstants(node ast.Node) {
 	case *ast.VariableDeclaration:
 		for _, decl := range n.Declarations {
 			if decl.Init != nil {
-				if val := w.EvaluateConstant(decl.Init); !math.IsNaN(val) {
-					w.constants[decl.ID.Name] = val
+				if id, ok := decl.ID.(*ast.Identifier); ok {
+					if val := w.EvaluateConstant(decl.Init); !math.IsNaN(val) {
+						w.constants[id.Name] = val
+					}
 				}
 			}
 		}
@@ -227,7 +229,11 @@ func (w *WarmupAnalyzer) scanNode(node ast.Node) {
 	case *ast.VariableDeclaration:
 		for _, decl := range n.Declarations {
 			if decl.Init != nil {
-				w.scanExpression(decl.Init, decl.ID.Name)
+				varName := "unknown"
+				if id, ok := decl.ID.(*ast.Identifier); ok {
+					varName = id.Name
+				}
+				w.scanExpression(decl.Init, varName)
 			}
 		}
 	case *ast.ExpressionStatement:

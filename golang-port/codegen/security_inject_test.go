@@ -39,7 +39,7 @@ func TestAnalyzeAndGeneratePrefetch_WithSecurityCall(t *testing.T) {
 				Declarations: []ast.VariableDeclarator{
 					{
 						NodeType: ast.TypeVariableDeclarator,
-						ID: ast.Identifier{
+						ID: &ast.Identifier{
 							NodeType: ast.TypeIdentifier,
 							Name:     "dailyClose",
 						},
@@ -180,7 +180,7 @@ func TestInjectSecurityCode_WithSecurityCall(t *testing.T) {
 				Declarations: []ast.VariableDeclarator{
 					{
 						NodeType: ast.TypeVariableDeclarator,
-						ID:       ast.Identifier{NodeType: ast.TypeIdentifier, Name: "dailyClose"},
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "dailyClose"},
 						Init: &ast.CallExpression{
 							NodeType: ast.TypeCallExpression,
 							Callee: &ast.MemberExpression{
