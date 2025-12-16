@@ -104,6 +104,16 @@ type generator struct {
 	inlineConditionRegistry *InlineConditionHandlerRegistry
 }
 
+func (g *generator) buildPlotOptions(opts PlotOptions) string {
+	if opts.OffsetExpr != nil {
+		offsetValue := g.constEvaluator.EvaluateConstant(opts.OffsetExpr)
+		if !math.IsNaN(offsetValue) && offsetValue != 0 {
+			return fmt.Sprintf("map[string]interface{}{\"offset\": %d}", int(offsetValue))
+		}
+	}
+	return "nil"
+}
+
 type taFunctionCall struct {
 	varName  string
 	funcName string
@@ -558,7 +568,8 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 		}
 
 		if plotExpr != "" {
-			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+			options := g.buildPlotOptions(opts)
+			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
 		}
 	case "ta.sma":
 		// SMA calculation - handled in variable declaration
@@ -1429,7 +1440,8 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 				if alternateIsNa {
 					code += g.ind() + fmt.Sprintf("if !(%s) {\n", testCode)
 					g.indent++
-					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+					options := g.buildPlotOptions(opts)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
 					g.indent--
 					code += g.ind() + "}\n"
 				} else {
@@ -1439,15 +1451,18 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 					g.indent--
 					code += g.ind() + "} else {\n"
 					g.indent++
-					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+					options := g.buildPlotOptions(opts)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
 					g.indent--
 					code += g.ind() + "}\n"
 				}
 			} else {
-				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+				options := g.buildPlotOptions(opts)
+				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
 			}
 		} else if plotExpr != "" {
-			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+			options := g.buildPlotOptions(opts)
+			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
 		}
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 		return code, nil

@@ -567,7 +567,7 @@ result = 1500 - 240
 				analyzer.collectConstants(node)
 			}
 
-			val, exists := analyzer.constants[tt.varName]
+			val, exists := analyzer.constantRegistry.Get(tt.varName)
 			if !exists {
 				t.Fatalf("Constant %q not found", tt.varName)
 			}

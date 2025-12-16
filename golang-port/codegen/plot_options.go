@@ -5,9 +5,10 @@ import (
 )
 
 type PlotOptions struct {
-	Variable  string
-	Title     string
-	ColorExpr ast.Expression
+	Variable   string
+	Title      string
+	ColorExpr  ast.Expression
+	OffsetExpr ast.Expression
 }
 
 func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
@@ -20,15 +21,31 @@ func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
 	opts.Variable = extractPlotVariable(call.Arguments[0])
 	opts.Title = opts.Variable
 
-	if len(call.Arguments) > 1 {
-		if obj, ok := call.Arguments[1].(*ast.ObjectExpression); ok {
-			parser := NewPropertyParser()
-			if title, ok := parser.ParseString(obj, "title"); ok {
-				opts.Title = title
+	// Find ObjectExpression in arguments (can be at any position after first)
+	var optionsObj *ast.ObjectExpression
+	for i := 1; i < len(call.Arguments); i++ {
+		if obj, ok := call.Arguments[i].(*ast.ObjectExpression); ok {
+			optionsObj = obj
+			break
+		} else if lit, ok := call.Arguments[i].(*ast.Literal); ok {
+			// String literal title
+			if strVal, ok := lit.Value.(string); ok {
+				opts.Title = strVal
 			}
-			if colorExpr, ok := parser.ParseExpression(obj, "color"); ok {
-				opts.ColorExpr = colorExpr
-			}
+		}
+	}
+
+	if optionsObj != nil {
+		parser := NewPropertyParser()
+		if title, ok := parser.ParseString(optionsObj, "title"); ok {
+			opts.Title = title
+		}
+		if colorExpr, ok := parser.ParseExpression(optionsObj, "color"); ok {
+			opts.ColorExpr = colorExpr
+		}
+		// Store expression for later evaluation (handles literals and compile-time constants)
+		if offsetExpr, ok := parser.ParseExpression(optionsObj, "offset"); ok {
+			opts.OffsetExpr = offsetExpr
 		}
 	}
 

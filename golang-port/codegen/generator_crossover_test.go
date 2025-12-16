@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
 func TestExtractSeriesExpression(t *testing.T) {
@@ -348,6 +349,7 @@ func TestBooleanTypeTracking(t *testing.T) {
 		boolConverter:     NewBooleanConverter(NewTypeInferenceEngine()),
 		constantRegistry:  NewConstantRegistry(),
 		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
+		constEvaluator:    validation.NewWarmupAnalyzer(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

@@ -28,10 +28,11 @@ type StyleConfig struct {
 
 /* IndicatorSeries represents a plot indicator with metadata */
 type IndicatorSeries struct {
-	Title string      `json:"title"`
-	Pane  string      `json:"pane,omitempty"`
-	Style StyleConfig `json:"style"`
-	Data  []PlotPoint `json:"data"`
+	Title  string      `json:"title"`
+	Pane   string      `json:"pane,omitempty"`
+	Style  StyleConfig `json:"style"`
+	Offset int         `json:"offset,omitempty"`
+	Data   []PlotPoint `json:"data"`
 }
 
 /* PaneConfig contains pane layout configuration */
@@ -154,11 +155,19 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 
 	for i, s := range series {
 		plotPoints := make([]PlotPoint, len(s.Data))
+		offset := 0
+
 		for j, p := range s.Data {
 			plotPoints[j] = PlotPoint{
 				Time:    p.Time,
 				Value:   p.Value,
 				Options: p.Options,
+			}
+
+			if offset == 0 && p.Options != nil {
+				if offsetVal, ok := p.Options["offset"].(int); ok {
+					offset = offsetVal
+				}
 			}
 		}
 
@@ -167,8 +176,9 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 		lineWidth := 2
 
 		cd.Indicators[s.Title] = IndicatorSeries{
-			Title: s.Title,
-			Pane:  "", /* Presentation layer assigns pane based on range analysis */
+			Title:  s.Title,
+			Pane:   "", /* Presentation layer assigns pane based on range analysis */
+			Offset: offset,
 			Style: StyleConfig{
 				Color:     color,
 				LineWidth: lineWidth,

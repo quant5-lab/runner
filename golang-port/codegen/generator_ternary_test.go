@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
 func newTestGenerator() *generator {
@@ -18,6 +19,7 @@ func newTestGenerator() *generator {
 		boolConverter:    NewBooleanConverter(NewTypeInferenceEngine()),
 		constantRegistry: NewConstantRegistry(),
 		barFieldRegistry: NewBarFieldSeriesRegistry(),
+		constEvaluator:   validation.NewWarmupAnalyzer(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

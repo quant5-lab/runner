@@ -34,26 +34,29 @@ type WarmupRequirement struct {
 // these to enable constant propagation across multi-step calculations like
 // total = years * days.
 type WarmupAnalyzer struct {
-	requirements []WarmupRequirement
-	constants    map[string]float64
+	requirements        []WarmupRequirement
+	constantRegistry    *ConstantRegistry
+	expressionEvaluator *ExpressionEvaluator
 }
 
 // NewWarmupAnalyzer creates a new warmup analyzer
 func NewWarmupAnalyzer() *WarmupAnalyzer {
+	registry := NewConstantRegistry()
 	return &WarmupAnalyzer{
-		requirements: []WarmupRequirement{},
-		constants:    make(map[string]float64),
+		requirements:        []WarmupRequirement{},
+		constantRegistry:    registry,
+		expressionEvaluator: NewExpressionEvaluator(registry),
 	}
 }
 
 // AddConstant adds a constant value for use in expression evaluation
 func (w *WarmupAnalyzer) AddConstant(name string, value float64) {
-	w.constants[name] = value
+	w.constantRegistry.Set(name, value)
 }
 
 func (w *WarmupAnalyzer) AnalyzeScript(program *ast.Program) []WarmupRequirement {
 	w.requirements = []WarmupRequirement{}
-	w.constants = make(map[string]float64)
+	w.constantRegistry.Clear()
 
 	for _, node := range program.Body {
 		w.collectConstants(node)
@@ -75,7 +78,7 @@ func (w *WarmupAnalyzer) CollectConstants(node ast.Node) {
 			if decl.Init != nil {
 				if id, ok := decl.ID.(*ast.Identifier); ok {
 					if val := w.EvaluateConstant(decl.Init); !math.IsNaN(val) {
-						w.constants[id.Name] = val
+						w.constantRegistry.Set(id.Name, val)
 					}
 				}
 			}
@@ -91,137 +94,7 @@ func (w *WarmupAnalyzer) collectConstants(node ast.Node) {
 // EvaluateConstant attempts to evaluate an expression to a constant value
 // Public method for use by codegen package
 func (w *WarmupAnalyzer) EvaluateConstant(expr ast.Expression) float64 {
-	return w.evaluateConstant(expr)
-}
-
-// evaluateConstant is internal implementation
-func (w *WarmupAnalyzer) evaluateConstant(expr ast.Expression) float64 {
-	switch e := expr.(type) {
-	case *ast.Literal:
-		if v, ok := e.Value.(float64); ok {
-			return v
-		}
-		if v, ok := e.Value.(int); ok {
-			return float64(v)
-		}
-	case *ast.Identifier:
-		if val, exists := w.constants[e.Name]; exists {
-			return val
-		}
-	case *ast.MemberExpression:
-		if isParserWrappedVariable(e) {
-			return w.lookupConstant(e)
-		}
-		return math.NaN()
-	case *ast.BinaryExpression:
-		left := w.evaluateConstant(e.Left)
-		right := w.evaluateConstant(e.Right)
-		if math.IsNaN(left) || math.IsNaN(right) {
-			return math.NaN()
-		}
-		switch e.Operator {
-		case "+":
-			return left + right
-		case "-":
-			return left - right
-		case "*":
-			return left * right
-		case "/":
-			if right != 0 {
-				return left / right
-			}
-		}
-	case *ast.CallExpression:
-		return w.evaluateMathCall(e)
-	case *ast.ConditionalExpression:
-		return math.NaN()
-	}
-	return math.NaN()
-}
-
-func isParserWrappedVariable(e *ast.MemberExpression) bool {
-	if !e.Computed {
-		return false
-	}
-	lit, ok := e.Property.(*ast.Literal)
-	if !ok {
-		return false
-	}
-	idx, ok := lit.Value.(int)
-	return ok && idx == 0
-}
-
-func (w *WarmupAnalyzer) lookupConstant(e *ast.MemberExpression) float64 {
-	ident, ok := e.Object.(*ast.Identifier)
-	if !ok {
-		return math.NaN()
-	}
-	if val, exists := w.constants[ident.Name]; exists {
-		return val
-	}
-	return math.NaN()
-}
-
-// evaluateMathCall handles math.pow(), round(), sqrt(), etc.
-func (w *WarmupAnalyzer) evaluateMathCall(e *ast.CallExpression) float64 {
-	// Extract function name
-	funcName := ""
-	if member, ok := e.Callee.(*ast.MemberExpression); ok {
-		if obj, ok := member.Object.(*ast.Identifier); ok && obj.Name == "math" {
-			if prop, ok := member.Property.(*ast.Identifier); ok {
-				funcName = prop.Name
-			}
-		}
-	} else if ident, ok := e.Callee.(*ast.Identifier); ok {
-		// Pine functions without math. prefix
-		funcName = ident.Name
-	}
-
-	// Evaluate based on function
-	switch funcName {
-	case "pow", "math.pow":
-		if len(e.Arguments) == 2 {
-			base := w.evaluateConstant(e.Arguments[0])
-			exp := w.evaluateConstant(e.Arguments[1])
-			if !math.IsNaN(base) && !math.IsNaN(exp) {
-				return math.Pow(base, exp)
-			}
-		}
-	case "round", "math.round":
-		if len(e.Arguments) >= 1 {
-			val := w.evaluateConstant(e.Arguments[0])
-			if !math.IsNaN(val) {
-				return math.Round(val)
-			}
-		}
-	case "sqrt", "math.sqrt":
-		if len(e.Arguments) == 1 {
-			val := w.evaluateConstant(e.Arguments[0])
-			if !math.IsNaN(val) {
-				return math.Sqrt(val)
-			}
-		}
-	case "floor", "math.floor":
-		if len(e.Arguments) == 1 {
-			val := w.evaluateConstant(e.Arguments[0])
-			if !math.IsNaN(val) {
-				return math.Floor(val)
-			}
-		}
-	case "ceil", "math.ceil":
-		if len(e.Arguments) == 1 {
-			val := w.evaluateConstant(e.Arguments[0])
-			if !math.IsNaN(val) {
-				return math.Ceil(val)
-			}
-		}
-	}
-	return math.NaN()
-}
-
-func (w *WarmupAnalyzer) evaluateMathPow(e *ast.CallExpression) float64 {
-	// Legacy method - delegate to evaluateMathCall
-	return w.evaluateMathCall(e)
+	return w.expressionEvaluator.Evaluate(expr)
 }
 
 func (w *WarmupAnalyzer) scanNode(node ast.Node) {
@@ -284,7 +157,7 @@ func (w *WarmupAnalyzer) analyzeSubscript(member *ast.MemberExpression, context 
 		indexExpr = nestedMember.Object
 	}
 
-	lookback := w.evaluateConstant(indexExpr)
+	lookback := w.EvaluateConstant(indexExpr)
 
 	if !math.IsNaN(lookback) && lookback > 0 {
 		w.requirements = append(w.requirements, WarmupRequirement{
