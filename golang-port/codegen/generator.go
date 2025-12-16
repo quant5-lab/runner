@@ -114,6 +114,51 @@ func (g *generator) buildPlotOptions(opts PlotOptions) string {
 	return "nil"
 }
 
+func (g *generator) buildPlotOptionsWithNullColor(opts PlotOptions) string {
+	optionsMap := make([]string, 0)
+	optionsMap = append(optionsMap, "\"color\": nil")
+
+	if opts.OffsetExpr != nil {
+		offsetValue := g.constEvaluator.EvaluateConstant(opts.OffsetExpr)
+		if !math.IsNaN(offsetValue) && offsetValue != 0 {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"offset\": %d", int(offsetValue)))
+		}
+	}
+
+	if len(optionsMap) > 0 {
+		return fmt.Sprintf("map[string]interface{}{%s}", strings.Join(optionsMap, ", "))
+	}
+	return "map[string]interface{}{\"color\": nil}"
+}
+
+func (g *generator) buildPlotOptionsWithColor(opts PlotOptions, color string) string {
+	optionsMap := make([]string, 0)
+	if color != "" {
+		optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %q", color))
+	}
+
+	if opts.OffsetExpr != nil {
+		offsetValue := g.constEvaluator.EvaluateConstant(opts.OffsetExpr)
+		if !math.IsNaN(offsetValue) && offsetValue != 0 {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"offset\": %d", int(offsetValue)))
+		}
+	}
+
+	if len(optionsMap) > 0 {
+		return fmt.Sprintf("map[string]interface{}{%s}", strings.Join(optionsMap, ", "))
+	}
+	return "nil"
+}
+
+func (g *generator) extractColorLiteral(expr ast.Expression) string {
+	if lit, ok := expr.(*ast.Literal); ok {
+		if colorStr, ok := lit.Value.(string); ok {
+			return colorStr
+		}
+	}
+	return ""
+}
+
 type taFunctionCall struct {
 	varName  string
 	funcName string
@@ -1440,19 +1485,29 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 				if alternateIsNa {
 					code += g.ind() + fmt.Sprintf("if !(%s) {\n", testCode)
 					g.indent++
-					options := g.buildPlotOptions(opts)
-					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
+					colorValue := g.extractColorLiteral(condExpr.Consequent)
+					optionsWithColor := g.buildPlotOptionsWithColor(opts, colorValue)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, optionsWithColor)
+					g.indent--
+					code += g.ind() + "} else {\n"
+					g.indent++
+					code += g.ind() + "/* Add plot point with null color to mark gap */\n"
+					gapOptions := g.buildPlotOptionsWithNullColor(opts)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, gapOptions)
 					g.indent--
 					code += g.ind() + "}\n"
 				} else {
 					code += g.ind() + fmt.Sprintf("if %s {\n", testCode)
 					g.indent++
-					code += g.ind() + "/* Color evaluates to na - skip plot */\n"
+					code += g.ind() + "/* Consequent is na - add plot point with null color to mark gap */\n"
+					gapOptions := g.buildPlotOptionsWithNullColor(opts)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, gapOptions)
 					g.indent--
 					code += g.ind() + "} else {\n"
 					g.indent++
-					options := g.buildPlotOptions(opts)
-					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
+					colorValue := g.extractColorLiteral(condExpr.Alternate)
+					optionsWithColor := g.buildPlotOptionsWithColor(opts, colorValue)
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, optionsWithColor)
 					g.indent--
 					code += g.ind() + "}\n"
 				}

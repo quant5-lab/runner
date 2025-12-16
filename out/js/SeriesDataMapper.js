@@ -1,9 +1,26 @@
-/* Map indicator data to chart series format with color */
 export class SeriesDataMapper {
   applyColorToData(data, color) {
-    return data.map((point) => ({
+    return data.map((point) => this.applyColorToPoint(point, color));
+  }
+
+  applyColorToPoint(point, defaultColor) {
+    const existingColor = point.options?.color;
+    const resolvedColor = this.resolvePointColor(existingColor, defaultColor);
+    
+    return {
       ...point,
-      options: { ...point.options, color },
-    }));
+      options: { ...point.options, color: resolvedColor },
+    };
+  }
+
+  resolvePointColor(pointColor, seriesColor) {
+    if (this.isExplicitGap(pointColor)) {
+      return null;
+    }
+    return pointColor || seriesColor;
+  }
+
+  isExplicitGap(color) {
+    return color === null;
   }
 }

@@ -48,7 +48,29 @@ describe('SeriesDataMapper', () => {
 
       const result = mapper.applyColorToData(data, '#00FF00');
 
-      expect(result[0].options).toEqual({ color: '#00FF00', style: 'line', width: 2 });
+      expect(result[0].options).toEqual({ color: '#FF0000', style: 'line', width: 2 });
+    });
+
+    test('should preserve existing non-null color', () => {
+      const data = [{ time: 1000, value: 100, options: { color: '#FF0000', style: 'line', width: 2 } }];
+
+      const result = mapper.applyColorToData(data, '#00FF00');
+
+      expect(result[0].options.color).toBe('#FF0000');
+    });
+
+    test('should preserve null color as gap marker', () => {
+      const data = [
+        { time: 1000, value: 100, options: { color: '#FF0000' } },
+        { time: 2000, value: 100, options: { color: null } },
+        { time: 3000, value: 100, options: { color: '#FF0000' } },
+      ];
+
+      const result = mapper.applyColorToData(data, '#00FF00');
+
+      expect(result[0].options.color).toBe('#FF0000');
+      expect(result[1].options.color).toBeNull();
+      expect(result[2].options.color).toBe('#FF0000');
     });
 
     test('should create options object when not present', () => {
@@ -74,6 +96,14 @@ describe('SeriesDataMapper', () => {
       const result = mapper.applyColorToData(data, null);
 
       expect(result[0].options.color).toBeNull();
+    });
+
+    test('should apply series color when point has no color', () => {
+      const data = [{ time: 1000, value: 100, options: {} }];
+
+      const result = mapper.applyColorToData(data, '#FF0000');
+
+      expect(result[0].options.color).toBe('#FF0000');
     });
 
     test('should handle undefined color', () => {
