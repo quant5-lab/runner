@@ -7,11 +7,7 @@ type RuntimeOnlyFunctionFilter struct {
 func NewRuntimeOnlyFunctionFilter() *RuntimeOnlyFunctionFilter {
 	return &RuntimeOnlyFunctionFilter{
 		runtimeOnlyFunctions: map[string]bool{
-			"ta.pivothigh": true,
-			"pivothigh":    true,
-			"ta.pivotlow":  true,
-			"pivotlow":     true,
-			"fixnan":       true,
+			"fixnan": true,
 		},
 	}
 }

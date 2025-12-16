@@ -11,10 +11,6 @@ func TestRuntimeOnlyFunctionFilter_KnownFunctions(t *testing.T) {
 		funcName string
 		expected bool
 	}{
-		{"namespaced pivothigh", "ta.pivothigh", true},
-		{"namespaced pivotlow", "ta.pivotlow", true},
-		{"non-namespaced pivothigh", "pivothigh", true},
-		{"non-namespaced pivotlow", "pivotlow", true},
 		{"fixnan function", "fixnan", true},
 	}
 
@@ -41,6 +37,10 @@ func TestRuntimeOnlyFunctionFilter_RegularFunctions(t *testing.T) {
 		{"ta.rsi", "ta.rsi", false},
 		{"ta.macd", "ta.macd", false},
 		{"ta.bb", "ta.bb", false},
+		{"ta.pivothigh", "ta.pivothigh", false},
+		{"ta.pivotlow", "ta.pivotlow", false},
+		{"pivothigh", "pivothigh", false},
+		{"pivotlow", "pivotlow", false},
 		{"sma non-namespaced", "sma", false},
 		{"ema non-namespaced", "ema", false},
 		{"plot function", "plot", false},
@@ -107,8 +107,9 @@ func TestRuntimeOnlyFunctionFilter_CaseSensitivity(t *testing.T) {
 		{"mixed case FixNan", "FixNan", false},
 		{"uppercase namespace TA.pivothigh", "TA.pivothigh", false},
 		{"mixed namespace Ta.pivothigh", "Ta.pivothigh", false},
-		{"correct lowercase pivothigh", "pivothigh", true},
-		{"correct lowercase ta.pivothigh", "ta.pivothigh", true},
+		{"correct lowercase pivothigh (codegen now)", "pivothigh", false},
+		{"correct lowercase ta.pivothigh (codegen now)", "ta.pivothigh", false},
+		{"correct lowercase fixnan", "fixnan", true},
 	}
 
 	for _, tt := range tests {
@@ -220,7 +221,7 @@ func TestRuntimeOnlyFunctionFilter_Constructor(t *testing.T) {
 		t.Fatal("runtimeOnlyFunctions map is nil")
 	}
 
-	expectedCount := 5
+	expectedCount := 1 // Only fixnan is runtime-only now (pivots have codegen)
 	actualCount := len(filter.runtimeOnlyFunctions)
 	if actualCount != expectedCount {
 		t.Errorf("Expected %d runtime-only functions, got %d", expectedCount, actualCount)

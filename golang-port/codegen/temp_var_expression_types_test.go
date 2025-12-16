@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
 /* TestTempVarInBinaryExpression validates temp var calculation emission
@@ -303,6 +304,9 @@ func createTestGenerator() *generator {
 		taRegistry:        NewTAFunctionRegistry(),
 		mathHandler:       NewMathHandler(),
 		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
+		barFieldRegistry:  NewBarFieldSeriesRegistry(),
+		constEvaluator:    validation.NewWarmupAnalyzer(),
+		indent:            1,
 	}
 	gen.typeSystem = NewTypeInferenceEngine()
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

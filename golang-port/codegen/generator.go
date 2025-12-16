@@ -3,6 +3,7 @@ package codegen
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 
@@ -2041,6 +2042,54 @@ func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar str
 	return seriesCode
 }
 
+/* convertSeriesAccessToIntOffset converts series access code to use specific integer offset */
+func (g *generator) convertSeriesAccessToIntOffset(seriesCode string, offset int) string {
+	offsetStr := fmt.Sprintf("%d", offset)
+
+	if strings.HasPrefix(seriesCode, "bar.") {
+		field := strings.TrimPrefix(seriesCode, "bar.")
+		if seriesName, exists := g.barFieldRegistry.GetSeriesName("bar." + field); exists {
+			return fmt.Sprintf("%s.Get(%d)", seriesName, offset)
+		}
+		return fmt.Sprintf("ctx.Data[i-%d].%s", offset, field)
+	}
+
+	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
+		seriesName := strings.TrimSuffix(seriesCode, "Series.GetCurrent()")
+		return fmt.Sprintf("%sSeries.Get(%d)", seriesName, offset)
+	}
+
+	if strings.Contains(seriesCode, "Series.Get(") {
+		re := regexp.MustCompile(`(\w+Series)\.Get\([^)]*\)`)
+		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetStr))
+		return result
+	}
+
+	return seriesCode
+}
+
+/* extractIntArgument extracts integer argument from AST expression */
+func (g *generator) extractIntArgument(expr ast.Expression, argName string) (int, error) {
+	if lit, ok := expr.(*ast.Literal); ok {
+		switch v := lit.Value.(type) {
+		case float64:
+			return int(v), nil
+		case int:
+			return v, nil
+		default:
+			return 0, fmt.Errorf("%s must be integer, got %T", argName, v)
+		}
+	}
+
+	/* Try constant evaluation */
+	value := g.constEvaluator.EvaluateConstant(expr)
+	if math.IsNaN(value) {
+		return 0, fmt.Errorf("%s must be compile-time constant, got %T", argName, expr)
+	}
+
+	return int(value), nil
+}
+
 func (g *generator) generateLiteral(lit *ast.Literal) (string, error) {
 	switch v := lit.Value.(type) {
 	case float64:
@@ -2327,13 +2376,90 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	return code, nil
 }
 
-// generatePivot delegates to runtime pivot evaluation within security() context
-// Pivots require bidirectional window scan incompatible with ForwardSeriesBuffer
-// Solution: security() evaluates pivots using batch array processing
+/* generatePivot generates inline delayed pivot detection code.
+ * Uses backward-only window scan: at bar i, calculates for bar (i - rightBars).
+ * All data access through SeriesBuffer.Get(offset) where offset >= 0 (historical).
+ */
 func (g *generator) generatePivot(varName string, call *ast.CallExpression, isHigh bool) (string, error) {
-	// When pivot appears in security() call, runtime handles it via PivotEvaluator
-	// When used standalone (non-security context), must be implemented separately
-	return "", fmt.Errorf("ta.pivot outside security() context not yet supported - use security() wrapper for pivot functions")
+	if len(call.Arguments) < 3 {
+		return "", fmt.Errorf("pivot requires 3 arguments (source, leftBars, rightBars)")
+	}
+
+	/* Extract arguments */
+	sourceExpr := call.Arguments[0]
+	leftBars, err := g.extractIntArgument(call.Arguments[1], "leftBars")
+	if err != nil {
+		return "", err
+	}
+	rightBars, err := g.extractIntArgument(call.Arguments[2], "rightBars")
+	if err != nil {
+		return "", err
+	}
+
+	if leftBars < 1 || rightBars < 1 {
+		return "", fmt.Errorf("pivot leftBars and rightBars must be >= 1, got left=%d right=%d", leftBars, rightBars)
+	}
+
+	totalWidth := leftBars + rightBars + 1
+	sourceAccess := g.extractSeriesExpression(sourceExpr)
+	comparisonOp := ">"
+	if !isHigh {
+		comparisonOp = "<"
+	}
+
+	var code string
+	code += g.ind() + fmt.Sprintf("if i >= %d {\n", totalWidth-1)
+	g.indent++
+
+	code += g.ind() + fmt.Sprintf("centerValue := %s\n", g.convertSeriesAccessToIntOffset(sourceAccess, rightBars))
+	code += g.ind() + "if !math.IsNaN(centerValue) {\n"
+	g.indent++
+	code += g.ind() + "isPivot := true\n\n"
+
+	for j := 0; j < leftBars; j++ {
+		offset := totalWidth - 1 - j
+		code += g.ind() + fmt.Sprintf("if leftVal := %s; !math.IsNaN(leftVal) && leftVal %s= centerValue {\n", g.convertSeriesAccessToIntOffset(sourceAccess, offset), comparisonOp)
+		g.indent++
+		code += g.ind() + "isPivot = false\n"
+		g.indent--
+		code += g.ind() + "}\n"
+	}
+
+	code += g.ind() + "\n"
+	for j := 1; j <= rightBars; j++ {
+		offset := rightBars - j
+		code += g.ind() + fmt.Sprintf("if rightVal := %s; !math.IsNaN(rightVal) && rightVal %s= centerValue {\n", g.convertSeriesAccessToIntOffset(sourceAccess, offset), comparisonOp)
+		g.indent++
+		code += g.ind() + "isPivot = false\n"
+		g.indent--
+		code += g.ind() + "}\n"
+	}
+
+	code += g.ind() + "\nif isPivot {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(centerValue)\n", varName)
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+
+	return code, nil
 }
 
 // collectNestedVariables recursively scans CallExpression arguments for nested function calls

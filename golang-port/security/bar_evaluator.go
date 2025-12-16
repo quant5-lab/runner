@@ -179,8 +179,8 @@ func (e *StreamingBarEvaluator) evaluatePivotHighAtBar(call *ast.CallExpression,
 		return 0.0, err
 	}
 
-	detector := NewPivotDetector(leftBars, rightBars)
-	return detector.DetectHighAtBar(secCtx.Data, sourceID.Name, barIdx), nil
+	evaluator := NewDelayedPivotHighEvaluator(leftBars, rightBars)
+	return evaluator.EvaluateAtBar(secCtx.Data, sourceID.Name, barIdx), nil
 }
 
 func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
@@ -189,8 +189,8 @@ func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, 
 		return 0.0, err
 	}
 
-	detector := NewPivotDetector(leftBars, rightBars)
-	return detector.DetectLowAtBar(secCtx.Data, sourceID.Name, barIdx), nil
+	evaluator := NewDelayedPivotLowEvaluator(leftBars, rightBars)
+	return evaluator.EvaluateAtBar(secCtx.Data, sourceID.Name, barIdx), nil
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {

@@ -326,7 +326,7 @@ func TestPivotEvaluator_IntegrationWithBarEvaluator(t *testing.T) {
 			},
 		}
 
-		result, err := evaluator.EvaluateAtBar(call, ctx, 2)
+		result, err := evaluator.EvaluateAtBar(call, ctx, 4)
 		if err != nil {
 			t.Fatalf("EvaluateAtBar failed: %v", err)
 		}
@@ -348,7 +348,7 @@ func TestPivotEvaluator_IntegrationWithBarEvaluator(t *testing.T) {
 			},
 		}
 
-		result, err := evaluator.EvaluateAtBar(call, ctx, 6)
+		result, err := evaluator.EvaluateAtBar(call, ctx, 8)
 		if err != nil {
 			t.Fatalf("EvaluateAtBar failed: %v", err)
 		}
@@ -421,12 +421,12 @@ func TestPivotDetector_MemberExpressionSupport(t *testing.T) {
 			Property: &ast.Literal{Value: float64(1)},
 		}
 
-		result, err := evaluator.EvaluateAtBar(memberExpr, ctx, 3)
+		result, err := evaluator.EvaluateAtBar(memberExpr, ctx, 5)
 		if err != nil {
 			t.Fatalf("EvaluateAtBar failed: %v", err)
 		}
 		if result != 110 {
-			t.Errorf("expected pivot[1] = 110 at bar 3, got %.2f", result)
+			t.Errorf("expected pivot[1] = 110 at bar 5, got %.2f", result)
 		}
 	})
 
@@ -446,12 +446,12 @@ func TestPivotDetector_MemberExpressionSupport(t *testing.T) {
 			Property: &ast.Literal{Value: float64(2)},
 		}
 
-		result, err := evaluator.EvaluateAtBar(memberExpr, ctx, 4)
+		result, err := evaluator.EvaluateAtBar(memberExpr, ctx, 6)
 		if err != nil {
 			t.Fatalf("EvaluateAtBar failed: %v", err)
 		}
 		if result != 110 {
-			t.Errorf("expected pivot[2] = 110 at bar 4, got %.2f", result)
+			t.Errorf("expected pivot[2] = 110 at bar 6, got %.2f", result)
 		}
 	})
 

@@ -104,7 +104,7 @@ func TestFixnanEvaluator_BasicForwardFill(t *testing.T) {
 	}
 
 	t.Run("first_valid_pivot", func(t *testing.T) {
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 2)
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 4)
 		if err != nil {
 			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
 		}
@@ -114,16 +114,6 @@ func TestFixnanEvaluator_BasicForwardFill(t *testing.T) {
 	})
 
 	t.Run("forward_fill_after_pivot", func(t *testing.T) {
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 3)
-		if err != nil {
-			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected forward-fill 110, got %.2f", result)
-		}
-	})
-
-	t.Run("forward_fill_continues", func(t *testing.T) {
 		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 5)
 		if err != nil {
 			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
@@ -133,8 +123,18 @@ func TestFixnanEvaluator_BasicForwardFill(t *testing.T) {
 		}
 	})
 
+	t.Run("forward_fill_continues", func(t *testing.T) {
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 6)
+		if err != nil {
+			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
+		}
+		if result != 110 {
+			t.Errorf("expected forward-fill 110, got %.2f", result)
+		}
+	})
+
 	t.Run("new_pivot_replaces", func(t *testing.T) {
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 7)
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 9)
 		if err != nil {
 			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
 		}
@@ -176,17 +176,17 @@ func TestFixnanEvaluator_WithMemberExpression(t *testing.T) {
 	}
 
 	t.Run("fixnan_with_subscript", func(t *testing.T) {
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 3)
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 5)
 		if err != nil {
 			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
 		}
 		if result != 110 {
-			t.Errorf("expected fixnan(pivot[1]) = 110 at bar 3, got %.2f", result)
+			t.Errorf("expected fixnan(pivot[1]) = 110 at bar 5, got %.2f", result)
 		}
 	})
 
 	t.Run("forward_fill_after_subscript", func(t *testing.T) {
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 4)
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 6)
 		if err != nil {
 			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
 		}
@@ -321,15 +321,15 @@ func TestFixnanEvaluator_EdgeCases(t *testing.T) {
 			Arguments: []ast.Expression{pivotCall},
 		}
 
-		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 2)
+		result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, 4)
 		if err != nil {
-			t.Fatalf("bar 2 failed: %v", err)
+			t.Fatalf("bar 4 failed: %v", err)
 		}
 		if result != 110 {
-			t.Errorf("bar 2: expected 110, got %.2f", result)
+			t.Errorf("bar 4: expected 110, got %.2f", result)
 		}
 
-		for i := 3; i <= 9; i++ {
+		for i := 5; i <= 9; i++ {
 			result, err := evaluator.evaluateFixnanAtBar(fixnanCall, ctx, i)
 			if err != nil {
 				t.Fatalf("bar %d failed: %v", i, err)
@@ -388,7 +388,7 @@ func TestFixnanEvaluator_MultipleSeriesIsolation(t *testing.T) {
 		Arguments: []ast.Expression{pivotLowCall},
 	}
 
-	highResult, err := evaluator.evaluateFixnanAtBar(fixnanHighCall, ctx, 2)
+	highResult, err := evaluator.evaluateFixnanAtBar(fixnanHighCall, ctx, 4)
 	if err != nil {
 		t.Fatalf("fixnan(pivothigh) failed: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestFixnanEvaluator_MultipleSeriesIsolation(t *testing.T) {
 		t.Errorf("expected pivothigh fixnan 110, got %.2f", highResult)
 	}
 
-	lowResult, err := evaluator.evaluateFixnanAtBar(fixnanLowCall, ctx, 2)
+	lowResult, err := evaluator.evaluateFixnanAtBar(fixnanLowCall, ctx, 4)
 	if err != nil {
 		t.Fatalf("fixnan(pivotlow) failed: %v", err)
 	}
@@ -404,8 +404,8 @@ func TestFixnanEvaluator_MultipleSeriesIsolation(t *testing.T) {
 		t.Errorf("expected pivotlow fixnan 80, got %.2f", lowResult)
 	}
 
-	highForward, _ := evaluator.evaluateFixnanAtBar(fixnanHighCall, ctx, 3)
-	lowForward, _ := evaluator.evaluateFixnanAtBar(fixnanLowCall, ctx, 3)
+	highForward, _ := evaluator.evaluateFixnanAtBar(fixnanHighCall, ctx, 5)
+	lowForward, _ := evaluator.evaluateFixnanAtBar(fixnanLowCall, ctx, 5)
 
 	if highForward != 110 {
 		t.Errorf("pivothigh forward-fill should be 110, got %.2f", highForward)
