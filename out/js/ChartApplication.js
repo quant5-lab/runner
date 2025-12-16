@@ -4,13 +4,18 @@ import { PaneManager } from './PaneManager.js';
 import { SeriesRouter } from './SeriesRouter.js';
 import { ChartManager } from './ChartManager.js';
 import { TradeDataFormatter, TradeTableRenderer } from './TradeTable.js';
+import { TimeIndexBuilder } from './TimeIndexBuilder.js';
+import { PlotOffsetTransformer } from './PlotOffsetTransformer.js';
+import { SeriesDataMapper } from './SeriesDataMapper.js';
 
-/* Main application orchestrator (SRP, DIP) */
 export class ChartApplication {
   constructor(chartOptions) {
     this.chartOptions = chartOptions;
     this.paneManager = null;
     this.seriesMap = {};
+    this.timeIndexBuilder = new TimeIndexBuilder();
+    this.plotOffsetTransformer = new PlotOffsetTransformer(this.timeIndexBuilder);
+    this.seriesDataMapper = new SeriesDataMapper();
   }
 
   async initialize() {
@@ -107,7 +112,6 @@ export class ChartApplication {
     this.seriesMap.candlestick.setData(candlestickData);
 
     Object.entries(indicatorsWithPanes).forEach(([key, indicator]) => {
-      // Extract style from config override
       const styleType = configOverride?.[key]?.style || 'line';
       const color = indicator.style?.color || configOverride?.[key]?.color || '#2196F3';
       
@@ -126,12 +130,16 @@ export class ChartApplication {
         return;
       }
 
-      const dataWithColor = indicator.data.map((point) => ({
-        ...point,
-        options: { color: color },
-      }));
+      const offset = indicator.offset || 0;
+      const offsetAdjustedData = this.plotOffsetTransformer.transform(
+        indicator.data,
+        offset,
+        candlestickData
+      );
 
+      const dataWithColor = this.seriesDataMapper.applyColorToData(offsetAdjustedData, color);
       const processedData = window.adaptLineSeriesData(dataWithColor);
+      
       if (processedData.length > 0) {
         series.setData(processedData);
       }
