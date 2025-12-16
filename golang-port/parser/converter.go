@@ -196,6 +196,13 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 			Raw:      fmt.Sprintf("'%s'", cleaned),
 		}, nil
 	}
+	if expr.HexColor != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *expr.HexColor,
+			Raw:      fmt.Sprintf("'%s'", *expr.HexColor),
+		}, nil
+	}
 	return nil, fmt.Errorf("empty expression")
 }
 
@@ -735,6 +742,14 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 			NodeType: ast.TypeLiteral,
 			Value:    cleaned,
 			Raw:      fmt.Sprintf("'%s'", cleaned),
+		}, nil
+	}
+
+	if factor.HexColor != nil {
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    *factor.HexColor,
+			Raw:      fmt.Sprintf("'%s'", *factor.HexColor),
 		}, nil
 	}
 

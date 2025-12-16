@@ -43,11 +43,6 @@ func main() {
 	// Normalize indented if blocks for parser (parser limitation workaround)
 	sourceStr = preprocessor.NormalizeIfBlocks(sourceStr)
 
-	// DEBUG: Show normalized source
-	if os.Getenv("DEBUG_NORMALIZE") == "1" {
-		fmt.Fprintf(os.Stderr, "=== NORMALIZED SOURCE ===\n%s\n=========================\n", sourceStr)
-	}
-
 	pineParser, err := parser.NewParser()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create parser: %v\n", err)
@@ -117,7 +112,15 @@ func main() {
 	}
 
 	temporaryDirectory := os.TempDir()
-	temporaryGoFile := filepath.Join(temporaryDirectory, "pine_strategy_temp.go")
+
+	/* Create unique temp file to avoid conflicts when running tests in parallel */
+	tempFile, err := os.CreateTemp(temporaryDirectory, "pine_strategy_*.go")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create temp file: %v\n", err)
+		os.Exit(1)
+	}
+	temporaryGoFile := tempFile.Name()
+	tempFile.Close()
 
 	err = codegen.InjectStrategy(*templateFlag, temporaryGoFile, strategyCode)
 	if err != nil {

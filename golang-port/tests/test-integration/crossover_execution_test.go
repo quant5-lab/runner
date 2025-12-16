@@ -67,7 +67,6 @@ func TestCrossoverExecution(t *testing.T) {
 	tempBinary := filepath.Join(tmpDir, "test-crossover-exec")
 	outputFile := filepath.Join(tmpDir, "crossover-exec-result.json")
 	testDataFile := filepath.Join(tmpDir, "crossover-test-data.json")
-	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
 
 	// Generate deterministic test data
 	if err := generateDeterministicCrossoverData(testDataFile); err != nil {
@@ -83,6 +82,8 @@ func TestCrossoverExecution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
+
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
 
 	compileCmd := exec.Command("go", "build",
 		"-o", tempBinary,

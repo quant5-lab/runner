@@ -42,7 +42,9 @@ plot(combined, "Combined", color=color.blue)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -58,8 +60,7 @@ plot(combined, "Combined", color=color.blue)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -102,7 +103,9 @@ plot(volatility, "Volatility %", color=color.red)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -124,8 +127,7 @@ plot(volatility, "Volatility %", color=color.red)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -297,18 +299,43 @@ sma20 = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 plot(sma20, "SMA20")`
 
 	tmpDir := t.TempDir()
-	success := buildAndCompilePineInDir(t, pineScript, tmpDir)
-	if !success {
-		t.Fatal("NaN handling test failed")
+	pineFile := filepath.Join(tmpDir, "test.pine")
+	outputBinary := filepath.Join(tmpDir, "test_binary")
+
+	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
+		t.Fatalf("Failed to write Pine file: %v", err)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	originalDir, _ := os.Getwd()
+	os.Chdir("../..")
+	defer os.Chdir(originalDir)
+
+	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
+		"-input", pineFile,
+		"-output", outputBinary)
+
+	buildOutput, err := buildCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
+	}
+
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
 
 	if !contains(string(generatedCode), "math.NaN()") {
 		t.Error("Expected NaN handling in generated code for insufficient warmup")
+	}
+
+	binaryPath := filepath.Join(tmpDir, "test_binary")
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
+
+	compileOutput, err := compileCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
 	}
 
 	t.Log("NaN handling compiled successfully")
@@ -339,9 +366,10 @@ func buildAndCompilePineInDir(t *testing.T, pineScript, tmpDir string) bool {
 		return false
 	}
 
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {

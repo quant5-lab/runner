@@ -21,6 +21,32 @@ func (mh *MathHandler) normalizeToGoMathFunc(pineFuncName string) string {
 	return "math." + strings.ToUpper(pineFuncName[:1]) + pineFuncName[1:]
 }
 
+/* CanHandle checks if this is an inline math function */
+func (mh *MathHandler) CanHandle(funcName string) bool {
+	funcName = strings.ToLower(funcName)
+	switch funcName {
+	case "math.pow",
+		"math.abs", "abs",
+		"math.sqrt", "sqrt",
+		"math.floor", "floor",
+		"math.ceil", "ceil",
+		"math.round", "round",
+		"math.log", "log",
+		"math.exp", "exp",
+		"math.max", "max",
+		"math.min", "min":
+		return true
+	default:
+		return false
+	}
+}
+
+/* GenerateInline implements InlineConditionHandler interface */
+func (mh *MathHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
+	funcName := g.extractFunctionName(expr.Callee)
+	return mh.GenerateMathCall(funcName, expr.Arguments, g)
+}
+
 func (mh *MathHandler) GenerateMathCall(funcName string, args []ast.Expression, g *generator) (string, error) {
 	funcName = strings.ToLower(funcName)
 

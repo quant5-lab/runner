@@ -213,10 +213,6 @@ func TestTAIndicatorFactory_Integration_SMA(t *testing.T) {
 
 	code := builder.Build()
 
-	// Debug: print generated code
-	t.Logf("Generated SMA code:\n%s", code)
-
-	// Verify complete SMA code structure
 	requiredElements := []string{
 		"ta.sma(50)",
 		"ctx.BarIndex < 50-1",

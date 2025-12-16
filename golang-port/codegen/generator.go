@@ -50,6 +50,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
 	gen.inlineRegistry = NewInlineFunctionRegistry()
 	gen.runtimeOnlyFilter = NewRuntimeOnlyFunctionFilter()
+	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -87,19 +88,20 @@ type generator struct {
 	typeSystem       *TypeInferenceEngine
 	boolConverter    *BooleanConverter
 
-	inputHandler      *InputHandler
-	mathHandler       *MathHandler
-	valueHandler      *ValueHandler
-	subscriptResolver *SubscriptResolver
-	builtinHandler    *BuiltinIdentifierHandler
-	taRegistry        *TAFunctionRegistry
-	exprAnalyzer      *ExpressionAnalyzer
-	tempVarMgr        *TempVariableManager
-	constEvaluator    *validation.WarmupAnalyzer
-	plotExprHandler   *PlotExpressionHandler
-	barFieldRegistry  *BarFieldSeriesRegistry
-	inlineRegistry    *InlineFunctionRegistry
-	runtimeOnlyFilter *RuntimeOnlyFunctionFilter
+	inputHandler            *InputHandler
+	mathHandler             *MathHandler
+	valueHandler            *ValueHandler
+	subscriptResolver       *SubscriptResolver
+	builtinHandler          *BuiltinIdentifierHandler
+	taRegistry              *TAFunctionRegistry
+	exprAnalyzer            *ExpressionAnalyzer
+	tempVarMgr              *TempVariableManager
+	constEvaluator          *validation.WarmupAnalyzer
+	plotExprHandler         *PlotExpressionHandler
+	barFieldRegistry        *BarFieldSeriesRegistry
+	inlineRegistry          *InlineFunctionRegistry
+	runtimeOnlyFilter       *RuntimeOnlyFunctionFilter
+	inlineConditionRegistry *InlineConditionHandlerRegistry
 }
 
 type taFunctionCall struct {
@@ -941,59 +943,17 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 	case *ast.CallExpression:
 		funcName := g.extractFunctionName(e.Callee)
 
+		/* Delegate to inline condition handler registry */
+		if g.inlineConditionRegistry.CanHandle(funcName) {
+			return g.inlineConditionRegistry.GenerateInline(funcName, e, g)
+		}
+
+		/* Fallback to value handler for backward compatibility */
 		if g.valueHandler.CanHandle(funcName) {
 			return g.valueHandler.GenerateInlineCall(funcName, e.Arguments, g)
 		}
 
-		switch funcName {
-		case "time":
-			handler := NewTimeHandler(g.ind())
-			return handler.HandleInlineExpression(e.Arguments), nil
-
-		case "math.min", "math.max", "math.pow", "math.abs", "math.sqrt",
-			"math.floor", "math.ceil", "math.round", "math.log", "math.exp":
-			mathHandler := NewMathHandler()
-			return mathHandler.GenerateMathCall(funcName, e.Arguments, g)
-
-		case "ta.dev", "dev":
-			if len(e.Arguments) < 2 {
-				return "", fmt.Errorf("dev requires 2 arguments (source, length)")
-			}
-			sourceExpr := g.extractSeriesExpression(e.Arguments[0])
-			lengthExpr := g.extractSeriesExpression(e.Arguments[1])
-			return fmt.Sprintf("(func() float64 { length := int(%s); if ctx.BarIndex < length-1 { return math.NaN() }; sum := 0.0; for j := 0; j < length; j++ { sum += %s }; mean := sum / float64(length); devSum := 0.0; for j := 0; j < length; j++ { devSum += math.Abs(%s - mean) }; return devSum / float64(length) }())", lengthExpr, sourceExpr, sourceExpr), nil
-
-		case "ta.crossover", "crossover", "ta.crossunder", "crossunder":
-			if len(e.Arguments) < 2 {
-				return "", fmt.Errorf("%s requires 2 arguments", funcName)
-			}
-
-			arg1Call, isCall1 := e.Arguments[0].(*ast.CallExpression)
-			arg2Call, isCall2 := e.Arguments[1].(*ast.CallExpression)
-
-			if !isCall1 || !isCall2 {
-				return "", fmt.Errorf("%s requires CallExpression arguments for inline generation", funcName)
-			}
-
-			inline1, err := g.plotExprHandler.Generate(arg1Call)
-			if err != nil {
-				return "", fmt.Errorf("%s arg1 inline generation failed: %w", funcName, err)
-			}
-			inline2, err := g.plotExprHandler.Generate(arg2Call)
-			if err != nil {
-				return "", fmt.Errorf("%s arg2 inline generation failed: %w", funcName, err)
-			}
-
-			if funcName == "ta.crossover" || funcName == "crossover" {
-				return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 > curr2 && prev1 <= prev2 }())",
-					inline1, inline2, inline1, inline2), nil
-			}
-			return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 < curr2 && prev1 >= prev2 }())",
-				inline1, inline2, inline1, inline2), nil
-
-		default:
-			return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
-		}
+		return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 
 	default:
 		return "", fmt.Errorf("unsupported condition expression: %T", expr)
@@ -1435,16 +1395,62 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 		return code, nil
 
-	default:
-		// Check if it's a math function
-		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
-			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
+	case "plot":
+		opts := ParsePlotOptions(call)
+
+		var plotExpr string
+		if len(call.Arguments) > 0 {
+			exprCode, err := g.generatePlotExpression(call.Arguments[0])
 			if err != nil {
 				return "", err
 			}
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathCode), nil
+			plotExpr = exprCode
 		}
-		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
+
+		code := ""
+		if plotExpr != "" && opts.ColorExpr != nil {
+			if condExpr, ok := opts.ColorExpr.(*ast.ConditionalExpression); ok {
+				testCode, err := g.generateConditionExpression(condExpr.Test)
+				if err != nil {
+					return "", err
+				}
+
+				if _, isCall := condExpr.Test.(*ast.CallExpression); isCall {
+					testCode = fmt.Sprintf("(%s) != 0", testCode)
+				} else {
+					testCode = g.addBoolConversionIfNeeded(condExpr.Test, testCode)
+				}
+
+				alternateIsNa := false
+				if ident, ok := condExpr.Alternate.(*ast.Identifier); ok && ident.Name == "na" {
+					alternateIsNa = true
+				}
+
+				if alternateIsNa {
+					code += g.ind() + fmt.Sprintf("if !(%s) {\n", testCode)
+					g.indent++
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+					g.indent--
+					code += g.ind() + "}\n"
+				} else {
+					code += g.ind() + fmt.Sprintf("if %s {\n", testCode)
+					g.indent++
+					code += g.ind() + "/* Color evaluates to na - skip plot */\n"
+					g.indent--
+					code += g.ind() + "} else {\n"
+					g.indent++
+					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+					g.indent--
+					code += g.ind() + "}\n"
+				}
+			} else {
+				code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+			}
+		} else if plotExpr != "" {
+			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, nil)\n", opts.Title, plotExpr)
+		}
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		return code, nil
 
 	case "time":
 		/* time(timeframe, session) - session filtering for intraday strategies
@@ -1454,6 +1460,16 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		 */
 		handler := NewTimeHandler(g.ind())
 		return handler.HandleVariableInit(varName, call), nil
+
+	default:
+		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
+			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathCode), nil
+		}
+		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
 	}
 }
 
@@ -2379,21 +2395,41 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 /* generatePivot generates inline delayed pivot detection code.
  * Uses backward-only window scan: at bar i, calculates for bar (i - rightBars).
  * All data access through SeriesBuffer.Get(offset) where offset >= 0 (historical).
+ * Supports 2-arg form: pivothigh(left, right) uses high, pivotlow(left, right) uses low.
  */
 func (g *generator) generatePivot(varName string, call *ast.CallExpression, isHigh bool) (string, error) {
-	if len(call.Arguments) < 3 {
-		return "", fmt.Errorf("pivot requires 3 arguments (source, leftBars, rightBars)")
-	}
+	var sourceExpr ast.Expression
+	var leftBars, rightBars int
+	var err error
 
-	/* Extract arguments */
-	sourceExpr := call.Arguments[0]
-	leftBars, err := g.extractIntArgument(call.Arguments[1], "leftBars")
-	if err != nil {
-		return "", err
-	}
-	rightBars, err := g.extractIntArgument(call.Arguments[2], "rightBars")
-	if err != nil {
-		return "", err
+	if len(call.Arguments) == 2 {
+		/* 2-arg form: pivothigh(leftBars, rightBars) - use default source */
+		if isHigh {
+			sourceExpr = &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "high"}
+		} else {
+			sourceExpr = &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "low"}
+		}
+		leftBars, err = g.extractIntArgument(call.Arguments[0], "leftBars")
+		if err != nil {
+			return "", err
+		}
+		rightBars, err = g.extractIntArgument(call.Arguments[1], "rightBars")
+		if err != nil {
+			return "", err
+		}
+	} else if len(call.Arguments) >= 3 {
+		/* 3-arg form: pivothigh(source, leftBars, rightBars) */
+		sourceExpr = call.Arguments[0]
+		leftBars, err = g.extractIntArgument(call.Arguments[1], "leftBars")
+		if err != nil {
+			return "", err
+		}
+		rightBars, err = g.extractIntArgument(call.Arguments[2], "rightBars")
+		if err != nil {
+			return "", err
+		}
+	} else {
+		return "", fmt.Errorf("pivot requires 2 or 3 arguments")
 	}
 
 	if leftBars < 1 || rightBars < 1 {

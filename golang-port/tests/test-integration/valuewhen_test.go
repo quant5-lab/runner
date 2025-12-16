@@ -41,7 +41,9 @@ plot(prevBullishClose, "Prev Bullish", color=color.blue)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -61,8 +63,7 @@ plot(prevBullishClose, "Prev Bullish", color=color.blue)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -104,7 +105,9 @@ plot(crossLevel, "Cross Level", color=color.orange)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -120,8 +123,7 @@ plot(crossLevel, "Cross Level", color=color.orange)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -166,7 +168,9 @@ plot(val2, "Occurrence 2", color=color.yellow)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -189,8 +193,7 @@ plot(val2, "Occurrence 2", color=color.yellow)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -234,9 +237,10 @@ plot(buyPrice, "Buy Price", color=color.green)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -280,7 +284,9 @@ plot(lastTriggerPrice, "Trigger Price", color=color.purple)
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -292,8 +298,7 @@ plot(lastTriggerPrice, "Trigger Price", color=color.purple)
 	}
 
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -364,9 +369,10 @@ plot(v1, "Chained")
 				t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 			}
 
+			tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
 			binaryPath := filepath.Join(tmpDir, "test_binary")
-			compileCmd := exec.Command("go", "build", "-o", binaryPath,
-				filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+			compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 			compileOutput, err := compileCmd.CombinedOutput()
 			if err != nil {

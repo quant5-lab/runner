@@ -84,6 +84,14 @@ func (p *PropertyParser) ParseIdentifier(obj *ast.ObjectExpression, key string) 
 	return result.Identifier, true
 }
 
+func (p *PropertyParser) ParseExpression(obj *ast.ObjectExpression, key string) (ast.Expression, bool) {
+	value := p.findProperty(obj, key)
+	if value == nil {
+		return nil, false
+	}
+	return value, true
+}
+
 func (p *PropertyParser) findProperty(obj *ast.ObjectExpression, key string) ast.Expression {
 	for _, prop := range obj.Properties {
 		keyID, ok := prop.Key.(*ast.Identifier)

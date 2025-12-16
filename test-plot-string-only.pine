@@ -1,0 +1,4 @@
+//@version=5
+indicator("Test", overlay=true)
+x = 10
+plot(x, "Test Title")

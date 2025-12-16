@@ -231,7 +231,9 @@ plot(ema10_1d, "EMA")
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
 
-	generatedCode, err := os.ReadFile(filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
+	generatedCode, err := os.ReadFile(tempGoFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated code: %v", err)
 	}
@@ -288,9 +290,10 @@ func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
 		return false
 	}
 
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
+
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath,
-		filepath.Join(os.TempDir(), "pine_strategy_temp.go"))
+	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
 
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {

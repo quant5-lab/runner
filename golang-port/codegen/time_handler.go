@@ -16,6 +16,16 @@ func NewTimeHandler(indentation string) *TimeHandler {
 	}
 }
 
+/* CanHandle checks if this is time() function */
+func (th *TimeHandler) CanHandle(funcName string) bool {
+	return funcName == "time"
+}
+
+/* GenerateInline implements InlineConditionHandler interface */
+func (th *TimeHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
+	return th.HandleInlineExpression(expr.Arguments), nil
+}
+
 func (h *TimeHandler) HandleVariableInit(varName string, call *ast.CallExpression) string {
 	argCount := len(call.Arguments)
 

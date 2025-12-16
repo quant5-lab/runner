@@ -61,36 +61,26 @@ func TestPivotCodegen_ArgumentValidation(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "too few arguments - missing source",
+			name: "valid 2-arg form",
 			arguments: []ast.Expression{
 				&ast.Literal{Value: float64(2)},
 				&ast.Literal{Value: float64(2)},
 			},
-			expectErr: true,
-			errMsg:    "requires 3 arguments",
+			expectErr: false,
 		},
 		{
-			name: "too few arguments - missing leftBars",
+			name: "too few arguments - only one arg",
 			arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
 				&ast.Literal{Value: float64(2)},
 			},
 			expectErr: true,
-			errMsg:    "requires 3 arguments",
-		},
-		{
-			name: "too few arguments - only source",
-			arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
-			},
-			expectErr: true,
-			errMsg:    "requires 3 arguments",
+			errMsg:    "requires 2 or 3 arguments",
 		},
 		{
 			name:      "no arguments",
 			arguments: []ast.Expression{},
 			expectErr: true,
-			errMsg:    "requires 3 arguments",
+			errMsg:    "requires 2 or 3 arguments",
 		},
 		{
 			name: "leftBars zero",

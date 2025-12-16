@@ -22,6 +22,12 @@ func (vh *ValueHandler) CanHandle(funcName string) bool {
 	}
 }
 
+/* GenerateInline implements InlineConditionHandler interface */
+func (vh *ValueHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
+	funcName := g.extractFunctionName(expr.Callee)
+	return vh.GenerateInlineCall(funcName, expr.Arguments, g)
+}
+
 func (vh *ValueHandler) GenerateInlineCall(funcName string, args []ast.Expression, g *generator) (string, error) {
 	switch funcName {
 	case "na":

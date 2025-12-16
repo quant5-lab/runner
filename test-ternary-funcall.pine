@@ -1,0 +1,4 @@
+//@version = 4
+study("Test", overlay=true)
+x = 1
+plot(x, color = x > 0 ? #FF0000 : #00FF00)

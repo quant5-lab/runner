@@ -159,23 +159,12 @@ result = max(a, b)
 		t.Fatalf("Parse failed: %v", err)
 	}
 
-	// Debug: Print original structure
 	if len(script.Statements) < 2 {
 		t.Fatal("Expected at least 2 statements")
 	}
 	assignment := script.Statements[1].Assignment
 	if assignment == nil {
 		t.Fatal("Expected assignment statement")
-	}
-	t.Logf("Before transform - Value type: %T", assignment.Value)
-	if assignment.Value.Ternary != nil {
-		t.Logf("  Ternary.Condition type: %T", assignment.Value.Ternary.Condition)
-		if assignment.Value.Ternary.Condition.Left != nil {
-			t.Logf("    Left type: %T", assignment.Value.Ternary.Condition.Left)
-			if assignment.Value.Ternary.Condition.Left.Left != nil {
-				t.Logf("      CompExpr.Left type: %T", assignment.Value.Ternary.Condition.Left.Left)
-			}
-		}
 	}
 
 	transformer := NewMathNamespaceTransformer()

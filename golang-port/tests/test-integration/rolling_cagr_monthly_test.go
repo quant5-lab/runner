@@ -53,8 +53,7 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 
 	t.Log(string(genOutput))
 
-	// pine-gen always generates to $TMPDIR/pine_strategy_temp.go
-	tempSource := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
+	tempSource := ParseGeneratedFilePath(t, genOutput)
 
 	// Compile generated code
 	absDataFile, _ := filepath.Abs(dataFile)

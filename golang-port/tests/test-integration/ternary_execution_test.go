@@ -16,7 +16,6 @@ func TestTernaryExecution(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	tempBinary := filepath.Join(tmpDir, "test-ternary-exec")
-	tempGoFile := filepath.Join(os.TempDir(), "pine_strategy_temp.go")
 
 	// Build strategy binary
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
@@ -27,6 +26,8 @@ func TestTernaryExecution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
 	}
+
+	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
 
 	compileCmd := exec.Command("go", "build",
 		"-o", tempBinary,

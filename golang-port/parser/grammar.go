@@ -53,6 +53,7 @@ type Expression struct {
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+	HexColor     *string       `parser:"| @HexColor"`
 }
 
 type TernaryExpr struct {
@@ -99,6 +100,7 @@ type Factor struct {
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+	HexColor     *string       `parser:"| @HexColor"`
 }
 
 type PostfixExpr struct {
@@ -166,12 +168,14 @@ type Value struct {
 	Ident        *string       `parser:"| @Ident"`
 	Number       *float64      `parser:"| ( @Float | @Int )"`
 	String       *string       `parser:"| @String"`
+	HexColor     *string       `parser:"| @HexColor"`
 }
 
 var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
 	{Name: "Whitespace", Pattern: `[ \t\r\n]+`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
+	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},

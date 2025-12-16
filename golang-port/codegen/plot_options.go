@@ -5,8 +5,9 @@ import (
 )
 
 type PlotOptions struct {
-	Variable string
-	Title    string
+	Variable  string
+	Title     string
+	ColorExpr ast.Expression
 }
 
 func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
@@ -24,6 +25,9 @@ func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
 			parser := NewPropertyParser()
 			if title, ok := parser.ParseString(obj, "title"); ok {
 				opts.Title = title
+			}
+			if colorExpr, ok := parser.ParseExpression(obj, "color"); ok {
+				opts.ColorExpr = colorExpr
 			}
 		}
 	}
