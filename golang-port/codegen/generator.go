@@ -51,6 +51,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inlineRegistry = NewInlineFunctionRegistry()
 	gen.runtimeOnlyFilter = NewRuntimeOnlyFunctionFilter()
 	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry()
+	gen.plotCollector = NewPlotCollector()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -102,6 +103,7 @@ type generator struct {
 	inlineRegistry          *InlineFunctionRegistry
 	runtimeOnlyFilter       *RuntimeOnlyFunctionFilter
 	inlineConditionRegistry *InlineConditionHandlerRegistry
+	plotCollector           *PlotCollector
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -477,7 +479,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += "\n"
 
-	// Generate statements inside bar loop
 	statementCounter.Reset()
 	for _, stmt := range program.Body {
 		if err := statementCounter.Increment(); err != nil {
@@ -490,7 +491,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += stmtCode
 	}
 
-	// Suppress unused variable warnings
+	if g.plotCollector != nil && g.plotCollector.HasPlots() {
+		for _, plotStmt := range g.plotCollector.GetPlots() {
+			code += g.ind() + plotStmt.code
+		}
+	}
+
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
 	if g.hasSecurityCalls {
 		code += g.ind() + "_ = secBarEvaluator\n"
@@ -592,19 +598,14 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 	code := ""
 	switch funcName {
 	case "indicator", "strategy":
-		// Strategy/indicator initialization - skip in bar loop
 		return "", nil
 	case "plot":
-		// Plot function - add to collector
 		opts := ParsePlotOptions(call)
 
-		// Generate expression for the plot value
 		var plotExpr string
 		if opts.Variable != "" {
-			// Simple variable reference
 			plotExpr = opts.Variable + "Series.Get(0)"
 		} else if len(call.Arguments) > 0 {
-			// Inline expression - generate numeric code for it
 			exprCode, err := g.generatePlotExpression(call.Arguments[0])
 			if err != nil {
 				return "", err
@@ -614,8 +615,12 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 
 		if plotExpr != "" {
 			options := g.buildPlotOptions(opts)
-			code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
+			plotCode := fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
+			if g.plotCollector != nil {
+				g.plotCollector.AddPlot(call, plotCode)
+			}
 		}
+		return "", nil
 	case "ta.sma":
 		// SMA calculation - handled in variable declaration
 		return "", nil

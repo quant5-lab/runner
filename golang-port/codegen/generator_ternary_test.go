@@ -5,26 +5,7 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
-	"github.com/quant5-lab/runner/runtime/validation"
 )
-
-func newTestGenerator() *generator {
-	gen := &generator{
-		imports:          make(map[string]bool),
-		variables:        make(map[string]string),
-		varInits:         make(map[string]ast.Expression),
-		constants:        make(map[string]interface{}),
-		taRegistry:       NewTAFunctionRegistry(),
-		typeSystem:       NewTypeInferenceEngine(),
-		boolConverter:    NewBooleanConverter(NewTypeInferenceEngine()),
-		constantRegistry: NewConstantRegistry(),
-		barFieldRegistry: NewBarFieldSeriesRegistry(),
-		constEvaluator:   validation.NewWarmupAnalyzer(),
-	}
-	gen.tempVarMgr = NewTempVariableManager(gen)
-	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
-	return gen
-}
 
 func TestTernaryCodegenIntegration(t *testing.T) {
 	// Test: signal = close > close_avg ? 1 : 0

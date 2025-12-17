@@ -5,9 +5,34 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/validation"
 )
 
-/* contains checks if string s contains substring substr */
+func newTestGenerator() *generator {
+	constantRegistry := NewConstantRegistry()
+	typeSystem := NewTypeInferenceEngine()
+	boolConverter := NewBooleanConverter(typeSystem)
+
+	gen := &generator{
+		imports:           make(map[string]bool),
+		variables:         make(map[string]string),
+		varInits:          make(map[string]ast.Expression),
+		constants:         make(map[string]interface{}),
+		taRegistry:        NewTAFunctionRegistry(),
+		typeSystem:        typeSystem,
+		boolConverter:     boolConverter,
+		constantRegistry:  constantRegistry,
+		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
+		constEvaluator:    validation.NewWarmupAnalyzer(),
+		plotCollector:     NewPlotCollector(),
+	}
+	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
+	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
+
+	return gen
+}
+
 func contains(s, substr string) bool {
 	if len(s) == 0 || len(substr) == 0 {
 		return false
