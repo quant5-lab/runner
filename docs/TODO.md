@@ -45,7 +45,7 @@
 - [x] Input functions with overrides
 - [x] SMA, EMA, RMA with warmup
 - [x] RSI with RMA smoothing
-- [x] TR, ATR calculation
+- [x] TR, ATR calculation (security() support added)
 - [x] Bollinger Bands
 - [x] MACD
 - [x] Stochastic oscillator
@@ -164,9 +164,9 @@
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison (1.3ms for 500 bars, 8 indicators, 268 bullish signals)
 - [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
-- [ ] `bb7-dissect-potential.pine` - Blocked: Codegen error "ta.pivot outside security() context not yet supported"
+- [ ] `bb7-dissect-potential.pine` - Blocked: Pivot in security() returns all-null values (0/500 bars)
 - [ ] `bb7-dissect-adx.pine` - Blocked: User-defined functions with `=>` syntax not supported
-- [ ] `bb7-dissect-sl.pine` - Blocked: plot() output broken (compiles, executes, but indicators: {})
+- [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions, undefined notSeries/strategySeries
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
@@ -203,10 +203,10 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 567+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 256, valuewhen: 6, pivot: 95) - 100% pass rate for core features
+- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
-- **security() Module**: ForwardSeriesBuffer alignment complete (256/256 tests) - dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests) - codegen integration incomplete
-- **Next Target**: BB7 strategy - pivot codegen integration, sl.pine boolean fixes, tp.pine condition fixes
+- **security() Module**: ForwardSeriesBuffer alignment complete (259/259 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete
+- **Next Target**: BB7 strategy - arrow function parser, tp.pine codegen fixes
