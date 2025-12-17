@@ -78,6 +78,8 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateRMAAtBar(call, secCtx, barIdx)
 	case "ta.rsi":
 		return e.evaluateRSIAtBar(call, secCtx, barIdx)
+	case "ta.atr":
+		return e.evaluateATRAtBar(call, secCtx, barIdx)
 	case "ta.pivothigh":
 		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
 	case "ta.pivotlow":
@@ -135,6 +137,19 @@ func (e *StreamingBarEvaluator) evaluateRSIAtBar(call *ast.CallExpression, secCt
 	stateManager := e.getOrCreateTAState(cacheKey, period, secCtx)
 
 	return stateManager.ComputeAtBar(secCtx, sourceID, barIdx)
+}
+
+func (e *StreamingBarEvaluator) evaluateATRAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	period, err := extractPeriodArgument(call, "atr")
+	if err != nil {
+		return 0.0, err
+	}
+
+	cacheKey := buildTACacheKey("atr", "hlc", period)
+	stateManager := e.getOrCreateTAState(cacheKey, period, secCtx)
+
+	dummyID := &ast.Identifier{Name: "close"}
+	return stateManager.ComputeAtBar(secCtx, dummyID, barIdx)
 }
 
 func (e *StreamingBarEvaluator) getOrCreateTAState(cacheKey string, period int, secCtx *context.Context) TAStateManager {

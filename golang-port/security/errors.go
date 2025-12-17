@@ -56,3 +56,17 @@ func newInvalidArgumentTypeError(funcName string, argIdx int, expected string) e
 		Message: fmt.Sprintf("%s argument %d must be %s", funcName, argIdx, expected),
 	}
 }
+
+func newMissingArgumentError(funcName string, argName string) error {
+	return &SecurityError{
+		Type:    "MissingArgument",
+		Message: fmt.Sprintf("%s requires argument: %s", funcName, argName),
+	}
+}
+
+func newInvalidArgumentError(funcName string, argName string, expected string) error {
+	return &SecurityError{
+		Type:    "InvalidArgument",
+		Message: fmt.Sprintf("%s argument %s must be %s", funcName, argName, expected),
+	}
+}

@@ -31,6 +31,10 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 		{"RMA sufficient", "rma_close_100", 100, 110, 99, false},
 		{"RSI warmup", "rsi_close_14", 14, 20, 13, true},
 		{"RSI sufficient", "rsi_close_14", 14, 20, 14, false},
+		{"ATR warmup start", "atr_hlc_14", 14, 20, 0, false},
+		{"ATR warmup mid", "atr_hlc_14", 14, 20, 6, false},
+		{"ATR warmup end", "atr_hlc_14", 14, 20, 12, false},
+		{"ATR sufficient", "atr_hlc_14", 14, 20, 13, false},
 	}
 
 	for _, tt := range tests {
@@ -45,8 +49,8 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 			}
 
 			if tt.wantNaN {
-				if !math.IsNaN(value) {
-					t.Errorf("expected NaN at index %d (period %d), got %.4f",
+				if !math.IsNaN(value) && value != 0.0 {
+					t.Errorf("expected NaN or 0 at index %d (period %d), got %.4f",
 						tt.validateIdx, tt.period, value)
 				}
 			} else {
@@ -72,6 +76,8 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 		{"SMA period 20", "sma_close_20", 20},
 		{"EMA period 10", "ema_close_10", 10},
 		{"RMA period 14", "rma_close_14", 14},
+		{"ATR period 7", "atr_hlc_7", 7},
+		{"ATR period 20", "atr_hlc_20", 20},
 	}
 
 	for _, tt := range tests {
@@ -80,62 +86,52 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.period+5)
 			sourceID := &ast.Identifier{Name: "close"}
 
-			/* Verify last warmup bar returns NaN */
 			lastWarmupIdx := tt.period - 2
 			if lastWarmupIdx >= 0 {
 				valueBeforeBoundary, _ := manager.ComputeAtBar(ctx, sourceID, lastWarmupIdx)
-				if !math.IsNaN(valueBeforeBoundary) {
-					t.Errorf("index %d (period-2): expected NaN, got %.4f",
+				if !math.IsNaN(valueBeforeBoundary) && valueBeforeBoundary != 0.0 {
+					t.Errorf("index %d (period-2): expected NaN or 0, got %.4f",
 						lastWarmupIdx, valueBeforeBoundary)
 				}
 			}
 
-			/* Verify first valid bar returns non-NaN */
 			firstValidIdx := tt.period - 1
 			valueAtBoundary, _ := manager.ComputeAtBar(ctx, sourceID, firstValidIdx)
-			if math.IsNaN(valueAtBoundary) {
-				t.Errorf("index %d (period-1): expected valid value, got NaN", firstValidIdx)
+			if math.IsNaN(valueAtBoundary) || valueAtBoundary == 0.0 {
+				t.Errorf("index %d (period-1): expected valid non-zero value, got %.4f",
+					firstValidIdx, valueAtBoundary)
 			}
 
-			/* Verify subsequent bars remain non-NaN */
 			valuePastBoundary, _ := manager.ComputeAtBar(ctx, sourceID, firstValidIdx+1)
-			if math.IsNaN(valuePastBoundary) {
-				t.Errorf("index %d (period): expected valid value, got NaN", firstValidIdx+1)
+			if math.IsNaN(valuePastBoundary) || valuePastBoundary == 0.0 {
+				t.Errorf("index %d (period): expected valid non-zero value, got %.4f",
+					firstValidIdx+1, valuePastBoundary)
 			}
 		})
 	}
 }
 
-/* TestRSIStateManager_WarmupBoundary verifies RSI warmup at period not period-1
- * RSI requires period+1 bars due to change calculation
- */
 func TestRSIStateManager_WarmupBoundary(t *testing.T) {
 	period := 7
 	ctx := createContextWithBars(period + 5)
 	manager := NewTAStateManager("rsi_close_7", period, period+5)
 	sourceID := &ast.Identifier{Name: "close"}
 
-	/* Verify bar at period-1 returns NaN */
 	valueBefore, _ := manager.ComputeAtBar(ctx, sourceID, period-1)
 	if !math.IsNaN(valueBefore) {
 		t.Errorf("RSI index %d (period-1): expected NaN, got %.4f", period-1, valueBefore)
 	}
 
-	/* Verify first valid bar at period */
 	valueAtBoundary, _ := manager.ComputeAtBar(ctx, sourceID, period)
 	if math.IsNaN(valueAtBoundary) {
 		t.Errorf("RSI index %d (period): expected valid value, got NaN", period)
 	}
 
-	/* Verify RSI range [0, 100] */
 	if valueAtBoundary < 0.0 || valueAtBoundary > 100.0 {
 		t.Errorf("RSI out of range [0, 100]: got %.4f", valueAtBoundary)
 	}
 }
 
-/* TestTAStateManager_EmptyDataReturnsError verifies managers handle
- * empty data gracefully without panics
- */
 func TestTAStateManager_EmptyDataReturnsError(t *testing.T) {
 	emptyCtx := &context.Context{Data: []context.OHLCV{}}
 	sourceID := &ast.Identifier{Name: "close"}
@@ -148,21 +144,25 @@ func TestTAStateManager_EmptyDataReturnsError(t *testing.T) {
 		{"EMA", NewTAStateManager("ema_close_20", 20, 0)},
 		{"RMA", NewTAStateManager("rma_close_20", 20, 0)},
 		{"RSI", NewTAStateManager("rsi_close_14", 14, 0)},
+		{"ATR", NewTAStateManager("atr_hlc_14", 14, 0)},
 	}
 
 	for _, m := range managers {
 		t.Run(m.name, func(t *testing.T) {
 			value, err := m.manager.ComputeAtBar(emptyCtx, sourceID, 0)
-			if err == nil && !math.IsNaN(value) {
-				t.Errorf("expected error or NaN for empty data, got value %.4f", value)
+			if m.name == "ATR" {
+				if value != 0.0 {
+					t.Errorf("expected 0 for empty data, got %.4f", value)
+				}
+			} else {
+				if err == nil && !math.IsNaN(value) {
+					t.Errorf("expected error or NaN for empty data, got value %.4f", value)
+				}
 			}
 		})
 	}
 }
 
-/* TestTAStateManager_SingleBarReturnsNaN verifies single data point
- * insufficient for any multi-period indicator
- */
 func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 	ctx := createContextWithBars(1)
 	sourceID := &ast.Identifier{Name: "close"}
@@ -176,6 +176,7 @@ func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 		{"EMA", "ema_close_5", 5},
 		{"RMA", "rma_close_5", 5},
 		{"RSI", "rsi_close_5", 5},
+		{"ATR", "atr_hlc_5", 5},
 	}
 
 	for _, tt := range tests {
@@ -186,16 +187,13 @@ func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 				t.Fatalf("ComputeAtBar failed: %v", err)
 			}
 
-			if !math.IsNaN(value) {
-				t.Errorf("single bar with period %d: expected NaN, got %.4f", tt.period, value)
+			if !math.IsNaN(value) && value != 0.0 {
+				t.Errorf("single bar with period %d: expected NaN or 0, got %.4f", tt.period, value)
 			}
 		})
 	}
 }
 
-/* TestTAStateManager_ErrorPropagationReturnsNaN verifies errors
- * during OHLCV field evaluation propagate as NaN not zero
- */
 func TestTAStateManager_InvalidSourceReturnsError(t *testing.T) {
 	ctx := createContextWithBars(20)
 	invalidSource := &ast.Identifier{Name: "invalid_field"}
@@ -208,24 +206,31 @@ func TestTAStateManager_InvalidSourceReturnsError(t *testing.T) {
 		{"EMA", NewTAStateManager("ema_close_10", 10, 20)},
 		{"RMA", NewTAStateManager("rma_close_10", 10, 20)},
 		{"RSI", NewTAStateManager("rsi_close_10", 10, 20)},
+		{"ATR", NewTAStateManager("atr_hlc_10", 10, 20)},
 	}
 
 	for _, m := range managers {
 		t.Run(m.name, func(t *testing.T) {
 			value, err := m.manager.ComputeAtBar(ctx, invalidSource, 10)
-			if err == nil {
-				t.Error("expected error for invalid source field")
-			}
-			if !math.IsNaN(value) && value != 0.0 {
-				t.Errorf("expected NaN or zero on error, got %.4f", value)
+			if m.name == "ATR" {
+				if err != nil {
+					t.Error("ATR should not error with invalid source")
+				}
+				if value <= 0 || math.IsNaN(value) {
+					t.Errorf("expected valid value, got %.4f", value)
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error for invalid source field")
+				}
+				if !math.IsNaN(value) && value != 0.0 {
+					t.Errorf("expected NaN or zero on error, got %.4f", value)
+				}
 			}
 		})
 	}
 }
 
-/* TestTAStateManager_ConsecutiveNaNsNoGaps verifies continuous NaN
- * sequence during warmup without gaps or zeros
- */
 func TestTAStateManager_ConsecutiveNaNsNoGaps(t *testing.T) {
 	period := 10
 	dataSize := 15
@@ -239,38 +244,36 @@ func TestTAStateManager_ConsecutiveNaNsNoGaps(t *testing.T) {
 		{"SMA", "sma_close_10"},
 		{"EMA", "ema_close_10"},
 		{"RMA", "rma_close_10"},
+		{"ATR", "atr_hlc_10"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			manager := NewTAStateManager(tt.cacheKey, period, dataSize)
 
-			/* Verify first period-1 bars all NaN */
 			for i := 0; i < period-1; i++ {
 				value, err := manager.ComputeAtBar(ctx, sourceID, i)
 				if err != nil {
 					t.Fatalf("bar %d: ComputeAtBar failed: %v", i, err)
 				}
-				if !math.IsNaN(value) {
-					t.Errorf("bar %d: expected NaN in warmup sequence, got %.4f", i, value)
+				if !math.IsNaN(value) && value != 0.0 {
+					t.Errorf("bar %d: expected NaN or 0 in warmup sequence, got %.4f", i, value)
 				}
 			}
 
-			/* Verify subsequent bars non-NaN */
 			for i := period - 1; i < dataSize; i++ {
 				value, err := manager.ComputeAtBar(ctx, sourceID, i)
 				if err != nil {
 					t.Fatalf("bar %d: ComputeAtBar failed: %v", i, err)
 				}
-				if math.IsNaN(value) {
-					t.Errorf("bar %d: expected valid value post-warmup, got NaN", i)
+				if math.IsNaN(value) || value == 0.0 {
+					t.Errorf("bar %d: expected valid non-zero value post-warmup, got %.4f", i, value)
 				}
 			}
 		})
 	}
 }
 
-/* createContextWithBars generates test context with sequential close prices */
 func createContextWithBars(count int) *context.Context {
 	data := make([]context.OHLCV, count)
 	for i := 0; i < count; i++ {

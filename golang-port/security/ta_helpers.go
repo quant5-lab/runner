@@ -29,3 +29,21 @@ func extractTAArguments(call *ast.CallExpression) (*ast.Identifier, int, error) 
 func buildTACacheKey(funcName, sourceName string, period int) string {
 	return fmt.Sprintf("%s_%s_%d", funcName, sourceName, period)
 }
+
+func extractPeriodArgument(call *ast.CallExpression, funcName string) (int, error) {
+	if len(call.Arguments) < 1 {
+		return 0, newMissingArgumentError(funcName, "period")
+	}
+
+	lit, ok := call.Arguments[0].(*ast.Literal)
+	if !ok {
+		return 0, newInvalidArgumentError(funcName, "period", "literal")
+	}
+
+	periodFloat, ok := lit.Value.(float64)
+	if !ok {
+		return 0, newInvalidArgumentError(funcName, "period", "number")
+	}
+
+	return int(periodFloat), nil
+}
