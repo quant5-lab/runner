@@ -22,19 +22,21 @@ type SecurityDataFetcher interface {
 }
 
 type Request struct {
-	ctx        *context.Context
-	fetcher    SecurityDataFetcher
-	cache      map[string]*context.Context
-	exprCache  map[string][]float64
-	currentBar int
+	ctx              *context.Context
+	fetcher          SecurityDataFetcher
+	cache            map[string]*context.Context
+	exprCache        map[string][]float64
+	currentBar       int
+	timeframeAligner *TimeframeAligner
 }
 
 func NewRequest(ctx *context.Context, fetcher SecurityDataFetcher) *Request {
 	return &Request{
-		ctx:       ctx,
-		fetcher:   fetcher,
-		cache:     make(map[string]*context.Context),
-		exprCache: make(map[string][]float64),
+		ctx:              ctx,
+		fetcher:          fetcher,
+		cache:            make(map[string]*context.Context),
+		exprCache:        make(map[string][]float64),
+		timeframeAligner: NewTimeframeAligner(),
 	}
 }
 
@@ -60,7 +62,7 @@ func (r *Request) Security(symbol, timeframe string, exprFunc func(*context.Cont
 	currentTimeObj := r.ctx.GetTime(-r.currentBar)
 	currentTime := currentTimeObj.Unix()
 
-	secIdx := r.findMatchingBar(secCtx, currentTime, lookahead)
+	secIdx := r.timeframeAligner.FindSecurityBarIndex(secCtx, currentTime, lookahead)
 	if secIdx < 0 || secIdx >= len(exprValues) {
 		return math.NaN(), nil
 	}
@@ -82,19 +84,4 @@ func (r *Request) SetCurrentBar(bar int) {
 func (r *Request) ClearCache() {
 	r.cache = make(map[string]*context.Context)
 	r.exprCache = make(map[string][]float64)
-}
-
-func (r *Request) findMatchingBar(secCtx *context.Context, currentTime int64, lookahead bool) int {
-	for i := 0; i <= secCtx.LastBarIndex(); i++ {
-		barTimeObj := secCtx.GetTime(-i)
-		barTime := barTimeObj.Unix()
-		if barTime <= currentTime {
-			if lookahead {
-				return i + 1
-			}
-			return i + 2
-		}
-	}
-
-	return -1
 }

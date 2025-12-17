@@ -13,21 +13,23 @@ type BarEvaluator interface {
 }
 
 type StreamingRequest struct {
-	ctx            *context.Context
-	fetcher        SecurityDataFetcher
-	cache          map[string]*context.Context
-	evaluator      BarEvaluator
-	pivotEvaluator *PivotEvaluator
-	currentBar     int
+	ctx              *context.Context
+	fetcher          SecurityDataFetcher
+	cache            map[string]*context.Context
+	evaluator        BarEvaluator
+	pivotEvaluator   *PivotEvaluator
+	timeframeAligner *TimeframeAligner
+	currentBar       int
 }
 
 func NewStreamingRequest(ctx *context.Context, fetcher SecurityDataFetcher, evaluator BarEvaluator) *StreamingRequest {
 	return &StreamingRequest{
-		ctx:            ctx,
-		fetcher:        fetcher,
-		cache:          make(map[string]*context.Context),
-		evaluator:      evaluator,
-		pivotEvaluator: NewPivotEvaluator(),
+		ctx:              ctx,
+		fetcher:          fetcher,
+		cache:            make(map[string]*context.Context),
+		evaluator:        evaluator,
+		pivotEvaluator:   NewPivotEvaluator(),
+		timeframeAligner: NewTimeframeAligner(),
 	}
 }
 
@@ -40,7 +42,7 @@ func (r *StreamingRequest) SecurityWithExpression(symbol, timeframe string, expr
 	}
 
 	currentTime := r.getCurrentTime()
-	secBarIdx := r.findMatchingBarIndex(secCtx, currentTime, lookahead)
+	secBarIdx := r.timeframeAligner.FindSecurityBarIndex(secCtx, currentTime, lookahead)
 
 	if !isValidBarIndex(secBarIdx, secCtx) {
 		return math.NaN(), nil
@@ -81,26 +83,6 @@ func (r *StreamingRequest) getOrFetchContext(cacheKey, symbol, timeframe string)
 func (r *StreamingRequest) getCurrentTime() int64 {
 	currentTimeObj := r.ctx.GetTime(-r.currentBar)
 	return currentTimeObj.Unix()
-}
-
-func (r *StreamingRequest) findMatchingBarIndex(secCtx *context.Context, currentTime int64, lookahead bool) int {
-	for i := 0; i <= secCtx.LastBarIndex(); i++ {
-		barTimeObj := secCtx.GetTime(-i)
-		barTime := barTimeObj.Unix()
-
-		if barTime <= currentTime {
-			return r.adjustForLookahead(i, lookahead)
-		}
-	}
-
-	return -1
-}
-
-func (r *StreamingRequest) adjustForLookahead(barIdx int, lookahead bool) int {
-	if lookahead {
-		return barIdx + 1
-	}
-	return barIdx + 2
 }
 
 func buildSecurityKey(symbol, timeframe string) string {
