@@ -30,18 +30,14 @@ const createAnchorPoint = (time) => ({
   color: 'transparent',
 });
 
-/* Pure function: create chart data point with optional gap edge marking */
-const createDataPoint = (time, value, isGapEdge) => {
-  const point = { time: toSeconds(time), value };
-  if (isGapEdge) point.color = 'transparent';
-  return point;
-};
-
-/* Pure function: check if next point starts a gap */
-const nextIsGap = (data, index) => {
-  const next = data[index + 1];
-  return next && (!isValidValue(next.value) || !hasColor(next));
-};
+/* Pure function: create chart data point */
+/* Note: Previously marked gap edges as transparent, but this caused rendering
+ * issues with short segments (e.g., 5 points) where the last point would become
+ * invisible. Gap handling is now done solely through anchor points (NaN values). */
+const createDataPoint = (time, value) => ({
+  time: toSeconds(time),
+  value
+});
 
 /* Pure function: check if previous point was valid */
 const prevIsValid = (data, index) => {
@@ -69,7 +65,7 @@ function adaptLineSeriesData(plotData) {
     if (i < firstValidIndex) {
       acc.push(createAnchorPoint(item.time));
     } else if (hasValidValue && isVisible) {
-      acc.push(createDataPoint(item.time, item.value, nextIsGap(plotData, i)));
+      acc.push(createDataPoint(item.time, item.value));
     } else if (hasValidValue && !isVisible && prevIsValid(plotData, i)) {
       /* Point has value but no color (Pine color=na) - treat as gap */
       acc.push(createAnchorPoint(item.time));

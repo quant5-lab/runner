@@ -7,6 +7,7 @@ import { TradeDataFormatter, TradeTableRenderer } from './TradeTable.js';
 import { TimeIndexBuilder } from './TimeIndexBuilder.js';
 import { PlotOffsetTransformer } from './PlotOffsetTransformer.js';
 import { SeriesDataMapper } from './SeriesDataMapper.js';
+import { LineStyleConverter } from './LineStyleConverter.js';
 
 export class ChartApplication {
   constructor(chartOptions) {
@@ -114,6 +115,7 @@ export class ChartApplication {
     Object.entries(indicatorsWithPanes).forEach(([key, indicator]) => {
       const styleType = configOverride?.[key]?.style || 'line';
       const color = indicator.style?.color || configOverride?.[key]?.color || '#2196F3';
+      const lineStyleValue = configOverride?.[key]?.lineStyle;
       
       const seriesConfig = {
         color: color,
@@ -121,6 +123,10 @@ export class ChartApplication {
         title: indicator.title || key,
         chart: indicator.pane || 'main',
         style: styleType,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: true,
+        lineStyle: LineStyleConverter.toNumeric(lineStyleValue),
       };
 
       const series = seriesRouter.routeSeries(key, seriesConfig, ChartManager);
@@ -142,6 +148,24 @@ export class ChartApplication {
       
       if (processedData.length > 0) {
         series.setData(processedData);
+        
+        // Auto-zoom to Buy/Sell Potential signals if they exist
+        if ((key === 'Buy Potential' || key === 'Sell Potential') && processedData.length > 0) {
+          const validPoints = processedData.filter(p => !isNaN(p.value) && p.value !== null);
+          if (validPoints.length > 0) {
+            const firstTime = validPoints[0].time;
+            const lastTime = validPoints[validPoints.length - 1].time;
+            const mainChart = this.paneManager.mainPane.chart;
+            
+            // Zoom to show signals with context (±50 bars = 50 hours for 1h timeframe)
+            const contextBars = 50;
+            const barInterval = 3600; // 1 hour
+            mainChart.timeScale().setVisibleRange({
+              from: firstTime - (contextBars * barInterval),
+              to: lastTime + (contextBars * barInterval)
+            });
+          }
+        }
       }
     });
   }
