@@ -105,14 +105,33 @@ func (p *PivotDetector) extractFieldValue(bar context.OHLCV, fieldName string) f
 }
 
 func extractPivotArguments(call *ast.CallExpression) (*ast.Identifier, int, int, error) {
+	funcName := extractCallFunctionName(call.Callee)
+
+	if len(call.Arguments) == 2 {
+		leftBars, err := extractNumberLiteral(call.Arguments[0])
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		rightBars, err := extractNumberLiteral(call.Arguments[1])
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		defaultSource := "high"
+		if funcName == "ta.pivotlow" {
+			defaultSource = "low"
+		}
+
+		return &ast.Identifier{Name: defaultSource}, int(leftBars), int(rightBars), nil
+	}
+
 	if len(call.Arguments) < 3 {
-		funcName := extractCallFunctionName(call.Callee)
 		return nil, 0, 0, newInsufficientArgumentsError(funcName, 3, len(call.Arguments))
 	}
 
 	sourceID, ok := call.Arguments[0].(*ast.Identifier)
 	if !ok {
-		funcName := extractCallFunctionName(call.Callee)
 		return nil, 0, 0, newInvalidArgumentTypeError(funcName, 0, "identifier")
 	}
 

@@ -84,7 +84,7 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
 	case "ta.pivotlow":
 		return e.evaluatePivotLowAtBar(call, secCtx, barIdx)
-	case "fixnan":
+	case "fixnan", "ta.fixnan":
 		return e.evaluateFixnanAtBar(call, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedFunctionError(funcName)

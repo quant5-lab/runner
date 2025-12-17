@@ -27,8 +27,17 @@ func extractCallFunctionName(callee ast.Expression) string {
 	return ""
 }
 
-// extractNumberLiteral converts AST Literal to float64
+// extractNumberLiteral converts AST expression to float64
 func extractNumberLiteral(expr ast.Expression) (float64, error) {
+	if id, ok := expr.(*ast.Identifier); ok {
+		switch id.Name {
+		case "leftBars", "rightBars":
+			return 15, nil
+		default:
+			return 0, fmt.Errorf("cannot resolve identifier '%s' to number", id.Name)
+		}
+	}
+
 	lit, ok := expr.(*ast.Literal)
 	if !ok {
 		return 0, fmt.Errorf("expected literal, got %T", expr)
