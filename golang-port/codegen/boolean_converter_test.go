@@ -102,42 +102,42 @@ func TestBooleanConverter_IsAlreadyBoolean_ComparisonOperators(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "greater than is boolean",
+			name:     "greater than is comparison",
 			expr:     &ast.BinaryExpression{Operator: ">"},
 			expected: true,
 		},
 		{
-			name:     "less than is boolean",
+			name:     "less than is comparison",
 			expr:     &ast.BinaryExpression{Operator: "<"},
 			expected: true,
 		},
 		{
-			name:     "greater equal is boolean",
+			name:     "greater equal is comparison",
 			expr:     &ast.BinaryExpression{Operator: ">="},
 			expected: true,
 		},
 		{
-			name:     "less equal is boolean",
+			name:     "less equal is comparison",
 			expr:     &ast.BinaryExpression{Operator: "<="},
 			expected: true,
 		},
 		{
-			name:     "equal is boolean",
+			name:     "equal is comparison",
 			expr:     &ast.BinaryExpression{Operator: "=="},
 			expected: true,
 		},
 		{
-			name:     "not equal is boolean",
+			name:     "not equal is comparison",
 			expr:     &ast.BinaryExpression{Operator: "!="},
 			expected: true,
 		},
 		{
-			name:     "addition is not boolean",
+			name:     "addition is not comparison",
 			expr:     &ast.BinaryExpression{Operator: "+"},
 			expected: false,
 		},
 		{
-			name:     "multiplication is not boolean",
+			name:     "multiplication is not comparison",
 			expr:     &ast.BinaryExpression{Operator: "*"},
 			expected: false,
 		},
@@ -437,6 +437,71 @@ func TestBooleanConverter_Integration_MixedTypes(t *testing.T) {
 			result := converter.EnsureBooleanOperand(tt.expr, tt.generatedCode)
 			if result != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestBooleanConverter_ConvertBoolSeriesForIfStatement_CallExpression(t *testing.T) {
+	typeSystem := NewTypeInferenceEngine()
+	converter := NewBooleanConverter(typeSystem)
+
+	tests := []struct {
+		name          string
+		expr          *ast.CallExpression
+		generatedCode string
+		expected      string
+	}{
+		{
+			name: "numeric function gets != 0",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "dev"},
+			},
+			generatedCode: "devResult.GetCurrent()",
+			expected:      "devResult.GetCurrent() != 0",
+		},
+		{
+			name: "boolean function unchanged",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "crossover"},
+				},
+			},
+			generatedCode: "ta.Crossover(fast, slow)",
+			expected:      "ta.Crossover(fast, slow)",
+		},
+		{
+			name: "IIFE with comparison operators",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "custom"},
+			},
+			generatedCode: "(func() float64 { if ctx.BarIndex < length { return 1 }; return 0 }())",
+			expected:      "(func() float64 { if ctx.BarIndex < length { return 1 }; return 0 }()) != 0",
+		},
+		{
+			name: "IIFE with Series.Get()",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "inline"},
+			},
+			generatedCode: "(func() float64 { sum := 0.0; for j := 0; j < len; j++ { sum += series.Get(j) }; return sum }())",
+			expected:      "(func() float64 { sum := 0.0; for j := 0; j < len; j++ { sum += series.Get(j) }; return sum }()) != 0",
+		},
+		{
+			name: "na() with Series pattern",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "na"},
+			},
+			generatedCode: "math.IsNaN(valueSeries.GetCurrent())",
+			expected:      "math.IsNaN(valueSeries.GetCurrent())",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := converter.ConvertBoolSeriesForIfStatement(tt.expr, tt.generatedCode)
+			if result != tt.expected {
+				t.Errorf("expected: %q\ngot:      %q", tt.expected, result)
 			}
 		})
 	}
