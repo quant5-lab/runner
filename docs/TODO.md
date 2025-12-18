@@ -167,7 +167,7 @@
 - [x] `bb7-dissect-potential.pine` - Pivot in security() returns valid values (3013/3045 high, 3000/3045 low non-null)
 - [ ] `bb7-dissect-adx.pine` - Blocked: User-defined functions with `=>` syntax not supported
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
-- [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions, undefined notSeries/strategySeries
+- [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions (ta.dev() result as ternary condition)
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
 
 ## Phase 5: Strategy Validation
@@ -203,10 +203,11 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95) - 100% pass rate for core features
-- **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests)
+- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35) - 100% pass rate for core features
+- **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
 - **security() Module**: ForwardSeriesBuffer alignment complete (259/259 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete
-- **Next Target**: BB7 strategy - arrow function parser, tp.pine codegen fixes
+- **Call Handler Architecture**: Strategy pattern refactoring (6 handlers: Meta, Plot, Strategy, TA, Unknown, Router), SOLID principles, 35 comprehensive tests (CanHandle, GenerateCode, Integration, EdgeCases)
+- **Next Target**: BB7 strategy - arrow function parser
