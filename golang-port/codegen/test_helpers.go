@@ -25,6 +25,7 @@ func newTestGenerator() *generator {
 		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
 		constEvaluator:    validation.NewWarmupAnalyzer(),
 		plotCollector:     NewPlotCollector(),
+		callRouter:        NewCallExpressionRouter(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

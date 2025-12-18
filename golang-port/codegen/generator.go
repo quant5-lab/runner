@@ -52,6 +52,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.runtimeOnlyFilter = NewRuntimeOnlyFunctionFilter()
 	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry()
 	gen.plotCollector = NewPlotCollector()
+	gen.callRouter = NewCallExpressionRouter()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -104,6 +105,7 @@ type generator struct {
 	runtimeOnlyFilter       *RuntimeOnlyFunctionFilter
 	inlineConditionRegistry *InlineConditionHandlerRegistry
 	plotCollector           *PlotCollector
+	callRouter              *CallExpressionRouter
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -576,88 +578,13 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 }
 
 func (g *generator) generateCallExpression(call *ast.CallExpression) (string, error) {
-	// Extract function name
-	funcName := ""
-	switch callee := call.Callee.(type) {
-	case *ast.Identifier:
-		funcName = callee.Name
-	case *ast.MemberExpression:
-		// Handle ta.sma, strategy.entry, etc.
-		obj := ""
-		if id, ok := callee.Object.(*ast.Identifier); ok {
-			obj = id.Name
-		}
-		prop := ""
-		if id, ok := callee.Property.(*ast.Identifier); ok {
-			prop = id.Name
-		}
-		funcName = obj + "." + prop
+	// Lazy-initialize callRouter if not set (for tests)
+	if g.callRouter == nil {
+		g.callRouter = NewCallExpressionRouter()
 	}
 
-	// Handle specific Pine functions
-	code := ""
-	switch funcName {
-	case "indicator", "strategy":
-		return "", nil
-	case "plot":
-		opts := ParsePlotOptions(call)
-
-		var plotExpr string
-		if len(call.Arguments) > 0 {
-			// Always use generatePlotExpression for proper builtin resolution
-			exprCode, err := g.generatePlotExpression(call.Arguments[0])
-			if err != nil {
-				return "", err
-			}
-			plotExpr = exprCode
-		}
-
-		if plotExpr != "" {
-			options := g.buildPlotOptions(opts)
-			plotCode := fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
-			if g.plotCollector != nil {
-				g.plotCollector.AddPlot(call, plotCode)
-			}
-		}
-		return "", nil
-	case "ta.sma":
-		// SMA calculation - handled in variable declaration
-		return "", nil
-	case "strategy.entry":
-		// strategy.entry(id, direction, qty)
-		if len(call.Arguments) >= 2 {
-			entryID := g.extractStringLiteral(call.Arguments[0])
-			direction := g.extractDirectionConstant(call.Arguments[1])
-			qty := 1.0
-			if len(call.Arguments) >= 3 {
-				qty = g.extractFloatLiteral(call.Arguments[2])
-			}
-
-			code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f)\n", entryID, direction, qty)
-		}
-	case "strategy.close":
-		// strategy.close(id)
-		if len(call.Arguments) >= 1 {
-			entryID := g.extractStringLiteral(call.Arguments[0])
-			code += g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time)\n", entryID)
-		}
-	case "strategy.close_all":
-		// strategy.close_all()
-		code += g.ind() + "strat.CloseAll(bar.Close, bar.Time)\n"
-	case "ta.crossover", "ta.crossunder":
-		// Crossover functions - handled in variable declaration
-		return "", nil
-	case "ta.stdev", "ta.change", "ta.pivothigh", "ta.pivotlow", "fixnan":
-		// TA functions - handled in variable declaration
-		return "", nil
-	case "valuewhen":
-		// Value functions - handled in variable declaration
-		return "", nil
-	default:
-		code += g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName)
-	}
-
-	return code, nil
+	// Delegate to registered handlers via router
+	return g.callRouter.RouteCall(g, call)
 }
 
 func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error) {
