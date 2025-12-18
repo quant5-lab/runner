@@ -164,7 +164,7 @@
 - [x] `bb7-dissect-sma.pine` - Inline SMA comparison (1.3ms for 500 bars, 8 indicators, 268 bullish signals)
 - [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
-- [ ] `bb7-dissect-potential.pine` - Blocked: Pivot in security() returns all-null values (0/500 bars)
+- [x] `bb7-dissect-potential.pine` - Pivot in security() returns valid values (3013/3045 high, 3000/3045 low non-null)
 - [ ] `bb7-dissect-adx.pine` - Blocked: User-defined functions with `=>` syntax not supported
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [ ] `bb7-dissect-tp.pine` - Blocked: Non-boolean conditions, undefined notSeries/strategySeries
