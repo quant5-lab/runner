@@ -36,7 +36,8 @@ func (h *BuiltinIdentifierHandler) IsStrategyRuntimeValue(obj, prop string) bool
 		return false
 	}
 	switch prop {
-	case "position_avg_price", "position_size", "position_entry_name":
+	case "position_avg_price", "position_size", "position_entry_name",
+		"equity", "netprofit", "closedtrades":
 		return true
 	default:
 		return false
@@ -116,6 +117,12 @@ func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string
 		return "strategy_position_sizeSeries.Get(0)"
 	case "position_entry_name":
 		return "strat.GetPositionEntryName()"
+	case "equity":
+		return "strategy_equitySeries.Get(0)"
+	case "netprofit":
+		return "strategy_netprofitSeries.Get(0)"
+	case "closedtrades":
+		return "strategy_closedtradesSeries.Get(0)"
 	default:
 		return ""
 	}

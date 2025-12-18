@@ -38,6 +38,7 @@ type TAIndicatorBuilder struct {
 	indicatorName string              // Name of the indicator (SMA, EMA, STDEV)
 	varName       string              // Variable name for the Series
 	period        int                 // Lookback period
+	accessor      AccessGenerator     // Data access strategy (Series or OHLCV field)
 	warmupChecker *WarmupChecker      // Handles warmup period validation
 	loopGen       *LoopGenerator      // Generates for loops with NaN handling
 	accumulator   AccumulatorStrategy // Accumulation logic (sum, variance, ema)
@@ -59,6 +60,7 @@ func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGene
 		indicatorName: name,
 		varName:       varName,
 		period:        period,
+		accessor:      accessor,
 		warmupChecker: NewWarmupChecker(period),
 		loopGen:       NewLoopGenerator(period, accessor, needsNaN),
 		indenter:      NewCodeIndenter(),
@@ -305,8 +307,10 @@ func (b *TAIndicatorBuilder) BuildDEV() string {
 
 	code += b.indenter.Line(fmt.Sprintf("mean := sum / float64(%d)", b.period))
 
-	// Current value - mean (use bar access)
-	code += b.indenter.Line(fmt.Sprintf("dev := %s - mean", b.loopGen.GenerateValueAccess()))
+	// Current value - mean (use current bar Get(0), not loop variable j)
+	// GenerateLoopValueAccess("0") produces: variableSeries.Get(0) or ctx.Data[ctx.BarIndex-0].Close
+	currentValueAccess := b.accessor.GenerateLoopValueAccess("0")
+	code += b.indenter.Line(fmt.Sprintf("dev := %s - mean", currentValueAccess))
 	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(dev)", b.varName))
 
 	b.indenter.DecreaseIndent()

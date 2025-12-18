@@ -603,9 +603,8 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 		opts := ParsePlotOptions(call)
 
 		var plotExpr string
-		if opts.Variable != "" {
-			plotExpr = opts.Variable + "Series.Get(0)"
-		} else if len(call.Arguments) > 0 {
+		if len(call.Arguments) > 0 {
+			// Always use generatePlotExpression for proper builtin resolution
 			exprCode, err := g.generatePlotExpression(call.Arguments[0])
 			if err != nil {
 				return "", err
@@ -850,11 +849,19 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 			condCode, consequentCode, alternateCode), nil
 
 	case *ast.Identifier:
+		// Try builtin resolution first (e.g., strategy.equity)
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, false); resolved {
+			return code, nil
+		}
 		// Variable reference - use Series.Get(0)
 		return e.Name + "Series.Get(0)", nil
 
 	case *ast.MemberExpression:
-		// Member expression like close[0]
+		// Try builtin member expression resolution (e.g., strategy.equity, close[0])
+		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
+			return code, nil
+		}
+		// Fallback: Member expression like userVar[0]
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Literal:
