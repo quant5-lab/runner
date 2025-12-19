@@ -165,7 +165,7 @@
 - [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
 - [x] `bb7-dissect-potential.pine` - Pivot in security() returns valid values (3013/3045 high, 3000/3045 low non-null)
-- [ ] `bb7-dissect-adx.pine` - Blocked: User-defined functions with `=>` syntax not supported
+- [ ] `bb7-dissect-adx.pine` - Arrow function parser complete (lexer ✓, grammar ✓, converter ✓, INDENT/DEDENT context-aware tracking ✓, 171 tests PASS, fixed 4 integration tests), codegen incomplete (VariableDeclaration with ArrowFunctionExpression init not supported)
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [x] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
 - [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
