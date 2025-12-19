@@ -3,6 +3,8 @@ package parser
 import (
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
+
+	indentlexer "github.com/quant5-lab/runner/lexer"
 )
 
 type Script struct {
@@ -16,6 +18,7 @@ type VersionDirective struct {
 
 type Statement struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
+	FunctionDecl    *FunctionDecl    `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
 	If              *IfStatement     `parser:"| @@"`
@@ -24,12 +27,23 @@ type Statement struct {
 
 type IfStatement struct {
 	Condition *OrExpr      `parser:"'if' ( '(' @@ ')' | @@ )"`
+	Indent    *string      `parser:"@Indent?"`
 	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent?"`
+}
+
+type FunctionDecl struct {
+	Name   string       `parser:"@Ident"`
+	Params []string     `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
+	Arrow  string       `parser:"@'=>' Newline? @Indent"`
+	Body   []*Statement `parser:"@@+"`
+	Dedent string       `parser:"@Dedent"`
 }
 
 type TupleAssignment struct {
-	Names []string    `parser:"'[' @Ident ( ',' @Ident )* ']' '='"`
-	Value *Expression `parser:"@@"`
+	Names []string    `parser:"'[' @Ident ( ',' @Ident )* ']'"`
+	Eq    *string     `parser:"( @'=' )?"`
+	Value *Expression `parser:"@@?"`
 }
 
 type Assignment struct {
@@ -46,8 +60,13 @@ type ExpressionStmt struct {
 	Expr *Expression `parser:"@@"`
 }
 
+type ArrayLiteral struct {
+	Elements []*TernaryExpr `parser:"'[' ( @@ ( ',' @@ )* )? ']'"`
+}
+
 type Expression struct {
-	Ternary      *TernaryExpr  `parser:"@@"`
+	Array        *ArrayLiteral `parser:"@@"`
+	Ternary      *TernaryExpr  `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
@@ -179,13 +198,15 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+\.\d+`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `:=|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
+	{Name: "Punct", Pattern: `:=|=>|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
 })
+
+var indentAwareLexer = indentlexer.NewIndentationDefinition(pineLexer)
 
 func NewParser() (*participle.Parser[Script], error) {
 	return participle.Build[Script](
-		participle.Lexer(pineLexer),
+		participle.Lexer(indentAwareLexer),
 		participle.Elide("Comment", "Whitespace"),
-		participle.UseLookahead(4),
+		participle.UseLookahead(8),
 	)
 }

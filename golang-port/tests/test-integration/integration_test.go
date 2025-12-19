@@ -199,11 +199,7 @@ func TestParseAllFixtures(t *testing.T) {
 	failCount := 0
 	knownLimitations := map[string]string{
 		"test-builtin-function.pine": "user-defined functions with => syntax",
-		"test-function-scoping.pine": "user-defined functions with => syntax",
 		"test-strategy.pine":         "user-defined functions with => syntax",
-		"test-tr-adx.pine":           "user-defined functions with => syntax",
-		"test-tr-bb7-adx.pine":       "user-defined functions with => syntax",
-		"test-tr-function.pine":      "user-defined functions with => syntax",
 	}
 
 	for _, entry := range entries {

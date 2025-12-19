@@ -549,6 +549,8 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateVariableDeclaration(n)
 	case *ast.IfStatement:
 		return g.generateIfStatement(n)
+	case *ast.ArrowFunctionExpression:
+		return g.generateArrowFunction(n)
 	default:
 		return "", fmt.Errorf("unsupported statement type: %T", node)
 	}
@@ -640,6 +642,10 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	// TODO: Handle alternate (else) if needed
 
 	return code, nil
+}
+
+func (g *generator) generateArrowFunction(arrowFunc *ast.ArrowFunctionExpression) (string, error) {
+	return "", fmt.Errorf("arrow function codegen not yet implemented")
 }
 
 func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {

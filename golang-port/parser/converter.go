@@ -8,10 +8,18 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-type Converter struct{}
+type Converter struct {
+	factory *StatementConverterFactory
+}
 
 func NewConverter() *Converter {
-	return &Converter{}
+	c := &Converter{}
+	c.factory = NewStatementConverterFactory(
+		c.convertExpression,
+		c.convertOrExpr,
+		c.convertStatement,
+	)
+	return c
 }
 
 func (c *Converter) ToESTree(script *Script) (*ast.Program, error) {
@@ -34,118 +42,25 @@ func (c *Converter) ToESTree(script *Script) (*ast.Program, error) {
 }
 
 func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
-	if stmt.TupleAssignment != nil {
-		init, err := c.convertExpression(stmt.TupleAssignment.Value)
-		if err != nil {
-			return nil, err
-		}
-
-		elements := make([]ast.Identifier, len(stmt.TupleAssignment.Names))
-		for i, name := range stmt.TupleAssignment.Names {
-			elements[i] = ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     name,
-			}
-		}
-
-		return &ast.VariableDeclaration{
-			NodeType: ast.TypeVariableDeclaration,
-			Declarations: []ast.VariableDeclarator{
-				{
-					NodeType: ast.TypeVariableDeclarator,
-					ID: &ast.ArrayPattern{
-						NodeType: ast.TypeArrayPattern,
-						Elements: elements,
-					},
-					Init: init,
-				},
-			},
-			Kind: "let",
-		}, nil
-	}
-
-	if stmt.Assignment != nil {
-		init, err := c.convertExpression(stmt.Assignment.Value)
-		if err != nil {
-			return nil, err
-		}
-		return &ast.VariableDeclaration{
-			NodeType: ast.TypeVariableDeclaration,
-			Declarations: []ast.VariableDeclarator{
-				{
-					NodeType: ast.TypeVariableDeclarator,
-					ID: &ast.Identifier{
-						NodeType: ast.TypeIdentifier,
-						Name:     stmt.Assignment.Name,
-					},
-					Init: init,
-				},
-			},
-			Kind: "let",
-		}, nil
-	}
-
-	if stmt.Reassignment != nil {
-		init, err := c.convertExpression(stmt.Reassignment.Value)
-		if err != nil {
-			return nil, err
-		}
-		return &ast.VariableDeclaration{
-			NodeType: ast.TypeVariableDeclaration,
-			Declarations: []ast.VariableDeclarator{
-				{
-					NodeType: ast.TypeVariableDeclarator,
-					ID: &ast.Identifier{
-						NodeType: ast.TypeIdentifier,
-						Name:     stmt.Reassignment.Name,
-					},
-					Init: init,
-				},
-			},
-			Kind: "var",
-		}, nil
-	}
-
-	if stmt.If != nil {
-		test, err := c.convertOrExpr(stmt.If.Condition)
-		if err != nil {
-			return nil, err
-		}
-
-		consequent := []ast.Node{}
-		for _, bodyStmt := range stmt.If.Body {
-			node, err := c.convertStatement(bodyStmt)
-			if err != nil {
-				return nil, err
-			}
-			if node != nil {
-				consequent = append(consequent, node)
-			}
-		}
-
-		return &ast.IfStatement{
-			NodeType:   ast.TypeIfStatement,
-			Test:       test,
-			Consequent: consequent,
-			Alternate:  []ast.Node{},
-		}, nil
-	}
-
-	if stmt.Expression != nil {
-		expr, err := c.convertExpression(stmt.Expression.Expr)
-		if err != nil {
-			return nil, err
-		}
-		return &ast.ExpressionStatement{
-			NodeType:   ast.TypeExpressionStatement,
-			Expression: expr,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("empty statement")
+	return c.factory.Convert(stmt)
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
+	if expr.Array != nil {
+		elements := []ast.Expression{}
+		for _, elem := range expr.Array.Elements {
+			astExpr, err := c.convertTernaryExpr(elem)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, astExpr)
+		}
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    elements,
+			Raw:      "[...]",
+		}, nil
+	}
 	if expr.Ternary != nil {
 		return c.convertTernaryExpr(expr.Ternary)
 	}

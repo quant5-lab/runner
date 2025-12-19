@@ -3,22 +3,23 @@ package ast
 type NodeType string
 
 const (
-	TypeProgram               NodeType = "Program"
-	TypeExpressionStatement   NodeType = "ExpressionStatement"
-	TypeCallExpression        NodeType = "CallExpression"
-	TypeVariableDeclaration   NodeType = "VariableDeclaration"
-	TypeVariableDeclarator    NodeType = "VariableDeclarator"
-	TypeMemberExpression      NodeType = "MemberExpression"
-	TypeIdentifier            NodeType = "Identifier"
-	TypeLiteral               NodeType = "Literal"
-	TypeObjectExpression      NodeType = "ObjectExpression"
-	TypeProperty              NodeType = "Property"
-	TypeBinaryExpression      NodeType = "BinaryExpression"
-	TypeIfStatement           NodeType = "IfStatement"
-	TypeConditionalExpression NodeType = "ConditionalExpression"
-	TypeLogicalExpression     NodeType = "LogicalExpression"
-	TypeUnaryExpression       NodeType = "UnaryExpression"
-	TypeArrayPattern          NodeType = "ArrayPattern"
+	TypeProgram                 NodeType = "Program"
+	TypeExpressionStatement     NodeType = "ExpressionStatement"
+	TypeCallExpression          NodeType = "CallExpression"
+	TypeVariableDeclaration     NodeType = "VariableDeclaration"
+	TypeVariableDeclarator      NodeType = "VariableDeclarator"
+	TypeMemberExpression        NodeType = "MemberExpression"
+	TypeIdentifier              NodeType = "Identifier"
+	TypeLiteral                 NodeType = "Literal"
+	TypeObjectExpression        NodeType = "ObjectExpression"
+	TypeProperty                NodeType = "Property"
+	TypeBinaryExpression        NodeType = "BinaryExpression"
+	TypeIfStatement             NodeType = "IfStatement"
+	TypeConditionalExpression   NodeType = "ConditionalExpression"
+	TypeLogicalExpression       NodeType = "LogicalExpression"
+	TypeUnaryExpression         NodeType = "UnaryExpression"
+	TypeArrayPattern            NodeType = "ArrayPattern"
+	TypeArrowFunctionExpression NodeType = "ArrowFunctionExpression"
 )
 
 type Node interface {
@@ -179,3 +180,12 @@ type UnaryExpression struct {
 
 func (u *UnaryExpression) Type() NodeType  { return TypeUnaryExpression }
 func (u *UnaryExpression) expressionNode() {}
+
+type ArrowFunctionExpression struct {
+	NodeType NodeType     `json:"type"`
+	Params   []Identifier `json:"params"`
+	Body     []Node       `json:"body"`
+}
+
+func (a *ArrowFunctionExpression) Type() NodeType  { return TypeArrowFunctionExpression }
+func (a *ArrowFunctionExpression) expressionNode() {}

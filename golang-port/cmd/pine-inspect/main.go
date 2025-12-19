@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/quant5-lab/runner/parser"
+	// "github.com/quant5-lab/runner/preprocessor" // Disabled: using INDENT/DEDENT lexer
 )
 
 func main() {
@@ -21,13 +22,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	sourceStr := string(content)
+	// sourceStr = preprocessor.NormalizeFunctionBlocks(sourceStr)  // Disabled: using INDENT/DEDENT lexer
+
 	p, err := parser.NewParser()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create parser: %v\n", err)
 		os.Exit(1)
 	}
 
-	script, err := p.ParseBytes(inputPath, content)
+	script, err := p.ParseString(inputPath, sourceStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
 		os.Exit(1)
