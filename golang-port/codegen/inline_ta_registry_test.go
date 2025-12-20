@@ -20,6 +20,8 @@ func TestInlineTAIIFERegistry_IsSupported(t *testing.T) {
 		{"wma", "wma", true},
 		{"ta.stdev", "ta.stdev", true},
 		{"stdev", "stdev", true},
+		{"ta.change", "ta.change", true},
+		{"change", "change", true},
 		{"unsupported", "ta.unsupported", false},
 		{"random", "random_func", false},
 	}
@@ -51,6 +53,8 @@ func TestInlineTAIIFERegistry_Generate(t *testing.T) {
 		{"rma_14", "ta.rma", 14, true},
 		{"wma_9", "ta.wma", 9, true},
 		{"stdev_20", "ta.stdev", 20, true},
+		{"change_1", "ta.change", 1, true},
+		{"change_default", "change", 1, true},
 		{"unsupported", "ta.unsupported", 10, false},
 	}
 

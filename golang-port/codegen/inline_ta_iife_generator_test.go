@@ -125,3 +125,120 @@ func TestSTDEVIIFEGenerator(t *testing.T) {
 		t.Error("Missing standard deviation calculation")
 	}
 }
+
+func TestChangeIIFEGenerator(t *testing.T) {
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].High")
+	accessor := CreateAccessGenerator(sourceInfo)
+	gen := &ChangeIIFEGenerator{}
+
+	result := gen.Generate(accessor, 1)
+
+	if !contains(result, "current := ") {
+		t.Error("Missing current value access")
+	}
+
+	if !contains(result, "previous := ") {
+		t.Error("Missing previous value access")
+	}
+
+	if !contains(result, "return current - previous") {
+		t.Error("Missing difference calculation")
+	}
+
+	if !contains(result, "ctx.BarIndex < 1") {
+		t.Error("Missing warmup check for offset=1")
+	}
+}
+
+func TestChangeIIFEGenerator_DefaultOffset(t *testing.T) {
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify("bar.Low")
+	accessor := CreateAccessGenerator(sourceInfo)
+	gen := &ChangeIIFEGenerator{}
+
+	result := gen.Generate(accessor, 0)
+
+	if !contains(result, "ctx.BarIndex < 1") {
+		t.Error("Offset 0 should default to 1")
+	}
+}
+
+func TestChangeIIFEGenerator_CustomOffset(t *testing.T) {
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify("bar.Close")
+	accessor := CreateAccessGenerator(sourceInfo)
+	gen := &ChangeIIFEGenerator{}
+
+	result := gen.Generate(accessor, 5)
+
+	if !contains(result, "ctx.BarIndex < 5") {
+		t.Error("Missing warmup check for offset=5")
+	}
+}
+
+/* TestChangeIIFEGenerator_EdgeCases validates boundary conditions and error handling */
+func TestChangeIIFEGenerator_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name                string
+		offset              int
+		expectedWarmupCheck string
+	}{
+		{
+			name:                "negative offset defaults to 1",
+			offset:              -5,
+			expectedWarmupCheck: "ctx.BarIndex < 1",
+		},
+		{
+			name:                "zero offset defaults to 1",
+			offset:              0,
+			expectedWarmupCheck: "ctx.BarIndex < 1",
+		},
+		{
+			name:                "offset 1",
+			offset:              1,
+			expectedWarmupCheck: "ctx.BarIndex < 1",
+		},
+		{
+			name:                "large offset",
+			offset:              1000,
+			expectedWarmupCheck: "ctx.BarIndex < 1000",
+		},
+		{
+			name:                "warmup boundary matches offset",
+			offset:              50,
+			expectedWarmupCheck: "ctx.BarIndex < 50",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			classifier := NewSeriesSourceClassifier()
+			sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Close")
+			accessor := CreateAccessGenerator(sourceInfo)
+			gen := &ChangeIIFEGenerator{}
+
+			result := gen.Generate(accessor, tt.offset)
+
+			if !contains(result, tt.expectedWarmupCheck) {
+				t.Errorf("Expected warmup check %q, but not found in: %s", tt.expectedWarmupCheck, result)
+			}
+
+			if !contains(result, "current := ") {
+				t.Error("Missing current value assignment")
+			}
+
+			if !contains(result, "previous := ") {
+				t.Error("Missing previous value assignment")
+			}
+
+			if !contains(result, "return current - previous") {
+				t.Error("Missing difference calculation")
+			}
+
+			if !contains(result, "math.NaN()") {
+				t.Error("Missing NaN return for warmup period")
+			}
+		})
+	}
+}

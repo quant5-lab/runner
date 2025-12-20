@@ -156,6 +156,113 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 	}
 }
 
+/* TestArrowFunctionTACallGenerator_ExtractChangeArguments validates change() argument parsing */
+func TestArrowFunctionTACallGenerator_ExtractChangeArguments(t *testing.T) {
+	tests := []struct {
+		name           string
+		call           *ast.CallExpression
+		expectError    bool
+		expectedOffset int
+	}{
+		{
+			name: "change with source only",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+				},
+			},
+			expectError:    false,
+			expectedOffset: 1,
+		},
+		{
+			name: "change with source and offset",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "high"},
+					&ast.Literal{Value: 3.0},
+				},
+			},
+			expectError:    false,
+			expectedOffset: 3,
+		},
+		{
+			name: "ta.change with source and offset",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "low"},
+					&ast.Literal{Value: 5.0},
+				},
+			},
+			expectError:    false,
+			expectedOffset: 5,
+		},
+		{
+			name: "change with integer offset",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: int(10)},
+				},
+			},
+			expectError:    false,
+			expectedOffset: 10,
+		},
+		{
+			name: "change without arguments",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{},
+			},
+			expectError: true,
+		},
+		{
+			name: "change with parameter as offset",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Identifier{Name: "period"},
+				},
+			},
+			expectError:    false,
+			expectedOffset: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			g.variables["period"] = "float"
+			gen := NewArrowFunctionTACallGenerator(g)
+
+			accessor, offset, err := gen.extractChangeArguments(tt.call)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if accessor == nil {
+				t.Error("Expected accessor, got nil")
+			}
+
+			if offset != tt.expectedOffset {
+				t.Errorf("Offset = %d, want %d", offset, tt.expectedOffset)
+			}
+		})
+	}
+}
+
 /* TestArrowFunctionTACallGenerator_SourceClassification validates source type detection */
 func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 	tests := []struct {
@@ -464,6 +571,46 @@ func TestArrowFunctionTACallGenerator_EdgeCases(t *testing.T) {
 						Property: &ast.Identifier{Name: "close"},
 					},
 					&ast.Literal{Value: 10.0},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "change without arguments",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{},
+			},
+			expectError: true,
+		},
+		{
+			name: "change with ta prefix and valid args",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: 2.0},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "change with only source argument",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "high"},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "change with invalid offset type",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "change"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "low"},
+					&ast.Identifier{Name: "nonExistentVar"},
 				},
 			},
 			expectError: true,

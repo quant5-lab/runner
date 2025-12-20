@@ -118,3 +118,20 @@ func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period int) str
 		WithBody(body).
 		Build()
 }
+
+type ChangeIIFEGenerator struct{}
+
+func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset int) string {
+	if offset <= 0 {
+		offset = 1
+	}
+
+	body := fmt.Sprintf("current := %s; ", accessor.GenerateLoopValueAccess("0"))
+	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offset)))
+	body += "return current - previous"
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheck(offset + 1).
+		WithBody(body).
+		Build()
+}

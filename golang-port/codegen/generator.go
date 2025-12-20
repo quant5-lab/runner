@@ -1201,6 +1201,17 @@ func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr a
 		return g.ind() + fmt.Sprintf("%s := func() float64 { if %s { return %s } else { return %s } }()\n",
 			varName, condCode, consequentCode, alternateCode), nil
 
+	case *ast.UnaryExpression:
+		operandCode, err := g.generateArrowFunctionExpression(expr.Argument)
+		if err != nil {
+			return "", err
+		}
+		op := expr.Operator
+		if op == "not" {
+			op = "!"
+		}
+		return g.ind() + fmt.Sprintf("%s := %s%s\n", varName, op, operandCode), nil
+
 	default:
 		return "", fmt.Errorf("unsupported arrow function variable init expression: %T", initExpr)
 	}

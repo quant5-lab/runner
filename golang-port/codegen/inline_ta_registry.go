@@ -27,6 +27,8 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	r.Register("highest", &HighestIIFEGenerator{})
 	r.Register("ta.lowest", &LowestIIFEGenerator{})
 	r.Register("lowest", &LowestIIFEGenerator{})
+	r.Register("ta.change", &ChangeIIFEGenerator{})
+	r.Register("change", &ChangeIIFEGenerator{})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {

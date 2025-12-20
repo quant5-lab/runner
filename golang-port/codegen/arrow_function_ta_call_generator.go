@@ -40,6 +40,10 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 }
 
 func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, int, error) {
+	if funcName == "ta.change" || funcName == "change" {
+		return a.extractChangeArguments(call)
+	}
+
 	if len(call.Arguments) == 1 {
 		return a.extractSingleArgumentForm(funcName, call)
 	}
@@ -62,6 +66,29 @@ func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call 
 	}
 
 	return accessor, period, nil
+}
+
+func (a *ArrowFunctionTACallGenerator) extractChangeArguments(call *ast.CallExpression) (AccessGenerator, int, error) {
+	if len(call.Arguments) < 1 {
+		return nil, 0, fmt.Errorf("change() requires at least 1 argument (source)")
+	}
+
+	sourceArg := call.Arguments[0]
+	accessor, err := a.createAccessorFromExpression(sourceArg)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create accessor for change(): %w", err)
+	}
+
+	offset := 1
+	if len(call.Arguments) >= 2 {
+		offsetValue, err := a.extractPeriodValue(call.Arguments[1])
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to extract offset for change(): %w", err)
+		}
+		offset = offsetValue
+	}
+
+	return accessor, offset, nil
 }
 
 func (a *ArrowFunctionTACallGenerator) extractSingleArgumentForm(funcName string, call *ast.CallExpression) (AccessGenerator, int, error) {
