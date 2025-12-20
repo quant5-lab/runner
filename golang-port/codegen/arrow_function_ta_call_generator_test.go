@@ -509,24 +509,24 @@ func TestArrowFunctionParameterAccessor_CodeGeneration(t *testing.T) {
 			paramName:       "length",
 			loopVar:         "j",
 			period:          20,
-			expectedLoop:    "ctx.Data[ctx.BarIndex-j].Close",
-			expectedInitial: "ctx.Data[ctx.BarIndex-(20-1)].Close",
+			expectedLoop:    "lengthSeries.Get(j)",
+			expectedInitial: "lengthSeries.Get(20-1)",
 		},
 		{
 			name:            "different loop variable",
 			paramName:       "period",
 			loopVar:         "i",
 			period:          10,
-			expectedLoop:    "ctx.Data[ctx.BarIndex-i].Close",
-			expectedInitial: "ctx.Data[ctx.BarIndex-(10-1)].Close",
+			expectedLoop:    "periodSeries.Get(i)",
+			expectedInitial: "periodSeries.Get(10-1)",
 		},
 		{
 			name:            "single period",
 			paramName:       "len",
 			loopVar:         "k",
 			period:          1,
-			expectedLoop:    "ctx.Data[ctx.BarIndex-k].Close",
-			expectedInitial: "ctx.Data[ctx.BarIndex-(1-1)].Close",
+			expectedLoop:    "lenSeries.Get(k)",
+			expectedInitial: "lenSeries.Get(1-1)",
 		},
 	}
 
@@ -596,9 +596,11 @@ smoothed(src, len) =>
 result = smoothed(close, 14)
 plot(result)`,
 			mustContain: []string{
-				"func smoothed(ctx *Context, src float64, len float64) float64",
+				"func smoothed(ctx *Context, srcSeries *series.Series, len float64) float64",
 				"alpha",
 				"ema",
+				"srcSeries.Get(",
+				"smoothed(ctx, closeSeries, 14.0)",
 			},
 		},
 	}

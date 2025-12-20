@@ -37,8 +37,8 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 	var args []string
 	args = append(args, "ctx") // First parameter is always ctx
 
-	for _, arg := range call.Arguments {
-		argCode, err := h.generateArgumentExpression(g, arg)
+	for argIdx, arg := range call.Arguments {
+		argCode, err := h.generateArgumentExpression(g, arg, funcName, argIdx)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate argument: %w", err)
 		}
@@ -57,30 +57,44 @@ func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) boo
 	}
 }
 
-func (h *UserDefinedFunctionHandler) generateArgumentExpression(g *generator, expr ast.Expression) (string, error) {
+func (h *UserDefinedFunctionHandler) generateArgumentExpression(g *generator, expr ast.Expression, funcName string, paramIndex int) (string, error) {
+	paramType, hasSignature := g.funcSigRegistry.GetParameterType(funcName, paramIndex)
+
 	switch e := expr.(type) {
 	case *ast.Identifier:
-		// Check if it's a builtin identifier (like close, open, high, low)
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
-			// Builtin identifiers need Series access for user function calls
-			// Convert "bar.Close" to "closeSeries.Get(0)"
-			switch e.Name {
-			case "close":
-				return "closeSeries.Get(0)", nil
-			case "open":
-				return "openSeries.Get(0)", nil
-			case "high":
-				return "highSeries.Get(0)", nil
-			case "low":
-				return "lowSeries.Get(0)", nil
-			case "volume":
-				return "volumeSeries.Get(0)", nil
-			default:
-				// Non-bar-field builtin, use as-is
-				return code, nil
+			if hasSignature && paramType == ParamTypeSeries {
+				switch e.Name {
+				case "close":
+					return "closeSeries", nil
+				case "open":
+					return "openSeries", nil
+				case "high":
+					return "highSeries", nil
+				case "low":
+					return "lowSeries", nil
+				case "volume":
+					return "volumeSeries", nil
+				default:
+					return code, nil
+				}
+			} else {
+				switch e.Name {
+				case "close":
+					return "closeSeries.Get(0)", nil
+				case "open":
+					return "openSeries.Get(0)", nil
+				case "high":
+					return "highSeries.Get(0)", nil
+				case "low":
+					return "lowSeries.Get(0)", nil
+				case "volume":
+					return "volumeSeries.Get(0)", nil
+				default:
+					return code, nil
+				}
 			}
 		}
-		// Function parameter, variable, or constant - return name directly
 		return e.Name, nil
 
 	case *ast.Literal:
@@ -97,11 +111,11 @@ func (h *UserDefinedFunctionHandler) generateArgumentExpression(g *generator, ex
 		return g.generateCallExpression(e)
 
 	case *ast.BinaryExpression:
-		left, err := h.generateArgumentExpression(g, e.Left)
+		left, err := h.generateArgumentExpression(g, e.Left, funcName, paramIndex)
 		if err != nil {
 			return "", err
 		}
-		right, err := h.generateArgumentExpression(g, e.Right)
+		right, err := h.generateArgumentExpression(g, e.Right, funcName, paramIndex)
 		if err != nil {
 			return "", err
 		}

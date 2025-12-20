@@ -16,7 +16,12 @@ func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
 }
 
 func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFunctionExpression) (string, error) {
-	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc)
+	analyzer := NewParameterUsageAnalyzer()
+	paramUsage := analyzer.AnalyzeArrowFunction(arrowFunc)
+
+	a.gen.signatureRegistrar.RegisterArrowFunction(funcName, arrowFunc.Params, paramUsage, "float64")
+
+	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc, paramUsage)
 	if err != nil {
 		return "", err
 	}
@@ -35,8 +40,8 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	return code, nil
 }
 
-func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arrowFunc *ast.ArrowFunctionExpression) (string, string, error) {
-	params := a.buildParameterList(arrowFunc.Params)
+func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arrowFunc *ast.ArrowFunctionExpression, paramTypes map[string]ParameterUsageType) (string, string, error) {
+	params := a.buildParameterList(arrowFunc.Params, paramTypes)
 	returnType, err := a.inferReturnType(arrowFunc)
 	if err != nil {
 		return "", "", err
@@ -46,14 +51,19 @@ func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arro
 	return signature, returnType, nil
 }
 
-func (a *ArrowFunctionCodegen) buildParameterList(params []ast.Identifier) string {
+func (a *ArrowFunctionCodegen) buildParameterList(params []ast.Identifier, paramTypes map[string]ParameterUsageType) string {
 	if len(params) == 0 {
 		return ""
 	}
 
 	var parts []string
 	for _, param := range params {
-		parts = append(parts, fmt.Sprintf("%s float64", param.Name))
+		paramType := paramTypes[param.Name]
+		if paramType == ParameterUsageSeries {
+			parts = append(parts, fmt.Sprintf("%sSeries *series.Series", param.Name))
+		} else {
+			parts = append(parts, fmt.Sprintf("%s float64", param.Name))
+		}
 	}
 
 	return ", " + strings.Join(parts, ", ")

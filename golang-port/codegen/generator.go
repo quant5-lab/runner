@@ -53,6 +53,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry()
 	gen.plotCollector = NewPlotCollector()
 	gen.callRouter = NewCallExpressionRouter()
+	gen.funcSigRegistry = NewFunctionSignatureRegistry()
+	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -107,6 +109,8 @@ type generator struct {
 	inlineConditionRegistry *InlineConditionHandlerRegistry
 	plotCollector           *PlotCollector
 	callRouter              *CallExpressionRouter
+	funcSigRegistry         *FunctionSignatureRegistry
+	signatureRegistrar      *SignatureRegistrar
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {

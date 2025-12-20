@@ -160,9 +160,9 @@ func NewArrowFunctionParameterAccessor(parameterName string) *ArrowFunctionParam
 }
 
 func (a *ArrowFunctionParameterAccessor) GenerateLoopValueAccess(loopVar string) string {
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].Close", loopVar)
+	return fmt.Sprintf("%sSeries.Get(%s)", a.parameterName, loopVar)
 }
 
 func (a *ArrowFunctionParameterAccessor) GenerateInitialValueAccess(period int) string {
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-(%d-1)].Close", period)
+	return fmt.Sprintf("%sSeries.Get(%d-1)", a.parameterName, period)
 }

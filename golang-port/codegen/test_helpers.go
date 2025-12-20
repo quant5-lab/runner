@@ -26,7 +26,9 @@ func newTestGenerator() *generator {
 		constEvaluator:    validation.NewWarmupAnalyzer(),
 		plotCollector:     NewPlotCollector(),
 		callRouter:        NewCallExpressionRouter(),
+		funcSigRegistry:   NewFunctionSignatureRegistry(),
 	}
+	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
