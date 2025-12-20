@@ -1157,6 +1157,11 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr ast.Expression) (string, error) {
 	switch expr := initExpr.(type) {
 	case *ast.CallExpression:
+		funcName := extractCallFunctionName(expr)
+		if funcName == "fixnan" || funcName == "ta.fixnan" {
+			return g.generateArrowFunctionFixnanInit(varName, expr)
+		}
+
 		exprCode, err := g.generateCallExpression(expr)
 		if err != nil {
 			return "", err
@@ -1214,6 +1219,78 @@ func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr a
 
 	default:
 		return "", fmt.Errorf("unsupported arrow function variable init expression: %T", initExpr)
+	}
+}
+
+func (g *generator) generateArrowFunctionFixnanInit(varName string, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("fixnan() requires 1 argument")
+	}
+
+	sourceExpr := call.Arguments[0]
+
+	accessor, err := g.createAccessorForFixnan(sourceExpr)
+	if err != nil {
+		return "", fmt.Errorf("fixnan: failed to create accessor: %w", err)
+	}
+
+	targetSeriesVar := varName + "Series"
+	generator := &FixnanIIFEGenerator{}
+	iifeCode := generator.GenerateWithSelfReference(accessor, targetSeriesVar)
+
+	return g.ind() + fmt.Sprintf("%s := %s\n", varName, iifeCode), nil
+}
+
+func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerator, error) {
+	switch e := expr.(type) {
+	case *ast.Identifier:
+		if varType, exists := g.variables[e.Name]; exists && varType == "float" {
+			return NewArrowFunctionParameterAccessor(e.Name), nil
+		}
+
+		classifier := NewSeriesSourceClassifier()
+		sourceInfo := classifier.ClassifyAST(e)
+		return CreateAccessGenerator(sourceInfo), nil
+
+	case *ast.CallExpression:
+		funcName := extractCallFunctionName(e)
+
+		tempVarName := strings.ReplaceAll(funcName, ".", "_") + "_temp"
+		tempCode, err := g.generateArrowFunctionVariableInit(tempVarName, e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate temp var for fixnan source: %w", err)
+		}
+
+		return &FixnanCallExpressionAccessor{
+			tempVarName: tempVarName,
+			tempVarCode: tempCode,
+		}, nil
+
+	case *ast.BinaryExpression:
+		tempVarName := "fixnan_source_temp"
+		binaryCode, err := g.generateBinaryExpression(e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate binary expression: %w", err)
+		}
+
+		return &FixnanCallExpressionAccessor{
+			tempVarName: tempVarName,
+			tempVarCode: g.ind() + fmt.Sprintf("%s := %s\n", tempVarName, binaryCode),
+		}, nil
+
+	case *ast.MemberExpression:
+		if obj, ok := e.Object.(*ast.Identifier); ok {
+			if obj.Name == "ctx" {
+				if prop, ok := e.Property.(*ast.Identifier); ok {
+					fieldName := capitalizeFirst(prop.Name)
+					return NewOHLCVFieldAccessGenerator(fieldName), nil
+				}
+			}
+		}
+		return nil, fmt.Errorf("unsupported member expression in fixnan")
+
+	default:
+		return nil, fmt.Errorf("unsupported source expression type for fixnan: %T", expr)
 	}
 }
 

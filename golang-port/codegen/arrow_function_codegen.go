@@ -265,6 +265,10 @@ func (a *ArrowFunctionCodegen) generateExpression(expr ast.Expression) (string, 
 		return fmt.Sprintf("%v", e.Value), nil
 
 	case *ast.CallExpression:
+		funcName := extractCallFunctionName(e)
+		if funcName == "fixnan" || funcName == "ta.fixnan" {
+			return a.generateFixnanExpression(e)
+		}
 		return a.gen.generateCallExpression(e)
 
 	case *ast.BinaryExpression:
@@ -339,4 +343,22 @@ func (a *ArrowFunctionCodegen) mapOperator(op string) string {
 	default:
 		return op
 	}
+}
+
+func (a *ArrowFunctionCodegen) generateFixnanExpression(call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("fixnan() requires 1 argument")
+	}
+
+	sourceExpr := call.Arguments[0]
+
+	accessor, err := a.gen.createAccessorForFixnan(sourceExpr)
+	if err != nil {
+		return "", fmt.Errorf("fixnan: failed to create accessor: %w", err)
+	}
+
+	generator := &FixnanIIFEGenerator{}
+	iifeCode := generator.GenerateWithSelfReference(accessor, "")
+
+	return iifeCode, nil
 }
