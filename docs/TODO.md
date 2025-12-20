@@ -165,10 +165,10 @@
 - [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
 - [x] `bb7-dissect-potential.pine` - Pivot in security() returns valid values (3013/3045 high, 3000/3045 low non-null)
-- [ ] `bb7-dissect-adx.pine` - Arrow function `dirmov` uses `change()` which is not supported in arrow function context
+- [ ] `bb7-dissect-adx.pine` - Arrow function fixnan() codegen (stateless IIFE, 40 tests, ForwardSeriesBuffer aligned) - Blocked: ConditionalExpression in fixnan() source
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [x] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
-- [ ] `bb7-dissect-full.pine` - Blocked: All above prerequisites required
+- [ ] `bb7-dissect-full.pine` - Blocked: ConditionalExpression in fixnan() source required
 
 ## Phase 5: Strategy Validation
 - [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully
