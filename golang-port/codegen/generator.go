@@ -80,6 +80,7 @@ type generator struct {
 	indent                   int
 	taFunctions              []taFunctionCall
 	inSecurityContext        bool
+	inArrowFunctionBody      bool // Track if generating arrow function body
 	hasSecurityCalls         bool // Track if security() calls exist
 	hasSecurityExprEvals     bool // Track if security() calls with complex expressions exist
 	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
@@ -236,25 +237,50 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				}
 				varName := id.Name
 
+				// Skip arrow function declarations (user-defined functions, not variables)
+				if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
+					continue
+				}
+
 				// Check if this is an input.* function call
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 					funcName := g.extractFunctionName(callExpr.Callee)
 
 					// Generate input constants immediately (if handler exists)
 					if g.inputHandler != nil {
-						// Handle Pine v4 generic input() - infer type from first arg
+						// Handle Pine v4 generic input() - infer type from arguments
 						if funcName == "input" && len(callExpr.Arguments) > 0 {
-							if lit, ok := callExpr.Arguments[0].(*ast.Literal); ok {
-								// Check if value is float or int
-								switch v := lit.Value.(type) {
-								case float64:
-									if v == float64(int(v)) {
-										funcName = "input.int"
-									} else {
-										funcName = "input.float"
+							// Check for type=input.session ObjectExpression
+							for _, arg := range callExpr.Arguments {
+								if objExpr, ok := arg.(*ast.ObjectExpression); ok {
+									for _, prop := range objExpr.Properties {
+										if keyId, ok := prop.Key.(*ast.Identifier); ok && keyId.Name == "type" {
+											if memExpr, ok := prop.Value.(*ast.MemberExpression); ok {
+												if objId, ok := memExpr.Object.(*ast.Identifier); ok {
+													if propId, ok := memExpr.Property.(*ast.Identifier); ok {
+														if objId.Name == "input" && propId.Name == "session" {
+															funcName = "input.session"
+														}
+													}
+												}
+											}
+										}
 									}
-								case int:
-									funcName = "input.int"
+								}
+							}
+							// Infer from first literal arg if not already determined
+							if funcName == "input" {
+								if lit, ok := callExpr.Arguments[0].(*ast.Literal); ok {
+									switch v := lit.Value.(type) {
+									case float64:
+										if v == float64(int(v)) {
+											funcName = "input.int"
+										} else {
+											funcName = "input.float"
+										}
+									case int:
+										funcName = "input.int"
+									}
 								}
 							}
 						}
@@ -338,6 +364,30 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Pre-analyze security() calls to register temp vars BEFORE declarations
 	g.preAnalyzeSecurityCalls(program)
 
+	// Generate arrow functions BEFORE bar loop
+	arrowFunctions := ""
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				id, ok := declarator.ID.(*ast.Identifier)
+				if !ok {
+					continue
+				}
+				if arrowFunc, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
+					// Register function
+					g.variables[id.Name] = "function"
+					// Generate function code
+					arrowCodegen := NewArrowFunctionCodegen(g)
+					funcCode, err := arrowCodegen.Generate(id.Name, arrowFunc)
+					if err != nil {
+						return "", fmt.Errorf("failed to generate arrow function %s: %w", id.Name, err)
+					}
+					arrowFunctions += funcCode
+				}
+			}
+		}
+	}
+
 	// Second pass: No longer needed (ALL variables use Series storage)
 	// Kept for future optimizations if needed
 
@@ -369,6 +419,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	code := ""
+
+	// Arrow functions (user-defined) - BEFORE bar loop
+	if arrowFunctions != "" {
+		code += g.ind() + "// User-defined functions\n"
+		code += arrowFunctions
+		code += "\n"
+	}
 
 	// Initialize strategy
 	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
@@ -549,8 +606,6 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateVariableDeclaration(n)
 	case *ast.IfStatement:
 		return g.generateIfStatement(n)
-	case *ast.ArrowFunctionExpression:
-		return g.generateArrowFunction(n)
 	default:
 		return "", fmt.Errorf("unsupported statement type: %T", node)
 	}
@@ -569,6 +624,22 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 	case *ast.UnaryExpression:
 		return g.generateUnaryExpression(e)
 	case *ast.Identifier:
+		// In arrow function context or as call argument, return identifier directly
+		if g.inArrowFunctionBody {
+			// Check if it's a builtin identifier
+			if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+				return code, nil
+			}
+			// Check if it's a function parameter or variable
+			if _, exists := g.variables[e.Name]; exists {
+				return e.Name, nil
+			}
+			// Check if it's a constant
+			if _, exists := g.constants[e.Name]; exists {
+				return e.Name, nil
+			}
+			return e.Name, nil
+		}
 		return g.ind() + "// " + e.Name + "\n", nil
 	case *ast.Literal:
 		return g.generateLiteral(e)
@@ -644,14 +715,49 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	return code, nil
 }
 
-func (g *generator) generateArrowFunction(arrowFunc *ast.ArrowFunctionExpression) (string, error) {
-	return "", fmt.Errorf("arrow function codegen not yet implemented")
+func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
+	// Arrow function context: Generate arithmetic expression
+	if g.inArrowFunctionBody {
+		left, err := g.generateArrowFunctionExpression(binExpr.Left)
+		if err != nil {
+			return "", err
+		}
+		right, err := g.generateArrowFunctionExpression(binExpr.Right)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(%s %s %s)", left, binExpr.Operator, right), nil
+	}
+
+	// Series context: Binary expressions should be in condition context
+	return "", fmt.Errorf("binary expression should be used in condition context")
 }
 
-func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
-	// Binary expressions should be handled in condition context
-	// This is just a fallback - shouldn't be called directly
-	return "", fmt.Errorf("binary expression should be used in condition context")
+func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string, error) {
+	switch e := expr.(type) {
+	case *ast.Identifier:
+		// Check if it's a builtin identifier
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+			return code, nil
+		}
+		// Function parameter or local variable
+		return e.Name, nil
+
+	case *ast.Literal:
+		return fmt.Sprintf("%v", e.Value), nil
+
+	case *ast.CallExpression:
+		return g.generateCallExpression(e)
+
+	case *ast.BinaryExpression:
+		return g.generateBinaryExpression(e)
+
+	case *ast.MemberExpression:
+		return g.generateMemberExpression(e)
+
+	default:
+		return "", fmt.Errorf("unsupported arrow function expression type: %T", expr)
+	}
 }
 
 func (g *generator) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (string, error) {
@@ -809,6 +915,11 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 		// Inline TA/math functions: plot(sma(close, 20)), plot(math.max(high, low))
 		return g.plotExprHandler.Generate(expr)
 
+	case *ast.ObjectExpression:
+		// Named arguments like type=input.session in input() calls, or title=/overlay= in study()
+		// These are metadata, not values - return empty string
+		return "", nil
+
 	default:
 		return "", fmt.Errorf("unsupported plot expression type: %T", expr)
 	}
@@ -954,6 +1065,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return g.valueHandler.GenerateInlineCall(funcName, e.Arguments, g)
 		}
 
+		if varType, exists := g.variables[funcName]; exists && varType == "function" {
+			return g.callRouter.RouteCall(g, e)
+		}
+
 		return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 
 	default:
@@ -966,14 +1081,15 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	for _, declarator := range decl.Declarations {
 		id, ok := declarator.ID.(*ast.Identifier)
 		if !ok {
-			initCode, err := g.generateExpression(declarator.Init)
-			if err != nil {
-				return "", err
-			}
-			code += fmt.Sprintf("\t%s %s = %s\n", decl.Kind, g.generatePattern(declarator.ID), initCode)
-			continue
+			return g.generateTupleDestructuringDeclaration(declarator)
 		}
 		varName := id.Name
+
+		// Handle arrow function declarations (user-defined functions)
+		if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
+			// Already generated before bar loop - skip here
+			continue
+		}
 
 		// Check if this is an input.* function call
 		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
@@ -1013,15 +1129,77 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 
 		// Generate initialization from init expression
 		if declarator.Init != nil {
-			// ALL variables use same initialization path (ForwardSeriesBuffer paradigm)
-			initCode, err := g.generateVariableInit(varName, declarator.Init)
-			if err != nil {
-				return "", err
+			// Arrow function context: Generate inline variable assignment
+			if g.inArrowFunctionBody {
+				initCode, err := g.generateArrowFunctionVariableInit(varName, declarator.Init)
+				if err != nil {
+					return "", err
+				}
+				code += initCode
+			} else {
+				// Series context: Use ForwardSeriesBuffer paradigm
+				initCode, err := g.generateVariableInit(varName, declarator.Init)
+				if err != nil {
+					return "", err
+				}
+				code += initCode
 			}
-			code += initCode
 		}
 	}
 	return code, nil
+}
+
+// generateArrowFunctionVariableInit generates inline variable assignment for arrow function context
+func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr ast.Expression) (string, error) {
+	switch expr := initExpr.(type) {
+	case *ast.CallExpression:
+		exprCode, err := g.generateCallExpression(expr)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+
+	case *ast.BinaryExpression:
+		exprCode, err := g.generateBinaryExpression(expr)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+
+	case *ast.Identifier:
+		return g.ind() + fmt.Sprintf("%s := %s\n", varName, expr.Name), nil
+
+	case *ast.Literal:
+		return g.ind() + fmt.Sprintf("%s := %v\n", varName, expr.Value), nil
+
+	case *ast.MemberExpression:
+		exprCode, err := g.generateMemberExpression(expr)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+
+	case *ast.ConditionalExpression:
+		condCode, err := g.generateConditionExpression(expr.Test)
+		if err != nil {
+			return "", err
+		}
+		condCode = g.addBoolConversionIfNeeded(expr.Test, condCode)
+
+		consequentCode, err := g.generateNumericExpression(expr.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateNumericExpression(expr.Alternate)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%s := func() float64 { if %s { return %s } else { return %s } }()\n",
+			varName, condCode, consequentCode, alternateCode), nil
+
+	default:
+		return "", fmt.Errorf("unsupported arrow function variable init expression: %T", initExpr)
+	}
 }
 
 // inferVariableType delegates to TypeInferenceEngine
@@ -1199,6 +1377,15 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpression) (string, error) {
 	funcName := g.extractFunctionName(call.Callee)
+
+	// Check if this is a user-defined function
+	if varType, exists := g.variables[funcName]; exists && varType == "function" {
+		callCode, err := g.generateCallExpression(call)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
+	}
 
 	// Try TA function registry first
 	if g.taRegistry.IsSupported(funcName) {
@@ -1783,10 +1970,39 @@ func (g *generator) generatePattern(pattern ast.Pattern) string {
 		for i, elem := range p.Elements {
 			names[i] = elem.Name
 		}
-		return "[" + strings.Join(names, ", ") + "]"
+		return strings.Join(names, ", ")
 	default:
 		return "unknown"
 	}
+}
+
+func (g *generator) generateTupleDestructuringDeclaration(declarator ast.VariableDeclarator) (string, error) {
+	arrayPattern, ok := declarator.ID.(*ast.ArrayPattern)
+	if !ok {
+		return "", fmt.Errorf("expected ArrayPattern for tuple destructuring, got %T", declarator.ID)
+	}
+
+	if len(arrayPattern.Elements) == 0 {
+		return "", fmt.Errorf("empty tuple pattern")
+	}
+
+	varNames := make([]string, len(arrayPattern.Elements))
+	for i, elem := range arrayPattern.Elements {
+		varNames[i] = elem.Name
+		g.variables[elem.Name] = "float"
+	}
+
+	callExpr, ok := declarator.Init.(*ast.CallExpression)
+	if !ok {
+		return "", fmt.Errorf("tuple destructuring init must be CallExpression, got %T", declarator.Init)
+	}
+
+	initCode, err := g.generateCallExpression(callExpr)
+	if err != nil {
+		return "", err
+	}
+
+	return g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), initCode), nil
 }
 
 func (g *generator) extractStringLiteral(expr ast.Expression) string {

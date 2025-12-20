@@ -69,6 +69,10 @@ func (e *TAArgumentExtractor) extractPeriod(periodArg ast.Expression, funcName s
 
 	periodValue := e.generator.constEvaluator.EvaluateConstant(periodArg)
 	if math.IsNaN(periodValue) || periodValue <= 0 {
+		// Allow runtime periods within arrow functions (use -1 as sentinel)
+		if e.generator.inArrowFunctionBody {
+			return -1, nil
+		}
 		return 0, fmt.Errorf("%s period must be compile-time constant (got %T that evaluates to NaN)", funcName, periodArg)
 	}
 

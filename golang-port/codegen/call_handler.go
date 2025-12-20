@@ -41,6 +41,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(&PlotFunctionHandler{})
 	router.RegisterHandler(&StrategyActionHandler{})
 	router.RegisterHandler(&TAIndicatorCallHandler{})
+	router.RegisterHandler(&UserDefinedFunctionHandler{})
 	router.RegisterHandler(&UnknownFunctionHandler{})
 
 	return router
@@ -56,12 +57,33 @@ func (r *CallExpressionRouter) RouteCall(g *generator, call *ast.CallExpression)
 	funcName := extractCallFunctionName(call)
 
 	for _, handler := range r.handlers {
-		if handler.CanHandle(funcName) {
-			return handler.GenerateCode(g, call)
+		canHandle := handler.CanHandle(funcName)
+
+		// Try handler regardless of CanHandle (context-based handlers need this)
+		code, err := handler.GenerateCode(g, call)
+		if err != nil {
+			return "", err
 		}
+
+		// If handler claims it can handle AND generated code, use it
+		if canHandle && code != "" {
+			return code, nil
+		}
+
+		// If handler can't handle but still generated code, use it (context-based handler)
+		if !canHandle && code != "" {
+			return code, nil
+		}
+
+		// If handler claims it can handle but returned empty, stop trying (explicit handling)
+		if canHandle && code == "" {
+			return "", nil
+		}
+
+		// Handler returned empty and doesn't claim to handle - try next
 	}
 
-	// Should never reach here if UnknownFunctionHandler is registered
+	// No handler generated code
 	return "", nil
 }
 

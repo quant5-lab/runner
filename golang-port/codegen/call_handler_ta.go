@@ -1,6 +1,8 @@
 package codegen
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"github.com/quant5-lab/runner/ast"
+)
 
 // TAIndicatorCallHandler handles TA indicator calls in expression context.
 //
@@ -23,7 +25,23 @@ func (h *TAIndicatorCallHandler) CanHandle(funcName string) bool {
 }
 
 func (h *TAIndicatorCallHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
-	// TA indicator calls are handled in variable declarations
-	// No immediate statement code generated
+	funcName := extractCallFunctionName(call)
+
+	// Check if this is actually a user-defined function (not a TA function)
+	if varType, exists := g.variables[funcName]; exists && varType == "function" {
+		return "", nil // Let UserDefinedFunctionHandler handle it
+	}
+
+	// Arrow function context: Generate function call expression
+	if g.inArrowFunctionBody {
+		return h.generateArrowFunctionTACall(g, call)
+	}
+
+	// Series context: TA indicator calls are handled in variable declarations
 	return "", nil
+}
+
+func (h *TAIndicatorCallHandler) generateArrowFunctionTACall(g *generator, call *ast.CallExpression) (string, error) {
+	generator := NewArrowFunctionTACallGenerator(g)
+	return generator.Generate(call)
 }

@@ -34,9 +34,30 @@ func (h *PlotExpressionHandler) Generate(expr ast.Expression) (string, error) {
 		return h.generator.generateConditionExpression(expr)
 	case *ast.CallExpression:
 		return h.handleCallExpression(e)
+	case *ast.ObjectExpression:
+		return h.handleObjectExpression(e)
 	default:
 		return "", fmt.Errorf("unsupported plot expression type: %T", expr)
 	}
+}
+
+func (h *PlotExpressionHandler) handleObjectExpression(obj *ast.ObjectExpression) (string, error) {
+	for _, prop := range obj.Properties {
+		if keyId, ok := prop.Key.(*ast.Identifier); ok {
+			if keyId.Name == "type" {
+				if memExpr, ok := prop.Value.(*ast.MemberExpression); ok {
+					if objId, ok := memExpr.Object.(*ast.Identifier); ok {
+						if propId, ok := memExpr.Property.(*ast.Identifier); ok {
+							if objId.Name == "input" && propId.Name == "session" {
+								return "", nil
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("unsupported ObjectExpression in plot context")
 }
 
 func (h *PlotExpressionHandler) handleConditional(expr *ast.ConditionalExpression) (string, error) {
@@ -77,6 +98,10 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 
 	if h.isMathFunction(funcName) {
 		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
+	}
+
+	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {
+		return h.generator.callRouter.RouteCall(h.generator, call)
 	}
 
 	return "", fmt.Errorf("unsupported inline function in plot: %s", funcName)

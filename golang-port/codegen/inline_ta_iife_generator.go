@@ -88,3 +88,33 @@ func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period int) stri
 		WithBody(body).
 		Build()
 }
+
+type HighestIIFEGenerator struct{}
+
+func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
+	body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(period))
+	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-1)
+	body += fmt.Sprintf("val := %s; ", accessor.GenerateLoopValueAccess("j"))
+	body += "if val > highest { highest = val } }; "
+	body += "return highest"
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheck(period).
+		WithBody(body).
+		Build()
+}
+
+type LowestIIFEGenerator struct{}
+
+func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
+	body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(period))
+	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-1)
+	body += fmt.Sprintf("val := %s; ", accessor.GenerateLoopValueAccess("j"))
+	body += "if val < lowest { lowest = val } }; "
+	body += "return lowest"
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheck(period).
+		WithBody(body).
+		Build()
+}

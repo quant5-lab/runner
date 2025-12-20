@@ -23,6 +23,10 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	r.Register("wma", &WMAIIFEGenerator{})
 	r.Register("ta.stdev", &STDEVIIFEGenerator{})
 	r.Register("stdev", &STDEVIIFEGenerator{})
+	r.Register("ta.highest", &HighestIIFEGenerator{})
+	r.Register("highest", &HighestIIFEGenerator{})
+	r.Register("ta.lowest", &LowestIIFEGenerator{})
+	r.Register("lowest", &LowestIIFEGenerator{})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {

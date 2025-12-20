@@ -17,6 +17,11 @@ func (h *PlotFunctionHandler) CanHandle(funcName string) bool {
 }
 
 func (h *PlotFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
+	funcName := extractCallFunctionName(call)
+	if !h.CanHandle(funcName) {
+		return "", nil
+	}
+
 	opts := ParsePlotOptions(call)
 
 	var plotExpr string
