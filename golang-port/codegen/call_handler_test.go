@@ -44,11 +44,13 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"strategy.entry", 2, "StrategyActionHandler"},
 		{"strategy.close", 2, "StrategyActionHandler"},
 		{"strategy.close_all", 2, "StrategyActionHandler"},
-		{"ta.sma", 3, "TAIndicatorCallHandler"},
-		{"ta.ema", 3, "TAIndicatorCallHandler"},
-		{"ta.crossover", 3, "TAIndicatorCallHandler"},
-		{"valuewhen", 3, "TAIndicatorCallHandler"},
-		{"unknown_function", 5, "UnknownFunctionHandler"},
+		{"abs", 3, "MathCallHandler"},
+		{"math.abs", 3, "MathCallHandler"},
+		{"ta.sma", 4, "TAIndicatorCallHandler"},
+		{"ta.ema", 4, "TAIndicatorCallHandler"},
+		{"ta.crossover", 4, "TAIndicatorCallHandler"},
+		{"valuewhen", 4, "TAIndicatorCallHandler"},
+		{"unknown_function", 6, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {

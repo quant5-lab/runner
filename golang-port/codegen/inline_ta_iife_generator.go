@@ -38,6 +38,11 @@ func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 type RMAIIFEGenerator struct{}
 
 func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
+	preamble := ""
+	if tempAccessor, ok := accessor.(*FixnanCallExpressionAccessor); ok {
+		preamble = tempAccessor.GetPreamble()
+	}
+
 	body := fmt.Sprintf("alpha := 1.0 / %d.0; ", period)
 	body += "sum := 0.0; "
 	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-1)
@@ -48,10 +53,15 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 	body += fmt.Sprintf("rma = alpha*%s + (1-alpha)*rma }; ", accessor.GenerateLoopValueAccess("j"))
 	body += "return rma"
 
-	return NewIIFECodeBuilder().
+	iife := NewIIFECodeBuilder().
 		WithWarmupCheck(period).
 		WithBody(body).
 		Build()
+
+	if preamble != "" {
+		return fmt.Sprintf("func() float64 { %sreturn %s }()", preamble, iife)
+	}
+	return iife
 }
 
 type WMAIIFEGenerator struct{}

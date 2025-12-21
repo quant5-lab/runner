@@ -759,6 +759,9 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 	case *ast.MemberExpression:
 		return g.generateMemberExpression(e)
 
+	case *ast.ConditionalExpression:
+		return g.generateConditionalExpression(e)
+
 	default:
 		return "", fmt.Errorf("unsupported arrow function expression type: %T", expr)
 	}
