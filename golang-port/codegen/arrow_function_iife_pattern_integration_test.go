@@ -150,13 +150,13 @@ result = composite(20)
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q", want)
 				}
 			}
 
 			for _, notWant := range tt.mustNotContain {
-				if strings.Contains(code.FunctionBody, notWant) {
+				if strings.Contains(code.UserDefinedFunctions, notWant) {
 					t.Errorf("Unexpected pattern %q", notWant)
 				}
 			}
@@ -228,15 +228,15 @@ result = indicator()
 				t.Fatalf("Generate failed: %v", err)
 			}
 
-			if !strings.Contains(code.FunctionBody, tt.expectedWarmup) {
+			if !strings.Contains(code.UserDefinedFunctions, tt.expectedWarmup) {
 				t.Errorf("Missing expected warmup check %q", tt.expectedWarmup)
 			}
 
-			if tt.unexpectedCheck != "" && strings.Contains(code.FunctionBody, tt.unexpectedCheck) {
+			if tt.unexpectedCheck != "" && strings.Contains(code.UserDefinedFunctions, tt.unexpectedCheck) {
 				t.Errorf("Found unexpected warmup check %q", tt.unexpectedCheck)
 			}
 
-			if !strings.Contains(code.FunctionBody, "math.NaN()") {
+			if !strings.Contains(code.UserDefinedFunctions, "math.NaN()") {
 				t.Error("Missing NaN return for warmup period")
 			}
 		})

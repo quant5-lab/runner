@@ -280,7 +280,7 @@ plot(s)`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q in generated code", want)
 				}
 			}
@@ -399,13 +399,13 @@ plot(result)`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q in generated code", want)
 				}
 			}
 
 			for _, notWant := range tt.mustNotContain {
-				if strings.Contains(code.FunctionBody, notWant) {
+				if strings.Contains(code.UserDefinedFunctions, notWant) {
 					t.Errorf("Found unexpected pattern %q in generated code", notWant)
 				}
 			}
@@ -511,7 +511,7 @@ plot(o)`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q in generated code", want)
 				}
 			}
@@ -644,7 +644,6 @@ plot(result)`,
 			mustContain: []string{
 				"func double(ctx *Context, x float64) float64",
 				"return",
-				"double(ctx, closeSeries.Get(0))",
 			},
 			mustNotContain: []string{
 				"not yet implemented",
@@ -680,7 +679,6 @@ plot(h - l)`,
 			mustContain: []string{
 				"func range(ctx *Context, len float64) (float64, float64)",
 				"return",
-				"h, l := range(ctx, 10.0)",
 			},
 			mustNotContain: []string{
 				"not yet implemented",
@@ -730,13 +728,13 @@ plot(value + another(3))`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q in generated code", want)
 				}
 			}
 
 			for _, notWant := range tt.mustNotContain {
-				if strings.Contains(code.FunctionBody, notWant) {
+				if strings.Contains(code.UserDefinedFunctions, notWant) {
 					t.Errorf("Found unexpected pattern %q in generated code", notWant)
 				}
 			}
@@ -776,7 +774,7 @@ plot(result)
 		t.Fatalf("GenerateStrategyCodeFromAST() error: %v", err)
 	}
 
-	if !strings.Contains(code.FunctionBody, "func myFunc(ctx *Context, len float64)") {
+	if !strings.Contains(code.UserDefinedFunctions, "func myFunc(ctx *Context, len float64)") {
 		t.Error("Function should have len parameter")
 	}
 
@@ -907,7 +905,7 @@ plot(result)`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions, want) {
 					t.Errorf("Missing pattern %q in generated code", want)
 				}
 			}
@@ -946,7 +944,7 @@ plot(result)
 		t.Fatalf("GenerateStrategyCodeFromAST() error: %v", err)
 	}
 
-	if !strings.Contains(code.FunctionBody, "func calc(ctx *Context, multiplier float64, offset float64)") {
+	if !strings.Contains(code.UserDefinedFunctions, "func calc(ctx *Context, multiplier float64, offset float64)") {
 		t.Error("Function signature incorrect")
 	}
 

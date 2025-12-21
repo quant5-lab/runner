@@ -7,18 +7,10 @@ type SelfReferencingIIFEGenerator interface {
 type FixnanIIFEGenerator struct{}
 
 func (g *FixnanIIFEGenerator) GenerateWithSelfReference(accessor AccessGenerator, targetSeriesVar string) string {
-	var preamble string
-	if tempAccessor, ok := accessor.(*FixnanCallExpressionAccessor); ok {
-		preamble = tempAccessor.GetPreamble()
-	}
-
 	body := "val := " + accessor.GenerateLoopValueAccess("0") + "; "
 	body += "if math.IsNaN(val) { return 0.0 }; "
 	body += "return val"
 
-	if preamble != "" {
-		return preamble + "func() float64 { " + body + " }()"
-	}
 	return "func() float64 { " + body + " }()"
 }
 

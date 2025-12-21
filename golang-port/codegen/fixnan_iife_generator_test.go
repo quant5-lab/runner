@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-/* TestFixnanIIFEGenerator_GenerateWithSelfReference validates IIFE code generation */
 func TestFixnanIIFEGenerator_GenerateWithSelfReference(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -95,7 +94,6 @@ func TestFixnanIIFEGenerator_GenerateWithSelfReference(t *testing.T) {
 	}
 }
 
-/* TestFixnanCallExpressionAccessor validates complex expression accessor behavior */
 func TestFixnanCallExpressionAccessor(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -161,8 +159,7 @@ func TestFixnanCallExpressionAccessor(t *testing.T) {
 	}
 }
 
-/* TestFixnanIIFEGenerator_WithComplexExpression validates preamble integration */
-func TestFixnanIIFEGenerator_WithComplexExpression(t *testing.T) {
+func TestFixnanIIFEGenerator_PreambleExtraction(t *testing.T) {
 	tests := []struct {
 		name            string
 		accessor        *FixnanCallExpressionAccessor
@@ -171,52 +168,56 @@ func TestFixnanIIFEGenerator_WithComplexExpression(t *testing.T) {
 		mustNotContain  []string
 	}{
 		{
-			name: "arithmetic expression",
+			name: "arithmetic expression - preamble extracted separately",
 			accessor: &FixnanCallExpressionAccessor{
 				tempVarName: "expr_temp",
 				tempVarCode: "expr_temp := 100 * rma(...) / truerange\n",
 			},
 			targetSeriesVar: "plusSeries",
 			mustContain: []string{
-				"expr_temp := 100 * rma(...) / truerange",
 				"func() float64",
 				"val := expr_temp",
 				"if math.IsNaN(val) { return 0.0 }",
 				"return val",
 			},
 			mustNotContain: []string{
+				"expr_temp := 100 * rma(...) / truerange",
 				"plusSeries.Position()",
 				"plusSeries.Get(j)",
 				"for j :=",
 			},
 		},
 		{
-			name: "nested function call",
+			name: "nested function call - preamble not embedded",
 			accessor: &FixnanCallExpressionAccessor{
 				tempVarName: "nested_result",
 				tempVarCode: "nested_result := func() float64 { return sma(...) }()\n",
 			},
 			targetSeriesVar: "indicatorSeries",
 			mustContain: []string{
-				"nested_result := func() float64",
+				"func() float64",
 				"val := nested_result",
 				"if math.IsNaN(val) { return 0.0 }",
 			},
 			mustNotContain: []string{
+				"nested_result := func() float64",
 				"selfSeries",
 			},
 		},
 		{
-			name: "division operation",
+			name: "division operation - clean IIFE only",
 			accessor: &FixnanCallExpressionAccessor{
 				tempVarName: "ratio_temp",
 				tempVarCode: "ratio_temp := numerator / denominator\n",
 			},
 			targetSeriesVar: "ratioSeries",
 			mustContain: []string{
-				"ratio_temp := numerator / denominator",
+				"func() float64",
 				"val := ratio_temp",
 				"return 0.0",
+			},
+			mustNotContain: []string{
+				"ratio_temp := numerator / denominator",
 			},
 		},
 	}
@@ -234,29 +235,67 @@ func TestFixnanIIFEGenerator_WithComplexExpression(t *testing.T) {
 
 			for _, pattern := range tt.mustNotContain {
 				if strings.Contains(code, pattern) {
-					t.Errorf("Code contains unwanted pattern %q\nGot: %s", pattern, code)
+					t.Errorf("Code contains unwanted pattern %q (preambles should be extracted separately)\nGot: %s", pattern, code)
 				}
 			}
 
-			preambleIndex := strings.Index(code, tt.accessor.tempVarCode)
-			funcIndex := strings.Index(code, "func() float64")
-
-			if preambleIndex == -1 {
-				t.Error("Preamble not found in generated code")
-			}
-
-			if funcIndex == -1 {
-				t.Error("IIFE not found in generated code")
-			}
-
-			if preambleIndex > funcIndex {
-				t.Error("Preamble must appear before IIFE")
+			if !strings.HasPrefix(code, "func() float64 {") {
+				t.Errorf("Expected IIFE to start with 'func() float64 {', got: %s", code[:min(50, len(code))])
 			}
 		})
 	}
 }
 
-/* TestFixnanIIFEGenerator_EdgeCases validates boundary conditions */
+func TestPreambleExtractor_ExtractsFromAccessor(t *testing.T) {
+	tests := []struct {
+		name             string
+		accessor         AccessGenerator
+		expectedPreamble string
+	}{
+		{
+			name: "accessor with preamble",
+			accessor: &FixnanCallExpressionAccessor{
+				tempVarName: "expr_temp",
+				tempVarCode: "expr_temp := 100 * rma(...) / truerange\n",
+			},
+			expectedPreamble: "expr_temp := 100 * rma(...) / truerange\n",
+		},
+		{
+			name: "accessor without preamble",
+			accessor: &FixnanCallExpressionAccessor{
+				tempVarName: "simple",
+				tempVarCode: "",
+			},
+			expectedPreamble: "",
+		},
+		{
+			name: "non-preamble accessor",
+			accessor: &struct {
+				AccessGenerator
+			}{},
+			expectedPreamble: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewPreambleExtractor()
+			preamble := extractor.ExtractFromAccessor(tt.accessor)
+
+			if preamble != tt.expectedPreamble {
+				t.Errorf("Expected preamble %q, got %q", tt.expectedPreamble, preamble)
+			}
+		})
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func TestFixnanIIFEGenerator_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -308,7 +347,6 @@ func TestFixnanIIFEGenerator_EdgeCases(t *testing.T) {
 	}
 }
 
-/* TestFixnanIIFEGenerator_CodeStructure validates generated code structure invariants */
 func TestFixnanIIFEGenerator_CodeStructure(t *testing.T) {
 	accessors := []struct {
 		name     string

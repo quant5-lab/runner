@@ -138,26 +138,26 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 
 	case *ast.ConditionalExpression:
 		tempVarName := "ternary_source_temp"
-		tempCode, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
+		result, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate ternary temp var: %w", err)
 		}
 
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
-			tempVarCode: tempCode,
+			tempVarCode: result.CombinedCode(),
 		}, nil
 
 	case *ast.BinaryExpression:
 		tempVarName := "binary_source_temp"
-		tempCode, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
+		result, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate binary temp var: %w", err)
 		}
 
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
-			tempVarCode: tempCode,
+			tempVarCode: result.CombinedCode(),
 		}, nil
 
 	default:

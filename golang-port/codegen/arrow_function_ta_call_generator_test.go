@@ -776,13 +776,13 @@ plot(result)`,
 			}
 
 			for _, want := range tt.mustContain {
-				if !strings.Contains(code.FunctionBody, want) {
+				if !strings.Contains(code.UserDefinedFunctions+code.FunctionBody, want) {
 					t.Errorf("Missing %q in generated code", want)
 				}
 			}
 
 			for _, notWant := range tt.mustNotContain {
-				if strings.Contains(code.FunctionBody, notWant) {
+				if strings.Contains(code.UserDefinedFunctions+code.FunctionBody, notWant) {
 					t.Errorf("Unexpected %q in generated code", notWant)
 				}
 			}

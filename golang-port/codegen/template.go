@@ -15,8 +15,13 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 
 	template := string(templateBytes)
 
+	userFuncs := ""
+	if code.UserDefinedFunctions != "" {
+		userFuncs = "// User-defined functions\n" + code.UserDefinedFunctions + "\n"
+	}
+
 	/* Generate function with strategy code (securityContexts map parameter for security() support) */
-	strategyFunc := fmt.Sprintf(`func executeStrategy(ctx *context.Context, dataDir string, securityContexts map[string]*context.Context) (*output.Collector, *strategy.Strategy) {
+	strategyFunc := userFuncs + fmt.Sprintf(`func executeStrategy(ctx *context.Context, dataDir string, securityContexts map[string]*context.Context) (*output.Collector, *strategy.Strategy) {
 	collector := output.NewCollector()
 	strat := strategy.NewStrategy()
 

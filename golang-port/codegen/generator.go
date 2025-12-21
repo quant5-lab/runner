@@ -13,9 +13,10 @@ import (
 
 /* StrategyCode holds generated Go code for strategy execution */
 type StrategyCode struct {
-	FunctionBody      string   // executeStrategy() function body
-	StrategyName      string   // Pine Script strategy name
-	AdditionalImports []string // Additional imports needed for security() streaming evaluation
+	UserDefinedFunctions string   // Arrow functions defined before executeStrategy
+	FunctionBody         string   // executeStrategy() function body
+	StrategyName         string   // Pine Script strategy name
+	AdditionalImports    []string // Additional imports needed for security() streaming evaluation
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -65,8 +66,9 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	}
 
 	code := &StrategyCode{
-		FunctionBody: body,
-		StrategyName: gen.strategyName,
+		UserDefinedFunctions: gen.userDefinedFunctions,
+		FunctionBody:         body,
+		StrategyName:         gen.strategyName,
 	}
 
 	return code, nil
@@ -80,6 +82,7 @@ type generator struct {
 	plots                    []string
 	strategyName             string
 	indent                   int
+	userDefinedFunctions     string // Arrow functions to be generated at module level
 	taFunctions              []taFunctionCall
 	inSecurityContext        bool
 	inArrowFunctionBody      bool // Track if generating arrow function body
@@ -369,7 +372,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	g.preAnalyzeSecurityCalls(program)
 
 	// Generate arrow functions BEFORE bar loop
-	arrowFunctions := ""
+	// Generate arrow functions AT MODULE LEVEL (before bar loop)
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
@@ -378,15 +381,20 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 					continue
 				}
 				if arrowFunc, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
-					// Register function
 					g.variables[id.Name] = "function"
-					// Generate function code
+
+					savedIndent := g.indent
+					g.indent = 0
+
 					arrowCodegen := NewArrowFunctionCodegen(g)
 					funcCode, err := arrowCodegen.Generate(id.Name, arrowFunc)
 					if err != nil {
+						g.indent = savedIndent
 						return "", fmt.Errorf("failed to generate arrow function %s: %w", id.Name, err)
 					}
-					arrowFunctions += funcCode
+
+					g.userDefinedFunctions += funcCode
+					g.indent = savedIndent
 				}
 			}
 		}
@@ -423,13 +431,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	code := ""
-
-	// Arrow functions (user-defined) - BEFORE bar loop
-	if arrowFunctions != "" {
-		code += g.ind() + "// User-defined functions\n"
-		code += arrowFunctions
-		code += "\n"
-	}
 
 	// Initialize strategy
 	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
@@ -1138,11 +1139,14 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		if declarator.Init != nil {
 			// Arrow function context: Generate inline variable assignment
 			if g.inArrowFunctionBody {
-				initCode, err := g.generateArrowFunctionVariableInit(varName, declarator.Init)
+				result, err := g.generateArrowFunctionVariableInit(varName, declarator.Init)
 				if err != nil {
 					return "", err
 				}
-				code += initCode
+				if result.HasPreamble() {
+					code += result.Preamble
+				}
+				code += result.Assignment
 			} else {
 				// Series context: Use ForwardSeriesBuffer paradigm
 				initCode, err := g.generateVariableInit(varName, declarator.Init)
@@ -1156,8 +1160,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	return code, nil
 }
 
-// generateArrowFunctionVariableInit generates inline variable assignment for arrow function context
-func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr ast.Expression) (string, error) {
+func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr ast.Expression) (*ArrowVarInitResult, error) {
 	switch expr := initExpr.(type) {
 	case *ast.CallExpression:
 		funcName := extractCallFunctionName(expr)
@@ -1167,81 +1170,92 @@ func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr a
 
 		exprCode, err := g.generateCallExpression(expr)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.BinaryExpression:
 		exprCode, err := g.generateBinaryExpression(expr)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.Identifier:
-		return g.ind() + fmt.Sprintf("%s := %s\n", varName, expr.Name), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %s\n", varName, expr.Name)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.Literal:
-		return g.ind() + fmt.Sprintf("%s := %v\n", varName, expr.Value), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %v\n", varName, expr.Value)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.MemberExpression:
 		exprCode, err := g.generateMemberExpression(expr)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.ConditionalExpression:
 		condCode, err := g.generateConditionExpression(expr.Test)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		condCode = g.addBoolConversionIfNeeded(expr.Test, condCode)
 
 		consequentCode, err := g.generateNumericExpression(expr.Consequent)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		alternateCode, err := g.generateNumericExpression(expr.Alternate)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return g.ind() + fmt.Sprintf("%s := func() float64 { if %s { return %s } else { return %s } }()\n",
-			varName, condCode, consequentCode, alternateCode), nil
+		assignment := g.ind() + fmt.Sprintf("%s := func() float64 { if %s { return %s } else { return %s } }()\n",
+			varName, condCode, consequentCode, alternateCode)
+		return NewArrowVarInitResult("", assignment), nil
 
 	case *ast.UnaryExpression:
 		operandCode, err := g.generateArrowFunctionExpression(expr.Argument)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		op := expr.Operator
 		if op == "not" {
 			op = "!"
 		}
-		return g.ind() + fmt.Sprintf("%s := %s%s\n", varName, op, operandCode), nil
+		assignment := g.ind() + fmt.Sprintf("%s := %s%s\n", varName, op, operandCode)
+		return NewArrowVarInitResult("", assignment), nil
 
 	default:
-		return "", fmt.Errorf("unsupported arrow function variable init expression: %T", initExpr)
+		return nil, fmt.Errorf("unsupported arrow function variable init expression: %T", initExpr)
 	}
 }
 
-func (g *generator) generateArrowFunctionFixnanInit(varName string, call *ast.CallExpression) (string, error) {
+func (g *generator) generateArrowFunctionFixnanInit(varName string, call *ast.CallExpression) (*ArrowVarInitResult, error) {
 	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("fixnan() requires 1 argument")
+		return nil, fmt.Errorf("fixnan() requires 1 argument")
 	}
 
 	sourceExpr := call.Arguments[0]
 
 	accessor, err := g.createAccessorForFixnan(sourceExpr)
 	if err != nil {
-		return "", fmt.Errorf("fixnan: failed to create accessor: %w", err)
+		return nil, fmt.Errorf("fixnan: failed to create accessor: %w", err)
 	}
+
+	extractor := NewPreambleExtractor()
+	preamble := extractor.ExtractFromAccessor(accessor)
 
 	targetSeriesVar := varName + "Series"
 	generator := &FixnanIIFEGenerator{}
 	iifeCode := generator.GenerateWithSelfReference(accessor, targetSeriesVar)
 
-	return g.ind() + fmt.Sprintf("%s := %s\n", varName, iifeCode), nil
+	assignment := g.ind() + fmt.Sprintf("%s := %s\n", varName, iifeCode)
+	return NewArrowVarInitResult(preamble, assignment), nil
 }
 
 func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerator, error) {
@@ -1259,14 +1273,14 @@ func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerato
 		funcName := extractCallFunctionName(e)
 
 		tempVarName := strings.ReplaceAll(funcName, ".", "_") + "_temp"
-		tempCode, err := g.generateArrowFunctionVariableInit(tempVarName, e)
+		result, err := g.generateArrowFunctionVariableInit(tempVarName, e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate temp var for fixnan source: %w", err)
 		}
 
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
-			tempVarCode: tempCode,
+			tempVarCode: result.CombinedCode(),
 		}, nil
 
 	case *ast.BinaryExpression:

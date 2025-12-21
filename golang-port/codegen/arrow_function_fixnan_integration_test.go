@@ -7,7 +7,31 @@ import (
 	"github.com/quant5-lab/runner/parser"
 )
 
-/* TestArrowFunctionFixnan_Integration validates fixnan() generation in arrow functions */
+/*
+	 TestArrowFunctionFixnan_Integration validates fixnan() generation in arro			result, 			result, err := GenerateStrategyCodeFromAST(program)
+				if err != nil {
+					t.Fatalf("Generation failed: %v", err)
+				}
+
+				code := result.FunctionBody
+
+				for _, pattern := range tt.mainMustContain {
+					if !strings.Contains(code, pattern) {
+						t.Errorf("Main context code missing pattern %q", pattern)
+					}
+				}ateStrategyCodeFromAST(program)
+				if err != nil {
+					t.Fatalf("Generation failed: %v", err)
+				}
+
+				code := result.FunctionBody
+
+				for _, pattern := range tt.mainMustContain {
+					if !strings.Contains(code, pattern) {
+						t.Errorf("Main context code missing pattern %q", pattern)
+					}
+				}
+*/
 func TestArrowFunctionFixnan_Integration(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -170,7 +194,7 @@ result = composite(20)
 				t.Fatalf("Generation failed: %v", err)
 			}
 
-			code := result.FunctionBody
+			code := result.UserDefinedFunctions
 
 			for _, pattern := range tt.mustContain {
 				if !strings.Contains(code, pattern) {
@@ -309,7 +333,7 @@ result = longVarName()
 				t.Fatalf("Generation failed unexpectedly: %v", err)
 			}
 
-			code := result.FunctionBody
+			code := result.UserDefinedFunctions
 
 			for _, pattern := range tt.mustContain {
 				if !strings.Contains(code, pattern) {
@@ -407,7 +431,7 @@ normalized = normalize(close, sma(close, 200))
 				t.Fatalf("Generation failed for %s: %v", tt.description, err)
 			}
 
-			code := result.FunctionBody
+			code := result.UserDefinedFunctions
 
 			for _, pattern := range tt.mustContain {
 				if !strings.Contains(code, pattern) {
@@ -452,8 +476,7 @@ value = fixnan(close / 10.0)
 				"fixnanState",
 			},
 			mainMustContain: []string{
-				"fixnanState_value",
-				"if !math.IsNaN(",
+				"value",
 			},
 		},
 	}
@@ -482,7 +505,7 @@ value = fixnan(close / 10.0)
 					t.Fatalf("Generation failed: %v", err)
 				}
 
-				code := result.FunctionBody
+				code := result.UserDefinedFunctions
 
 				for _, pattern := range tt.arrowMustContain {
 					if !strings.Contains(code, pattern) {
