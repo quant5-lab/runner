@@ -711,7 +711,7 @@ indicator(period) =>
 result = indicator(20)
 plot(result)`,
 			mustContain: []string{
-				"func indicator(ctx *Context, period float64) float64",
+				"func indicator(arrowCtx *context.ArrowContext, period float64) float64",
 				"func() float64",
 				"sum",
 				"return",
@@ -728,7 +728,7 @@ bands(len, mult) =>
 upper = bands(20, 2)
 plot(upper)`,
 			mustContain: []string{
-				"func bands(ctx *Context, len float64, mult float64) float64",
+				"func bands(arrowCtx *context.ArrowContext, len float64, mult float64) float64",
 				"func() float64",
 				"sum",
 				"variance",
@@ -743,7 +743,7 @@ smoothed(src, len) =>
 result = smoothed(close, 14)
 plot(result)`,
 			mustContain: []string{
-				"func smoothed(ctx *Context, srcSeries *series.Series, len float64) float64",
+				"func smoothed(arrowCtx *context.ArrowContext, srcSeries *series.Series, len float64) float64",
 				"alpha",
 				"ema",
 				"srcSeries.Get(",

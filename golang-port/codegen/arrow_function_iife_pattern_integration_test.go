@@ -26,7 +26,7 @@ dirmov(len) =>
 [x, y] = dirmov(5)
 `,
 			mustContain: []string{
-				"func dirmov(ctx *Context, len float64)",
+				"func dirmov(arrowCtx *context.ArrowContext, len float64)",
 				"func() float64",
 				"current := ",
 				"previous := ",
@@ -43,7 +43,7 @@ customChange(src) =>
 result = customChange(close)
 `,
 			mustContain: []string{
-				"func customChange(ctx *Context, src float64)",
+				"func customChange(arrowCtx *context.ArrowContext, src float64)",
 				"ctx.BarIndex < 2",
 				"func() float64",
 			},
@@ -57,7 +57,7 @@ negChange(src) =>
 result = negChange(low)
 `,
 			mustContain: []string{
-				"func negChange(ctx *Context, src float64)",
+				"func negChange(arrowCtx *context.ArrowContext, src float64)",
 				"-func() float64",
 				"return current - previous",
 			},
@@ -73,7 +73,7 @@ spread(len) =>
 result = spread(10)
 `,
 			mustContain: []string{
-				"func spread(ctx *Context, len float64)",
+				"func spread(arrowCtx *context.ArrowContext, len float64)",
 				"highChange :=",
 				"lowChange :=",
 			},
@@ -87,7 +87,7 @@ indicator(period) =>
 result = indicator(14)
 `,
 			mustContain: []string{
-				"func indicator(ctx *Context, period float64)",
+				"func indicator(arrowCtx *context.ArrowContext, period float64)",
 				"func() float64",
 				"current := ",
 				"previous := ",
@@ -103,7 +103,7 @@ momentum(len) =>
 result = momentum(14)
 `,
 			mustContain: []string{
-				"func momentum(ctx *Context, len float64)",
+				"func momentum(arrowCtx *context.ArrowContext, len float64)",
 				"upMove :=",
 			},
 		},
@@ -118,7 +118,7 @@ composite(len) =>
 result = composite(20)
 `,
 			mustContain: []string{
-				"func composite(ctx *Context, len float64)",
+				"func composite(arrowCtx *context.ArrowContext, len float64)",
 				"chg :=",
 				"avg :=",
 				"sum := 0.0",

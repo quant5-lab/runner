@@ -7,9 +7,7 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* UserDefinedFunctionHandler generates calls to user-defined arrow functions.
- * Handles proper ctx parameter passing and argument marshaling.
- */
+/* UserDefinedFunctionHandler generates calls to user-defined arrow functions */
 type UserDefinedFunctionHandler struct{}
 
 func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
@@ -19,7 +17,6 @@ func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
 func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	// In arrow function context, check if this is an unprefixed TA function
 	if g.inArrowFunctionBody {
 		if h.isUnprefixedTAFunction(funcName) {
 			taHandler := &TAIndicatorCallHandler{}
@@ -27,25 +24,32 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 		}
 	}
 
-	// Check if this is a user-defined function
-	varType, exists := g.variables[funcName]
-	if !exists || varType != "function" {
-		return "", nil // Not a user-defined function, let next handler try
+	detector := NewUserDefinedFunctionDetector(g.variables)
+	if !detector.IsUserDefinedFunction(funcName) {
+		return "", nil
 	}
 
-	// Generate arguments
-	var args []string
-	args = append(args, "ctx") // First parameter is always ctx
+	argumentList, err := h.buildArgumentList(g, funcName, call.Arguments)
+	if err != nil {
+		return "", err
+	}
 
-	for argIdx, arg := range call.Arguments {
-		argCode, err := h.generateArgumentExpression(g, arg, funcName, argIdx)
+	return fmt.Sprintf("%s(%s)", funcName, argumentList), nil
+}
+
+func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName string, args []ast.Expression) (string, error) {
+	argStrings := []string{"ctx"}
+
+	for idx, arg := range args {
+		argGen := NewArgumentExpressionGenerator(g, funcName, idx)
+		argCode, err := argGen.Generate(arg)
 		if err != nil {
-			return "", fmt.Errorf("failed to generate argument: %w", err)
+			return "", fmt.Errorf("failed to generate argument %d: %w", idx, err)
 		}
-		args = append(args, argCode)
+		argStrings = append(argStrings, argCode)
 	}
 
-	return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", ")), nil
+	return strings.Join(argStrings, ", "), nil
 }
 
 func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) bool {
@@ -54,77 +58,5 @@ func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) boo
 		return true
 	default:
 		return false
-	}
-}
-
-func (h *UserDefinedFunctionHandler) generateArgumentExpression(g *generator, expr ast.Expression, funcName string, paramIndex int) (string, error) {
-	paramType, hasSignature := g.funcSigRegistry.GetParameterType(funcName, paramIndex)
-
-	switch e := expr.(type) {
-	case *ast.Identifier:
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
-			if hasSignature && paramType == ParamTypeSeries {
-				switch e.Name {
-				case "close":
-					return "closeSeries", nil
-				case "open":
-					return "openSeries", nil
-				case "high":
-					return "highSeries", nil
-				case "low":
-					return "lowSeries", nil
-				case "volume":
-					return "volumeSeries", nil
-				default:
-					return code, nil
-				}
-			} else {
-				switch e.Name {
-				case "close":
-					return "closeSeries.Get(0)", nil
-				case "open":
-					return "openSeries.Get(0)", nil
-				case "high":
-					return "highSeries.Get(0)", nil
-				case "low":
-					return "lowSeries.Get(0)", nil
-				case "volume":
-					return "volumeSeries.Get(0)", nil
-				default:
-					return code, nil
-				}
-			}
-		}
-		return e.Name, nil
-
-	case *ast.Literal:
-		switch v := e.Value.(type) {
-		case float64:
-			return fmt.Sprintf("%.1f", v), nil
-		case int:
-			return fmt.Sprintf("%d.0", v), nil
-		default:
-			return fmt.Sprintf("%v", v), nil
-		}
-
-	case *ast.CallExpression:
-		return g.generateCallExpression(e)
-
-	case *ast.BinaryExpression:
-		left, err := h.generateArgumentExpression(g, e.Left, funcName, paramIndex)
-		if err != nil {
-			return "", err
-		}
-		right, err := h.generateArgumentExpression(g, e.Right, funcName, paramIndex)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right), nil
-
-	case *ast.MemberExpression:
-		return g.generateMemberExpression(e)
-
-	default:
-		return "", fmt.Errorf("unsupported argument expression type: %T", expr)
 	}
 }

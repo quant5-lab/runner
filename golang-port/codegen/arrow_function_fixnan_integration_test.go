@@ -48,7 +48,7 @@ safeDivClose(denominator) =>
 value = safeDivClose(volume)
 `,
 			mustContain: []string{
-				"func safeDivClose(ctx *Context, denominator float64) float64",
+				"func safeDivClose(arrowCtx *context.ArrowContext, denominator float64) float64",
 				"func() float64",
 				"val :=",
 				"if math.IsNaN(val) { return 0.0 }",
@@ -72,7 +72,7 @@ momentum(len) =>
 result = momentum(14)
 `,
 			mustContain: []string{
-				"func momentum(ctx *Context, len float64) float64",
+				"func momentum(arrowCtx *context.ArrowContext, len float64) float64",
 				"plus :=",
 				"func() float64",
 				"val :=",
@@ -98,7 +98,7 @@ dirmov(len) =>
 [x, y] = dirmov(5)
 `,
 			mustContain: []string{
-				"func dirmov(ctx *Context, len float64) (float64, float64)",
+				"func dirmov(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"plus :=",
 				"minus :=",
 				"return plus, minus",
@@ -117,7 +117,7 @@ indicator() =>
 result = indicator()
 `,
 			mustContain: []string{
-				"func indicator(ctx *Context) float64",
+				"func indicator(arrowCtx *context.ArrowContext) float64",
 				"func() float64",
 				"if math.IsNaN(val) { return 0.0 }",
 			},
@@ -131,7 +131,7 @@ processor(src) =>
 output = processor(close)
 `,
 			mustContain: []string{
-				"func processor(ctx *Context, src float64) float64",
+				"func processor(arrowCtx *context.ArrowContext, src float64) float64",
 				"func() float64",
 				"return val",
 			},
@@ -148,7 +148,7 @@ normalizer(a, b, c) =>
 result = normalizer(close, high, low)
 `,
 			mustContain: []string{
-				"func normalizer(ctx *Context, a float64, b float64, c float64) float64",
+				"func normalizer(arrowCtx *context.ArrowContext, a float64, b float64, c float64) float64",
 				"na :=",
 				"nb :=",
 				"nc :=",
@@ -164,7 +164,7 @@ composite(len) =>
 result = composite(20)
 `,
 			mustContain: []string{
-				"func composite(ctx *Context, len float64) float64",
+				"func composite(arrowCtx *context.ArrowContext, len float64) float64",
 				"avg :=",
 				"func() float64",
 			},
@@ -230,7 +230,7 @@ result = validOHLCV()
 `,
 			expectError: false,
 			mustContain: []string{
-				"func validOHLCV(ctx *Context) float64",
+				"func validOHLCV(arrowCtx *context.ArrowContext) float64",
 				"func() float64",
 			},
 		},
@@ -244,7 +244,7 @@ result = validParam(close)
 `,
 			expectError: false,
 			mustContain: []string{
-				"func validParam(ctx *Context, x float64) float64",
+				"func validParam(arrowCtx *context.ArrowContext, x float64) float64",
 				"val := x",
 			},
 		},
@@ -258,7 +258,7 @@ result = validTA()
 `,
 			expectError: false,
 			mustContain: []string{
-				"func validTA(ctx *Context) float64",
+				"func validTA(arrowCtx *context.ArrowContext) float64",
 			},
 		},
 		{
@@ -369,7 +369,7 @@ dirmov(len) =>
 `,
 			description: "DMI indicator with fixnan for safe division",
 			mustContain: []string{
-				"func dirmov(ctx *Context, len float64) (float64, float64)",
+				"func dirmov(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"plus :=",
 				"minus :=",
 				"if math.IsNaN(val) { return 0.0 }",
@@ -386,7 +386,7 @@ ratio = safeDiv(close, volume)
 `,
 			description: "Common pattern for avoiding NaN in division",
 			mustContain: []string{
-				"func safeDiv(ctx *Context, numerator float64, denominator float64) float64",
+				"func safeDiv(arrowCtx *context.ArrowContext, numerator float64, denominator float64) float64",
 				"func() float64",
 				"return val",
 			},
@@ -402,7 +402,7 @@ normalized = normalize(close, sma(close, 200))
 `,
 			description: "Normalize indicator values with fixnan",
 			mustContain: []string{
-				"func normalize(ctx *Context, value float64, baseline float64) float64",
+				"func normalize(arrowCtx *context.ArrowContext, value float64, baseline float64) float64",
 				"ratio :=",
 			},
 		},

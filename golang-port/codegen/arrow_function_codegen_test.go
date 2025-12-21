@@ -20,7 +20,7 @@ func TestArrowFunctionCodegen_SignatureGeneration(t *testing.T) {
 			name:        "zero parameters",
 			funcName:    "simple",
 			params:      []ast.Identifier{},
-			expectedSig: "func simple(ctx *Context)",
+			expectedSig: "func simple(arrowCtx *context.ArrowContext)",
 		},
 		{
 			name:     "single parameter",
@@ -28,7 +28,7 @@ func TestArrowFunctionCodegen_SignatureGeneration(t *testing.T) {
 			params: []ast.Identifier{
 				{Name: "period"},
 			},
-			expectedSig: "func getValue(ctx *Context, period float64)",
+			expectedSig: "func getValue(arrowCtx *context.ArrowContext, period float64)",
 		},
 		{
 			name:     "multiple parameters",
@@ -37,7 +37,7 @@ func TestArrowFunctionCodegen_SignatureGeneration(t *testing.T) {
 				{Name: "len"},
 				{Name: "mult"},
 			},
-			expectedSig: "func calculate(ctx *Context, len float64, mult float64)",
+			expectedSig: "func calculate(arrowCtx *context.ArrowContext, len float64, mult float64)",
 		},
 		{
 			name:     "parameter name preservation",
@@ -47,7 +47,7 @@ func TestArrowFunctionCodegen_SignatureGeneration(t *testing.T) {
 				{Name: "myMultiplier"},
 				{Name: "threshold"},
 			},
-			expectedSig: "func custom(ctx *Context, myLength float64, myMultiplier float64, threshold float64)",
+			expectedSig: "func custom(arrowCtx *context.ArrowContext, myLength float64, myMultiplier float64, threshold float64)",
 		},
 	}
 
@@ -209,7 +209,7 @@ calc(len) =>
 result = calc(5)
 plot(result)`,
 			mustContain: []string{
-				"func calc(ctx *Context, len float64) float64",
+				"func calc(arrowCtx *context.ArrowContext, len float64) float64",
 				"return",
 			},
 		},
@@ -222,7 +222,7 @@ avg(period) =>
 result = avg(14)
 plot(result)`,
 			mustContain: []string{
-				"func avg(ctx *Context, period float64) float64",
+				"func avg(arrowCtx *context.ArrowContext, period float64) float64",
 				"func() float64",
 				"sum",
 			},
@@ -236,7 +236,7 @@ band(len, mult) =>
 upper = band(20, 2)
 plot(upper)`,
 			mustContain: []string{
-				"func band(ctx *Context, len float64, mult float64) float64",
+				"func band(arrowCtx *context.ArrowContext, len float64, mult float64) float64",
 				"return",
 			},
 		},
@@ -249,7 +249,7 @@ signal(threshold) =>
 s = signal(100)
 plot(s)`,
 			mustContain: []string{
-				"func signal(ctx *Context, threshold float64) float64",
+				"func signal(arrowCtx *context.ArrowContext, threshold float64) float64",
 				"if",
 				"threshold",
 			},
@@ -305,7 +305,7 @@ double(x) =>
 result = double(close)
 plot(result)`,
 			mustContain: []string{
-				"func double(ctx *Context, x float64) float64",
+				"func double(arrowCtx *context.ArrowContext, x float64) float64",
 				"return",
 				"x * 2",
 			},
@@ -325,7 +325,7 @@ compute(len) =>
 result = compute(20)
 plot(result)`,
 			mustContain: []string{
-				"func compute(ctx *Context, len float64) float64",
+				"func compute(arrowCtx *context.ArrowContext, len float64) float64",
 				"avg :=",
 				"dev :=",
 				"return",
@@ -346,7 +346,7 @@ indicator(period) =>
 signal = indicator(14)
 plot(signal)`,
 			mustContain: []string{
-				"func indicator(ctx *Context, period float64) float64",
+				"func indicator(arrowCtx *context.ArrowContext, period float64) float64",
 				"func() float64",
 				"sum",
 			},
@@ -365,7 +365,7 @@ check(threshold) =>
 result = check(2.0)
 plot(result)`,
 			mustContain: []string{
-				"func check(ctx *Context, threshold float64) float64",
+				"func check(arrowCtx *context.ArrowContext, threshold float64) float64",
 				"if",
 				"return",
 			},
@@ -431,7 +431,7 @@ pair() =>
 [x, y] = pair()
 plot(x)`,
 			mustContain: []string{
-				"func pair(ctx *Context) (float64, float64)",
+				"func pair(arrowCtx *context.ArrowContext) (float64, float64)",
 				"return",
 			},
 		},
@@ -448,7 +448,7 @@ bounds(len) =>
 [lower, upper] = bounds(20)
 plot(lower)`,
 			mustContain: []string{
-				"func bounds(ctx *Context, len float64) (float64, float64)",
+				"func bounds(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"return",
 			},
 		},
@@ -463,7 +463,7 @@ minmax(len) =>
 [min, max] = minmax(10)
 plot(min)`,
 			mustContain: []string{
-				"func minmax(ctx *Context, len float64) (float64, float64)",
+				"func minmax(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"h :=",
 				"l :=",
 				"return l, h",
@@ -481,7 +481,7 @@ triple() =>
 [o, h, l] = triple()
 plot(o)`,
 			mustContain: []string{
-				"func triple(ctx *Context) (float64, float64, float64)",
+				"func triple(arrowCtx *context.ArrowContext) (float64, float64, float64)",
 				"return",
 			},
 		},
@@ -642,7 +642,7 @@ double(x) =>
 result = double(close)
 plot(result)`,
 			mustContain: []string{
-				"func double(ctx *Context, x float64) float64",
+				"func double(arrowCtx *context.ArrowContext, x float64) float64",
 				"return",
 			},
 			mustNotContain: []string{
@@ -661,8 +661,8 @@ multiply(x, y) =>
 result = add(multiply(close, 2), 10)
 plot(result)`,
 			mustContain: []string{
-				"func add(ctx *Context, a float64, b float64) float64",
-				"func multiply(ctx *Context, x float64, y float64) float64",
+				"func add(arrowCtx *context.ArrowContext, a float64, b float64) float64",
+				"func multiply(arrowCtx *context.ArrowContext, x float64, y float64) float64",
 			},
 			mustNotContain: []string{
 				"not yet implemented",
@@ -677,7 +677,7 @@ range(len) =>
 [h, l] = range(10)
 plot(h - l)`,
 			mustContain: []string{
-				"func range(ctx *Context, len float64) (float64, float64)",
+				"func range(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"return",
 			},
 			mustNotContain: []string{
@@ -695,8 +695,8 @@ another(m) =>
     m + 1
 plot(value + another(3))`,
 			mustContain: []string{
-				"func helper(ctx *Context, n float64) float64",
-				"func another(ctx *Context, m float64) float64",
+				"func helper(arrowCtx *context.ArrowContext, n float64) float64",
+				"func another(arrowCtx *context.ArrowContext, m float64) float64",
 			},
 			mustNotContain: []string{
 				"not yet implemented",
@@ -774,7 +774,7 @@ plot(result)
 		t.Fatalf("GenerateStrategyCodeFromAST() error: %v", err)
 	}
 
-	if !strings.Contains(code.UserDefinedFunctions, "func myFunc(ctx *Context, len float64)") {
+	if !strings.Contains(code.UserDefinedFunctions, "func myFunc(arrowCtx *context.ArrowContext, len float64)") {
 		t.Error("Function should have len parameter")
 	}
 
@@ -944,7 +944,7 @@ plot(result)
 		t.Fatalf("GenerateStrategyCodeFromAST() error: %v", err)
 	}
 
-	if !strings.Contains(code.UserDefinedFunctions, "func calc(ctx *Context, multiplier float64, offset float64)") {
+	if !strings.Contains(code.UserDefinedFunctions, "func calc(arrowCtx *context.ArrowContext, multiplier float64, offset float64)") {
 		t.Error("Function signature incorrect")
 	}
 

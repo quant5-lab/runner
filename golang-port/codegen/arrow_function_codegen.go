@@ -33,6 +33,15 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 
 	code := a.gen.ind() + signature + " " + returnType + " {\n"
 	a.gen.indent++
+
+	code += a.gen.ind() + "ctx := arrowCtx.Context\n"
+
+	seriesInitializer := NewArrowLocalSeriesInitializer(a.gen.ind())
+	seriesInit := seriesInitializer.GenerateInitializations(arrowFunc)
+	if seriesInit != "" {
+		code += "\n" + seriesInit
+	}
+
 	code += body
 	a.gen.indent--
 	code += a.gen.ind() + "}\n\n"
@@ -47,7 +56,7 @@ func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arro
 		return "", "", err
 	}
 
-	signature := fmt.Sprintf("func %s(ctx *Context%s)", funcName, params)
+	signature := fmt.Sprintf("func %s(arrowCtx *context.ArrowContext%s)", funcName, params)
 	return signature, returnType, nil
 }
 

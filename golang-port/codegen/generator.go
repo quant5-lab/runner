@@ -25,9 +25,12 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	typeSystem := NewTypeInferenceEngine()
 	boolConverter := NewBooleanConverter(typeSystem)
 
+	variablesRegistry := make(map[string]string)
+	registryGuard := NewVariableRegistryGuard(variablesRegistry)
+
 	gen := &generator{
 		imports:          make(map[string]bool),
-		variables:        make(map[string]string),
+		variables:        variablesRegistry,
 		varInits:         make(map[string]ast.Expression),
 		constants:        make(map[string]interface{}),
 		strategyName:     "Generated Strategy",
@@ -36,6 +39,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		constantRegistry: constantRegistry,
 		typeSystem:       typeSystem,
 		boolConverter:    boolConverter,
+		registryGuard:    registryGuard,
 	}
 
 	gen.inputHandler = NewInputHandler()
@@ -95,6 +99,7 @@ type generator struct {
 	constantRegistry *ConstantRegistry
 	typeSystem       *TypeInferenceEngine
 	boolConverter    *BooleanConverter
+	registryGuard    *VariableRegistryGuard
 
 	inputHandler            *InputHandler
 	mathHandler             *MathHandler
@@ -238,6 +243,18 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		// Collect variable declarations
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
+				// Handle tuple destructuring (ArrayPattern)
+				if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					for _, elem := range arrayPattern.Elements {
+						varName := elem.Name
+						// Infer type from initialization
+						varType := g.inferVariableType(declarator.Init)
+						g.variables[varName] = varType
+						g.typeSystem.RegisterVariable(varName, varType)
+					}
+					continue
+				}
+
 				id, ok := declarator.ID.(*ast.Identifier)
 				if !ok {
 					continue
@@ -1124,12 +1141,17 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			continue
 		}
 
-		// Determine variable type based on init expression
 		varType := g.inferVariableType(declarator.Init)
-		g.variables[varName] = varType
-		g.varInits[varName] = declarator.Init // Store for constant resolution in extractTAArguments
 
-		// Skip string variables (Series storage is float64 only)
+		if g.registryGuard != nil {
+			if g.registryGuard.SafeRegister(varName, varType) {
+				g.varInits[varName] = declarator.Init
+			}
+		} else {
+			g.variables[varName] = varType
+			g.varInits[varName] = declarator.Init
+		}
+
 		if varType == "string" {
 			code += g.ind() + fmt.Sprintf("// %s = string variable (not implemented)\n", varName)
 			continue
@@ -2106,12 +2128,43 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 		return "", fmt.Errorf("tuple destructuring init must be CallExpression, got %T", declarator.Init)
 	}
 
+	funcName := extractCallFunctionName(callExpr)
+	detector := NewUserDefinedFunctionDetector(g.variables)
+
+	if detector.IsUserDefinedFunction(funcName) {
+		return g.generateUserDefinedFunctionTupleCall(varNames, funcName, callExpr)
+	}
+
 	initCode, err := g.generateCallExpression(callExpr)
 	if err != nil {
 		return "", err
 	}
 
 	return g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), initCode), nil
+}
+
+func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, funcName string, callExpr *ast.CallExpression) (string, error) {
+	code := ""
+
+	ctxVarName := fmt.Sprintf("arrowCtx_%s", funcName)
+	code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+
+	args := []string{ctxVarName}
+	for idx, arg := range callExpr.Arguments {
+		argGen := NewArgumentExpressionGenerator(g, funcName, idx)
+		argCode, err := argGen.Generate(arg)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate argument %d: %w", idx, err)
+		}
+		args = append(args, argCode)
+	}
+
+	callCode := fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
+	code += g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), callCode)
+
+	code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
+
+	return code, nil
 }
 
 func (g *generator) extractStringLiteral(expr ast.Expression) string {
