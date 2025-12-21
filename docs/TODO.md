@@ -156,6 +156,8 @@
 - [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
 - [x] `strategy.position_avg_price` built-in variable (StateManager + codegen sampling order fixed)
 - [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
+- [x] Arrow function preamble extraction (ArrowVarInitResult, PreambleExtractor, module-level functions, 100+ tests, double-assignment syntax fixed)
+- [ ] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code)
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
@@ -165,7 +167,7 @@
 - [x] `bb7-dissect-bb.pine` - Input constant Series bug fixed, compiles successfully (3.0MB binary)
 - [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
 - [x] `bb7-dissect-potential.pine` - Pivot in security() returns valid values (3013/3045 high, 3000/3045 low non-null)
-- [ ] `bb7-dissect-adx.pine` - ConditionalExpression/BinaryExpression support added (69 tests) - Blocked: nested preamble syntax errors (double assignment)
+- [ ] `bb7-dissect-adx.pine` - Blocked: undefined Series variables (trSeries, upSeries, downSeries), Context type missing in arrow functions
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [x] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
 - [ ] `bb7-dissect-full.pine` - Blocked: Nested preamble architecture (double assignment syntax)
