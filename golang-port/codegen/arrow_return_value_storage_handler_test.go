@@ -199,3 +199,213 @@ func TestReturnValueSeriesStorageHandler_EmptyInput(t *testing.T) {
 		t.Errorf("Expected empty string for nil input, got %q", got)
 	}
 }
+
+func TestReturnValueSeriesStorageHandler_LargeInputs(t *testing.T) {
+	tests := []struct {
+		name     string
+		varCount int
+	}{
+		{"moderate size", 10},
+		{"large size", 50},
+		{"very large size", 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewReturnValueSeriesStorageHandler("\t")
+
+			varNames := make([]string, tt.varCount)
+			for i := 0; i < tt.varCount; i++ {
+				varNames[i] = "var" + string(rune('A'+i%26))
+			}
+
+			got := handler.GenerateStorageStatements(varNames)
+
+			lines := strings.Split(strings.TrimSpace(got), "\n")
+			if len(lines) != tt.varCount {
+				t.Errorf("Expected %d statements, got %d", tt.varCount, len(lines))
+			}
+
+			for i, varName := range varNames {
+				expected := varName + "Series.Set(" + varName + ")"
+				if !strings.Contains(lines[i], expected) {
+					t.Errorf("Line %d missing expected statement %q", i, expected)
+				}
+			}
+		})
+	}
+}
+
+func TestReturnValueSeriesStorageHandler_VariableNameEdgeCases(t *testing.T) {
+	tests := []struct {
+		name      string
+		varNames  []string
+		wantValid bool
+	}{
+		{
+			name:      "single character names",
+			varNames:  []string{"a", "b", "c"},
+			wantValid: true,
+		},
+		{
+			name:      "very long name",
+			varNames:  []string{"veryLongVariableNameThatExceedsNormalLengthButStillValidGoIdentifier"},
+			wantValid: true,
+		},
+		{
+			name:      "consecutive underscores",
+			varNames:  []string{"var__name", "___triple"},
+			wantValid: true,
+		},
+		{
+			name:      "leading underscore",
+			varNames:  []string{"_private", "_internal"},
+			wantValid: true,
+		},
+		{
+			name:      "trailing numbers",
+			varNames:  []string{"var1", "var2", "var999"},
+			wantValid: true,
+		},
+		{
+			name:      "mixed valid invalid",
+			varNames:  []string{"valid", "123invalid"},
+			wantValid: false,
+		},
+		{
+			name:      "all caps",
+			varNames:  []string{"CONSTANT", "VALUE"},
+			wantValid: true,
+		},
+		{
+			name:      "camelCase",
+			varNames:  []string{"myVariable", "anotherOne"},
+			wantValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewReturnValueSeriesStorageHandler("\t")
+			err := handler.ValidateReturnValueNames(tt.varNames)
+
+			if tt.wantValid && err != nil {
+				t.Errorf("Expected valid, got error: %v", err)
+			}
+			if !tt.wantValid && err == nil {
+				t.Error("Expected error for invalid names, got nil")
+			}
+
+			if tt.wantValid {
+				got := handler.GenerateStorageStatements(tt.varNames)
+				for _, varName := range tt.varNames {
+					expected := varName + "Series.Set(" + varName + ")"
+					if !strings.Contains(got, expected) {
+						t.Errorf("Missing expected statement for %q", varName)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestReturnValueSeriesStorageHandler_IndentationVariations(t *testing.T) {
+	tests := []struct {
+		name        string
+		indentation string
+		varNames    []string
+	}{
+		{
+			name:        "no indentation",
+			indentation: "",
+			varNames:    []string{"result"},
+		},
+		{
+			name:        "single tab",
+			indentation: "\t",
+			varNames:    []string{"result"},
+		},
+		{
+			name:        "deep indentation",
+			indentation: "\t\t\t\t\t\t\t\t\t\t",
+			varNames:    []string{"result"},
+		},
+		{
+			name:        "spaces",
+			indentation: "  ",
+			varNames:    []string{"result"},
+		},
+		{
+			name:        "many spaces",
+			indentation: "        ",
+			varNames:    []string{"result"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewReturnValueSeriesStorageHandler(tt.indentation)
+			got := handler.GenerateStorageStatements(tt.varNames)
+
+			if tt.indentation == "" {
+				if strings.HasPrefix(got, "\t") || strings.HasPrefix(got, " ") {
+					t.Error("Expected no indentation, but got indented output")
+				}
+			} else {
+				maxLen := len(tt.indentation)
+				if len(got) < maxLen {
+					maxLen = len(got)
+				}
+				if !strings.HasPrefix(got, tt.indentation) {
+					t.Errorf("Expected prefix %q, got: %q", tt.indentation, got[:maxLen])
+				}
+			}
+		})
+	}
+}
+
+func TestReturnValueSeriesStorageHandler_StatementIntegrity(t *testing.T) {
+	t.Run("single return preserves format", func(t *testing.T) {
+		handler := NewReturnValueSeriesStorageHandler("\t")
+		got := handler.GenerateStorageStatements([]string{"value"})
+
+		if !strings.Contains(got, "valueSeries.Set(value)") {
+			t.Errorf("Statement format corrupted: %q", got)
+		}
+
+		if strings.Count(got, "valueSeries.Set") != 1 {
+			t.Error("Statement duplicated or missing")
+		}
+	})
+
+	t.Run("trailing newline consistency", func(t *testing.T) {
+		handler := NewReturnValueSeriesStorageHandler("\t")
+		got := handler.GenerateStorageStatements([]string{"a", "b", "c"})
+
+		if !strings.HasSuffix(got, "\n") {
+			t.Error("Expected trailing newline")
+		}
+
+		if strings.HasSuffix(got, "\n\n") {
+			t.Error("Unexpected double newline")
+		}
+	})
+
+	t.Run("no statement leakage", func(t *testing.T) {
+		handler := NewReturnValueSeriesStorageHandler("\t")
+		got := handler.GenerateStorageStatements([]string{"secure"})
+
+		forbiddenPatterns := []string{
+			"undefined",
+			"null",
+			"Series.Set(Series",
+			"Set(Set",
+		}
+
+		for _, pattern := range forbiddenPatterns {
+			if strings.Contains(got, pattern) {
+				t.Errorf("Generated code contains forbidden pattern: %q", pattern)
+			}
+		}
+	})
+}

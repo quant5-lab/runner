@@ -5,23 +5,7 @@ import (
 	"testing"
 )
 
-/*
-TestUserDefinedFunction_ArrowContextAllocation validates ArrowContext lifecycle management
-for user-defined function calls with unique instance tracking.
-
-Behavior: Each call to a user-defined function allocates a unique ArrowContext instance
-with an incremental suffix (_1, _2, _3...) to prevent variable redeclaration within the
-same scope. This applies to both tuple-destructuring and single-value calls.
-
-Architecture: Tests ArrowContextLifecycleManager integration ensuring unique context
-variable names across multiple calls to the same function or different functions.
-
-Edge cases covered:
-- Multiple calls to same function (same scope)
-- Interleaved calls to different functions
-- Single-value vs tuple-destructuring calls
-- Sequential and nested call patterns
-*/
+/* Tests unique ArrowContext allocation preventing variable redeclaration */
 func TestUserDefinedFunction_ArrowContextAllocation(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -188,24 +172,7 @@ s2 = single(30)
 	}
 }
 
-/*
-TestUserDefinedFunction_ReturnValueStorage validates that return values from
-user-defined functions are stored in Series for historical access.
-
-Behavior: All return values (single or tuple) must be stored via Series.Set()
-immediately after the function call and before ArrowContext.AdvanceAll(). This
-maintains PineScript semantics where function return values become Series variables.
-
-Architecture: Tests ReturnValueSeriesStorageHandler integration ensuring proper
-Series.Set() generation for all return value patterns.
-
-Edge cases covered:
-- Single return value
-- Multiple return values (tuple destructuring)
-- No return value (void-like functions)
-- Return values used immediately vs later
-- Nested function calls with cascading storage
-*/
+/* Tests Series.Set() generation for return values maintaining PineScript historical access semantics */
 func TestUserDefinedFunction_ReturnValueStorage(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -350,25 +317,7 @@ doubled = value * 2
 	}
 }
 
-/*
-TestUserDefinedFunction_CompleteLifecycle validates the complete ArrowContext
-lifecycle: create → call → store → advance.
-
-Behavior: Every user-defined function call follows a strict sequence:
- 1. Create unique ArrowContext
- 2. Call function with context
- 3. Store return values in Series (if any)
- 4. Advance all Series in ArrowContext
-
-Architecture: Tests end-to-end integration of ArrowContextLifecycleManager and
-ReturnValueSeriesStorageHandler ensuring correct statement ordering.
-
-Edge cases covered:
-- Lifecycle ordering validation
-- Multiple calls maintaining individual lifecycles
-- Nested calls with cascading lifecycles
-- Error conditions (missing stages)
-*/
+/* Tests complete ArrowContext lifecycle: create → call → store → advance */
 func TestUserDefinedFunction_CompleteLifecycle(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -464,6 +413,321 @@ r2 = compute(20)
 
 			if !(createIdx < callIdx && callIdx < advanceIdx) {
 				t.Errorf("%s: Lifecycle stages out of order", tt.description)
+			}
+		})
+	}
+}
+
+/* Tests complex patterns: deep nesting, large tuples, parameterless functions, production patterns */
+func TestUserDefinedFunction_ComplexCallPatterns(t *testing.T) {
+	tests := []struct {
+		name                 string
+		pine                 string
+		expectedContexts     []string
+		expectedStorageStmts []string
+		forbiddenPatterns    []string
+		description          string
+	}{
+		{
+			name: "large tuple return (5 values)",
+			pine: `
+//@version=5
+indicator("Test")
+quintuple() =>
+    [close, open, high, low, volume]
+
+[a, b, c, d, e] = quintuple()
+`,
+			expectedContexts: []string{
+				"arrowCtx_quintuple_1 := context.NewArrowContext(ctx)",
+			},
+			expectedStorageStmts: []string{
+				"aSeries.Set(a)",
+				"bSeries.Set(b)",
+				"cSeries.Set(c)",
+				"dSeries.Set(d)",
+				"eSeries.Set(e)",
+			},
+			forbiddenPatterns: nil,
+			description:       "large tuple return creates storage for all values",
+		},
+		{
+			name: "function with no parameters",
+			pine: `
+//@version=5
+indicator("Test")
+constant() =>
+    42.0
+
+value = constant()
+`,
+			expectedContexts: []string{
+				"arrowCtx_constant_1 := context.NewArrowContext(ctx)",
+			},
+			expectedStorageStmts: []string{
+				"valueSeries.Set(",
+			},
+			forbiddenPatterns: nil,
+			description:       "parameterless function allocates context",
+		},
+		{
+			name: "function called multiple times in sequence",
+			pine: `
+//@version=5
+indicator("Test")
+increment(x) =>
+    x + 1
+
+a = increment(10)
+b = increment(20)
+c = increment(30)
+d = increment(40)
+e = increment(50)
+`,
+			expectedContexts: []string{
+				"arrowCtx_increment_1",
+				"arrowCtx_increment_2",
+				"arrowCtx_increment_3",
+				"arrowCtx_increment_4",
+				"arrowCtx_increment_5",
+			},
+			expectedStorageStmts: []string{
+				"aSeries.Set(",
+				"bSeries.Set(",
+				"cSeries.Set(",
+				"dSeries.Set(",
+				"eSeries.Set(",
+			},
+			forbiddenPatterns: []string{
+				"arrowCtx_increment := context.NewArrowContext",
+			},
+			description: "many sequential calls create unique contexts",
+		},
+		{
+			name: "mixed parameter types",
+			pine: `
+//@version=5
+indicator("Test")
+mixer(scalar, src) =>
+    src * scalar
+
+result = mixer(2.0, close)
+`,
+			expectedContexts: []string{
+				"arrowCtx_mixer_1 := context.NewArrowContext(ctx)",
+			},
+			expectedStorageStmts: []string{
+				"resultSeries.Set(",
+			},
+			forbiddenPatterns: nil,
+			description:       "mixed scalar and series parameters work correctly",
+		},
+		{
+			name: "interleaved multiple functions",
+			pine: `
+//@version=5
+indicator("Test")
+double(x) =>
+    x * 2
+
+triple(x) =>
+    x * 3
+
+a1 = double(10)
+t1 = triple(10)
+a2 = double(20)
+t2 = triple(20)
+a3 = double(30)
+`,
+			expectedContexts: []string{
+				"arrowCtx_double_1",
+				"arrowCtx_triple_1",
+				"arrowCtx_double_2",
+				"arrowCtx_triple_2",
+				"arrowCtx_double_3",
+			},
+			expectedStorageStmts: []string{
+				"a1Series.Set(",
+				"t1Series.Set(",
+				"a2Series.Set(",
+				"t2Series.Set(",
+				"a3Series.Set(",
+			},
+			forbiddenPatterns: nil,
+			description:       "interleaved calls maintain independent counters",
+		},
+		{
+			name: "tuple and single value mixed",
+			pine: `
+//@version=5
+indicator("Test")
+pair() =>
+    [close, open]
+
+single() =>
+    high
+
+[a, b] = pair()
+c = single()
+[d, e] = pair()
+f = single()
+`,
+			expectedContexts: []string{
+				"arrowCtx_pair_1",
+				"arrowCtx_single_1",
+				"arrowCtx_pair_2",
+				"arrowCtx_single_2",
+			},
+			expectedStorageStmts: []string{
+				"aSeries.Set(a)",
+				"bSeries.Set(b)",
+				"cSeries.Set(",
+				"dSeries.Set(d)",
+				"eSeries.Set(e)",
+				"fSeries.Set(",
+			},
+			forbiddenPatterns: nil,
+			description:       "mixed tuple and single value calls handled correctly",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+
+			for _, expectedCtx := range tt.expectedContexts {
+				if !strings.Contains(code, expectedCtx) {
+					t.Errorf("%s: Missing expected context:\n  %s", tt.description, expectedCtx)
+				}
+			}
+
+			for _, expectedStorage := range tt.expectedStorageStmts {
+				if !strings.Contains(code, expectedStorage) {
+					t.Errorf("%s: Missing expected storage statement:\n  %s", tt.description, expectedStorage)
+				}
+			}
+
+			for _, forbidden := range tt.forbiddenPatterns {
+				if strings.Contains(code, forbidden) {
+					t.Errorf("%s: Found forbidden pattern:\n  %s", tt.description, forbidden)
+				}
+			}
+		})
+	}
+}
+
+/* Regression tests for production patterns (bb7-dissect-adx, dirmov) ensuring stability */
+func TestUserDefinedFunction_RegressionSafety(t *testing.T) {
+	tests := []struct {
+		name             string
+		pine             string
+		criticalPatterns []string
+		description      string
+	}{
+		{
+			name: "bb7-dissect-adx pattern (multiple ADX calls)",
+			pine: `
+//@version=5
+indicator("BB7 Pattern")
+adx_calc(dilength, adxlength) =>
+    [ta.sma(close, dilength), ta.sma(open, adxlength), ta.sma(high, dilength)]
+
+[ADX, up, down] = adx_calc(14, 14)
+[ADX2, up2, down2] = adx_calc(21, 21)
+`,
+			criticalPatterns: []string{
+				"arrowCtx_adx_calc_1 := context.NewArrowContext(ctx)",
+				"arrowCtx_adx_calc_2 := context.NewArrowContext(ctx)",
+				"ADXSeries.Set(ADX)",
+				"upSeries.Set(up)",
+				"downSeries.Set(down)",
+				"ADX2Series.Set(ADX2)",
+				"up2Series.Set(up2)",
+				"down2Series.Set(down2)",
+				"arrowCtx_adx_calc_1.AdvanceAll()",
+				"arrowCtx_adx_calc_2.AdvanceAll()",
+			},
+			description: "bb7-dissect-adx pattern must generate unique contexts and complete storage",
+		},
+		{
+			name: "dirmov pattern (nested TA calls)",
+			pine: `
+//@version=5
+indicator("Dirmov Pattern")
+dirmov(len) =>
+    up = ta.change(high)
+    down = -ta.change(low)
+    [up, down]
+
+[plus, minus] = dirmov(14)
+`,
+			criticalPatterns: []string{
+				"arrowCtx_dirmov_1 := context.NewArrowContext(ctx)",
+				"plusSeries.Set(plus)",
+				"minusSeries.Set(minus)",
+				"arrowCtx_dirmov_1.AdvanceAll()",
+			},
+			description: "dirmov pattern with nested TA calls must work correctly",
+		},
+		{
+			name: "multiple functions multiple calls",
+			pine: `
+//@version=5
+indicator("Complex Pattern")
+calc_a(x) =>
+    ta.sma(close, x)
+
+calc_b(y) =>
+    ta.ema(open, y)
+
+r1 = calc_a(10)
+r2 = calc_b(20)
+r3 = calc_a(30)
+r4 = calc_b(40)
+`,
+			criticalPatterns: []string{
+				"arrowCtx_calc_a_1",
+				"arrowCtx_calc_b_1",
+				"arrowCtx_calc_a_2",
+				"arrowCtx_calc_b_2",
+				"r1Series.Set(",
+				"r2Series.Set(",
+				"r3Series.Set(",
+				"r4Series.Set(",
+			},
+			description: "multiple functions with multiple calls each maintain separate counters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("%s: Compilation failed: %v", tt.description, err)
+			}
+
+			for _, pattern := range tt.criticalPatterns {
+				if !strings.Contains(code, pattern) {
+					t.Errorf("%s: REGRESSION - Missing critical pattern:\n  %s\n\nThis pattern MUST exist for production code to work correctly.",
+						tt.description, pattern)
+				}
+			}
+
+			forbiddenPatterns := []string{
+				"arrowCtx_calc_a := context.NewArrowContext",
+				"arrowCtx_calc_b := context.NewArrowContext",
+				"arrowCtx_adx_calc := context.NewArrowContext",
+				"arrowCtx_dirmov := context.NewArrowContext",
+			}
+
+			for _, pattern := range forbiddenPatterns {
+				if strings.Contains(code, pattern) {
+					t.Errorf("%s: REGRESSION - Found non-unique context pattern:\n  %s\n\nThis indicates context variable redeclaration bug has returned.",
+						tt.description, pattern)
+				}
 			}
 		})
 	}

@@ -130,3 +130,157 @@ func TestArrowContextLifecycleManager_NoRedeclaration(t *testing.T) {
 		}
 	}
 }
+
+func TestArrowContextLifecycleManager_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name         string
+		funcName     string
+		allocations  int
+		expectPrefix string
+		expectCount  int
+	}{
+		{
+			name:         "zero allocations",
+			funcName:     "unused",
+			allocations:  0,
+			expectPrefix: "",
+			expectCount:  0,
+		},
+		{
+			name:         "single character function name",
+			funcName:     "a",
+			allocations:  2,
+			expectPrefix: "arrowCtx_a_",
+			expectCount:  2,
+		},
+		{
+			name:         "function name with underscores",
+			funcName:     "calc_moving_avg",
+			allocations:  3,
+			expectPrefix: "arrowCtx_calc_moving_avg_",
+			expectCount:  3,
+		},
+		{
+			name:         "function name with numbers",
+			funcName:     "func123",
+			allocations:  2,
+			expectPrefix: "arrowCtx_func123_",
+			expectCount:  2,
+		},
+		{
+			name:         "very long function name",
+			funcName:     "calculateExponentialMovingAverageWithVolatilityAdjustment",
+			allocations:  2,
+			expectPrefix: "arrowCtx_calculateExponentialMovingAverageWithVolatilityAdjustment_",
+			expectCount:  2,
+		},
+		{
+			name:         "many sequential allocations",
+			funcName:     "repeated",
+			allocations:  50,
+			expectPrefix: "arrowCtx_repeated_",
+			expectCount:  50,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := NewArrowContextLifecycleManager()
+
+			for i := 0; i < tt.allocations; i++ {
+				name := manager.AllocateContextVariable(tt.funcName)
+				if tt.allocations > 0 && !strings.HasPrefix(name, tt.expectPrefix) {
+					t.Errorf("Allocation %d: expected prefix %q, got %q", i+1, tt.expectPrefix, name)
+				}
+			}
+
+			if got := manager.GetInstanceCount(tt.funcName); got != tt.expectCount {
+				t.Errorf("GetInstanceCount() = %d, want %d", got, tt.expectCount)
+			}
+		})
+	}
+}
+
+func TestArrowContextLifecycleManager_StateTransitions(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	manager.AllocateContextVariable("func1")
+	manager.AllocateContextVariable("func2")
+
+	manager.Reset()
+
+	name1 := manager.AllocateContextVariable("func1")
+	if name1 != "arrowCtx_func1_1" {
+		t.Errorf("After reset: expected arrowCtx_func1_1, got %q", name1)
+	}
+
+	manager.Reset()
+	manager.Reset()
+
+	name2 := manager.AllocateContextVariable("func1")
+	if name2 != "arrowCtx_func1_1" {
+		t.Errorf("After multiple resets: expected arrowCtx_func1_1, got %q", name2)
+	}
+}
+
+func TestArrowContextLifecycleManager_BoundaryConditions(t *testing.T) {
+	t.Run("uninitialized state query", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+		count := manager.GetInstanceCount("never_allocated")
+		if count != 0 {
+			t.Errorf("Unallocated function count = %d, want 0", count)
+		}
+	})
+
+	t.Run("large counter values", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+		for i := 0; i < 1000; i++ {
+			name := manager.AllocateContextVariable("stress_test")
+			if !strings.HasPrefix(name, "arrowCtx_stress_test_") {
+				t.Errorf("Allocation %d: invalid format %q", i+1, name)
+				break
+			}
+		}
+		if manager.GetInstanceCount("stress_test") != 1000 {
+			t.Errorf("After 1000 allocations: count = %d, want 1000", manager.GetInstanceCount("stress_test"))
+		}
+	})
+
+	t.Run("reset mid-sequence", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+		manager.AllocateContextVariable("partial")
+		manager.AllocateContextVariable("partial")
+		manager.AllocateContextVariable("partial")
+
+		manager.Reset()
+
+		manager.AllocateContextVariable("other")
+		name := manager.AllocateContextVariable("partial")
+
+		if name != "arrowCtx_partial_1" {
+			t.Errorf("After mid-sequence reset: expected arrowCtx_partial_1, got %q", name)
+		}
+	})
+}
+
+func TestArrowContextLifecycleManager_CaseSensitivity(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	lower := manager.AllocateContextVariable("func")
+	upper := manager.AllocateContextVariable("FUNC")
+	mixed := manager.AllocateContextVariable("Func")
+
+	if lower == upper || lower == mixed || upper == mixed {
+		t.Error("Function names should be case-sensitive")
+	}
+
+	if !strings.Contains(lower, "func") {
+		t.Errorf("Expected lowercase 'func', got %q", lower)
+	}
+	if !strings.Contains(upper, "FUNC") {
+		t.Errorf("Expected uppercase 'FUNC', got %q", upper)
+	}
+	if !strings.Contains(mixed, "Func") {
+		t.Errorf("Expected mixed case 'Func', got %q", mixed)
+	}
+}

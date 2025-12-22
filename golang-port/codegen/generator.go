@@ -1564,37 +1564,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 	// Check if this is a user-defined function
 	if varType, exists := g.variables[funcName]; exists && varType == "function" {
-		// Nested calls (from within arrow functions) use arrowCtx parameter
-		if g.inArrowFunctionBody {
-			callCode, err := g.generateUserDefinedFunctionCallWithContext(call, "arrowCtx")
-			if err != nil {
-				return "", err
-			}
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
-		}
-
-		// Top-level calls: check if function has Series parameters
-		sig, hasSig := g.funcSigRegistry.Get(funcName)
-		hasSeriesParams := false
-		if hasSig {
-			for _, paramType := range sig.Parameters {
-				if paramType == ParamTypeSeries {
-					hasSeriesParams = true
-					break
-				}
-			}
-		}
-
-		if hasSeriesParams {
-			// Functions with Series parameters use ctx directly (no ArrowContext lifecycle)
-			callCode, err := g.generateUserDefinedFunctionCallWithContext(call, "ctx")
-			if err != nil {
-				return "", err
-			}
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
-		}
-
-		// Top-level functions without Series parameters create unique ArrowContext instances
 		ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
 		code := g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
 
@@ -2235,37 +2204,8 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, funcName string, callExpr *ast.CallExpression) (string, error) {
 	code := ""
 
-	var ctxVarName string
-	var needsAdvance bool
-
-	// Nested calls (from within arrow functions) use arrowCtx parameter
-	if g.inArrowFunctionBody {
-		ctxVarName = "arrowCtx"
-		needsAdvance = false
-	} else {
-		// Top-level calls: check if function has Series parameters
-		sig, hasSig := g.funcSigRegistry.Get(funcName)
-		hasSeriesParams := false
-		if hasSig {
-			for _, paramType := range sig.Parameters {
-				if paramType == ParamTypeSeries {
-					hasSeriesParams = true
-					break
-				}
-			}
-		}
-
-		if hasSeriesParams {
-			// Functions with Series parameters use ctx directly (no ArrowContext lifecycle)
-			ctxVarName = "ctx"
-			needsAdvance = false
-		} else {
-			// Top-level functions without Series parameters create unique ArrowContext instances
-			ctxVarName = g.arrowContextLifecycle.AllocateContextVariable(funcName)
-			code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
-			needsAdvance = true
-		}
-	}
+	ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
+	code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
 
 	args := []string{ctxVarName}
 	for idx, arg := range callExpr.Arguments {
@@ -2282,9 +2222,7 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 
 	code += g.returnValueStorage.GenerateStorageStatements(varNames)
 
-	if needsAdvance {
-		code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
-	}
+	code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
 
 	return code, nil
 }

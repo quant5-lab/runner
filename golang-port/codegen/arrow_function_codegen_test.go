@@ -782,13 +782,12 @@ plot(result)
 		t.Error("Function should have len parameter")
 	}
 
-	// Functions without Series parameters create ArrowContext for isolation
 	if !strings.Contains(code.FunctionBody, "arrowCtx_myFunc_1 := context.NewArrowContext(ctx)") {
-		t.Error("Should create ArrowContext for function without Series parameters")
+		t.Error("Function should allocate unique ArrowContext")
 	}
 
 	if !strings.Contains(code.FunctionBody, "myFunc(arrowCtx_myFunc_1, 20.0)") {
-		t.Error("Function should be called with unique ArrowContext and 20.0, not global len")
+		t.Error("Function should be called with unique context and 20.0, not global len")
 	}
 }
 
@@ -957,12 +956,11 @@ plot(result)
 		t.Error("Function signature incorrect")
 	}
 
-	// Functions without Series parameters create ArrowContext for isolation
 	if !strings.Contains(code.FunctionBody, "arrowCtx_calc_1 := context.NewArrowContext(ctx)") {
-		t.Error("Should create ArrowContext for function without Series parameters")
+		t.Error("Function should allocate unique ArrowContext")
 	}
 
 	if !strings.Contains(code.FunctionBody, "calc(arrowCtx_calc_1, 2.0, 10.0)") {
-		t.Error("Function invocation should include unique ArrowContext and arguments")
+		t.Error("Function invocation should include unique context and arguments")
 	}
 }
