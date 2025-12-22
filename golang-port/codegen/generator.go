@@ -60,6 +60,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.callRouter = NewCallExpressionRouter()
 	gen.funcSigRegistry = NewFunctionSignatureRegistry()
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
+	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
+	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -119,6 +121,8 @@ type generator struct {
 	callRouter              *CallExpressionRouter
 	funcSigRegistry         *FunctionSignatureRegistry
 	signatureRegistrar      *SignatureRegistrar
+	arrowContextLifecycle   *ArrowContextLifecycleManager
+	returnValueStorage      *ReturnValueSeriesStorageHandler
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -1560,11 +1564,47 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 	// Check if this is a user-defined function
 	if varType, exists := g.variables[funcName]; exists && varType == "function" {
-		callCode, err := g.generateCallExpression(call)
+		// Nested calls (from within arrow functions) use arrowCtx parameter
+		if g.inArrowFunctionBody {
+			callCode, err := g.generateUserDefinedFunctionCallWithContext(call, "arrowCtx")
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
+		}
+
+		// Top-level calls: check if function has Series parameters
+		sig, hasSig := g.funcSigRegistry.Get(funcName)
+		hasSeriesParams := false
+		if hasSig {
+			for _, paramType := range sig.Parameters {
+				if paramType == ParamTypeSeries {
+					hasSeriesParams = true
+					break
+				}
+			}
+		}
+
+		if hasSeriesParams {
+			// Functions with Series parameters use ctx directly (no ArrowContext lifecycle)
+			callCode, err := g.generateUserDefinedFunctionCallWithContext(call, "ctx")
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
+		}
+
+		// Top-level functions without Series parameters create unique ArrowContext instances
+		ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
+		code := g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+
+		callCode, err := g.generateUserDefinedFunctionCallWithContext(call, ctxVarName)
 		if err != nil {
 			return "", err
 		}
-		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode), nil
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode)
+		code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
+		return code, nil
 	}
 
 	// Try TA function registry first
@@ -2195,8 +2235,37 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, funcName string, callExpr *ast.CallExpression) (string, error) {
 	code := ""
 
-	ctxVarName := fmt.Sprintf("arrowCtx_%s", funcName)
-	code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+	var ctxVarName string
+	var needsAdvance bool
+
+	// Nested calls (from within arrow functions) use arrowCtx parameter
+	if g.inArrowFunctionBody {
+		ctxVarName = "arrowCtx"
+		needsAdvance = false
+	} else {
+		// Top-level calls: check if function has Series parameters
+		sig, hasSig := g.funcSigRegistry.Get(funcName)
+		hasSeriesParams := false
+		if hasSig {
+			for _, paramType := range sig.Parameters {
+				if paramType == ParamTypeSeries {
+					hasSeriesParams = true
+					break
+				}
+			}
+		}
+
+		if hasSeriesParams {
+			// Functions with Series parameters use ctx directly (no ArrowContext lifecycle)
+			ctxVarName = "ctx"
+			needsAdvance = false
+		} else {
+			// Top-level functions without Series parameters create unique ArrowContext instances
+			ctxVarName = g.arrowContextLifecycle.AllocateContextVariable(funcName)
+			code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+			needsAdvance = true
+		}
+	}
 
 	args := []string{ctxVarName}
 	for idx, arg := range callExpr.Arguments {
@@ -2211,9 +2280,29 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 	callCode := fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
 	code += g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), callCode)
 
-	code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
+	code += g.returnValueStorage.GenerateStorageStatements(varNames)
+
+	if needsAdvance {
+		code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
+	}
 
 	return code, nil
+}
+
+func (g *generator) generateUserDefinedFunctionCallWithContext(callExpr *ast.CallExpression, ctxVarName string) (string, error) {
+	funcName := extractCallFunctionName(callExpr)
+
+	args := []string{ctxVarName}
+	for idx, arg := range callExpr.Arguments {
+		argGen := NewArgumentExpressionGenerator(g, funcName, idx)
+		argCode, err := argGen.Generate(arg)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate argument %d: %w", idx, err)
+		}
+		args = append(args, argCode)
+	}
+
+	return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", ")), nil
 }
 
 func (g *generator) extractStringLiteral(expr ast.Expression) string {

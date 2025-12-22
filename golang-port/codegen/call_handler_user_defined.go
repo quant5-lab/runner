@@ -38,7 +38,8 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 }
 
 func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName string, args []ast.Expression) (string, error) {
-	argStrings := []string{"ctx"}
+	contextArg := h.selectContextArgument(g)
+	argStrings := []string{contextArg}
 
 	for idx, arg := range args {
 		argGen := NewArgumentExpressionGenerator(g, funcName, idx)
@@ -50,6 +51,13 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 	}
 
 	return strings.Join(argStrings, ", "), nil
+}
+
+func (h *UserDefinedFunctionHandler) selectContextArgument(g *generator) string {
+	if g.inArrowFunctionBody {
+		return "arrowCtx"
+	}
+	return "ctx"
 }
 
 func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) bool {

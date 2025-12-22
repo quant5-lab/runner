@@ -152,12 +152,7 @@ func (a *ArrowFunctionCodegen) buildTupleReturnType(count int) string {
 	return "(" + strings.Join(parts, ", ") + ")"
 }
 
-/*
-generateAllSeriesDeclarations creates Series storage for ALL local variables.
-
-Universal ForwardSeriesBuffer paradigm: every variable gets Series storage.
-This ensures historical access and TA function compatibility.
-*/
+/* Universal ForwardSeriesBuffer paradigm: every local variable gets Series storage */
 func (a *ArrowFunctionCodegen) generateAllSeriesDeclarations(arrowFunc *ast.ArrowFunctionExpression) string {
 	var code string
 
@@ -183,8 +178,9 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 		return "", fmt.Errorf("arrow function has empty body")
 	}
 
-	// Register function parameters as variables (runtime values, not constants)
+	/* T2 Fix: Register local variables in g.variables for IIFE expression resolution */
 	savedVariables := make(map[string]string)
+
 	for _, param := range arrowFunc.Params {
 		if existingType, exists := a.gen.variables[param.Name]; exists {
 			savedVariables[param.Name] = existingType
@@ -192,11 +188,29 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 		a.gen.variables[param.Name] = "float"
 	}
 
-	// Mark that we're inside arrow function body (affects TA generation)
+	for _, stmt := range arrowFunc.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if id, ok := declarator.ID.(*ast.Identifier); ok {
+					if existingType, exists := a.gen.variables[id.Name]; exists {
+						savedVariables[id.Name] = existingType
+					}
+					a.gen.variables[id.Name] = "float"
+				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					for _, elem := range arrayPattern.Elements {
+						if existingType, exists := a.gen.variables[elem.Name]; exists {
+							savedVariables[elem.Name] = existingType
+						}
+						a.gen.variables[elem.Name] = "float"
+					}
+				}
+			}
+		}
+	}
+
 	wasInArrowFunction := a.gen.inArrowFunctionBody
 	a.gen.inArrowFunctionBody = true
 
-	// Restore state after body generation
 	defer func() {
 		a.gen.inArrowFunctionBody = wasInArrowFunction
 		for _, param := range arrowFunc.Params {
@@ -204,6 +218,27 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 				a.gen.variables[param.Name] = savedType
 			} else {
 				delete(a.gen.variables, param.Name)
+			}
+		}
+		for _, stmt := range arrowFunc.Body {
+			if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+				for _, declarator := range varDecl.Declarations {
+					if id, ok := declarator.ID.(*ast.Identifier); ok {
+						if savedType, wasSaved := savedVariables[id.Name]; wasSaved {
+							a.gen.variables[id.Name] = savedType
+						} else {
+							delete(a.gen.variables, id.Name)
+						}
+					} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+						for _, elem := range arrayPattern.Elements {
+							if savedType, wasSaved := savedVariables[elem.Name]; wasSaved {
+								a.gen.variables[elem.Name] = savedType
+							} else {
+								delete(a.gen.variables, elem.Name)
+							}
+						}
+					}
+				}
 			}
 		}
 	}()
@@ -260,7 +295,6 @@ func (a *ArrowFunctionCodegen) generateVariableReturnStatement(varDecl *ast.Vari
 		if err != nil {
 			return "", err
 		}
-		// Return Series.GetCurrent() since all variables use Series storage
 		return stmtCode + a.gen.ind() + "return " + id.Name + "Series.GetCurrent()\n", nil
 	}
 
@@ -274,7 +308,6 @@ func (a *ArrowFunctionCodegen) generateTupleReturn(arrayPattern *ast.ArrayPatter
 
 	var returnVars []string
 	for _, elem := range arrayPattern.Elements {
-		// Use Series.GetCurrent() for all tuple elements
 		returnVars = append(returnVars, elem.Name+"Series.GetCurrent()")
 	}
 
