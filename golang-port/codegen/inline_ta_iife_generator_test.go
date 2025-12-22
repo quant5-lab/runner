@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -85,6 +86,226 @@ func TestRMAIIFEGenerator(t *testing.T) {
 
 	if !contains(result, "alpha := 1.0 / 14.0") {
 		t.Error("Missing alpha calculation for RMA")
+	}
+
+	if !contains(result, "ctx.BarIndex < 13") {
+		t.Error("Missing warmup check for period 14")
+	}
+
+	if !contains(result, "for j := 12; j >= 0; j--") {
+		t.Error("Missing backward loop from period-2 to 0")
+	}
+
+	if !contains(result, "rma = alpha*") {
+		t.Error("Missing RMA exponential smoothing formula")
+	}
+
+	if !contains(result, "(1-alpha)*rma") {
+		t.Error("Missing RMA decay term")
+	}
+
+	if contains(result, "sum :=") {
+		t.Error("RMA should not calculate sum variable")
+	}
+
+	if contains(result, "sma :=") {
+		t.Error("RMA should not calculate unused sma variable")
+	}
+
+	if !contains(result, "return rma") {
+		t.Error("Missing return statement")
+	}
+}
+
+func TestRMAIIFEGenerator_PeriodVariations(t *testing.T) {
+	tests := []struct {
+		name              string
+		period            int
+		expectedAlpha     string
+		expectWarmupCheck bool
+		expectedLoopStart string
+	}{
+		{
+			name:              "period 1",
+			period:            1,
+			expectedAlpha:     "alpha := 1.0 / 1.0",
+			expectWarmupCheck: false,
+			expectedLoopStart: "for j := -1; j >= 0; j--",
+		},
+		{
+			name:              "period 2",
+			period:            2,
+			expectedAlpha:     "alpha := 1.0 / 2.0",
+			expectWarmupCheck: true,
+			expectedLoopStart: "for j := 0; j >= 0; j--",
+		},
+		{
+			name:              "period 10",
+			period:            10,
+			expectedAlpha:     "alpha := 1.0 / 10.0",
+			expectWarmupCheck: true,
+			expectedLoopStart: "for j := 8; j >= 0; j--",
+		},
+		{
+			name:              "period 20 (RSI default)",
+			period:            20,
+			expectedAlpha:     "alpha := 1.0 / 20.0",
+			expectWarmupCheck: true,
+			expectedLoopStart: "for j := 18; j >= 0; j--",
+		},
+		{
+			name:              "period 200 (large)",
+			period:            200,
+			expectedAlpha:     "alpha := 1.0 / 200.0",
+			expectWarmupCheck: true,
+			expectedLoopStart: "for j := 198; j >= 0; j--",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			classifier := NewSeriesSourceClassifier()
+			sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Close")
+			accessor := CreateAccessGenerator(sourceInfo)
+			gen := &RMAIIFEGenerator{}
+
+			result := gen.Generate(accessor, tt.period)
+
+			if !contains(result, tt.expectedAlpha) {
+				t.Errorf("Expected alpha %q, not found in generated code", tt.expectedAlpha)
+			}
+
+			if tt.expectWarmupCheck {
+				expectedWarmup := fmt.Sprintf("ctx.BarIndex < %d", tt.period-1)
+				if !contains(result, expectedWarmup) {
+					t.Errorf("Expected warmup check %q, not found in generated code", expectedWarmup)
+				}
+			} else {
+				if contains(result, "ctx.BarIndex <") {
+					t.Error("Did not expect warmup check for period 1")
+				}
+			}
+
+			if !contains(result, tt.expectedLoopStart) {
+				t.Errorf("Expected loop start %q, not found in generated code", tt.expectedLoopStart)
+			}
+
+			if contains(result, "sum :=") || contains(result, "sma :=") {
+				t.Error("RMA should not generate unused sum or sma variables")
+			}
+
+			if !contains(result, "rma := ") {
+				t.Error("Missing rma initialization")
+			}
+
+			if !contains(result, "rma = alpha*") {
+				t.Error("Missing RMA update formula")
+			}
+		})
+	}
+}
+
+func TestRMAIIFEGenerator_SourceTypeVariations(t *testing.T) {
+	tests := []struct {
+		name        string
+		sourceExpr  string
+		expectValid bool
+	}{
+		{
+			name:        "bar field close",
+			sourceExpr:  "ctx.Data[ctx.BarIndex].Close",
+			expectValid: true,
+		},
+		{
+			name:        "bar field high",
+			sourceExpr:  "ctx.Data[ctx.BarIndex].High",
+			expectValid: true,
+		},
+		{
+			name:        "bar field low",
+			sourceExpr:  "ctx.Data[ctx.BarIndex].Low",
+			expectValid: true,
+		},
+		{
+			name:        "bar field open",
+			sourceExpr:  "ctx.Data[ctx.BarIndex].Open",
+			expectValid: true,
+		},
+		{
+			name:        "series accessor",
+			sourceExpr:  "closeSeries.GetCurrent()",
+			expectValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			classifier := NewSeriesSourceClassifier()
+			sourceInfo := classifier.Classify(tt.sourceExpr)
+			accessor := CreateAccessGenerator(sourceInfo)
+			gen := &RMAIIFEGenerator{}
+
+			result := gen.Generate(accessor, 14)
+
+			if result == "" && tt.expectValid {
+				t.Error("Expected valid generated code, got empty string")
+			}
+
+			if tt.expectValid {
+				if contains(result, "sum :=") || contains(result, "sma :=") {
+					t.Error("RMA should not generate unused variables regardless of source type")
+				}
+
+				if !contains(result, "alpha := 1.0 / 14.0") {
+					t.Error("Missing alpha calculation")
+				}
+
+				if !contains(result, "rma := ") {
+					t.Error("Missing rma initialization")
+				}
+			}
+		})
+	}
+}
+
+func TestRMAIIFEGenerator_CodeStructureValidation(t *testing.T) {
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Close")
+	accessor := CreateAccessGenerator(sourceInfo)
+	gen := &RMAIIFEGenerator{}
+
+	result := gen.Generate(accessor, 20)
+
+	requiredComponents := []string{
+		"func() float64",
+		"if ctx.BarIndex < 19",
+		"return math.NaN()",
+		"alpha := 1.0 / 20.0",
+		"rma := ",
+		"for j := 18; j >= 0; j--",
+		"rma = alpha*",
+		"+ (1-alpha)*rma",
+		"return rma",
+		"}()",
+	}
+
+	for _, component := range requiredComponents {
+		if !contains(result, component) {
+			t.Errorf("Missing required component: %q", component)
+		}
+	}
+
+	prohibitedComponents := []string{
+		"sum := 0.0",
+		"sum +=",
+		"sma := sum",
+		"sma :=",
+	}
+
+	for _, component := range prohibitedComponents {
+		if contains(result, component) {
+			t.Errorf("Found prohibited component (unused variable): %q", component)
+		}
 	}
 }
 

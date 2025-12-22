@@ -44,10 +44,6 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 	}
 
 	body := fmt.Sprintf("alpha := 1.0 / %d.0; ", period)
-	body += "sum := 0.0; "
-	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-1)
-	body += fmt.Sprintf("sum += %s }; ", accessor.GenerateLoopValueAccess("j"))
-	body += fmt.Sprintf("sma := sum / %d.0; ", period)
 	body += fmt.Sprintf("rma := %s; ", accessor.GenerateInitialValueAccess(period))
 	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-2)
 	body += fmt.Sprintf("rma = alpha*%s + (1-alpha)*rma }; ", accessor.GenerateLoopValueAccess("j"))
