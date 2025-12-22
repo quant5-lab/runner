@@ -8,11 +8,18 @@ import (
 )
 
 type ArrowFunctionCodegen struct {
-	gen *generator
+	gen            *generator
+	accessResolver *ArrowSeriesAccessResolver
+	seriesVarGen   *ArrowSeriesVariableGenerator
+	statementGen   *ArrowStatementGenerator
 }
 
 func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
-	return &ArrowFunctionCodegen{gen: gen}
+	return &ArrowFunctionCodegen{
+		gen:            gen,
+		accessResolver: NewArrowSeriesAccessResolver(),
+		seriesVarGen:   nil, // Initialized in Generate with proper indentation
+	}
 }
 
 func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFunctionExpression) (string, error) {
@@ -21,10 +28,35 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 
 	a.gen.signatureRegistrar.RegisterArrowFunction(funcName, arrowFunc.Params, paramUsage, "float64")
 
+	// Register all parameters in access resolver
+	for _, param := range arrowFunc.Params {
+		a.accessResolver.RegisterParameter(param.Name)
+	}
+
+	// Register all local variables in access resolver
+	for _, stmt := range arrowFunc.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if id, ok := declarator.ID.(*ast.Identifier); ok {
+					a.accessResolver.RegisterLocalVariable(id.Name)
+				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					for _, elem := range arrayPattern.Elements {
+						a.accessResolver.RegisterLocalVariable(elem.Name)
+					}
+				}
+			}
+		}
+	}
+
 	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc, paramUsage)
 	if err != nil {
 		return "", err
 	}
+
+	// Initialize Series variable generator with proper indentation context
+	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
+	a.seriesVarGen = NewArrowSeriesVariableGenerator(a.gen.ind(), exprGen)
+	a.statementGen = NewArrowStatementGenerator(a.gen, a.seriesVarGen, exprGen)
 
 	body, err := a.generateFunctionBody(arrowFunc)
 	if err != nil {
@@ -34,12 +66,12 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	code := a.gen.ind() + signature + " " + returnType + " {\n"
 	a.gen.indent++
 
-	code += a.gen.ind() + "ctx := arrowCtx.Context\n"
+	code += a.gen.ind() + "ctx := arrowCtx.Context\n\n"
 
-	seriesInitializer := NewArrowLocalSeriesInitializer(a.gen.ind())
-	seriesInit := seriesInitializer.GenerateInitializations(arrowFunc)
-	if seriesInit != "" {
-		code += "\n" + seriesInit
+	// Generate Series declarations for ALL local variables (universal ForwardSeriesBuffer)
+	seriesDecls := a.generateAllSeriesDeclarations(arrowFunc)
+	if seriesDecls != "" {
+		code += seriesDecls + "\n"
 	}
 
 	code += body
@@ -120,6 +152,32 @@ func (a *ArrowFunctionCodegen) buildTupleReturnType(count int) string {
 	return "(" + strings.Join(parts, ", ") + ")"
 }
 
+/*
+generateAllSeriesDeclarations creates Series storage for ALL local variables.
+
+Universal ForwardSeriesBuffer paradigm: every variable gets Series storage.
+This ensures historical access and TA function compatibility.
+*/
+func (a *ArrowFunctionCodegen) generateAllSeriesDeclarations(arrowFunc *ast.ArrowFunctionExpression) string {
+	var code string
+
+	for _, stmt := range arrowFunc.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if id, ok := declarator.ID.(*ast.Identifier); ok {
+					code += a.seriesVarGen.GenerateDeclaration(id.Name)
+				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					for _, elem := range arrayPattern.Elements {
+						code += a.seriesVarGen.GenerateDeclaration(elem.Name)
+					}
+				}
+			}
+		}
+	}
+
+	return code
+}
+
 func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunctionExpression) (string, error) {
 	if len(arrowFunc.Body) == 0 {
 		return "", fmt.Errorf("arrow function has empty body")
@@ -163,7 +221,7 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 			break
 		}
 
-		stmtCode, err := a.gen.generateStatement(stmt)
+		stmtCode, err := a.statementGen.GenerateStatement(stmt)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate statement: %w", err)
 		}
@@ -202,7 +260,8 @@ func (a *ArrowFunctionCodegen) generateVariableReturnStatement(varDecl *ast.Vari
 		if err != nil {
 			return "", err
 		}
-		return stmtCode + a.gen.ind() + "return " + id.Name + "\n", nil
+		// Return Series.GetCurrent() since all variables use Series storage
+		return stmtCode + a.gen.ind() + "return " + id.Name + "Series.GetCurrent()\n", nil
 	}
 
 	return "", fmt.Errorf("unsupported variable declarator pattern: %T", decl.ID)
@@ -215,7 +274,8 @@ func (a *ArrowFunctionCodegen) generateTupleReturn(arrayPattern *ast.ArrayPatter
 
 	var returnVars []string
 	for _, elem := range arrayPattern.Elements {
-		returnVars = append(returnVars, elem.Name)
+		// Use Series.GetCurrent() for all tuple elements
+		returnVars = append(returnVars, elem.Name+"Series.GetCurrent()")
 	}
 
 	initCode, err := a.generateTupleInitExpression(init, returnVars)
@@ -235,7 +295,21 @@ func (a *ArrowFunctionCodegen) generateTupleInitExpression(expr ast.Expression, 
 		return "", err
 	}
 
-	return a.gen.ind() + strings.Join(varNames, ", ") + " := " + exprCode + "\n", nil
+	baseVarNames := make([]string, len(varNames))
+	tempVarNames := make([]string, len(varNames))
+	for i, varName := range varNames {
+		baseName := strings.TrimSuffix(varName, "Series.GetCurrent()")
+		baseVarNames[i] = baseName
+		tempVarNames[i] = "temp_" + baseName
+	}
+
+	code := a.gen.ind() + strings.Join(tempVarNames, ", ") + " := " + exprCode + "\n"
+
+	for i, baseName := range baseVarNames {
+		code += a.gen.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", baseName, tempVarNames[i])
+	}
+
+	return code, nil
 }
 
 func (a *ArrowFunctionCodegen) generateExpressionReturnStatement(exprStmt *ast.ExpressionStatement) (string, error) {
@@ -266,108 +340,9 @@ func (a *ArrowFunctionCodegen) generateTupleReturnFromLiteral(elements []ast.Exp
 }
 
 func (a *ArrowFunctionCodegen) generateExpression(expr ast.Expression) (string, error) {
-	switch e := expr.(type) {
-	case *ast.Identifier:
-		return e.Name, nil
-
-	case *ast.Literal:
-		return fmt.Sprintf("%v", e.Value), nil
-
-	case *ast.CallExpression:
-		funcName := extractCallFunctionName(e)
-		if funcName == "fixnan" || funcName == "ta.fixnan" {
-			return a.generateFixnanExpression(e)
-		}
-		return a.gen.generateCallExpression(e)
-
-	case *ast.BinaryExpression:
-		return a.generateBinaryExpression(e)
-
-	case *ast.MemberExpression:
-		return a.gen.generateMemberExpression(e)
-
-	case *ast.ConditionalExpression:
-		return a.generateConditionalExpression(e)
-
-	case *ast.UnaryExpression:
-		return a.generateUnaryExpression(e)
-
-	default:
-		return "", fmt.Errorf("unsupported expression type: %T", expr)
-	}
-}
-
-func (a *ArrowFunctionCodegen) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
-	left, err := a.generateExpression(binExpr.Left)
-	if err != nil {
-		return "", err
-	}
-
-	right, err := a.generateExpression(binExpr.Right)
-	if err != nil {
-		return "", err
-	}
-
-	op := a.mapOperator(binExpr.Operator)
-	return fmt.Sprintf("(%s %s %s)", left, op, right), nil
-}
-
-func (a *ArrowFunctionCodegen) generateConditionalExpression(condExpr *ast.ConditionalExpression) (string, error) {
-	testCode, err := a.generateExpression(condExpr.Test)
-	if err != nil {
-		return "", err
-	}
-
-	consCode, err := a.generateExpression(condExpr.Consequent)
-	if err != nil {
-		return "", err
-	}
-
-	altCode, err := a.generateExpression(condExpr.Alternate)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()", testCode, consCode, altCode), nil
-}
-
-func (a *ArrowFunctionCodegen) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (string, error) {
-	argCode, err := a.generateExpression(unaryExpr.Argument)
-	if err != nil {
-		return "", err
-	}
-
-	op := a.mapOperator(unaryExpr.Operator)
-	return fmt.Sprintf("(%s%s)", op, argCode), nil
-}
-
-func (a *ArrowFunctionCodegen) mapOperator(op string) string {
-	switch op {
-	case "and":
-		return "&&"
-	case "or":
-		return "||"
-	case "not":
-		return "!"
-	default:
-		return op
-	}
-}
-
-func (a *ArrowFunctionCodegen) generateFixnanExpression(call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("fixnan() requires 1 argument")
-	}
-
-	sourceExpr := call.Arguments[0]
-
-	accessor, err := a.gen.createAccessorForFixnan(sourceExpr)
-	if err != nil {
-		return "", fmt.Errorf("fixnan: failed to create accessor: %w", err)
-	}
-
-	generator := &FixnanIIFEGenerator{}
-	iifeCode := generator.GenerateWithSelfReference(accessor, "")
-
-	return iifeCode, nil
+	// Delegate ALL expression generation to Series-aware generator
+	// This ensures proper identifier resolution (parameters vs local variables)
+	// AND proper inline TA generation with arrow-aware accessors
+	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
+	return exprGen.Generate(expr)
 }

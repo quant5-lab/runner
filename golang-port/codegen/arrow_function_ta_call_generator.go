@@ -22,6 +22,19 @@ func NewArrowFunctionTACallGenerator(gen *generator) *ArrowFunctionTACallGenerat
 func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
+	// Check if this is a user-defined function first
+	detector := NewUserDefinedFunctionDetector(a.gen.variables)
+	if detector.IsUserDefinedFunction(funcName) {
+		// User-defined arrow function call - delegate to user-defined handler
+		handler := &UserDefinedFunctionHandler{}
+		return handler.GenerateCode(a.gen, call)
+	}
+
+	// Special case: fixnan uses inline IIFE with NaN check
+	if funcName == "fixnan" || funcName == "ta.fixnan" {
+		return a.generateFixnanIIFE(call)
+	}
+
 	if !a.iifeRegistry.IsSupported(funcName) {
 		return "", fmt.Errorf("TA function %s not supported in arrow function context", funcName)
 	}
@@ -37,6 +50,24 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 	}
 
 	return code, nil
+}
+
+/*
+generateFixnanIIFE creates inline code for fixnan(source).
+Returns: func() float64 { val := source; if math.IsNaN(val) { return 0.0 }; return val }()
+*/
+func (a *ArrowFunctionTACallGenerator) generateFixnanIIFE(call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("fixnan requires 1 argument")
+	}
+
+	sourceArg := call.Arguments[0]
+	sourceCode, err := a.gen.generateArrowFunctionExpression(sourceArg)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate fixnan source: %w", err)
+	}
+
+	return fmt.Sprintf("func() float64 { val := %s; if math.IsNaN(val) { return 0.0 }; return val }()", sourceCode), nil
 }
 
 func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, int, error) {
@@ -117,6 +148,11 @@ func (a *ArrowFunctionTACallGenerator) getDefaultSourceAccessor(funcName string)
 func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Expression) (AccessGenerator, error) {
 	switch e := expr.(type) {
 	case *ast.Identifier:
+		// tr builtin generates inline calculation, not Series access
+		if e.Name == "tr" {
+			return NewBuiltinTrueRangeAccessor(), nil
+		}
+
 		if varType, exists := a.gen.variables[e.Name]; exists && varType == "float" {
 			return NewArrowFunctionParameterAccessor(e.Name), nil
 		}

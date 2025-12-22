@@ -326,8 +326,10 @@ result = compute(20)
 plot(result)`,
 			mustContain: []string{
 				"func compute(arrowCtx *context.ArrowContext, len float64) float64",
-				"avg :=",
-				"dev :=",
+				"avgSeries := arrowCtx.GetOrCreateSeries(\"avg\")",
+				"devSeries := arrowCtx.GetOrCreateSeries(\"dev\")",
+				"avgSeries.Set(",
+				"devSeries.Set(",
 				"return",
 			},
 			mustNotContain: []string{
@@ -464,9 +466,11 @@ minmax(len) =>
 plot(min)`,
 			mustContain: []string{
 				"func minmax(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
-				"h :=",
-				"l :=",
-				"return l, h",
+				"hSeries := arrowCtx.GetOrCreateSeries(\"h\")",
+				"lSeries := arrowCtx.GetOrCreateSeries(\"l\")",
+				"hSeries.Set(",
+				"lSeries.Set(",
+				"return lSeries.GetCurrent(), hSeries.GetCurrent()",
 			},
 		},
 		{
@@ -811,7 +815,7 @@ getClose() =>
 result = getClose()
 plot(result)`,
 			mustContain: []string{
-				"return close",
+				"return bar.Close",
 			},
 		},
 		{

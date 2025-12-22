@@ -762,7 +762,25 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
 			return code, nil
 		}
-		// Function parameter or local variable
+
+		// Check if it's a local variable (needs Series access)
+		if varType, exists := g.variables[e.Name]; exists {
+			// Local variable in arrow function uses Series storage
+			if varType == "float" || varType == "bool" {
+				return e.Name + "Series.GetCurrent()", nil
+			}
+			// Function type stays as-is (user-defined function call)
+			if varType == "function" {
+				return e.Name, nil
+			}
+		}
+
+		// Check if it's a constant
+		if _, isConstant := g.constants[e.Name]; isConstant {
+			return e.Name, nil
+		}
+
+		// Function parameter or unknown - direct access
 		return e.Name, nil
 
 	case *ast.Literal:
@@ -780,9 +798,26 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 	case *ast.ConditionalExpression:
 		return g.generateConditionalExpression(e)
 
+	case *ast.UnaryExpression:
+		return g.generateUnaryExpressionInArrowContext(e)
+
 	default:
 		return "", fmt.Errorf("unsupported arrow function expression type: %T", expr)
 	}
+}
+
+func (g *generator) generateUnaryExpressionInArrowContext(unaryExpr *ast.UnaryExpression) (string, error) {
+	operandCode, err := g.generateArrowFunctionExpression(unaryExpr.Argument)
+	if err != nil {
+		return "", err
+	}
+
+	op := unaryExpr.Operator
+	if op == "not" {
+		op = "!"
+	}
+
+	return fmt.Sprintf("%s%s", op, operandCode), nil
 }
 
 func (g *generator) generateUnaryExpression(unaryExpr *ast.UnaryExpression) (string, error) {
@@ -1159,16 +1194,13 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 
 		// Generate initialization from init expression
 		if declarator.Init != nil {
-			// Arrow function context: Generate inline variable assignment
+			// Arrow function context: ALL variables use Series (ForwardSeriesBuffer paradigm)
 			if g.inArrowFunctionBody {
-				result, err := g.generateArrowFunctionVariableInit(varName, declarator.Init)
+				seriesCode, err := g.generateArrowFunctionSeriesInit(varName, declarator.Init)
 				if err != nil {
 					return "", err
 				}
-				if result.HasPreamble() {
-					code += result.Preamble
-				}
-				code += result.Assignment
+				code += seriesCode
 			} else {
 				// Series context: Use ForwardSeriesBuffer paradigm
 				initCode, err := g.generateVariableInit(varName, declarator.Init)
@@ -1180,6 +1212,23 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 	}
 	return code, nil
+}
+
+/*
+generateArrowFunctionSeriesInit generates Series.Set() for arrow function variables.
+
+Universal ForwardSeriesBuffer paradigm: ALL arrow function variables use Series storage.
+This replaces the old scalar assignment approach.
+*/
+func (g *generator) generateArrowFunctionSeriesInit(varName string, initExpr ast.Expression) (string, error) {
+	// Generate the expression value
+	exprCode, err := g.generateArrowFunctionExpression(initExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate expression for %s: %w", varName, err)
+	}
+
+	// Generate Series.Set() assignment
+	return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, exprCode), nil
 }
 
 func (g *generator) generateArrowFunctionVariableInit(varName string, initExpr ast.Expression) (*ArrowVarInitResult, error) {

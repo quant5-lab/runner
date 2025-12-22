@@ -7,13 +7,6 @@ import (
 )
 
 // BuiltinIdentifierHandler resolves Pine Script built-in identifiers to Go runtime expressions.
-//
-// Responsibilities:
-//   - Detect built-in series (close, open, high, low, volume)
-//   - Detect strategy runtime values (strategy.position_avg_price, etc.)
-//   - Generate correct Go code for each context (current bar vs security() context)
-//
-// Design: Centralized builtin detection prevents duplicate switch statements across generator.
 type BuiltinIdentifierHandler struct{}
 
 func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
@@ -23,7 +16,7 @@ func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 // IsBuiltinSeriesIdentifier checks if identifier is a Pine built-in series variable.
 func (h *BuiltinIdentifierHandler) IsBuiltinSeriesIdentifier(name string) bool {
 	switch name {
-	case "close", "open", "high", "low", "volume":
+	case "close", "open", "high", "low", "volume", "tr":
 		return true
 	default:
 		return false
@@ -45,8 +38,6 @@ func (h *BuiltinIdentifierHandler) IsStrategyRuntimeValue(obj, prop string) bool
 }
 
 // GenerateCurrentBarAccess generates code for built-in series at current bar.
-//
-// Returns: bar.Close, bar.Open, etc.
 func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string {
 	switch name {
 	case "close":
@@ -59,14 +50,14 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return "bar.Low"
 	case "volume":
 		return "bar.Volume"
+	case "tr":
+		return h.generateTrueRangeCalculation("bar")
 	default:
 		return ""
 	}
 }
 
 // GenerateSecurityContextAccess generates code for built-in series in security() context.
-//
-// Why different: security() processes historical data, needs ctx.Data[ctx.BarIndex] access.
 func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) string {
 	switch name {
 	case "close":
@@ -79,15 +70,19 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return "ctx.Data[ctx.BarIndex].Low"
 	case "volume":
 		return "ctx.Data[ctx.BarIndex].Volume"
+	case "tr":
+		return h.generateTrueRangeCalculation("ctx.Data[ctx.BarIndex]")
 	default:
 		return ""
 	}
 }
 
-// GenerateHistoricalAccess generates code for historical built-in series access.
-//
-// Returns: Bounds-checked historical access with NaN fallback.
+// GenerateHistoricalAccess generates code for historical built-in series access with bounds checking.
 func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset int) string {
+	if name == "tr" {
+		return h.generateHistoricalTrueRange(offset)
+	}
+
 	field := ""
 	switch name {
 	case "close":
@@ -108,7 +103,7 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		offset, offset, field)
 }
 
-// GenerateStrategyRuntimeAccess generates Series.Get(0) access for strategy runtime values
+// GenerateStrategyRuntimeAccess generates Series access for strategy runtime values.
 func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string) string {
 	switch property {
 	case "position_avg_price":
@@ -129,10 +124,6 @@ func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string
 }
 
 // TryResolveIdentifier attempts to resolve identifier as builtin.
-//
-// Returns: (code, resolved)
-//   - If builtin: (generated code, true)
-//   - If not builtin: ("", false)
 func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, inSecurityContext bool) (string, bool) {
 	if expr.Name == "na" {
 		return "math.NaN()", true
@@ -150,10 +141,6 @@ func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, in
 }
 
 // TryResolveMemberExpression attempts to resolve member expression as builtin.
-//
-// Returns: (code, resolved)
-//   - If builtin: (generated code, true)
-//   - If not builtin: ("", false)
 func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberExpression, inSecurityContext bool) (string, bool) {
 	obj, okObj := expr.Object.(*ast.Identifier)
 	if !okObj {
@@ -204,4 +191,30 @@ func (h *BuiltinIdentifierHandler) extractOffset(expr ast.Expression) int {
 	default:
 		return 0
 	}
+}
+
+// generateTrueRangeCalculation generates inline tr calculation.
+func (h *BuiltinIdentifierHandler) generateTrueRangeCalculation(barAccessor string) string {
+	return fmt.Sprintf(
+		"func() float64 { if ctx.BarIndex < 1 { return %s.High - %s.Low }; "+
+			"prevClose := ctx.Data[ctx.BarIndex-1].Close; "+
+			"return math.Max(%s.High - %s.Low, math.Max(math.Abs(%s.High - prevClose), math.Abs(%s.Low - prevClose))) }()",
+		barAccessor, barAccessor,
+		barAccessor, barAccessor, barAccessor, barAccessor,
+	)
+}
+
+// generateHistoricalTrueRange generates tr calculation for historical bar access with offset.
+func (h *BuiltinIdentifierHandler) generateHistoricalTrueRange(offset int) string {
+	return fmt.Sprintf(
+		"func() float64 { "+
+			"if i-%d < 0 { return math.NaN() }; "+
+			"barIdx := i-%d; "+
+			"if barIdx < 1 { return ctx.Data[barIdx].High - ctx.Data[barIdx].Low }; "+
+			"prevClose := ctx.Data[barIdx-1].Close; "+
+			"currentBar := ctx.Data[barIdx]; "+
+			"return math.Max(currentBar.High - currentBar.Low, math.Max(math.Abs(currentBar.High - prevClose), math.Abs(currentBar.Low - prevClose))) "+
+			"}()",
+		offset, offset,
+	)
 }

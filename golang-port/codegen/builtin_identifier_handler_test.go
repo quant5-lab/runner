@@ -19,6 +19,7 @@ func TestBuiltinIdentifierHandler_IsBuiltinSeriesIdentifier(t *testing.T) {
 		{"high builtin", "high", true},
 		{"low builtin", "low", true},
 		{"volume builtin", "volume", true},
+		{"tr builtin", "tr", true},
 		{"user variable", "my_var", false},
 		{"na builtin", "na", false},
 	}
@@ -86,6 +87,31 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess(t *testing.T) {
 	}
 }
 
+func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess_TrueRange(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	result := handler.GenerateCurrentBarAccess("tr")
+
+	/* Verify tr generates inline calculation with expected components */
+	expectedComponents := []string{
+		"bar.High", "bar.Low",
+		"ctx.Data", "Close", /* prevClose from previous bar */
+		"math.Max", "math.Abs",
+		"if ctx.BarIndex < 1", /* First bar edge case */
+	}
+
+	for _, component := range expectedComponents {
+		if !contains(result, component) {
+			t.Errorf("GenerateCurrentBarAccess(tr) missing expected component: %s\nGot: %s", component, result)
+		}
+	}
+
+	/* Verify IIFE wrapper */
+	if !contains(result, "func() float64") {
+		t.Errorf("GenerateCurrentBarAccess(tr) should wrap in IIFE\nGot: %s", result)
+	}
+}
+
 func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
@@ -108,6 +134,32 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 				t.Errorf("GenerateSecurityContextAccess(%s) = %s, want %s", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess_TrueRange(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	result := handler.GenerateSecurityContextAccess("tr")
+
+	/* Verify tr in security() context generates inline calculation */
+	expectedComponents := []string{
+		"ctx.Data[ctx.BarIndex].High",
+		"ctx.Data[ctx.BarIndex].Low",
+		"Close", /* prevClose from previous bar */
+		"math.Max", "math.Abs",
+		"if ctx.BarIndex < 1", /* First bar edge case */
+	}
+
+	for _, component := range expectedComponents {
+		if !contains(result, component) {
+			t.Errorf("GenerateSecurityContextAccess(tr) missing expected component: %s\nGot: %s", component, result)
+		}
+	}
+
+	/* Verify IIFE wrapper */
+	if !contains(result, "func() float64") {
+		t.Errorf("GenerateSecurityContextAccess(tr) should wrap in IIFE\nGot: %s", result)
 	}
 }
 
@@ -145,6 +197,40 @@ func TestBuiltinIdentifierHandler_GenerateHistoricalAccess(t *testing.T) {
 			result := handler.GenerateHistoricalAccess(tt.builtin, tt.offset)
 			if result != tt.expected {
 				t.Errorf("GenerateHistoricalAccess(%s, %d) = %s, want %s", tt.builtin, tt.offset, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_GenerateHistoricalAccess_TrueRange(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name   string
+		offset int
+	}{
+		{"tr[1]", 1},
+		{"tr[5]", 5},
+		{"tr[10]", 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := handler.GenerateHistoricalAccess("tr", tt.offset)
+
+			/* Verify historical tr access generates inline calculation with offset */
+			expectedComponents := []string{
+				"func() float64",
+				"ctx.Data",
+				"math.Max",
+				"math.Abs",
+				"High", "Low", "Close",
+			}
+
+			for _, component := range expectedComponents {
+				if !contains(result, component) {
+					t.Errorf("GenerateHistoricalAccess(tr, %d) missing expected component: %s\nGot: %s", tt.offset, component, result)
+				}
 			}
 		})
 	}
@@ -197,6 +283,40 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier(t *testing.T) {
 			if code != tt.expectedCode || resolved != tt.expectedResolved {
 				t.Errorf("TryResolveIdentifier(%s, %v) = (%s, %v), want (%s, %v)",
 					tt.identifier, tt.inSecurityContext, code, resolved, tt.expectedCode, tt.expectedResolved)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_TryResolveIdentifier_TrueRange(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name              string
+		inSecurityContext bool
+		expectedResolved  bool
+	}{
+		{"tr current bar", false, true},
+		{"tr in security", true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.Identifier{Name: "tr"}
+			code, resolved := handler.TryResolveIdentifier(expr, tt.inSecurityContext)
+
+			if resolved != tt.expectedResolved {
+				t.Errorf("TryResolveIdentifier(tr, %v) resolved = %v, want %v", tt.inSecurityContext, resolved, tt.expectedResolved)
+			}
+
+			if resolved {
+				/* Verify tr generates inline calculation */
+				expectedComponents := []string{"math.Max", "High", "Low", "Close"}
+				for _, component := range expectedComponents {
+					if !contains(code, component) {
+						t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+					}
+				}
 			}
 		})
 	}

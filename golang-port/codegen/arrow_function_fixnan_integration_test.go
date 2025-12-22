@@ -73,11 +73,12 @@ result = momentum(14)
 `,
 			mustContain: []string{
 				"func momentum(arrowCtx *context.ArrowContext, len float64) float64",
-				"plus :=",
+				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
+				"plusSeries.Set(",
 				"func() float64",
 				"val :=",
 				"if math.IsNaN(val) { return 0.0 }",
-				"return plus",
+				"return plusSeries.GetCurrent()",
 			},
 			mustNotContain: []string{
 				"fixnanState",
@@ -99,9 +100,11 @@ dirmov(len) =>
 `,
 			mustContain: []string{
 				"func dirmov(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
-				"plus :=",
-				"minus :=",
-				"return plus, minus",
+				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
+				"minusSeries := arrowCtx.GetOrCreateSeries(\"minus\")",
+				"plusSeries.Set(",
+				"minusSeries.Set(",
+				"return plusSeries.GetCurrent(), minusSeries.GetCurrent()",
 			},
 			mustNotContain: []string{
 				"fixnanState_plus",
@@ -149,9 +152,9 @@ result = normalizer(close, high, low)
 `,
 			mustContain: []string{
 				"func normalizer(arrowCtx *context.ArrowContext, a float64, b float64, c float64) float64",
-				"na :=",
-				"nb :=",
-				"nc :=",
+				"naSeries := arrowCtx.GetOrCreateSeries(\"na\")",
+				"nbSeries := arrowCtx.GetOrCreateSeries(\"nb\")",
+				"ncSeries := arrowCtx.GetOrCreateSeries(\"nc\")",
 			},
 		},
 		{
@@ -165,7 +168,7 @@ result = composite(20)
 `,
 			mustContain: []string{
 				"func composite(arrowCtx *context.ArrowContext, len float64) float64",
-				"avg :=",
+				"avgSeries := arrowCtx.GetOrCreateSeries(\"avg\")",
 				"func() float64",
 			},
 		},
@@ -273,8 +276,8 @@ result = nested()
 `,
 			expectError: false,
 			mustContain: []string{
-				"a :=",
-				"b :=",
+				"aSeries := arrowCtx.GetOrCreateSeries(\"a\")",
+				"bSeries := arrowCtx.GetOrCreateSeries(\"b\")",
 				"func() float64",
 			},
 		},
@@ -289,7 +292,7 @@ result = longVarName()
 `,
 			expectError: false,
 			mustContain: []string{
-				"veryLongVariableNameForTestingPurposesOnly :=",
+				"veryLongVariableNameForTestingPurposesOnlySeries := arrowCtx.GetOrCreateSeries(\"veryLongVariableNameForTestingPurposesOnly\")",
 			},
 		},
 	}
@@ -370,10 +373,10 @@ dirmov(len) =>
 			description: "DMI indicator with fixnan for safe division",
 			mustContain: []string{
 				"func dirmov(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
-				"plus :=",
-				"minus :=",
+				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
+				"minusSeries := arrowCtx.GetOrCreateSeries(\"minus\")",
 				"if math.IsNaN(val) { return 0.0 }",
-				"return plus, minus",
+				"return plusSeries.GetCurrent(), minusSeries.GetCurrent()",
 			},
 		},
 		{
@@ -403,7 +406,7 @@ normalized = normalize(close, sma(close, 200))
 			description: "Normalize indicator values with fixnan",
 			mustContain: []string{
 				"func normalize(arrowCtx *context.ArrowContext, value float64, baseline float64) float64",
-				"ratio :=",
+				"ratioSeries := arrowCtx.GetOrCreateSeries(\"ratio\")",
 			},
 		},
 	}

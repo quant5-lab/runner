@@ -74,8 +74,8 @@ result = spread(10)
 `,
 			mustContain: []string{
 				"func spread(arrowCtx *context.ArrowContext, len float64)",
-				"highChange :=",
-				"lowChange :=",
+				"highChangeSeries := arrowCtx.GetOrCreateSeries(\"highChange\")",
+				"lowChangeSeries := arrowCtx.GetOrCreateSeries(\"lowChange\")",
 			},
 		},
 		{
@@ -104,7 +104,7 @@ result = momentum(14)
 `,
 			mustContain: []string{
 				"func momentum(arrowCtx *context.ArrowContext, len float64)",
-				"upMove :=",
+				"upMoveSeries := arrowCtx.GetOrCreateSeries(\"upMove\")",
 			},
 		},
 		{
@@ -119,9 +119,8 @@ result = composite(20)
 `,
 			mustContain: []string{
 				"func composite(arrowCtx *context.ArrowContext, len float64)",
-				"chg :=",
-				"avg :=",
-				"sum := 0.0",
+				"chgSeries := arrowCtx.GetOrCreateSeries(\"chg\")",
+				"avgSeries := arrowCtx.GetOrCreateSeries(\"avg\")",
 			},
 		},
 	}

@@ -1,0 +1,47 @@
+package codegen
+
+import "fmt"
+
+/*
+ArrowAwareSeriesAccessor adapts standard Series access to arrow function context.
+
+Responsibility (SRP):
+  - Generate Series.GetCurrent() access code for loop values
+  - Generate Series.Get(offset) access code for historical values
+  - No knowledge of identifier resolution (delegates to ArrowIdentifierResolver)
+
+Design:
+  - Implements AccessGenerator interface for compatibility with inline TA generators
+  - Uses composition: wraps identifier resolver for proper Series access
+  - KISS: Simple delegation, no complex logic
+*/
+type ArrowAwareSeriesAccessor struct {
+	seriesName string
+}
+
+func NewArrowAwareSeriesAccessor(seriesName string) *ArrowAwareSeriesAccessor {
+	return &ArrowAwareSeriesAccessor{
+		seriesName: seriesName,
+	}
+}
+
+/*
+GenerateLoopValueAccess generates code for accessing series values in a loop.
+*/
+func (a *ArrowAwareSeriesAccessor) GenerateLoopValueAccess(loopVar string) string {
+	return fmt.Sprintf("%sSeries.Get(%s)", a.seriesName, loopVar)
+}
+
+/*
+GenerateInitialValueAccess generates code for accessing the initial series value.
+*/
+func (a *ArrowAwareSeriesAccessor) GenerateInitialValueAccess(period int) string {
+	return fmt.Sprintf("%sSeries.Get(%d-1)", a.seriesName, period)
+}
+
+/*
+GetPreamble returns any setup code needed before the accessor is used.
+*/
+func (a *ArrowAwareSeriesAccessor) GetPreamble() string {
+	return ""
+}
