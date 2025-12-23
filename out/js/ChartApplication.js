@@ -67,12 +67,21 @@ export class ChartApplication {
       main: { height: 400, fixed: true },
     };
 
-    const hasIndicatorPane = Object.values(indicatorsWithPanes).some(
-      (ind) => ind.pane === 'indicator'
-    );
+    const uniquePanes = new Set();
+    Object.values(indicatorsWithPanes).forEach((indicator) => {
+      const pane = indicator.pane;
+      if (pane && pane !== 'main') {
+        uniquePanes.add(pane);
+      }
+    });
 
-    if (hasIndicatorPane) {
-      config.indicator = uiPanes?.indicator || { height: 200, fixed: false };
+    uniquePanes.forEach((paneName) => {
+      config[paneName] = uiPanes?.[paneName] || { height: 200, fixed: false };
+    });
+
+    /* Backward compatibility: ensure 'indicator' pane exists if no dynamic panes */
+    if (Object.keys(config).length === 1) {
+      config.indicator = { height: 200, fixed: false };
     }
 
     return config;
