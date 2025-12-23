@@ -157,7 +157,7 @@
 - [x] `strategy.position_avg_price` built-in variable (StateManager + codegen sampling order fixed)
 - [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
 - [x] Arrow function preamble extraction (ArrowVarInitResult, PreambleExtractor, module-level functions, 100+ tests, double-assignment syntax fixed)
-- [ ] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code)
+- [x] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code)
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
@@ -170,7 +170,7 @@
 - [x] `bb7-dissect-adx.pine` - RMA IIFE unused variable fix (4 lines removed, 245 lines tests added, 28/28 E2E pass)
 - [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
 - [x] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
-- [ ] `bb7-dissect-full.pine` - Blocked: Arrow function Series variable scope
+- [x] All bb7-dissect components compile successfully with arrow function scalar access fix
 
 ## Phase 5: Strategy Validation
 - [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully
@@ -181,7 +181,7 @@
 - [x] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations (requires: same as above + ta.ema on calculated variables)
 - [x] Visualization config system: filename-based config loading (metadata.strategy = source filename)
 - [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
-- [ ] Parse bb-strategy-7-rus.pine successfully (all 13 prerequisites)
+- [ ] Parse bb-strategy-7-rus.pine successfully (blocked: parser doesn't support nested member expressions like `strategy.commission.percent`)
 - [ ] `./bin/strategy` on BB7 produces 9 trades (requires: all input types, security() with complex expressions, fixnan, pivothigh/pivotlow)
 - [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
 - [ ] `./bin/strategy` on BB8 produces expected trades
