@@ -9,12 +9,14 @@ import (
 
 type ArrowFunctionTACallGenerator struct {
 	gen          *generator
+	exprGen      ArrowExpressionGenerator
 	iifeRegistry *InlineTAIIFERegistry
 }
 
-func NewArrowFunctionTACallGenerator(gen *generator) *ArrowFunctionTACallGenerator {
+func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGenerator) *ArrowFunctionTACallGenerator {
 	return &ArrowFunctionTACallGenerator{
 		gen:          gen,
+		exprGen:      exprGen,
 		iifeRegistry: NewInlineTAIIFERegistry(),
 	}
 }
@@ -174,26 +176,26 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 
 	case *ast.ConditionalExpression:
 		tempVarName := "ternary_source_temp"
-		result, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
+		condCode, err := a.exprGen.Generate(e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate ternary temp var: %w", err)
+			return nil, fmt.Errorf("failed to generate ternary expression: %w", err)
 		}
 
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
-			tempVarCode: result.CombinedCode(),
+			tempVarCode: fmt.Sprintf("%s := %s", tempVarName, condCode),
 		}, nil
 
 	case *ast.BinaryExpression:
 		tempVarName := "binary_source_temp"
-		result, err := a.gen.generateArrowFunctionVariableInit(tempVarName, e)
+		binaryCode, err := a.exprGen.Generate(e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate binary temp var: %w", err)
+			return nil, fmt.Errorf("failed to generate binary expression: %w", err)
 		}
 
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
-			tempVarCode: result.CombinedCode(),
+			tempVarCode: fmt.Sprintf("%s := %s", tempVarName, binaryCode),
 		}, nil
 
 	default:

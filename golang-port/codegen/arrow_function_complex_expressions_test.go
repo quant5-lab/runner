@@ -129,7 +129,7 @@ func TestArrowFunctionTACall_ConditionalExpressionSource(t *testing.T) {
 			g.variables["down"] = "float"
 			g.inArrowFunctionBody = true
 
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			call := &ast.CallExpression{
 				Callee: &ast.MemberExpression{
@@ -307,7 +307,7 @@ func TestArrowFunctionTACall_BinaryExpressionSource(t *testing.T) {
 			g.variables["denominator"] = "float"
 			g.inArrowFunctionBody = true
 
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			call := &ast.CallExpression{
 				Callee: &ast.MemberExpression{
@@ -504,7 +504,7 @@ func TestArrowFunctionTACall_MixedComplexExpressions(t *testing.T) {
 			if funcName == "fixnan" || funcName == "ta.fixnan" {
 				code, err = g.generateCallExpression(call)
 			} else {
-				gen := NewArrowFunctionTACallGenerator(g)
+				gen := newTestArrowTAGenerator(g)
 				code, err = gen.Generate(call)
 			}
 
@@ -543,7 +543,7 @@ func TestArrowFunctionTACall_MultipleComplexArguments(t *testing.T) {
 	g.variables["len2"] = "float"
 	g.inArrowFunctionBody = true
 
-	gen := NewArrowFunctionTACallGenerator(g)
+	gen := newTestArrowTAGenerator(g)
 
 	// Test where both source and period could be complex (though period usually isn't)
 	call := &ast.CallExpression{
@@ -665,7 +665,7 @@ func TestArrowFunctionTACall_EdgeCases(t *testing.T) {
 				tt.setupGen(g)
 			}
 
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 			call := tt.buildCall()
 
 			code, err := gen.Generate(call)

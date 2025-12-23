@@ -3,7 +3,11 @@ package codegen
 import "fmt"
 
 /*
-ArrowIdentifierResolver resolves identifiers to their correct access patterns in arrow function context.
+	Arrfunc (r *ArrowIdentifierResolver) IsParameter(identifierName string) bool {
+		return r.accessResolver.IsParameter(identifierName)
+	}
+
+func (r *ArrowIdentifierResolver) ResolveBinaryExpression(expr *ast.BinaryExpression) (string, string, error) {rResolver resolves identifiers to their correct access patterns in arrow function context.
 
 Responsibility (SRP):
   - Single purpose: determine if identifier needs Series.GetCurrent() wrapper
@@ -24,9 +28,6 @@ func NewArrowIdentifierResolver(resolver *ArrowSeriesAccessResolver) *ArrowIdent
 	}
 }
 
-/*
-ResolveIdentifier determines the correct Go code for accessing an identifier.
-*/
 func (r *ArrowIdentifierResolver) ResolveIdentifier(identifierName string) string {
 	if access, resolved := r.accessResolver.ResolveAccess(identifierName); resolved {
 		return access
@@ -34,9 +35,6 @@ func (r *ArrowIdentifierResolver) ResolveIdentifier(identifierName string) strin
 	return identifierName
 }
 
-/*
-IsLocalVariable checks if identifier is a local variable requiring Series access.
-*/
 func (r *ArrowIdentifierResolver) IsLocalVariable(identifierName string) bool {
 	return r.accessResolver.IsLocalVariable(identifierName)
 }

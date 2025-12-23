@@ -74,11 +74,11 @@ result = momentum(14)
 			mustContain: []string{
 				"func momentum(arrowCtx *context.ArrowContext, len float64) float64",
 				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
-				"plusSeries.Set(",
+				"plusSeries.Set(plus)",
 				"func() float64",
 				"val :=",
 				"if math.IsNaN(val) { return 0.0 }",
-				"return plusSeries.GetCurrent()",
+				"return plus",
 			},
 			mustNotContain: []string{
 				"fixnanState",
@@ -102,9 +102,9 @@ dirmov(len) =>
 				"func dirmov(arrowCtx *context.ArrowContext, len float64) (float64, float64)",
 				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
 				"minusSeries := arrowCtx.GetOrCreateSeries(\"minus\")",
-				"plusSeries.Set(",
-				"minusSeries.Set(",
-				"return plusSeries.GetCurrent(), minusSeries.GetCurrent()",
+				"plusSeries.Set(plus)",
+				"minusSeries.Set(minus)",
+				"return plus, minus",
 			},
 			mustNotContain: []string{
 				"fixnanState_plus",
@@ -376,7 +376,7 @@ dirmov(len) =>
 				"plusSeries := arrowCtx.GetOrCreateSeries(\"plus\")",
 				"minusSeries := arrowCtx.GetOrCreateSeries(\"minus\")",
 				"if math.IsNaN(val) { return 0.0 }",
-				"return plusSeries.GetCurrent(), minusSeries.GetCurrent()",
+				"return plus, minus",
 			},
 		},
 		{

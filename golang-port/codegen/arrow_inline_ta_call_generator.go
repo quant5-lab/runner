@@ -36,12 +36,7 @@ func NewArrowInlineTACallGenerator(
 	}
 }
 
-/*
-GenerateInlineTACall generates arrow-aware inline TA function call code.
-
-Extracts function name and arguments, creates arrow-aware accessor for source,
-delegates IIFE generation to registry, returns complete inline code.
-*/
+/* Generates arrow-aware inline TA function with proper accessor for source expression */
 func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpression) (string, bool, error) {
 	funcName := extractCallFunctionName(call)
 

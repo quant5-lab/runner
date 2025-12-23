@@ -6,42 +6,26 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/*
-ArrowStatementGenerator generates statements with arrow-context awareness.
-
-Responsibility (SRP):
-  - Single purpose: generate variable declaration statements in arrow functions
-  - Uses ArrowSeriesVariableGenerator for Series.Set() generation
-  - Delegates expression generation to ArrowExpressionGeneratorImpl
-  - No knowledge of function-level code organization
-
-Design:
-  - Composition: uses expression generator for RHS evaluation
-  - DRY: reuses existing Series variable generator
-  - KISS: simple delegation, minimal logic
-*/
+/* ArrowStatementGenerator generates variable declarations with dual scalar+series pattern */
 type ArrowStatementGenerator struct {
 	gen           *generator
-	seriesVarGen  *ArrowSeriesVariableGenerator
+	localStorage  *ArrowLocalVariableStorage
 	exprGenerator *ArrowExpressionGeneratorImpl
 }
 
 func NewArrowStatementGenerator(
 	gen *generator,
-	seriesVarGen *ArrowSeriesVariableGenerator,
+	localStorage *ArrowLocalVariableStorage,
 	exprGen *ArrowExpressionGeneratorImpl,
 ) *ArrowStatementGenerator {
 	return &ArrowStatementGenerator{
 		gen:           gen,
-		seriesVarGen:  seriesVarGen,
+		localStorage:  localStorage,
 		exprGenerator: exprGen,
 	}
 }
 
-/*
-GenerateStatement generates arrow-aware statement code.
-Handles variable declarations with Series.Set(), delegates other statements to standard generator.
-*/
+/* GenerateStatement generates arrow-aware statement code with Series.Set() for variables */
 func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, error) {
 	switch st := stmt.(type) {
 	case *ast.VariableDeclaration:
@@ -76,7 +60,7 @@ func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(varName stri
 		return "", fmt.Errorf("failed to generate init expression for '%s': %w", varName, err)
 	}
 
-	return s.seriesVarGen.GenerateAssignment(varName, exprCode), nil
+	return s.localStorage.GenerateDualStorage(varName, exprCode), nil
 }
 
 func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.ArrayPattern, initExpr ast.Expression) (string, error) {
@@ -90,27 +74,5 @@ func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.Arr
 		return "", fmt.Errorf("failed to generate tuple init expression: %w", err)
 	}
 
-	// Generate tuple unpacking and Series.Set() for each variable
-	tempVarNames := make([]string, len(varNames))
-	for i, varName := range varNames {
-		tempVarNames[i] = "temp_" + varName
-	}
-
-	code := s.gen.ind() + fmt.Sprintf("%s := %s\n", join(tempVarNames, ", "), exprCode)
-	for i, varName := range varNames {
-		code += s.seriesVarGen.GenerateAssignment(varName, tempVarNames[i])
-	}
-
-	return code, nil
-}
-
-func join(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
-	}
-	return result
+	return s.localStorage.GenerateTupleDualStorage(varNames, exprCode), nil
 }

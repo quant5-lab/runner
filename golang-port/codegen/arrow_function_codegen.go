@@ -10,7 +10,7 @@ import (
 type ArrowFunctionCodegen struct {
 	gen            *generator
 	accessResolver *ArrowSeriesAccessResolver
-	seriesVarGen   *ArrowSeriesVariableGenerator
+	localStorage   *ArrowLocalVariableStorage
 	statementGen   *ArrowStatementGenerator
 }
 
@@ -18,7 +18,7 @@ func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
 	return &ArrowFunctionCodegen{
 		gen:            gen,
 		accessResolver: NewArrowSeriesAccessResolver(),
-		seriesVarGen:   nil, // Initialized in Generate with proper indentation
+		localStorage:   nil, // Initialized in Generate with proper indentation
 	}
 }
 
@@ -53,10 +53,10 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 		return "", err
 	}
 
-	// Initialize Series variable generator with proper indentation context
+	// Initialize local variable storage and statement generator with proper indentation
+	a.localStorage = NewArrowLocalVariableStorage(a.gen.ind())
 	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
-	a.seriesVarGen = NewArrowSeriesVariableGenerator(a.gen.ind(), exprGen)
-	a.statementGen = NewArrowStatementGenerator(a.gen, a.seriesVarGen, exprGen)
+	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen)
 
 	body, err := a.generateFunctionBody(arrowFunc)
 	if err != nil {
@@ -160,10 +160,10 @@ func (a *ArrowFunctionCodegen) generateAllSeriesDeclarations(arrowFunc *ast.Arro
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
 				if id, ok := declarator.ID.(*ast.Identifier); ok {
-					code += a.seriesVarGen.GenerateDeclaration(id.Name)
+					code += a.gen.ind() + fmt.Sprintf("%sSeries := arrowCtx.GetOrCreateSeries(%q)\n", id.Name, id.Name)
 				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
 					for _, elem := range arrayPattern.Elements {
-						code += a.seriesVarGen.GenerateDeclaration(elem.Name)
+						code += a.gen.ind() + fmt.Sprintf("%sSeries := arrowCtx.GetOrCreateSeries(%q)\n", elem.Name, elem.Name)
 					}
 				}
 			}
@@ -178,7 +178,7 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 		return "", fmt.Errorf("arrow function has empty body")
 	}
 
-	/* T2 Fix: Register local variables in g.variables for IIFE expression resolution */
+	/* T2 Fix: Register local variables in g.variables for expression resolution */
 	savedVariables := make(map[string]string)
 
 	for _, param := range arrowFunc.Params {
@@ -295,7 +295,7 @@ func (a *ArrowFunctionCodegen) generateVariableReturnStatement(varDecl *ast.Vari
 		if err != nil {
 			return "", err
 		}
-		return stmtCode + a.gen.ind() + "return " + id.Name + "Series.GetCurrent()\n", nil
+		return stmtCode + a.gen.ind() + "return " + id.Name + "\n", nil
 	}
 
 	return "", fmt.Errorf("unsupported variable declarator pattern: %T", decl.ID)
@@ -308,7 +308,7 @@ func (a *ArrowFunctionCodegen) generateTupleReturn(arrayPattern *ast.ArrayPatter
 
 	var returnVars []string
 	for _, elem := range arrayPattern.Elements {
-		returnVars = append(returnVars, elem.Name+"Series.GetCurrent()")
+		returnVars = append(returnVars, elem.Name)
 	}
 
 	initCode, err := a.generateTupleInitExpression(init, returnVars)
@@ -328,18 +328,15 @@ func (a *ArrowFunctionCodegen) generateTupleInitExpression(expr ast.Expression, 
 		return "", err
 	}
 
-	baseVarNames := make([]string, len(varNames))
 	tempVarNames := make([]string, len(varNames))
 	for i, varName := range varNames {
-		baseName := strings.TrimSuffix(varName, "Series.GetCurrent()")
-		baseVarNames[i] = baseName
-		tempVarNames[i] = "temp_" + baseName
+		tempVarNames[i] = "temp_" + varName
 	}
 
 	code := a.gen.ind() + strings.Join(tempVarNames, ", ") + " := " + exprCode + "\n"
 
-	for i, baseName := range baseVarNames {
-		code += a.gen.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", baseName, tempVarNames[i])
+	for i, varName := range varNames {
+		code += a.localStorage.GenerateDualStorage(varName, tempVarNames[i])
 	}
 
 	return code, nil

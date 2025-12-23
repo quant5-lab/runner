@@ -11,7 +11,7 @@ import (
 /* TestArrowFunctionTACallGenerator_CanHandle validates TA function recognition */
 func TestArrowFunctionTACallGenerator_CanHandle(t *testing.T) {
 	g := newTestGenerator()
-	gen := NewArrowFunctionTACallGenerator(g)
+	gen := newTestArrowTAGenerator(g)
 
 	tests := []struct {
 		name     string
@@ -129,7 +129,7 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
 			g.variables["period"] = "float"
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			funcName := extractCallFunctionName(tt.call)
 			accessor, period, err := gen.extractTAArguments(funcName, tt.call)
@@ -237,7 +237,7 @@ func TestArrowFunctionTACallGenerator_ExtractChangeArguments(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
 			g.variables["period"] = "float"
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			accessor, offset, err := gen.extractChangeArguments(tt.call)
 
@@ -343,7 +343,7 @@ func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 					g.variables[k] = v
 				}
 			}
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			accessor, err := gen.createAccessorFromExpression(tt.expr)
 
@@ -431,7 +431,7 @@ func TestArrowFunctionTACallGenerator_IIFEGeneration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			code, err := gen.Generate(tt.call)
 			if err != nil {
@@ -508,7 +508,7 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 					g.variables[k] = v
 				}
 			}
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			period, err := gen.extractPeriodValue(tt.expr)
 
@@ -623,7 +623,7 @@ func TestArrowFunctionTACallGenerator_EdgeCases(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(g)
 			}
-			gen := NewArrowFunctionTACallGenerator(g)
+			gen := newTestArrowTAGenerator(g)
 
 			if tt.call == nil {
 				return

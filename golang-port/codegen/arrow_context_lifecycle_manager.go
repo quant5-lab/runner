@@ -25,32 +25,17 @@ func NewArrowContextLifecycleManager() *ArrowContextLifecycleManager {
 	}
 }
 
-/*
-AllocateContextVariable generates unique ArrowContext variable name for function call.
-
-Returns: "arrowCtx_<funcName>_<instanceNum>"
-Example: "arrowCtx_adx_1", "arrowCtx_adx_2"
-
-Ensures no variable redeclaration within same scope.
-*/
+/* Generates unique ArrowContext variable name per function call to avoid redeclaration */
 func (m *ArrowContextLifecycleManager) AllocateContextVariable(funcName string) string {
 	m.instanceCounts[funcName]++
 	instanceNum := m.instanceCounts[funcName]
 	return fmt.Sprintf("arrowCtx_%s_%d", funcName, instanceNum)
 }
 
-/*
-GetInstanceCount returns number of allocated contexts for function.
-Used for testing and validation.
-*/
 func (m *ArrowContextLifecycleManager) GetInstanceCount(funcName string) int {
 	return m.instanceCounts[funcName]
 }
 
-/*
-Reset clears all instance counts.
-Used between strategy compilations.
-*/
 func (m *ArrowContextLifecycleManager) Reset() {
 	m.instanceCounts = make(map[string]int)
 }

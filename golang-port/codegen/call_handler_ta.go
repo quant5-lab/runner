@@ -42,6 +42,17 @@ func (h *TAIndicatorCallHandler) GenerateCode(g *generator, call *ast.CallExpres
 }
 
 func (h *TAIndicatorCallHandler) generateArrowFunctionTACall(g *generator, call *ast.CallExpression) (string, error) {
-	generator := NewArrowFunctionTACallGenerator(g)
+	// Create a simple expression generator that uses the OLD generator methods
+	// This is a fallback for cases where arrow-aware context is not available
+	exprGen := &legacyArrowExpressionGenerator{gen: g}
+	generator := NewArrowFunctionTACallGenerator(g, exprGen)
 	return generator.Generate(call)
+}
+
+type legacyArrowExpressionGenerator struct {
+	gen *generator
+}
+
+func (e *legacyArrowExpressionGenerator) Generate(expr ast.Expression) (string, error) {
+	return e.gen.generateArrowFunctionExpression(expr)
 }

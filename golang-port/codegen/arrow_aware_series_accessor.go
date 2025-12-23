@@ -25,16 +25,10 @@ func NewArrowAwareSeriesAccessor(seriesName string) *ArrowAwareSeriesAccessor {
 	}
 }
 
-/*
-GenerateLoopValueAccess generates code for accessing series values in a loop.
-*/
 func (a *ArrowAwareSeriesAccessor) GenerateLoopValueAccess(loopVar string) string {
 	return fmt.Sprintf("%sSeries.Get(%s)", a.seriesName, loopVar)
 }
 
-/*
-GenerateInitialValueAccess generates code for accessing the initial series value.
-*/
 func (a *ArrowAwareSeriesAccessor) GenerateInitialValueAccess(period int) string {
 	return fmt.Sprintf("%sSeries.Get(%d-1)", a.seriesName, period)
 }

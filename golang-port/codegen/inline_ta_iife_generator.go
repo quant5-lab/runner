@@ -55,7 +55,7 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 		Build()
 
 	if preamble != "" {
-		return fmt.Sprintf("func() float64 { %sreturn %s }()", preamble, iife)
+		return fmt.Sprintf("func() float64 { %s; return %s }()", preamble, iife)
 	}
 	return iife
 }

@@ -133,7 +133,7 @@ func TestBuiltinTrueRangeAccessor_FirstBarFormula(t *testing.T) {
 
 func TestArrowFunctionTACallGenerator_CreateAccessorForTr(t *testing.T) {
 	gen := newTestGenerator()
-	taGen := NewArrowFunctionTACallGenerator(gen)
+	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
 	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
@@ -155,7 +155,7 @@ func TestArrowFunctionTACallGenerator_CreateAccessorForTr(t *testing.T) {
 func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
 	gen := newTestGenerator()
 	gen.variables = map[string]string{"my_tr": "float"}
-	taGen := NewArrowFunctionTACallGenerator(gen)
+	taGen := newTestArrowTAGenerator(gen)
 
 	t.Run("tr builtin returns BuiltinTrueRangeAccessor", func(t *testing.T) {
 		trIdentifier := &ast.Identifier{Name: "tr"}
@@ -187,7 +187,7 @@ func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
 func TestBuiltinTrueRange_IntegrationWithTAFunctions(t *testing.T) {
 	/* Test that tr accessor is correctly used in TA function contexts */
 	gen := newTestGenerator()
-	taGen := NewArrowFunctionTACallGenerator(gen)
+	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
 	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
@@ -236,7 +236,7 @@ func TestBuiltinTrueRange_IntegrationWithTAFunctions(t *testing.T) {
 func TestBuiltinTrueRange_InArrowFunctionContext(t *testing.T) {
 	/* Test tr accessor in arrow function TA call generator */
 	gen := newTestGenerator()
-	taGen := NewArrowFunctionTACallGenerator(gen)
+	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
 	accessor, err := taGen.createAccessorFromExpression(trIdentifier)

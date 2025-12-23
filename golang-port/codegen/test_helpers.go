@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/parser"
 	"github.com/quant5-lab/runner/runtime/validation"
 )
 
@@ -34,6 +35,11 @@ func newTestGenerator() *generator {
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
 
 	return gen
+}
+
+func newTestArrowTAGenerator(g *generator) *ArrowFunctionTACallGenerator {
+	exprGen := &legacyArrowExpressionGenerator{gen: g}
+	return NewArrowFunctionTACallGenerator(g, exprGen)
 }
 
 func contains(s, substr string) bool {
@@ -118,4 +124,31 @@ func generateMultiSecurityProgram(t *testing.T, vars map[string]ast.Expression) 
 		t.Fatalf("Code generation failed: %v", err)
 	}
 	return generated.FunctionBody
+}
+
+/* compilePineScript parses PineScript source and generates Go code for integration testing */
+func compilePineScript(source string) (string, error) {
+	p, err := parser.NewParser()
+	if err != nil {
+		return "", err
+	}
+
+	script, err := p.ParseBytes("test.pine", []byte(source))
+	if err != nil {
+		return "", err
+	}
+
+	converter := parser.NewConverter()
+	program, err := converter.ToESTree(script)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := GenerateStrategyCodeFromAST(program)
+	if err != nil {
+		return "", err
+	}
+
+	// Return both user-defined functions and function body for comprehensive validation
+	return result.UserDefinedFunctions + "\n" + result.FunctionBody, nil
 }

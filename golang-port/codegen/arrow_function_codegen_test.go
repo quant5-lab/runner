@@ -470,7 +470,7 @@ plot(min)`,
 				"lSeries := arrowCtx.GetOrCreateSeries(\"l\")",
 				"hSeries.Set(",
 				"lSeries.Set(",
-				"return lSeries.GetCurrent(), hSeries.GetCurrent()",
+				"return l, h", // Scalar returns (dual-access pattern)
 			},
 		},
 		{

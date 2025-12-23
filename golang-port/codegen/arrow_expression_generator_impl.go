@@ -59,6 +59,9 @@ func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (
 	case *ast.UnaryExpression:
 		return e.generateUnaryExpression(ex)
 
+	case *ast.LogicalExpression:
+		return e.generateLogicalExpression(ex)
+
 	case *ast.ConditionalExpression:
 		return e.generateConditionalExpression(ex)
 
@@ -71,16 +74,50 @@ func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpression) (string, error) {
+	// Try inline TA generation first (compile-time constant periods)
 	code, handled, err := e.inlineTAGenerator.GenerateInlineTACall(call)
 	if err != nil {
 		return "", err
 	}
-	if !handled {
-		// Not handled by inline generator (runtime parameter or unsupported) - delegate to runtime TA
-		taHandler := NewArrowFunctionTACallGenerator(e.gen)
+	if handled {
+		return code, nil
+	}
+
+	// Not handled by inline generator
+	funcName := extractCallFunctionName(call)
+
+	// Check if it's a TA function - if so, use arrow-aware TA handler directly
+	if isTAFunction(funcName) {
+		taHandler := NewArrowFunctionTACallGenerator(e.gen, e)
 		return taHandler.Generate(call)
 	}
-	return code, nil
+
+	// For non-TA functions (math, user-defined, etc.), try standard call routing
+	if e.gen.callRouter != nil {
+		routedCode, routeErr := e.gen.callRouter.RouteCall(e.gen, call)
+		if routeErr == nil && routedCode != "" {
+			return routedCode, nil
+		}
+	}
+
+	// Final fallback
+	return "", fmt.Errorf("unhandled call expression: %s", funcName)
+}
+
+func isTAFunction(funcName string) bool {
+	switch funcName {
+	case "ta.sma", "ta.ema", "ta.rma", "ta.wma", "ta.stdev",
+		"ta.highest", "ta.lowest", "ta.change",
+		"ta.crossover", "ta.crossunder",
+		"ta.pivothigh", "ta.pivotlow",
+		"sma", "ema", "rma", "wma", "stdev",
+		"highest", "lowest", "change",
+		"crossover", "crossunder",
+		"fixnan", "ta.fixnan":
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateFixnanExpression(call *ast.CallExpression) (string, error) {
@@ -143,6 +180,27 @@ func (e *ArrowExpressionGeneratorImpl) generateUnaryExpression(unaryExpr *ast.Un
 	}
 
 	return fmt.Sprintf("%s%s", op, operand), nil
+}
+
+func (e *ArrowExpressionGeneratorImpl) generateLogicalExpression(logExpr *ast.LogicalExpression) (string, error) {
+	left, err := e.generateExpression(logExpr.Left)
+	if err != nil {
+		return "", err
+	}
+
+	right, err := e.generateExpression(logExpr.Right)
+	if err != nil {
+		return "", err
+	}
+
+	goOp := logExpr.Operator
+	if goOp == "and" {
+		goOp = "&&"
+	} else if goOp == "or" {
+		goOp = "||"
+	}
+
+	return fmt.Sprintf("(%s %s %s)", left, goOp, right), nil
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateConditionalExpression(condExpr *ast.ConditionalExpression) (string, error) {

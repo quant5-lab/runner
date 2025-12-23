@@ -41,18 +41,7 @@ func NewReturnValueSeriesStorageHandler(indent string) *ReturnValueSeriesStorage
 	}
 }
 
-/*
-GenerateStorageStatements produces Series.Set() calls for all return values.
-
-Input: ["ADX", "up", "down"]
-Output:
-
-	ADXSeries.Set(ADX)
-	upSeries.Set(up)
-	downSeries.Set(down)
-
-Returns empty string for empty varNames (void functions).
-*/
+/* Generates Series.Set() statements for return values to maintain ForwardSeriesBuffer */
 func (h *ReturnValueSeriesStorageHandler) GenerateStorageStatements(varNames []string) string {
 	if len(varNames) == 0 {
 		return ""
