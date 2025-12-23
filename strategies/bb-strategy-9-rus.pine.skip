@@ -1,2 +1,4 @@
-Parser limitation: long strategy() parameter list (line 2:253)
-Related to: bb-strategy-7-rus.pine, bb-strategy-7-rus-ported.pine, bb-strategy-8-rus.pine (same parser issue)
+Parser limitation: Unexpected token at line 342
+Parse: ❌ Fails
+Error: "Parse error: bb-strategy-9-rus.pine:342:5: unexpected token ''"
+Blocker: Parser cannot handle syntax at line 342

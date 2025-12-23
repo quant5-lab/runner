@@ -181,7 +181,8 @@
 - [x] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations (requires: same as above + ta.ema on calculated variables)
 - [x] Visualization config system: filename-based config loading (metadata.strategy = source filename)
 - [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
-- [ ] Parse bb-strategy-7-rus.pine successfully (blocked: parser doesn't support nested member expressions like `strategy.commission.percent`)
+- [x] Parse bb-strategy-7-rus.pine successfully (N-level member expressions: strategy.commission.percent)
+- [ ] Compile bb-strategy-7-rus.pine to working binary (blocked: ADX function, type mismatches, nzSeries undefined)
 - [ ] `./bin/strategy` on BB7 produces 9 trades (requires: all input types, security() with complex expressions, fixnan, pivothigh/pivotlow)
 - [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
 - [ ] `./bin/strategy` on BB8 produces expected trades
@@ -193,7 +194,7 @@
 - [ ] E2E: 26/26 tests pass with Go binary
 
 ## Current Status
-- **Parser**: 18/37 Pine fixtures parse successfully
+- **Parser**: 39/40 Pine fixtures parse successfully (97.5% coverage, 1 known limitation: single-line arrow functions)
 - **Runtime**: 15 packages (codegen, parser, chartdata, context, input, math, output, request, series, strategy, ta, value, visual, integration, validation)
 - **Codegen**: ForwardSeriesBuffer paradigm (ALL variables → Series storage, cursor-based, forward-only, immutable history, O(1) advance)
 - **TA Functions**: ta.sma/ema/rma/rsi/atr/bbands/macd/stoch/crossover/crossunder/stdev/change/pivothigh/pivotlow/valuewhen, wma, dev
@@ -205,7 +206,7 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35) - 100% pass rate for core features
+- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29) - 100% pass rate for core features
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)

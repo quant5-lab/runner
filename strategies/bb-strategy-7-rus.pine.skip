@@ -1,3 +1,10 @@
-Parser limitation: long strategy() parameter list (line 2:228)
-TODO: Enhance parser to support extended function argument lists
-Blocked by: golang-port/parser token handling for long expressions
+Codegen limitation: Missing ADX function implementation
+Parse: ✅ Success (strategy.commission.percent works)
+Generate: ✅ Success
+Compile: ❌ Fails
+Errors:
+  - undefined: adx (lines 968, 976)
+  - undefined: nzSeries (line 1683)
+  - Type mismatch: strategy.Long/Short as float64
+  - Boolean comparison errors
+Blocker: ADX function not implemented in runtime/ta package

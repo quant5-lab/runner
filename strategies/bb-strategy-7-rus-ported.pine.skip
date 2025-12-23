@@ -1,2 +1,9 @@
-Parser limitation: long strategy() parameter list (line 2:224)
-Related to: bb-strategy-7-rus.pine (same parser issue)
+Codegen limitation: Missing ADX function implementation (same as bb-strategy-7-rus.pine)
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ❌ Fails
+Errors:
+  - undefined: adx (lines 972, 980)
+  - undefined: nzSeries (line 1687)
+  - Type mismatches and boolean comparison errors
+Blocker: ADX function not implemented in runtime/ta package
