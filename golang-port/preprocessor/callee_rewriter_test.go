@@ -75,8 +75,8 @@ func TestCalleeRewriter_RewriteSimple(t *testing.T) {
 					t.Errorf("Expected Object=%q, got %q", tt.expectObject, callee.MemberAccess.Object)
 				}
 
-				if callee.MemberAccess.Property != tt.expectProperty {
-					t.Errorf("Expected Property=%q, got %q", tt.expectProperty, callee.MemberAccess.Property)
+				if callee.MemberAccess.Properties[0] != tt.expectProperty {
+					t.Errorf("Expected Property=%q, got %q", tt.expectProperty, callee.MemberAccess.Properties[0])
 				}
 			}
 		})
@@ -135,8 +135,8 @@ func TestCalleeRewriter_RewriteIfMapped(t *testing.T) {
 					t.Errorf("Expected Object=%q, got %q", tt.expectObject, callee.MemberAccess.Object)
 				}
 
-				if callee.MemberAccess.Property != tt.expectProperty {
-					t.Errorf("Expected Property=%q, got %q", tt.expectProperty, callee.MemberAccess.Property)
+				if callee.MemberAccess.Properties[0] != tt.expectProperty {
+					t.Errorf("Expected Property=%q, got %q", tt.expectProperty, callee.MemberAccess.Properties[0])
 				}
 			}
 		})

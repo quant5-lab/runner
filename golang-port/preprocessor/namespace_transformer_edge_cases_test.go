@@ -383,10 +383,10 @@ func TestNamespaceTransformer_MultipleTransformersSameNode(t *testing.T) {
 	}
 
 	if call.Callee.MemberAccess != nil {
-		if call.Callee.MemberAccess.Object != "ta" || call.Callee.MemberAccess.Property != "sma" {
+		if call.Callee.MemberAccess.Object != "ta" || call.Callee.MemberAccess.Properties[0] != "sma" {
 			t.Errorf("Expected ta.sma, got %s.%s",
 				call.Callee.MemberAccess.Object,
-				call.Callee.MemberAccess.Property)
+				call.Callee.MemberAccess.Properties[0])
 		}
 	}
 }
@@ -419,7 +419,7 @@ mixed = Sma(close, 20)
 	lowerExpr := result.Statements[0].Assignment.Value
 	lowerCall := findCallInFactor(lowerExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if lowerCall != nil && lowerCall.Callee.MemberAccess != nil {
-		if lowerCall.Callee.MemberAccess.Property != "sma" {
+		if lowerCall.Callee.MemberAccess.Properties[0] != "sma" {
 			t.Error("Lowercase 'sma' should be transformed")
 		}
 	}
@@ -471,10 +471,10 @@ func TestNamespaceTransformer_ConsecutiveTransforms(t *testing.T) {
 	}
 
 	if call.Callee.MemberAccess != nil {
-		if call.Callee.MemberAccess.Object != "ta" || call.Callee.MemberAccess.Property != "sma" {
+		if call.Callee.MemberAccess.Object != "ta" || call.Callee.MemberAccess.Properties[0] != "sma" {
 			t.Errorf("Expected ta.sma after 5 transforms, got %s.%s",
 				call.Callee.MemberAccess.Object,
-				call.Callee.MemberAccess.Property)
+				call.Callee.MemberAccess.Properties[0])
 		}
 	}
 }

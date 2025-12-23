@@ -23,15 +23,15 @@ func (r *CalleeRewriter) Rewrite(callee *parser.CallCallee, qualifiedName string
 		return false
 	}
 
-	parts := strings.SplitN(qualifiedName, ".", 2)
-	if len(parts) != 2 {
+	parts := strings.Split(qualifiedName, ".")
+	if len(parts) < 2 {
 		return false
 	}
 
 	callee.Ident = nil
 	callee.MemberAccess = &parser.MemberAccess{
-		Object:   parts[0],
-		Property: parts[1],
+		Object:     parts[0],
+		Properties: parts[1:],
 	}
 
 	return true

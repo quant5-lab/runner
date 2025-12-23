@@ -12,6 +12,28 @@ type Converter struct {
 	factory *StatementConverterFactory
 }
 
+/* Builds nested MemberExpression from object and property chain (strategy.commission.percent) */
+func buildNestedMemberExpression(object string, properties []string) ast.Expression {
+	var current ast.Expression = &ast.Identifier{
+		NodeType: ast.TypeIdentifier,
+		Name:     object,
+	}
+
+	for _, prop := range properties {
+		current = &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object:   current,
+			Property: &ast.Identifier{
+				NodeType: ast.TypeIdentifier,
+				Name:     prop,
+			},
+			Computed: false,
+		}
+	}
+
+	return current
+}
+
 func NewConverter() *Converter {
 	c := &Converter{}
 	c.factory = NewStatementConverterFactory(
@@ -65,18 +87,7 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 		return c.convertTernaryExpr(expr.Ternary)
 	}
 	if expr.MemberAccess != nil {
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     expr.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     expr.MemberAccess.Property,
-			},
-			Computed: false,
-		}, nil
+		return buildNestedMemberExpression(expr.MemberAccess.Object, expr.MemberAccess.Properties), nil
 	}
 	if expr.Call != nil {
 		return c.convertCallExpr(expr.Call)
@@ -151,18 +162,7 @@ func (c *Converter) convertComparisonTerm(term *ComparisonTerm) (ast.Expression,
 	}
 
 	if term.MemberAccess != nil {
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     term.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     term.MemberAccess.Property,
-			},
-			Computed: false,
-		}, nil
+		return buildNestedMemberExpression(term.MemberAccess.Object, term.MemberAccess.Properties), nil
 	}
 	if term.True != nil {
 		return &ast.Literal{
@@ -215,21 +215,8 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	var callee ast.Expression
 
 	if call.Callee.MemberAccess != nil {
-		// ta.sma(...) -> MemberExpression as callee
-		callee = &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     call.Callee.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     call.Callee.MemberAccess.Property,
-			},
-			Computed: false,
-		}
+		callee = buildNestedMemberExpression(call.Callee.MemberAccess.Object, call.Callee.MemberAccess.Properties)
 	} else if call.Callee.Ident != nil {
-		// plot(...) -> Identifier as callee
 		callee = &ast.Identifier{
 			NodeType: ast.TypeIdentifier,
 			Name:     *call.Callee.Ident,
@@ -293,18 +280,7 @@ func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, er
 			return nil, err
 		}
 	} else if postfix.Primary.MemberAccess != nil {
-		baseExpr = &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     postfix.Primary.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     postfix.Primary.MemberAccess.Property,
-			},
-			Computed: false,
-		}
+		baseExpr = buildNestedMemberExpression(postfix.Primary.MemberAccess.Object, postfix.Primary.MemberAccess.Properties)
 	} else if postfix.Primary.Ident != nil {
 		baseExpr = &ast.Identifier{
 			NodeType: ast.TypeIdentifier,
@@ -337,18 +313,7 @@ func (c *Converter) convertValue(val *Value) (ast.Expression, error) {
 	}
 
 	if val.MemberAccess != nil {
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     val.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     val.MemberAccess.Property,
-			},
-			Computed: false,
-		}, nil
+		return buildNestedMemberExpression(val.MemberAccess.Object, val.MemberAccess.Properties), nil
 	}
 	if val.True != nil {
 		return &ast.Literal{
@@ -589,18 +554,7 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	}
 
 	if factor.MemberAccess != nil {
-		return &ast.MemberExpression{
-			NodeType: ast.TypeMemberExpression,
-			Object: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     factor.MemberAccess.Object,
-			},
-			Property: &ast.Identifier{
-				NodeType: ast.TypeIdentifier,
-				Name:     factor.MemberAccess.Property,
-			},
-			Computed: false,
-		}, nil
+		return buildNestedMemberExpression(factor.MemberAccess.Object, factor.MemberAccess.Properties), nil
 	}
 
 	if factor.True != nil {

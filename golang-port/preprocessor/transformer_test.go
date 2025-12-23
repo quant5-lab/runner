@@ -70,8 +70,8 @@ func assertMemberAccessCallee(t *testing.T, call *parser.CallExpr, expectedObjec
 	if call.Callee.MemberAccess.Object != expectedObject {
 		t.Errorf("Expected object '%s', got '%s'", expectedObject, call.Callee.MemberAccess.Object)
 	}
-	if call.Callee.MemberAccess.Property != expectedProperty {
-		t.Errorf("Expected property '%s', got '%s'", expectedProperty, call.Callee.MemberAccess.Property)
+	if call.Callee.MemberAccess.Properties[0] != expectedProperty {
+		t.Errorf("Expected property '%s', got '%s'", expectedProperty, call.Callee.MemberAccess.Properties[0])
 	}
 }
 

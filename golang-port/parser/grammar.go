@@ -160,8 +160,8 @@ type ComparisonTerm struct {
 }
 
 type MemberAccess struct {
-	Object   string `parser:"@Ident"`
-	Property string `parser:"'.' @Ident"`
+	Object     string   `parser:"@Ident"`
+	Properties []string `parser:"( '.' @Ident )+"`
 }
 
 type CallExpr struct {
