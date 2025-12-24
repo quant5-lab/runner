@@ -182,8 +182,8 @@
 - [x] Visualization config system: filename-based config loading (metadata.strategy = source filename)
 - [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
 - [x] Parse bb-strategy-7-rus.pine successfully (N-level member expressions: strategy.commission.percent)
-- [ ] Compile bb-strategy-7-rus.pine to working binary (blocked: ADX function, type mismatches, nzSeries undefined)
-- [ ] `./bin/strategy` on BB7 produces 9 trades (requires: all input types, security() with complex expressions, fixnan, pivothigh/pivotlow)
+- [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
+- [ ] `./bin/strategy` on BB7 produces 9 trades (current: 0 trades, 7 indicators generated)
 - [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
 - [ ] `./bin/strategy` on BB8 produces expected trades
 - [ ] `./bin/strategy` on BB9 produces expected trades
