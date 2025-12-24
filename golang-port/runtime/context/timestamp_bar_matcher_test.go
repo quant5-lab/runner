@@ -200,30 +200,34 @@ func TestTimestampBarMatcher_RealWorldScenario_DailyValues(t *testing.T) {
 func TestTimestampBarMatcher_LookaheadSemantics(t *testing.T) {
 	matcher := NewTimestampBarMatcher()
 
+	// Real dates: Dec 16-18, 2024
+	dec16 := int64(1734307200) // Dec 16, 2024 00:00 UTC
+	dec17 := int64(1734393600) // Dec 17, 2024 00:00 UTC
+	dec18 := int64(1734480000) // Dec 18, 2024 00:00 UTC
+
 	ctx := &Context{
 		Data: []OHLCV{
-			{Time: 0},
-			{Time: 100},
-			{Time: 200},
+			{Time: dec16},
+			{Time: dec17},
+			{Time: dec18},
 		},
 	}
 
-	// Critical test: lookahead=on means "current bar" not "next bar"
-	// This is PineScript semantics for security() function
+	t.Run("lookahead matches by calendar date", func(t *testing.T) {
+		// Timestamp during Dec 17 (10 hours after midnight)
+		dec17At10AM := dec17 + 10*3600
 
-	t.Run("lookahead should equal standard match", func(t *testing.T) {
-		timestamp := int64(150)
+		standardIdx := matcher.MatchBarForTimestamp(ctx, dec17At10AM)
+		lookaheadIdx := matcher.MatchBarWithLookahead(ctx, dec17At10AM)
 
-		standardIdx := matcher.MatchBarForTimestamp(ctx, timestamp)
-		lookaheadIdx := matcher.MatchBarWithLookahead(ctx, timestamp)
-
-		if standardIdx != lookaheadIdx {
-			t.Errorf("lookahead should equal standard match: standard=%d, lookahead=%d",
-				standardIdx, lookaheadIdx)
+		// Standard: finds containing bar (Dec 17)
+		if standardIdx != 1 {
+			t.Errorf("standard match should return bar 1 (Dec 17), got %d", standardIdx)
 		}
 
-		if standardIdx != 1 {
-			t.Errorf("both should return bar 1, got %d", standardIdx)
+		// Lookahead: matches by calendar date (Dec 17)
+		if lookaheadIdx != 1 {
+			t.Errorf("lookahead should match Dec 17 bar (index 1), got %d", lookaheadIdx)
 		}
 	})
 }
