@@ -472,6 +472,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			if varType == "function" {
 				continue
 			}
+			if varType == "string" {
+				code += g.ind() + fmt.Sprintf("var %s string\n", varName)
+				continue
+			}
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 	}
@@ -513,7 +517,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
-			if varType == "function" {
+			if varType == "function" || varType == "string" {
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
@@ -599,6 +603,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if varType == "function" {
 			continue
 		}
+		if varType == "string" {
+			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
+			continue
+		}
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
 
@@ -610,7 +618,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	for varName, varType := range g.variables {
-		if varType == "function" {
+		if varType == "function" || varType == "string" {
 			continue
 		}
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
@@ -940,12 +948,7 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		// Add != 0 conversion for Series variables used in boolean context
-		if _, ok := e.Test.(*ast.Identifier); ok {
-			condCode = condCode + " != 0"
-		} else if _, ok := e.Test.(*ast.MemberExpression); ok {
-			condCode = condCode + " != 0"
-		}
+		condCode = g.addBoolConversionIfNeeded(e.Test, condCode)
 
 		consequentCode, err := g.generateNumericExpression(e.Consequent)
 		if err != nil {
@@ -1200,7 +1203,12 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 
 		if varType == "string" {
-			code += g.ind() + fmt.Sprintf("// %s = string variable (not implemented)\n", varName)
+			stringCode, err := g.generateStringVariableInit(varName, declarator.Init)
+			if err != nil {
+				code += g.ind() + fmt.Sprintf("// %s = string variable (generation failed: %v)\n", varName, err)
+			} else {
+				code += stringCode
+			}
 			continue
 		}
 
@@ -1399,12 +1407,70 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 	return g.typeSystem.InferType(expr)
 }
 
+func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expression) (string, error) {
+	switch expr := initExpr.(type) {
+	case *ast.ConditionalExpression:
+		condCode, err := g.generateConditionExpression(expr.Test)
+		if err != nil {
+			return "", err
+		}
+		condCode = g.addBoolConversionIfNeeded(expr.Test, condCode)
+
+		consequentCode, err := g.generateStringExpression(expr.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateStringExpression(expr.Alternate)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%s = func() string { if %s { return %s } else { return %s } }()\n",
+			varName, condCode, consequentCode, alternateCode), nil
+
+	case *ast.MemberExpression:
+		if obj, ok := expr.Object.(*ast.Identifier); ok {
+			if obj.Name == "strategy" {
+				if prop, ok := expr.Property.(*ast.Identifier); ok {
+					if prop.Name == "long" || prop.Name == "short" {
+						return g.ind() + fmt.Sprintf("%s = strategy.%s\n", varName, capitalizeFirst(prop.Name)), nil
+					}
+				}
+			}
+		}
+		return "", fmt.Errorf("unsupported string member expression: %v", expr)
+
+	default:
+		return "", fmt.Errorf("unsupported string variable init: %T", initExpr)
+	}
+}
+
+func (g *generator) generateStringExpression(expr ast.Expression) (string, error) {
+	switch e := expr.(type) {
+	case *ast.MemberExpression:
+		if obj, ok := e.Object.(*ast.Identifier); ok {
+			if obj.Name == "strategy" {
+				if prop, ok := e.Property.(*ast.Identifier); ok {
+					if prop.Name == "long" {
+						return "strategy.Long", nil
+					}
+					if prop.Name == "short" {
+						return "strategy.Short", nil
+					}
+				}
+			}
+		}
+		return "", fmt.Errorf("unsupported string member expression: %v", e)
+
+	default:
+		return "", fmt.Errorf("unsupported string expression: %T", expr)
+	}
+}
+
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
 	nestedCalls := g.exprAnalyzer.FindNestedCalls(initExpr)
 
 	tempVarCode := ""
 	if len(nestedCalls) > 0 {
-		/* Process nested calls in reverse order to resolve dependencies first */
 		for i := len(nestedCalls) - 1; i >= 0; i-- {
 			callInfo := nestedCalls[i]
 
@@ -2461,6 +2527,15 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		existingVar := g.tempVarMgr.GetVarNameForCall(e)
 		if existingVar != "" {
 			return fmt.Sprintf("%sSeries.GetCurrent()", existingVar)
+		}
+
+		/* Inline value functions generate direct code, not Series variables */
+		if g.valueHandler != nil && g.valueHandler.CanHandle(funcName) {
+			inlineCode, err := g.valueHandler.GenerateInlineCall(funcName, e.Arguments, g)
+			if err != nil {
+				return "0.0"
+			}
+			return inlineCode
 		}
 
 		if (strings.HasPrefix(funcName, "math.") ||

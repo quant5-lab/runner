@@ -58,6 +58,13 @@ func (te *TypeInferenceEngine) inferMemberExpressionType(e *ast.MemberExpression
 				}
 			}
 		}
+		if obj.Name == "strategy" {
+			if prop, ok := e.Property.(*ast.Identifier); ok {
+				if prop.Name == "long" || prop.Name == "short" {
+					return "string"
+				}
+			}
+		}
 	}
 	return "float64"
 }

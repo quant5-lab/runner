@@ -28,11 +28,17 @@ type typeBasedRule struct {
 
 func (r *typeBasedRule) ShouldConvert(expr ast.Expression, code string) bool {
 	if ident, ok := expr.(*ast.Identifier); ok {
+		if r.typeSystem.IsBoolConstant(ident.Name) {
+			return false
+		}
 		return r.typeSystem.IsBoolVariableByName(ident.Name)
 	}
 
 	if member, ok := expr.(*ast.MemberExpression); ok {
 		if ident, ok := member.Object.(*ast.Identifier); ok {
+			if r.typeSystem.IsBoolConstant(ident.Name) {
+				return false
+			}
 			return r.typeSystem.IsBoolVariableByName(ident.Name)
 		}
 	}
