@@ -392,8 +392,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Pre-analyze security() calls to register temp vars BEFORE declarations
 	g.preAnalyzeSecurityCalls(program)
 
-	// Generate arrow functions BEFORE bar loop
-	// Generate arrow functions AT MODULE LEVEL (before bar loop)
+	// Generate user-defined functions at module level
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
@@ -420,9 +419,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			}
 		}
 	}
-
-	// Second pass: No longer needed (ALL variables use Series storage)
-	// Kept for future optimizations if needed
 
 	// Third pass: collect TA function calls for pre-calculation
 	statementCounter.Reset()
@@ -472,7 +468,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	if len(g.variables) > 0 {
-		for varName := range g.variables {
+		for varName, varType := range g.variables {
+			if varType == "function" {
+				continue
+			}
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 		}
 	}
@@ -513,7 +512,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	if len(g.variables) > 0 {
-		for varName := range g.variables {
+		for varName, varType := range g.variables {
+			if varType == "function" {
+				continue
+			}
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
 		}
 
@@ -593,7 +595,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "_ = strategy_netprofitSeries\n"
 		code += g.ind() + "_ = strategy_closedtradesSeries\n"
 	}
-	for varName := range g.variables {
+	for varName, varType := range g.variables {
+		if varType == "function" {
+			continue
+		}
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
 
@@ -604,7 +609,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %s.Next() }\n", iterVar, seriesName)
 	}
 
-	for varName := range g.variables {
+	for varName, varType := range g.variables {
+		if varType == "function" {
+			continue
+		}
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
 	}
 
