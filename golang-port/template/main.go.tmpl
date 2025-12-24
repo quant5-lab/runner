@@ -13,6 +13,7 @@ import (
 	"github.com/quant5-lab/runner/runtime/chartdata"
 	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/runtime/output"
+	"github.com/quant5-lab/runner/runtime/request"
 	"github.com/quant5-lab/runner/runtime/series"
 	"github.com/quant5-lab/runner/runtime/session"
 	"github.com/quant5-lab/runner/runtime/strategy"
@@ -102,7 +103,8 @@ func main() {
 	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
 	startTime := clock.Now()
 	securityContexts := make(map[string]*context.Context)
-	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts)
+	securityBarMappers := make(map[string]*request.SecurityBarMapper)
+	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts, securityBarMappers)
 	executionTime := time.Since(startTime)
 
 	/* Generate chart data with metadata */

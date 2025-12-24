@@ -1080,7 +1080,7 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			op = "||"
 		}
 
-		return fmt.Sprintf("%s %s %s", left, op, right), nil
+		return fmt.Sprintf("(%s %s %s)", left, op, right), nil
 
 	case *ast.MemberExpression:
 		// Use extractSeriesExpression for proper offset handling
@@ -1759,10 +1759,18 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			}
 		}
 
+		code += g.ind() + "securityBarMapper, mapperFound := securityBarMappers[secKey]\n"
+		code += g.ind() + "if !mapperFound {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+
 		if lookahead {
-			code += g.ind() + "secBarIdx := context.FindBarIndexByTimestampWithLookahead(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+			code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, true)\n"
 		} else {
-			code += g.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+			code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, false)\n"
 		}
 		code += g.ind() + "if secBarIdx < 0 {\n"
 		g.indent++
@@ -1837,6 +1845,8 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			code += g.ind() + "}\n"
 		}
 
+		g.indent--
+		code += g.ind() + "}\n"
 		g.indent--
 		code += g.ind() + "}\n"
 		g.indent--

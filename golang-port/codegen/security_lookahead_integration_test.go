@@ -146,13 +146,15 @@ func TestSecurityCallEmitter_LookaheadParameter(t *testing.T) {
 				t.Fatalf("EmitSecurityCall failed: %v", err)
 			}
 
-			expectedFunctionCall := "FindBarIndexByTimestamp"
+			expectedMapperCall := "securityBarMapper.FindDailyBarIndex(ctx.BarIndex, "
+			lookaheadParam := "false)"
 			if tt.expectedLookahead {
-				expectedFunctionCall = "FindBarIndexByTimestampWithLookahead"
+				lookaheadParam = "true)"
 			}
+			expectedFullCall := expectedMapperCall + lookaheadParam
 
-			if !strings.Contains(code, expectedFunctionCall) {
-				t.Errorf("Expected %s in generated code, got:\n%s", expectedFunctionCall, code)
+			if !strings.Contains(code, expectedFullCall) {
+				t.Errorf("Expected %s in generated code, got:\n%s", expectedFullCall, code)
 			}
 		})
 	}

@@ -7,7 +7,6 @@ import (
 )
 
 func TestGenerateStrategyCodeFromAST(t *testing.T) {
-	// Create minimal AST
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body:     []ast.Node{},
@@ -36,7 +35,6 @@ func TestGenerateStrategyCodeFromAST(t *testing.T) {
 }
 
 func TestGenerateProgramWithStatements(t *testing.T) {
-	// Create AST with indicator call
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{

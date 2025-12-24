@@ -8,7 +8,6 @@ import (
 )
 
 func TestIfStatementCodegen(t *testing.T) {
-	// Create a minimal strategy with if statement
 	pineScript := `//@version=5
 strategy("Test If", overlay=true)
 

@@ -82,7 +82,6 @@ func (m *TempVariableManager) generateUniqueName(info CallInfo) string {
 	// Try to extract period from arguments for readability
 	period := m.extractPeriodFromCall(info.Call)
 
-	// Build unique name
 	if period > 0 {
 		return fmt.Sprintf("%s_%d_%s", baseName, period, info.ArgHash)
 	}
@@ -96,7 +95,6 @@ func (m *TempVariableManager) extractPeriodFromCall(call *ast.CallExpression) in
 		return 0
 	}
 
-	// Check if second argument is literal number
 	if lit, ok := call.Arguments[1].(*ast.Literal); ok {
 		switch v := lit.Value.(type) {
 		case int:

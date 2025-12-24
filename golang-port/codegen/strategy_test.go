@@ -7,7 +7,6 @@ import (
 )
 
 func TestGenerateStrategyEntry(t *testing.T) {
-	// Create AST with strategy.entry call
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{
@@ -45,7 +44,6 @@ func TestGenerateStrategyEntry(t *testing.T) {
 }
 
 func TestGenerateStrategyClose(t *testing.T) {
-	// Create AST with strategy.close call
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{

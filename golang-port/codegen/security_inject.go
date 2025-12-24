@@ -123,9 +123,15 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\t}\n")
 
 		if isPlaceholder {
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n\n", runtimeKey, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n", runtimeKey, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMapping(%s_ctx.Data, ctx.Data)\n", varName, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[fmt.Sprintf(%q, ctx.Symbol)] = %s_mapper\n\n", runtimeKey, varName))
 		} else {
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n\n", key, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", key, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMapping(%s_ctx.Data, ctx.Data)\n", varName, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", key, varName))
 		}
 	}
 

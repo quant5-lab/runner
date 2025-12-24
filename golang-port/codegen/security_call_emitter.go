@@ -99,11 +99,18 @@ func (e *SecurityCallEmitter) emitStreamingEvaluation(varName, symbolCode, timef
 	e.gen.indent--
 	code += e.gen.ind() + "} else {\n"
 	e.gen.indent++
+	code += e.gen.ind() + "securityBarMapper, mapperFound := securityBarMappers[secKey]\n"
+	code += e.gen.ind() + "if !mapperFound {\n"
+	e.gen.indent++
+	code += e.gen.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	e.gen.indent--
+	code += e.gen.ind() + "} else {\n"
+	e.gen.indent++
 
 	if lookahead {
-		code += e.gen.ind() + "secBarIdx := context.FindBarIndexByTimestampWithLookahead(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		code += e.gen.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, true)\n"
 	} else {
-		code += e.gen.ind() + "secBarIdx := context.FindBarIndexByTimestamp(secCtx, ctx.Data[ctx.BarIndex].Time)\n"
+		code += e.gen.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, false)\n"
 	}
 	code += e.gen.ind() + "if secBarIdx < 0 {\n"
 	e.gen.indent++
@@ -118,6 +125,8 @@ func (e *SecurityCallEmitter) emitStreamingEvaluation(varName, symbolCode, timef
 	}
 	code += exprCode
 
+	e.gen.indent--
+	code += e.gen.ind() + "}\n"
 	e.gen.indent--
 	code += e.gen.ind() + "}\n"
 	e.gen.indent--

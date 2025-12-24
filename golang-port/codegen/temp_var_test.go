@@ -135,7 +135,6 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 			gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 			gen.tempVarMgr = NewTempVariableManager(gen)
 
-			// Add variable to context
 			gen.variables[tt.varName] = "float64"
 			gen.varInits[tt.varName] = tt.initExpr
 
@@ -144,14 +143,12 @@ func TestTempVarCreationForMathWithNestedTA(t *testing.T) {
 				t.Fatalf("generateVariableInit failed: %v", err)
 			}
 
-			// Check expected code patterns
 			for _, expected := range tt.expectedCode {
 				if !strings.Contains(code, expected) {
 					t.Errorf("Expected code to contain %q\nGenerated code:\n%s", expected, code)
 				}
 			}
 
-			// Check unexpected code patterns
 			for _, unexpected := range tt.unexpectedCode {
 				if strings.Contains(code, unexpected) {
 					t.Errorf("Expected code NOT to contain %q\nGenerated code:\n%s", unexpected, code)

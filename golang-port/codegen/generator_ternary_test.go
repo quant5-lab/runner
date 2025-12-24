@@ -50,7 +50,7 @@ func TestTernaryCodegenIntegration(t *testing.T) {
 		t.Errorf("Missing signal Series declaration: got %s", code)
 	}
 
-	if !strings.Contains(code, "if bar.Close > close_avgSeries.GetCurrent() { return 1") {
+	if !strings.Contains(code, "if (bar.Close > close_avgSeries.GetCurrent()) { return 1") {
 		t.Errorf("Missing ternary true branch: got %s", code)
 	}
 
@@ -110,7 +110,7 @@ func TestTernaryWithArithmetic(t *testing.T) {
 		t.Errorf("Missing arithmetic in ternary condition: got %s", code)
 	}
 
-	if !strings.Contains(code, "bar.Volume > volume_avgSeries.GetCurrent() * 1.50") {
+	if !strings.Contains(code, "bar.Volume > (volume_avgSeries.GetCurrent() * 1.50)") {
 		t.Errorf("Missing complete condition with arithmetic: got %s", code)
 	}
 }
@@ -180,5 +180,235 @@ func TestTernaryWithLogicalOperators(t *testing.T) {
 
 	if !strings.Contains(code, "bar.Volume > 1000") {
 		t.Errorf("Missing volume > 1000 comparison: got %s", code)
+	}
+}
+
+func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
+	tests := []struct {
+		name       string
+		initDecls  []ast.VariableDeclarator
+		testExpr   ast.Expression
+		expectCode []string
+	}{
+		{
+			name: "arithmetic: multiplication with subtraction",
+			initDecls: []ast.VariableDeclarator{
+				{
+					ID:   &ast.Identifier{Name: "factor"},
+					Init: &ast.Literal{Value: 0.02},
+				},
+			},
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.Identifier{Name: "condition"},
+				Consequent: &ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "value"},
+					Operator: "*",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Literal{Value: 1.0},
+						Operator: "-",
+						Right:    &ast.Identifier{Name: "factor"},
+					},
+				},
+				Alternate: &ast.Identifier{Name: "fallback"},
+			},
+			expectCode: []string{
+				"(1.00 - factorSeries.GetCurrent())",
+			},
+		},
+		{
+			name: "arithmetic: division with addition",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "x"},
+					Operator: ">",
+					Right:    &ast.Literal{Value: 0.0},
+				},
+				Consequent: &ast.Identifier{Name: "result"},
+				Alternate: &ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "numerator"},
+					Operator: "/",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "denominator"},
+						Operator: "+",
+						Right:    &ast.Literal{Value: 1.00},
+					},
+				},
+			},
+			expectCode: []string{
+				"(denominatorSeries.GetCurrent() + 1.00)",
+			},
+		},
+		{
+			name: "comparison: nested arithmetic",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "a"},
+						Operator: "+",
+						Right:    &ast.Identifier{Name: "b"},
+					},
+					Operator: ">",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "c"},
+						Operator: "*",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+				Consequent: &ast.Literal{Value: 1.0},
+				Alternate:  &ast.Literal{Value: 0.0},
+			},
+			expectCode: []string{
+				"((aSeries.GetCurrent() + bSeries.GetCurrent()) > (cSeries.GetCurrent() * 2.00))",
+			},
+		},
+		{
+			name: "logical: and with comparisons",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "price"},
+						Operator: ">",
+						Right:    &ast.Literal{Value: 100.0},
+					},
+					Operator: "and",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "volume"},
+						Operator: ">",
+						Right:    &ast.Literal{Value: 1000.0},
+					},
+				},
+				Consequent: &ast.Identifier{Name: "signal_on"},
+				Alternate:  &ast.Identifier{Name: "signal_off"},
+			},
+			expectCode: []string{
+				"(priceSeries.GetCurrent() > 100.00)",
+				"&&",
+				"bar.Volume > 1000.00",
+			},
+		},
+		{
+			name: "logical: or with comparisons",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "stop_loss"},
+						Operator: "<=",
+						Right:    &ast.Identifier{Name: "price"},
+					},
+					Operator: "or",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "take_profit"},
+						Operator: ">=",
+						Right:    &ast.Identifier{Name: "price"},
+					},
+				},
+				Consequent: &ast.Identifier{Name: "close_pos"},
+				Alternate:  &ast.Identifier{Name: "hold_pos"},
+			},
+			expectCode: []string{
+				"(stop_lossSeries.GetCurrent() <= priceSeries.GetCurrent())",
+				"||",
+				"(take_profitSeries.GetCurrent() >= priceSeries.GetCurrent())",
+			},
+		},
+		{
+			name: "modulo: remainder with comparison",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "bar_index"},
+						Operator: "%",
+						Right:    &ast.Literal{Value: 5.0},
+					},
+					Operator: "==",
+					Right:    &ast.Literal{Value: 0.0},
+				},
+				Consequent: &ast.Identifier{Name: "execute"},
+				Alternate:  &ast.Identifier{Name: "skip"},
+			},
+			expectCode: []string{
+				"((bar_indexSeries.GetCurrent() % 5.00) == 0.00)",
+			},
+		},
+		{
+			name: "nested: multi-level expressions",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.Identifier{Name: "flag"},
+				Consequent: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "a"},
+						Operator: "+",
+						Right:    &ast.Identifier{Name: "b"},
+					},
+					Operator: "*",
+					Right: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "c"},
+						Operator: "-",
+						Right:    &ast.Identifier{Name: "d"},
+					},
+				},
+				Alternate: &ast.Literal{Value: 0.0},
+			},
+			expectCode: []string{
+				"(aSeries.GetCurrent() + bSeries.GetCurrent())",
+				"(cSeries.GetCurrent() - dSeries.GetCurrent())",
+			},
+		},
+		{
+			name: "mixed: nested arithmetic in division",
+			testExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "high"},
+					Operator: "!=",
+					Right:    &ast.Identifier{Name: "low"},
+				},
+				Consequent: &ast.BinaryExpression{
+					Left: &ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "high"},
+						Operator: "-",
+						Right:    &ast.Identifier{Name: "low"},
+					},
+					Operator: "/",
+					Right:    &ast.Identifier{Name: "close"},
+				},
+				Alternate: &ast.Literal{Value: 0.0},
+			},
+			expectCode: []string{
+				"((bar.High - bar.Low) / bar.Close)",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := []ast.Node{}
+			for _, decl := range tt.initDecls {
+				body = append(body, &ast.VariableDeclaration{
+					Declarations: []ast.VariableDeclarator{decl},
+				})
+			}
+			body = append(body, &ast.VariableDeclaration{
+				Declarations: []ast.VariableDeclarator{
+					{
+						ID:   &ast.Identifier{Name: "test_result"},
+						Init: tt.testExpr,
+					},
+				},
+			})
+
+			program := &ast.Program{Body: body}
+			gen := newTestGenerator()
+
+			code, err := gen.generateProgram(program)
+			if err != nil {
+				t.Fatalf("Generate failed: %v", err)
+			}
+
+			for _, expectStr := range tt.expectCode {
+				if !strings.Contains(code, expectStr) {
+					t.Errorf("Expected pattern %q not found in generated code:\n%s", expectStr, code)
+				}
+			}
+		})
 	}
 }
