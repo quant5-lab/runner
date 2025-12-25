@@ -9,46 +9,91 @@ func TestWarmupChecker(t *testing.T) {
 	tests := []struct {
 		name           string
 		period         int
+		baseOffset     int
 		varName        string
 		expectedInCode []string
 	}{
 		{
-			name:    "Period 20",
-			period:  20,
-			varName: "sma20",
+			name:       "Period 20, no offset",
+			period:     20,
+			baseOffset: 0,
+			varName:    "sma20",
 			expectedInCode: []string{
-				"if ctx.BarIndex < 20-1",
+				"if ctx.BarIndex < 19",
 				"sma20Series.Set(math.NaN())",
 				"} else {",
 			},
 		},
 		{
-			name:    "Period 5",
-			period:  5,
-			varName: "ema5",
+			name:       "Period 20, offset 4 (close[4])",
+			period:     20,
+			baseOffset: 4,
+			varName:    "sma20",
 			expectedInCode: []string{
-				"if ctx.BarIndex < 5-1",
+				"if ctx.BarIndex < 23",
+				"sma20Series.Set(math.NaN())",
+			},
+		},
+		{
+			name:       "Period 50, offset 10",
+			period:     50,
+			baseOffset: 10,
+			varName:    "ema50",
+			expectedInCode: []string{
+				"if ctx.BarIndex < 59",
+				"ema50Series.Set(math.NaN())",
+			},
+		},
+		{
+			name:       "Period 5, offset 0",
+			period:     5,
+			baseOffset: 0,
+			varName:    "ema5",
+			expectedInCode: []string{
+				"if ctx.BarIndex < 4",
 				"ema5Series.Set(math.NaN())",
 			},
 		},
 		{
-			name:    "Period 1",
-			period:  1,
-			varName: "test",
+			name:       "Period 1, offset 0",
+			period:     1,
+			baseOffset: 0,
+			varName:    "test",
 			expectedInCode: []string{
-				"if ctx.BarIndex < 1-1",
+				"if ctx.BarIndex < 0",
 				"testSeries.Set(math.NaN())",
+			},
+		},
+		{
+			name:       "Period 1, offset 5",
+			period:     1,
+			baseOffset: 5,
+			varName:    "test",
+			expectedInCode: []string{
+				"if ctx.BarIndex < 5",
+				"testSeries.Set(math.NaN())",
+			},
+		},
+		{
+			name:       "Period 100, offset 50",
+			period:     100,
+			baseOffset: 50,
+			varName:    "longSMA",
+			expectedInCode: []string{
+				"if ctx.BarIndex < 149",
+				"longSMASeries.Set(math.NaN())",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checker := NewWarmupChecker(tt.period)
+			checker := NewWarmupCheckerWithOffset(tt.period, tt.baseOffset)
 
-			if checker.MinimumBarsRequired() != tt.period {
-				t.Errorf("MinimumBarsRequired() = %d, want %d",
-					checker.MinimumBarsRequired(), tt.period)
+			expectedWarmup := tt.period + tt.baseOffset
+			if checker.MinimumBarsRequired() != expectedWarmup {
+				t.Errorf("MinimumBarsRequired() = %d, want %d (period=%d + baseOffset=%d)",
+					checker.MinimumBarsRequired(), expectedWarmup, tt.period, tt.baseOffset)
 			}
 
 			indenter := NewCodeIndenter()

@@ -160,7 +160,7 @@ func TestTempVariableManager_GenerateCalculations_DifferentSources(t *testing.T)
 			},
 			funcName:   "ta.sma",
 			period:     200,
-			wantAccess: "ctx.Data[ctx.BarIndex-j].Close",
+			wantAccess: "ctx.Data[ctx.BarIndex-(j+4)].Close",
 		},
 	}
 

@@ -29,15 +29,22 @@ import "fmt"
 //   - Reusable: Works with any indicator that needs warmup handling
 //   - Testable: Easy to verify warmup boundary conditions
 type WarmupChecker struct {
-	period int // Minimum bars required for valid calculation
+	period     int // Minimum bars required for valid calculation
+	baseOffset int // Additional offset from expressions like close[4]
 }
 
 func NewWarmupChecker(period int) *WarmupChecker {
-	return &WarmupChecker{period: period}
+	return &WarmupChecker{period: period, baseOffset: 0}
+}
+
+func NewWarmupCheckerWithOffset(period int, baseOffset int) *WarmupChecker {
+	return &WarmupChecker{period: period, baseOffset: baseOffset}
 }
 
 func (w *WarmupChecker) GenerateCheck(varName string, indenter *CodeIndenter) string {
-	code := indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d-1 {", w.period))
+	// Total warmup = period + baseOffset. For sma(close[4], 20), need 20+4-1 = 23 bars minimum
+	totalWarmup := w.period + w.baseOffset - 1
+	code := indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d {", totalWarmup))
 	indenter.IncreaseIndent()
 	code += indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", varName))
 	indenter.DecreaseIndent()
@@ -46,5 +53,5 @@ func (w *WarmupChecker) GenerateCheck(varName string, indenter *CodeIndenter) st
 }
 
 func (w *WarmupChecker) MinimumBarsRequired() int {
-	return w.period
+	return w.period + w.baseOffset
 }

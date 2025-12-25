@@ -19,7 +19,7 @@ func TestTAIndicatorBuilder_SMA(t *testing.T) {
 
 	requiredElements := []string{
 		"/* Inline SMA(20) */",
-		"if ctx.BarIndex < 20-1",
+		"if ctx.BarIndex < 19",
 		"sma20Series.Set(math.NaN())",
 		"} else {",
 		"sum := 0.0",
@@ -116,7 +116,7 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 
 	requiredElements := []string{
 		"/* Inline RMA(20) */",
-		"if ctx.BarIndex < 20-1",
+		"if ctx.BarIndex < 19",
 		"rma20Series.Set(math.NaN())",
 		"} else {",
 		"alpha := 1.0 / float64(20)",
@@ -202,7 +202,7 @@ func TestTAIndicatorBuilder_EdgeCases(t *testing.T) {
 		builder.WithAccumulator(NewSumAccumulator())
 		code := builder.Build()
 
-		if !strings.Contains(code, "if ctx.BarIndex < 200-1") {
+		if !strings.Contains(code, "if ctx.BarIndex < 199") {
 			t.Error("Large period should have correct warmup check")
 		}
 
@@ -245,7 +245,7 @@ func TestTAIndicatorBuilder_BuildStep(t *testing.T) {
 
 	t.Run("BuildWarmupCheck", func(t *testing.T) {
 		warmup := builder.BuildWarmupCheck()
-		if !strings.Contains(warmup, "if ctx.BarIndex < 10-1") {
+		if !strings.Contains(warmup, "if ctx.BarIndex < 9") {
 			t.Errorf("Warmup check incorrect: %s", warmup)
 		}
 	})
@@ -298,7 +298,7 @@ func TestTAIndicatorBuilder_Integration(t *testing.T) {
 		count    int
 	}{
 		{"Header comment", "/* Inline SMA(20) */", 1},
-		{"Warmup check", "if ctx.BarIndex < 20-1", 1},
+		{"Warmup check", "if ctx.BarIndex < 19", 1},
 		{"NaN set in warmup", "sma20Series.Set(math.NaN())", 2}, // warmup + NaN check
 		{"Initialization", "sum := 0.0", 1},
 		{"NaN flag", "hasNaN := false", 1},

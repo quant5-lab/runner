@@ -122,10 +122,27 @@ func (ea *ExpressionAnalyzer) argToString(expr ast.Expression) string {
 	case *ast.MemberExpression:
 		obj := ea.argToString(e.Object)
 		prop := ea.argToString(e.Property)
+		if e.Computed {
+			return obj + "[" + prop + "]"
+		}
 		return obj + "." + prop
 	case *ast.CallExpression:
 		funcName := ea.gen.extractFunctionName(e.Callee)
-		return funcName + "()"
+		args := ""
+		for i, arg := range e.Arguments {
+			if i > 0 {
+				args += ","
+			}
+			args += ea.argToString(arg)
+		}
+		return funcName + "(" + args + ")"
+	case *ast.BinaryExpression:
+		left := ea.argToString(e.Left)
+		right := ea.argToString(e.Right)
+		return "(" + left + e.Operator + right + ")"
+	case *ast.UnaryExpression:
+		operand := ea.argToString(e.Argument)
+		return e.Operator + operand
 	default:
 		return "expr"
 	}

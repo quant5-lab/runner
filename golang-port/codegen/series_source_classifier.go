@@ -6,21 +6,23 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-// SourceType represents the category of data source for technical analysis calculations.
+// SourceType distinguishes between user-defined Series and built-in OHLCV fields.
+// This classification drives code generation strategy selection.
 type SourceType int
 
 const (
 	SourceTypeUnknown SourceType = iota
-	SourceTypeSeriesVariable
-	SourceTypeOHLCVField
+	SourceTypeSeriesVariable // User variable: myVar, cagr5
+	SourceTypeOHLCVField     // Built-in field: close, high, low, open, volume
 )
 
-// SourceInfo contains classification results for a source expression.
+// SourceInfo encapsulates classified source expression metadata for code generation.
 type SourceInfo struct {
 	Type         SourceType
 	VariableName string
 	FieldName    string
 	OriginalExpr string
+	BaseOffset   int // Historical lookback offset
 }
 
 // IsSeriesVariable returns true if the source is a user-defined Series variable.
@@ -33,19 +35,21 @@ func (s SourceInfo) IsOHLCVField() bool {
 	return s.Type == SourceTypeOHLCVField
 }
 
-// SeriesSourceClassifier analyzes source expressions to determine their type.
+// SeriesSourceClassifier determines source expression type from AST nodes.
+// Distinguishes built-in OHLCV fields from user variables and extracts historical offsets.
 type SeriesSourceClassifier struct {
 	seriesVariablePattern *regexp.Regexp
 }
 
-// NewSeriesSourceClassifier creates a classifier for series source expressions.
+// NewSeriesSourceClassifier creates classifier for analyzing source expressions.
 func NewSeriesSourceClassifier() *SeriesSourceClassifier {
 	return &SeriesSourceClassifier{
 		seriesVariablePattern: regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)Series\.Get(?:Current)?\(`),
 	}
 }
 
-// ClassifyAST analyzes AST expression node directly, avoiding code generation artifacts.
+// ClassifyAST analyzes AST expression, extracting type and historical offset.
+// Handles Identifier and MemberExpression nodes, falling back to Close for unknown expressions.
 func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
 	info := SourceInfo{}
 
@@ -54,34 +58,51 @@ func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
 		if c.isBuiltinOHLCVField(e.Name) {
 			info.Type = SourceTypeOHLCVField
 			info.FieldName = c.capitalizeOHLCVField(e.Name)
+			info.BaseOffset = 0
 			return info
 		}
 		info.Type = SourceTypeSeriesVariable
 		info.VariableName = e.Name
+		info.BaseOffset = 0
 		return info
 
 	case *ast.MemberExpression:
 		if obj, ok := e.Object.(*ast.Identifier); ok && e.Computed {
+			offset := 0
+			if lit, ok := e.Property.(*ast.Literal); ok {
+				switch v := lit.Value.(type) {
+				case float64:
+					offset = int(v)
+				case int:
+					offset = v
+				}
+			}
+
 			if c.isBuiltinOHLCVField(obj.Name) {
 				info.Type = SourceTypeOHLCVField
 				info.FieldName = c.capitalizeOHLCVField(obj.Name)
+				info.BaseOffset = offset
 				return info
 			}
 			info.Type = SourceTypeSeriesVariable
 			info.VariableName = obj.Name
+			info.BaseOffset = offset
 			return info
 		}
 	}
 
 	info.Type = SourceTypeOHLCVField
 	info.FieldName = "Close"
+	info.BaseOffset = 0
 	return info
 }
 
+// isBuiltinOHLCVField checks if identifier is built-in OHLCV field.
 func (c *SeriesSourceClassifier) isBuiltinOHLCVField(name string) bool {
 	return name == "close" || name == "open" || name == "high" || name == "low" || name == "volume"
 }
 
+// capitalizeOHLCVField converts Pine field name to Go struct field name.
 func (c *SeriesSourceClassifier) capitalizeOHLCVField(name string) string {
 	switch name {
 	case "close":

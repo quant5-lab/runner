@@ -215,7 +215,7 @@ func TestTAIndicatorFactory_Integration_SMA(t *testing.T) {
 
 	requiredElements := []string{
 		"ta.sma(50)",
-		"ctx.BarIndex < 50-1",
+		"ctx.BarIndex < 49",
 		"sma50Series.Set(math.NaN())",
 		"sum := 0.0",
 		"for j := 0; j < 50; j++",
@@ -245,7 +245,7 @@ func TestTAIndicatorFactory_Integration_EMA(t *testing.T) {
 	// Verify complete EMA code structure
 	requiredElements := []string{
 		"ta.ema(21)",
-		"ctx.BarIndex < 21-1",
+		"ctx.BarIndex < 20",
 		"ema21Series.Set(math.NaN())",
 		"alpha := 2.0 / float64(21+1)",
 	}

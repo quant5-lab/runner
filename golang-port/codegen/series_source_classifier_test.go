@@ -247,9 +247,9 @@ func TestSeriesVariableAccessGenerator(t *testing.T) {
 			period int
 			want   string
 		}{
-			{period: 5, want: "myVarSeries.Get(5-1)"},
-			{period: 20, want: "myVarSeries.Get(20-1)"},
-			{period: 60, want: "myVarSeries.Get(60-1)"},
+			{period: 5, want: "myVarSeries.Get(4)"},
+			{period: 20, want: "myVarSeries.Get(19)"},
+			{period: 60, want: "myVarSeries.Get(59)"},
 		}
 
 		for _, tt := range tests {
@@ -287,9 +287,9 @@ func TestOHLCVFieldAccessGenerator(t *testing.T) {
 			period int
 			want   string
 		}{
-			{period: 5, want: "ctx.Data[ctx.BarIndex-(5-1)].Close"},
-			{period: 20, want: "ctx.Data[ctx.BarIndex-(20-1)].Close"},
-			{period: 60, want: "ctx.Data[ctx.BarIndex-(60-1)].Close"},
+			{period: 5, want: "ctx.Data[ctx.BarIndex-4].Close"},
+			{period: 20, want: "ctx.Data[ctx.BarIndex-19].Close"},
+			{period: 60, want: "ctx.Data[ctx.BarIndex-59].Close"},
 		}
 
 		for _, tt := range tests {
@@ -329,7 +329,7 @@ func TestCreateAccessGenerator(t *testing.T) {
 		gen := CreateAccessGenerator(source)
 
 		got := gen.GenerateInitialValueAccess(60)
-		want := "cagr5Series.Get(60-1)"
+		want := "cagr5Series.Get(59)"
 
 		if got != want {
 			t.Errorf("CreateAccessGenerator for series variable: got %q, want %q", got, want)
@@ -345,7 +345,7 @@ func TestCreateAccessGenerator(t *testing.T) {
 		gen := CreateAccessGenerator(source)
 
 		got := gen.GenerateInitialValueAccess(20)
-		want := "ctx.Data[ctx.BarIndex-(20-1)].Close"
+		want := "ctx.Data[ctx.BarIndex-19].Close"
 
 		if got != want {
 			t.Errorf("CreateAccessGenerator for OHLCV field: got %q, want %q", got, want)
