@@ -37,4 +37,3 @@ func (o HistoricalOffset) FormatLoopAccess(loopVar string) string {
 	}
 	return fmt.Sprintf("%s+%d", loopVar, o.value)
 }
-

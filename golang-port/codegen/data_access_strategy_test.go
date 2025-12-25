@@ -393,9 +393,9 @@ func TestDataAccessStrategy_AllOHLCVFields(t *testing.T) {
 // TestDataAccessStrategy_EdgeCasePeriods validates edge case period values
 func TestDataAccessStrategy_EdgeCasePeriods(t *testing.T) {
 	tests := []struct {
-		name        string
-		period      int
-		offset      int
+		name           string
+		period         int
+		offset         int
 		wantSeriesInit string
 		wantOHLCVInit  string
 	}{

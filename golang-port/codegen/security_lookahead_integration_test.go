@@ -146,15 +146,30 @@ func TestSecurityCallEmitter_LookaheadParameter(t *testing.T) {
 				t.Fatalf("EmitSecurityCall failed: %v", err)
 			}
 
-			expectedMapperCall := "securityBarMapper.FindDailyBarIndex(ctx.BarIndex, "
-			lookaheadParam := "false)"
+			// With runtime same-timeframe detection, the pattern is now:
+			// secLookahead := <initial value>
+			// if <secTF> == ctx.Timeframe { secLookahead = true }
+			// secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)
+			expectedInitialValue := "false"
 			if tt.expectedLookahead {
-				lookaheadParam = "true)"
+				expectedInitialValue = "true"
 			}
-			expectedFullCall := expectedMapperCall + lookaheadParam
+			expectedSecLookaheadInit := "secLookahead := " + expectedInitialValue
 
-			if !strings.Contains(code, expectedFullCall) {
-				t.Errorf("Expected %s in generated code, got:\n%s", expectedFullCall, code)
+			if !strings.Contains(code, expectedSecLookaheadInit) {
+				t.Errorf("Expected '%s' in generated code, got:\n%s", expectedSecLookaheadInit, code)
+			}
+
+			// Check for runtime detection logic
+			runtimeCheck := "if \"1h\" == ctx.Timeframe {"
+			if !strings.Contains(code, runtimeCheck) {
+				t.Errorf("Expected runtime same-timeframe detection in generated code, got:\n%s", code)
+			}
+
+			// Check for mapper call with secLookahead variable
+			mapperCall := "securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)"
+			if !strings.Contains(code, mapperCall) {
+				t.Errorf("Expected '%s' in generated code, got:\n%s", mapperCall, code)
 			}
 		})
 	}

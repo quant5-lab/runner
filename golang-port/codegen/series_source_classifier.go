@@ -11,9 +11,9 @@ import (
 type SourceType int
 
 const (
-	SourceTypeUnknown SourceType = iota
-	SourceTypeSeriesVariable // User variable: myVar, cagr5
-	SourceTypeOHLCVField     // Built-in field: close, high, low, open, volume
+	SourceTypeUnknown        SourceType = iota
+	SourceTypeSeriesVariable            // User variable: myVar, cagr5
+	SourceTypeOHLCVField                // Built-in field: close, high, low, open, volume
 )
 
 // SourceInfo encapsulates classified source expression metadata for code generation.

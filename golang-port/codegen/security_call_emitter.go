@@ -107,11 +107,15 @@ func (e *SecurityCallEmitter) emitStreamingEvaluation(varName, symbolCode, timef
 	code += e.gen.ind() + "} else {\n"
 	e.gen.indent++
 
-	if lookahead {
-		code += e.gen.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, true)\n"
-	} else {
-		code += e.gen.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, false)\n"
-	}
+	// Runtime same-timeframe detection: if security TF equals base TF, use lookahead
+	code += e.gen.ind() + fmt.Sprintf("secLookahead := %v\n", lookahead)
+	code += e.gen.ind() + fmt.Sprintf("if %s == ctx.Timeframe {\n", timeframeCode)
+	e.gen.indent++
+	code += e.gen.ind() + "secLookahead = true  // Same-timeframe: force lookahead for 1:1 mapping\n"
+	e.gen.indent--
+	code += e.gen.ind() + "}\n"
+
+	code += e.gen.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)\n"
 	code += e.gen.ind() + "if secBarIdx < 0 {\n"
 	e.gen.indent++
 	code += e.gen.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)

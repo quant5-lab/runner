@@ -272,10 +272,10 @@ func TestHistoricalOffset_Immutability(t *testing.T) {
 // TestHistoricalOffset_CompositeOperations validates multiple operations in sequence
 func TestHistoricalOffset_CompositeOperations(t *testing.T) {
 	tests := []struct {
-		name              string
-		offset            int
-		operations        func(HistoricalOffset) []interface{}
-		wantResults       []interface{}
+		name        string
+		offset      int
+		operations  func(HistoricalOffset) []interface{}
+		wantResults []interface{}
 	}{
 		{
 			name:   "zero offset - all operations",
@@ -325,7 +325,7 @@ func TestHistoricalOffset_EdgeCaseFormulas(t *testing.T) {
 		name        string
 		baseOffset  int
 		period      int
-		wantWarmup  int // period - 1 + baseOffset
+		wantWarmup  int    // period - 1 + baseOffset
 		wantInitial string // Format for initial value access
 	}{
 		{

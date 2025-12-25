@@ -83,43 +83,28 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 }
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {
-	tempVarName := "binary_source_temp"
-
 	binaryCode, err := f.exprGenerator.Generate(binExpr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate binary expression for accessor: %w", err)
 	}
 
-	return &FixnanCallExpressionAccessor{
-		tempVarName: tempVarName,
-		tempVarCode: fmt.Sprintf("%s := %s", tempVarName, binaryCode),
-	}, nil
+	return NewInlineLoopExpressionAccessorWithResolver(binaryCode, f.identifierResolver), nil
 }
 
 func (f *ArrowAwareAccessorFactory) createCallAccessor(call *ast.CallExpression) (AccessGenerator, error) {
-	tempVarName := "call_source_temp"
-
 	callCode, err := f.exprGenerator.Generate(call)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate call expression for accessor: %w", err)
 	}
 
-	return &FixnanCallExpressionAccessor{
-		tempVarName: tempVarName,
-		tempVarCode: fmt.Sprintf("%s := %s", tempVarName, callCode),
-	}, nil
+	return NewInlineLoopExpressionAccessorWithResolver(callCode, f.identifierResolver), nil
 }
 
 func (f *ArrowAwareAccessorFactory) createConditionalAccessor(cond *ast.ConditionalExpression) (AccessGenerator, error) {
-	tempVarName := "ternary_source_temp"
-
 	condCode, err := f.exprGenerator.Generate(cond)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate conditional expression for accessor: %w", err)
 	}
 
-	return &FixnanCallExpressionAccessor{
-		tempVarName: tempVarName,
-		tempVarCode: fmt.Sprintf("%s := %s", tempVarName, condCode),
-	}, nil
+	return NewInlineLoopExpressionAccessorWithResolver(condCode, f.identifierResolver), nil
 }

@@ -285,19 +285,19 @@ func TestAccessGenerator_OffsetCalculation(t *testing.T) {
 			// Test OHLCV accessor
 			ohlcvGen := NewOHLCVFieldAccessGeneratorWithOffset("Close", tt.baseOffset)
 			ohlcvInitial := ohlcvGen.GenerateInitialValueAccess(tt.period)
-			
+
 			// Extract the offset from generated code: "ctx.Data[ctx.BarIndex-X].Close"
 			// We verify the formula: period - 1 + baseOffset = wantSum
 			_ = ohlcvInitial // Validated by formula test
-			
+
 			// Test Series accessor
 			seriesGen := NewSeriesVariableAccessGeneratorWithOffset("myVar", tt.baseOffset)
 			seriesInitial := seriesGen.GenerateInitialValueAccess(tt.period)
-			
+
 			// Extract the offset from generated code: "myVarSeries.Get(X)"
 			// We verify the formula: period - 1 + baseOffset = wantSum
 			_ = seriesInitial // Validated by formula test
-			
+
 			// Validate both contain the calculated offset
 			if tt.baseOffset == 0 && tt.period <= 10 {
 				// For small values, do exact string matching

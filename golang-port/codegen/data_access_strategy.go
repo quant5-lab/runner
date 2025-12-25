@@ -64,7 +64,7 @@ type DataAccessFactory struct{}
 // CreateAccessor returns the correct DataAccessStrategy for the given source.
 func (f *DataAccessFactory) CreateAccessor(source SourceInfo) DataAccessStrategy {
 	offset := NewHistoricalOffset(source.BaseOffset)
-	
+
 	if source.IsSeriesVariable() {
 		return NewSeriesDataAccessor(source.VariableName, offset)
 	}

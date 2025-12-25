@@ -8,17 +8,23 @@ import (
 )
 
 type ArrowFunctionTACallGenerator struct {
-	gen          *generator
-	exprGen      ArrowExpressionGenerator
-	iifeRegistry *InlineTAIIFERegistry
+	gen                *generator
+	exprGen            ArrowExpressionGenerator
+	iifeRegistry       *InlineTAIIFERegistry
+	identifierResolver *ArrowIdentifierResolver // Optional resolver for variable → series transformation
 }
 
 func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGenerator) *ArrowFunctionTACallGenerator {
 	return &ArrowFunctionTACallGenerator{
-		gen:          gen,
-		exprGen:      exprGen,
-		iifeRegistry: NewInlineTAIIFERegistry(),
+		gen:                gen,
+		exprGen:            exprGen,
+		iifeRegistry:       NewInlineTAIIFERegistry(),
+		identifierResolver: nil, // Set by caller if available
 	}
+}
+
+func (a *ArrowFunctionTACallGenerator) SetIdentifierResolver(resolver *ArrowIdentifierResolver) {
+	a.identifierResolver = resolver
 }
 
 func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (string, error) {
@@ -175,28 +181,26 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 		return nil, fmt.Errorf("unsupported member expression in TA call")
 
 	case *ast.ConditionalExpression:
-		tempVarName := "ternary_source_temp"
 		condCode, err := a.exprGen.Generate(e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate ternary expression: %w", err)
 		}
 
-		return &FixnanCallExpressionAccessor{
-			tempVarName: tempVarName,
-			tempVarCode: fmt.Sprintf("%s := %s", tempVarName, condCode),
-		}, nil
+		if a.identifierResolver != nil {
+			return NewInlineLoopExpressionAccessorWithResolver(condCode, a.identifierResolver), nil
+		}
+		return NewInlineLoopExpressionAccessor(condCode), nil
 
 	case *ast.BinaryExpression:
-		tempVarName := "binary_source_temp"
 		binaryCode, err := a.exprGen.Generate(e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate binary expression: %w", err)
 		}
 
-		return &FixnanCallExpressionAccessor{
-			tempVarName: tempVarName,
-			tempVarCode: fmt.Sprintf("%s := %s", tempVarName, binaryCode),
-		}, nil
+		if a.identifierResolver != nil {
+			return NewInlineLoopExpressionAccessorWithResolver(binaryCode, a.identifierResolver), nil
+		}
+		return NewInlineLoopExpressionAccessor(binaryCode), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported source expression type: %T", expr)
