@@ -16,7 +16,7 @@ func TestStatefulIndicatorBuilder_RMA_Structure(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Run("HasWarmupPhase", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", 10, mockAccessor, true)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", 10, mockAccessor, true, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Run("HasNaNCheckInInitialization", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestStatefulIndicatorBuilder_EMA_Structure(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", 20, mockAccessor, false)
+	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", 20, mockAccessor, false, NewTopLevelIndicatorContext())
 	code := builder.BuildEMA()
 
 	t.Run("HasCorrectAlpha", func(t *testing.T) {
@@ -156,7 +156,7 @@ func TestStatefulIndicatorBuilder_DifferentPeriods(t *testing.T) {
 				},
 			}
 
-			builder := NewStatefulIndicatorBuilder("ta.rma", "test", tc.period, mockAccessor, false)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "test", tc.period, mockAccessor, false, NewTopLevelIndicatorContext())
 			code := builder.BuildRMA()
 
 			warmupCheck := fmt.Sprintf("if ctx.BarIndex < %d", tc.warmupBar)

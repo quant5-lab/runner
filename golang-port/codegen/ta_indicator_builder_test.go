@@ -110,7 +110,7 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false, NewTopLevelIndicatorContext())
 
 	code := builder.BuildRMA()
 

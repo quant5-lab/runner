@@ -14,6 +14,7 @@ type StatefulIndicatorBuilder struct {
 	accessor      AccessGenerator
 	needsNaN      bool
 	indenter      CodeIndenter
+	context       StatefulIndicatorContext
 }
 
 // NewStatefulIndicatorBuilder creates builder for stateful indicators
@@ -23,6 +24,7 @@ func NewStatefulIndicatorBuilder(
 	period int,
 	accessor AccessGenerator,
 	needsNaN bool,
+	context StatefulIndicatorContext,
 ) *StatefulIndicatorBuilder {
 	return &StatefulIndicatorBuilder{
 		indicatorName: indicatorName,
@@ -31,6 +33,7 @@ func NewStatefulIndicatorBuilder(
 		accessor:      accessor,
 		needsNaN:      needsNaN,
 		indenter:      NewCodeIndenter(),
+		context:       context,
 	}
 }
 
@@ -78,7 +81,7 @@ func (b *StatefulIndicatorBuilder) buildHeader(indicatorType string) string {
 
 func (b *StatefulIndicatorBuilder) buildWarmupPeriod() string {
 	b.indenter.IncreaseIndent()
-	code := b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code := b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	return code + b.indenter.Line("} else {")
 }
@@ -97,7 +100,7 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
 		code += b.indenter.Line("if math.IsNaN(val) {")
 		b.indenter.IncreaseIndent()
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "math.NaN()"))
 		code += b.indenter.Line("return")
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("}")
@@ -109,7 +112,7 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}")
 	code += b.indenter.Line(fmt.Sprintf("initialValue := sum / float64(%d)", b.period))
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(initialValue)", b.varName))
+	code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "initialValue"))
 
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
@@ -123,7 +126,7 @@ func (b *StatefulIndicatorBuilder) buildRecursivePhase(formula recursiveFormula)
 	b.indenter.IncreaseIndent()
 
 	code := b.indenter.Line("/* Recursive phase: use previous indicator value */")
-	code += b.indenter.Line(fmt.Sprintf("previousValue := %sSeries.Get(1)", b.varName))
+	code += b.indenter.Line(fmt.Sprintf("previousValue := %s", b.context.GenerateSeriesAccess(b.varName, 1)))
 
 	currentSourceAccess := b.accessor.GenerateLoopValueAccess("0")
 	code += b.indenter.Line(fmt.Sprintf("currentSource := %s", currentSourceAccess))
@@ -131,7 +134,7 @@ func (b *StatefulIndicatorBuilder) buildRecursivePhase(formula recursiveFormula)
 	if b.needsNaN {
 		code += b.indenter.Line("if math.IsNaN(currentSource) || math.IsNaN(previousValue) {")
 		b.indenter.IncreaseIndent()
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "math.NaN()"))
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("} else {")
 		b.indenter.IncreaseIndent()
@@ -153,14 +156,14 @@ func (b *StatefulIndicatorBuilder) buildRecursivePhase(formula recursiveFormula)
 func (b *StatefulIndicatorBuilder) rmaFormula() string {
 	code := b.indenter.Line(fmt.Sprintf("alpha := 1.0 / float64(%d)", b.period))
 	code += b.indenter.Line("newValue := alpha*currentSource + (1-alpha)*previousValue")
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(newValue)", b.varName))
+	code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "newValue"))
 	return code
 }
 
 func (b *StatefulIndicatorBuilder) emaFormula() string {
 	code := b.indenter.Line(fmt.Sprintf("alpha := 2.0 / float64(%d+1)", b.period))
 	code += b.indenter.Line("newValue := alpha*currentSource + (1-alpha)*previousValue")
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(newValue)", b.varName))
+	code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "newValue"))
 	return code
 }
 

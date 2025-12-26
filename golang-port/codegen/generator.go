@@ -1804,11 +1804,14 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		if lookahead {
-			code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, true)\n"
-		} else {
-			code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, false)\n"
-		}
+		code += g.ind() + fmt.Sprintf("secLookahead := %v\n", lookahead)
+		code += g.ind() + fmt.Sprintf("if %q == ctx.Timeframe {\n", timeframeStr)
+		g.indent++
+		code += g.ind() + "secLookahead = true\n"
+		g.indent--
+		code += g.ind() + "}\n"
+
+		code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)\n"
 		code += g.ind() + "if secBarIdx < 0 {\n"
 		g.indent++
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
@@ -2901,7 +2904,13 @@ func (g *generator) generateSTDEV(varName string, period int, accessor AccessGen
 // generateRMA generates inline RMA (Relative Moving Average) calculation
 // RMA uses alpha = 1/period and maintains state across bars
 func (g *generator) generateRMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN)
+	var context StatefulIndicatorContext
+	if g.inArrowFunctionBody {
+		context = NewArrowFunctionIndicatorContext()
+	} else {
+		context = NewTopLevelIndicatorContext()
+	}
+	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN, context)
 	return g.indentCode(builder.BuildRMA()), nil
 }
 

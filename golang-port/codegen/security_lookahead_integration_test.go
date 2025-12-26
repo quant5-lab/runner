@@ -146,15 +146,24 @@ func TestSecurityCallEmitter_LookaheadParameter(t *testing.T) {
 				t.Fatalf("EmitSecurityCall failed: %v", err)
 			}
 
-			expectedMapperCall := "securityBarMapper.FindDailyBarIndex(ctx.BarIndex, "
-			lookaheadParam := "false)"
-			if tt.expectedLookahead {
-				lookaheadParam = "true)"
+			if !strings.Contains(code, "secLookahead := ") {
+				t.Errorf("Expected secLookahead variable declaration in generated code, got:\n%s", code)
 			}
-			expectedFullCall := expectedMapperCall + lookaheadParam
 
-			if !strings.Contains(code, expectedFullCall) {
-				t.Errorf("Expected %s in generated code, got:\n%s", expectedFullCall, code)
+			expectedInitValue := "secLookahead := false"
+			if tt.expectedLookahead {
+				expectedInitValue = "secLookahead := true"
+			}
+			if !strings.Contains(code, expectedInitValue) {
+				t.Errorf("Expected %s in generated code, got:\n%s", expectedInitValue, code)
+			}
+
+			if !strings.Contains(code, "if \"1h\" == ctx.Timeframe {") {
+				t.Errorf("Expected runtime same-timeframe detection in generated code, got:\n%s", code)
+			}
+
+			if !strings.Contains(code, "securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)") {
+				t.Errorf("Expected FindDailyBarIndex call with secLookahead variable in generated code, got:\n%s", code)
 			}
 		})
 	}

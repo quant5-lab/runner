@@ -17,7 +17,7 @@ func TestGeneratedRMACode_VisualInspection(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Log("Generated RMA(14) code:")
@@ -42,7 +42,7 @@ func TestGeneratedRMACode_WithNaN(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, true)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, true, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Log("Generated RMA(20) with NaN checking:")
