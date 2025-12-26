@@ -89,7 +89,6 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 	// Check if it's a TA function - if so, use arrow-aware TA handler directly
 	if isTAFunction(funcName) {
 		taHandler := NewArrowFunctionTACallGenerator(e.gen, e)
-		taHandler.SetIdentifierResolver(e.identifierResolver)
 		return taHandler.Generate(call)
 	}
 

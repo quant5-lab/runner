@@ -23,34 +23,24 @@ func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 type EMAIIFEGenerator struct{}
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
-	preamble := ""
-	if preambleAccessor, ok := accessor.(interface{ GetPreamble() string }); ok {
-		preamble = preambleAccessor.GetPreamble()
-	}
-
 	body := fmt.Sprintf("alpha := 2.0 / float64(%d+1); ", period)
 	body += fmt.Sprintf("ema := %s; ", accessor.GenerateInitialValueAccess(period))
 	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-2)
 	body += fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema }; ", accessor.GenerateLoopValueAccess("j"))
 	body += "return ema"
 
-	iife := NewIIFECodeBuilder().
+	return NewIIFECodeBuilder().
 		WithWarmupCheck(period).
 		WithBody(body).
 		Build()
-
-	if preamble != "" {
-		return fmt.Sprintf("func() float64 { %s; return %s }()", preamble, iife)
-	}
-	return iife
 }
 
 type RMAIIFEGenerator struct{}
 
 func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
 	preamble := ""
-	if preambleAccessor, ok := accessor.(interface{ GetPreamble() string }); ok {
-		preamble = preambleAccessor.GetPreamble()
+	if tempAccessor, ok := accessor.(*FixnanCallExpressionAccessor); ok {
+		preamble = tempAccessor.GetPreamble()
 	}
 
 	body := fmt.Sprintf("alpha := 1.0 / %d.0; ", period)

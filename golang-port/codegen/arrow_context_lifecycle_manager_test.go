@@ -284,3 +284,291 @@ func TestArrowContextLifecycleManager_CaseSensitivity(t *testing.T) {
 		t.Errorf("Expected mixed case 'Func', got %q", mixed)
 	}
 }
+
+func TestArrowContextLifecycleManager_MarkAsHoisted(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contextVar := "arrowCtx_adx_1"
+
+	if manager.IsHoisted(contextVar) {
+		t.Error("Context should not be hoisted before marking")
+	}
+
+	manager.MarkAsHoisted(contextVar)
+
+	if !manager.IsHoisted(contextVar) {
+		t.Error("Context should be hoisted after marking")
+	}
+}
+
+func TestArrowContextLifecycleManager_IsHoisted_DefaultState(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contexts := []string{
+		"arrowCtx_adx_1",
+		"arrowCtx_rma_1",
+		"arrowCtx_ema_1",
+		"arrowCtx_dirmov_1",
+	}
+
+	for _, ctx := range contexts {
+		if manager.IsHoisted(ctx) {
+			t.Errorf("Context %q should not be hoisted by default", ctx)
+		}
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingMultipleContexts(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contexts := []string{
+		"arrowCtx_adx_1",
+		"arrowCtx_adx_2",
+		"arrowCtx_rma_1",
+		"arrowCtx_ema_1",
+	}
+
+	for _, ctx := range contexts {
+		manager.MarkAsHoisted(ctx)
+	}
+
+	for _, ctx := range contexts {
+		if !manager.IsHoisted(ctx) {
+			t.Errorf("Context %q should be hoisted", ctx)
+		}
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingIndependence(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	manager.MarkAsHoisted("arrowCtx_adx_1")
+	manager.MarkAsHoisted("arrowCtx_adx_3")
+
+	if !manager.IsHoisted("arrowCtx_adx_1") {
+		t.Error("arrowCtx_adx_1 should be hoisted")
+	}
+
+	if manager.IsHoisted("arrowCtx_adx_2") {
+		t.Error("arrowCtx_adx_2 should NOT be hoisted (not marked)")
+	}
+
+	if !manager.IsHoisted("arrowCtx_adx_3") {
+		t.Error("arrowCtx_adx_3 should be hoisted")
+	}
+}
+
+func TestArrowContextLifecycleManager_ResetClearsHoistedState(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contexts := []string{
+		"arrowCtx_func1_1",
+		"arrowCtx_func2_1",
+		"arrowCtx_func3_1",
+	}
+
+	for _, ctx := range contexts {
+		manager.MarkAsHoisted(ctx)
+	}
+
+	for _, ctx := range contexts {
+		if !manager.IsHoisted(ctx) {
+			t.Fatalf("Context %q should be hoisted before reset", ctx)
+		}
+	}
+
+	manager.Reset()
+
+	for _, ctx := range contexts {
+		if manager.IsHoisted(ctx) {
+			t.Errorf("Context %q should NOT be hoisted after reset", ctx)
+		}
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingDuplicateMarking(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contextVar := "arrowCtx_test_1"
+
+	manager.MarkAsHoisted(contextVar)
+	manager.MarkAsHoisted(contextVar)
+	manager.MarkAsHoisted(contextVar)
+
+	if !manager.IsHoisted(contextVar) {
+		t.Error("Context should remain hoisted after duplicate marking")
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingWithAllocation(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	ctx1 := manager.AllocateContextVariable("adx")
+	ctx2 := manager.AllocateContextVariable("adx")
+
+	manager.MarkAsHoisted(ctx1)
+
+	if !manager.IsHoisted(ctx1) {
+		t.Errorf("Context %q should be hoisted", ctx1)
+	}
+
+	if manager.IsHoisted(ctx2) {
+		t.Errorf("Context %q should NOT be hoisted (not marked)", ctx2)
+	}
+
+	if manager.GetInstanceCount("adx") != 2 {
+		t.Errorf("Expected 2 adx instances, got %d", manager.GetInstanceCount("adx"))
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingCaseSensitivity(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	contexts := []string{
+		"arrowCtx_func_1",
+		"arrowCtx_Func_1",
+		"arrowCtx_FUNC_1",
+	}
+
+	manager.MarkAsHoisted(contexts[0])
+
+	if !manager.IsHoisted(contexts[0]) {
+		t.Errorf("Context %q should be hoisted", contexts[0])
+	}
+
+	if manager.IsHoisted(contexts[1]) {
+		t.Errorf("Context %q should NOT be hoisted (different case)", contexts[1])
+	}
+
+	if manager.IsHoisted(contexts[2]) {
+		t.Errorf("Context %q should NOT be hoisted (different case)", contexts[2])
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingStateIntegration(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	ctx1 := manager.AllocateContextVariable("adx")
+	ctx2 := manager.AllocateContextVariable("rma")
+	ctx3 := manager.AllocateContextVariable("adx")
+
+	manager.MarkAsHoisted(ctx1)
+	manager.MarkAsHoisted(ctx3)
+
+	hoistedCount := 0
+	nonHoistedCount := 0
+
+	for _, ctx := range []string{ctx1, ctx2, ctx3} {
+		if manager.IsHoisted(ctx) {
+			hoistedCount++
+		} else {
+			nonHoistedCount++
+		}
+	}
+
+	if hoistedCount != 2 {
+		t.Errorf("Expected 2 hoisted contexts, got %d", hoistedCount)
+	}
+
+	if nonHoistedCount != 1 {
+		t.Errorf("Expected 1 non-hoisted context, got %d", nonHoistedCount)
+	}
+
+	if manager.GetInstanceCount("adx") != 2 {
+		t.Errorf("Expected 2 adx instances, got %d", manager.GetInstanceCount("adx"))
+	}
+
+	if manager.GetInstanceCount("rma") != 1 {
+		t.Errorf("Expected 1 rma instance, got %d", manager.GetInstanceCount("rma"))
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingWithResetAndReallocation(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	ctx1 := manager.AllocateContextVariable("func")
+	manager.MarkAsHoisted(ctx1)
+
+	if !manager.IsHoisted(ctx1) {
+		t.Fatal("Context should be hoisted before reset")
+	}
+
+	manager.Reset()
+
+	if manager.IsHoisted(ctx1) {
+		t.Error("Context should NOT be hoisted after reset")
+	}
+
+	ctx2 := manager.AllocateContextVariable("func")
+
+	if ctx1 != ctx2 {
+		t.Logf("Note: After reset, same function gets same context name: %q == %q", ctx1, ctx2)
+	}
+
+	manager.MarkAsHoisted(ctx2)
+
+	if !manager.IsHoisted(ctx2) {
+		t.Error("Re-allocated context should be hoisted after marking")
+	}
+}
+
+func TestArrowContextLifecycleManager_HoistingBoundaryConditions(t *testing.T) {
+	t.Run("empty context name", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+		manager.MarkAsHoisted("")
+
+		if !manager.IsHoisted("") {
+			t.Error("Empty string should be markable as hoisted")
+		}
+	})
+
+	t.Run("very long context name", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+		longName := "arrowCtx_" + strings.Repeat("veryLongFunctionName", 10) + "_1"
+
+		manager.MarkAsHoisted(longName)
+
+		if !manager.IsHoisted(longName) {
+			t.Error("Long context name should be markable as hoisted")
+		}
+	})
+
+	t.Run("many hoisted contexts", func(t *testing.T) {
+		manager := NewArrowContextLifecycleManager()
+
+		for i := 1; i <= 1000; i++ {
+			ctxName := "arrowCtx_func_" + string(rune('0'+i%10))
+			manager.MarkAsHoisted(ctxName)
+		}
+
+		for i := 1; i <= 1000; i++ {
+			ctxName := "arrowCtx_func_" + string(rune('0'+i%10))
+			if !manager.IsHoisted(ctxName) {
+				t.Errorf("Context %q should be hoisted", ctxName)
+				break
+			}
+		}
+	})
+}
+
+func TestArrowContextLifecycleManager_HoistingPreventsDuplicateAllocation(t *testing.T) {
+	manager := NewArrowContextLifecycleManager()
+
+	ctx1 := manager.AllocateContextVariable("adx")
+
+	manager.MarkAsHoisted(ctx1)
+
+	if !manager.IsHoisted(ctx1) {
+		t.Fatal("Context should be hoisted")
+	}
+
+	ctx2 := manager.AllocateContextVariable("adx")
+
+	if ctx1 == ctx2 {
+		t.Error("Second allocation should produce different context name (hoisting doesn't prevent allocation)")
+	}
+
+	if manager.GetInstanceCount("adx") != 2 {
+		t.Errorf("Expected 2 instances (hoisting is metadata, not allocation control), got %d", manager.GetInstanceCount("adx"))
+	}
+}

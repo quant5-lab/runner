@@ -97,6 +97,7 @@ type generator struct {
 	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
+	hoistedArrowContexts     []ArrowCallSite // Contexts pre-allocated before bar loop
 
 	constantRegistry *ConstantRegistry
 	typeSystem       *TypeInferenceEngine
@@ -541,6 +542,24 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
+	scanner := NewArrowCallSiteScanner(g.variables)
+	callSites := scanner.ScanForArrowFunctionCalls(program)
+	g.hoistedArrowContexts = callSites
+
+	if len(callSites) > 0 {
+		hoister := NewArrowContextHoister(g.ind())
+		hoistedCode := hoister.GeneratePreLoopDeclarations(callSites)
+		if hoistedCode != "" {
+			code += g.ind() + "// Pre-allocate ArrowContext (persistent across bars)\n"
+			code += hoistedCode
+			code += "\n"
+
+			for _, site := range callSites {
+				g.arrowContextLifecycle.MarkAsHoisted(site.ContextVar)
+			}
+		}
+	}
+
 	// Bar loop for strategy execution
 	code += g.ind() + "const maxBars = 1000000\n"
 	code += g.ind() + "barCount := len(ctx.Data)\n"
@@ -628,6 +647,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	tempVarNextCalls := g.tempVarMgr.GenerateNextCalls()
 	if tempVarNextCalls != "" {
 		code += tempVarNextCalls
+	}
+
+	if len(g.hoistedArrowContexts) > 0 {
+		for _, site := range g.hoistedArrowContexts {
+			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %s.AdvanceAll() }\n", iterVar, site.ContextVar)
+		}
 	}
 
 	if g.hasStrategyRuntimeAccess {
@@ -1369,9 +1394,16 @@ func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerato
 			return nil, fmt.Errorf("failed to generate temp var for fixnan source: %w", err)
 		}
 
+		// Extract expression code from assignment (format: "tempVar := expression\n")
+		exprCode, err := g.generateCallExpression(e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate call expression for accessor: %w", err)
+		}
+
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
 			tempVarCode: result.CombinedCode(),
+			exprCode:    exprCode,
 		}, nil
 
 	case *ast.BinaryExpression:
@@ -1384,6 +1416,7 @@ func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerato
 		return &FixnanCallExpressionAccessor{
 			tempVarName: tempVarName,
 			tempVarCode: g.ind() + fmt.Sprintf("%s := %s\n", tempVarName, binaryCode),
+			exprCode:    binaryCode,
 		}, nil
 
 	case *ast.MemberExpression:
@@ -1639,14 +1672,18 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	// Check if this is a user-defined function
 	if varType, exists := g.variables[funcName]; exists && varType == "function" {
 		ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
-		code := g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+
+		code := ""
+
+		if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
+			code = g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+		}
 
 		callCode, err := g.generateUserDefinedFunctionCallWithContext(call, ctxVarName)
 		if err != nil {
 			return "", err
 		}
 		code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, callCode)
-		code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
 		return code, nil
 	}
 
@@ -2289,7 +2326,10 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 	code := ""
 
 	ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
-	code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+
+	if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
+		code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+	}
 
 	args := []string{ctxVarName}
 	for idx, arg := range callExpr.Arguments {
@@ -2305,8 +2345,6 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 	code += g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), callCode)
 
 	code += g.returnValueStorage.GenerateStorageStatements(varNames)
-
-	code += g.ind() + fmt.Sprintf("%s.AdvanceAll()\n", ctxVarName)
 
 	return code, nil
 }
@@ -2861,9 +2899,9 @@ func (g *generator) generateSTDEV(varName string, period int, accessor AccessGen
 }
 
 // generateRMA generates inline RMA (Relative Moving Average) calculation
-// RMA uses alpha = 1/period (vs EMA's 2/(period+1))
+// RMA uses alpha = 1/period and maintains state across bars
 func (g *generator) generateRMA(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	builder := NewTAIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN)
+	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN)
 	return g.indentCode(builder.BuildRMA()), nil
 }
 

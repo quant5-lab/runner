@@ -3,29 +3,22 @@ package codegen
 import "fmt"
 
 /*
-ArrowContextLifecycleManager tracks ArrowContext instances across call sites.
+ArrowContextLifecycleManager tracks ArrowContext instances and hoisting state.
 
-Responsibilities:
-- Generates unique context variable names per function call
-- Tracks instance counts to avoid variable redeclaration
-- Enforces ForwardSeriesBuffer paradigm (pre-allocation)
-
-Design:
-- SRP: Single responsibility - manage ArrowContext naming/lifecycle
-- KISS: Simple counter-based unique name generation
-- DRY: Centralizes all ArrowContext instance tracking logic
+Design (SRP): Single responsibility - naming and lifecycle tracking only
 */
 type ArrowContextLifecycleManager struct {
-	instanceCounts map[string]int
+	instanceCounts  map[string]int
+	hoistedContexts map[string]bool
 }
 
 func NewArrowContextLifecycleManager() *ArrowContextLifecycleManager {
 	return &ArrowContextLifecycleManager{
-		instanceCounts: make(map[string]int),
+		instanceCounts:  make(map[string]int),
+		hoistedContexts: make(map[string]bool),
 	}
 }
 
-/* Generates unique ArrowContext variable name per function call to avoid redeclaration */
 func (m *ArrowContextLifecycleManager) AllocateContextVariable(funcName string) string {
 	m.instanceCounts[funcName]++
 	instanceNum := m.instanceCounts[funcName]
@@ -38,4 +31,13 @@ func (m *ArrowContextLifecycleManager) GetInstanceCount(funcName string) int {
 
 func (m *ArrowContextLifecycleManager) Reset() {
 	m.instanceCounts = make(map[string]int)
+	m.hoistedContexts = make(map[string]bool)
+}
+
+func (m *ArrowContextLifecycleManager) MarkAsHoisted(contextVar string) {
+	m.hoistedContexts[contextVar] = true
+}
+
+func (m *ArrowContextLifecycleManager) IsHoisted(contextVar string) bool {
+	return m.hoistedContexts[contextVar]
 }

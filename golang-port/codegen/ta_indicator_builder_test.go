@@ -110,20 +110,29 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 		},
 	}
 
-	builder := NewTAIndicatorBuilder("RMA", "rma20", 20, mockAccessor, false)
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false)
 
 	code := builder.BuildRMA()
 
 	requiredElements := []string{
-		"/* Inline RMA(20) */",
+		"/* Inline RMA(20) - Stateful recursive calculation */",
 		"if ctx.BarIndex < 19",
 		"rma20Series.Set(math.NaN())",
 		"} else {",
+		"if ctx.BarIndex == 19",
+		"/* First valid value: calculate SMA as initial state */",
+		"sum := 0.0",
+		"for j := 0; j < 20; j++",
+		"sum += closeSeries.Get(j)",
+		"initialValue := sum / float64(20)",
+		"rma20Series.Set(initialValue)",
+		"} else {",
+		"/* Recursive phase: use previous indicator value */",
+		"previousValue := rma20Series.Get(1)",
+		"currentSource := closeSeries.Get(0)",
 		"alpha := 1.0 / float64(20)",
-		"rma := closeSeries.Get(20-1)",
-		"for j := 20-2; j >= 0; j--",
-		"rma = alpha*closeSeries.Get(j) + (1-alpha)*rma",
-		"rma20Series.Set(rma)",
+		"newValue := alpha*currentSource + (1-alpha)*previousValue",
+		"rma20Series.Set(newValue)",
 	}
 
 	for _, elem := range requiredElements {
@@ -132,12 +141,16 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 		}
 	}
 
-	if strings.Count(code, "if ctx.BarIndex") != 1 {
+	if strings.Count(code, "if ctx.BarIndex < 19") != 1 {
 		t.Error("RMA should have exactly one warmup check")
 	}
 
-	if strings.Count(code, "for j :=") != 1 {
-		t.Error("RMA should have exactly one backward loop")
+	if strings.Contains(code, "for j := 20-2; j >= 0; j--") {
+		t.Error("RMA should NOT use backward loop - it should reference previous RMA value")
+	}
+
+	if !strings.Contains(code, "rma20Series.Get(1)") {
+		t.Error("RMA must reference its own previous value using Series.Get(1)")
 	}
 }
 

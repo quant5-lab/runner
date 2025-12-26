@@ -105,7 +105,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		codeBuilder.WriteString(fmt.Sprintf("\t/* Dynamic warmup based on indicators: %d bars */\n", warmupBars))
 
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data) + %d\n", varName, warmupBars))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
 		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds {\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t\ttimeframeRatio := float64(secTimeframeSeconds) / float64(baseTimeframeSeconds)\n"))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = int(float64(len(ctx.Data)) * timeframeRatio) + %d\n", varName, warmupBars))
