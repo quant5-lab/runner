@@ -168,7 +168,7 @@
 - [x] `bb7-dissect-vol.pine` - manual validation PASSED
 - [x] `bb7-dissect-potential.pine` - manual validation PASSED
 - [x] `bb7-dissect-sl.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
-- [ ] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
+- [x] `bb7-dissect-tp.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
 - [ ] `bb7-dissect-adx.pine` - RMA IIFE unused variable fix (4 lines removed, 245 lines tests added, 28/28 E2E pass)
 - [x] All bb7-dissect components compile successfully with arrow function scalar access fix
 
