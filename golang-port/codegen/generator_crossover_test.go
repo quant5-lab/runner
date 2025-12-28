@@ -12,6 +12,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 	gen := &generator{
 		imports:        make(map[string]bool),
 		variables:      make(map[string]string),
+		strategyConfig: NewStrategyConfig(),
 		taRegistry:     NewTAFunctionRegistry(),
 		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
@@ -97,9 +98,10 @@ func TestExtractSeriesExpression(t *testing.T) {
 
 func TestConvertSeriesAccessToPrev(t *testing.T) {
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:        make(map[string]bool),
+		variables:      make(map[string]string),
+		strategyConfig: NewStrategyConfig(),
+		taRegistry:     NewTAFunctionRegistry(),
 	}
 
 	tests := []struct {
@@ -171,9 +173,10 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:        make(map[string]bool),
+		variables:      make(map[string]string),
+		strategyConfig: NewStrategyConfig(),
+		taRegistry:     NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("longCross", call)
@@ -225,9 +228,10 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:        make(map[string]bool),
+		variables:      make(map[string]string),
+		strategyConfig: NewStrategyConfig(),
+		taRegistry:     NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("shortCross", call)
@@ -278,9 +282,10 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 	}
 
 	gen := &generator{
-		imports:    make(map[string]bool),
-		variables:  make(map[string]string),
-		taRegistry: NewTAFunctionRegistry(),
+		imports:        make(map[string]bool),
+		variables:      make(map[string]string),
+		strategyConfig: NewStrategyConfig(),
+		taRegistry:     NewTAFunctionRegistry(),
 	}
 
 	code, err := gen.generateVariableFromCall("crossAboveThreshold", call)
@@ -344,6 +349,7 @@ func TestBooleanTypeTracking(t *testing.T) {
 		variables:         make(map[string]string),
 		varInits:          make(map[string]ast.Expression),
 		constants:         make(map[string]interface{}),
+		strategyConfig:    NewStrategyConfig(),
 		taRegistry:        NewTAFunctionRegistry(),
 		typeSystem:        NewTypeInferenceEngine(),
 		boolConverter:     NewBooleanConverter(NewTypeInferenceEngine()),

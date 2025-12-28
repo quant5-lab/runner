@@ -9,8 +9,9 @@ import (
 /* TestExpressionAnalyzer_SimpleCallExpression tests detection of single TA function call */
 func TestExpressionAnalyzer_SimpleCallExpression(t *testing.T) {
 	g := &generator{
-		variables: make(map[string]string),
-		constants: make(map[string]interface{}),
+		variables:      make(map[string]string),
+		constants:      make(map[string]interface{}),
+		strategyConfig: NewStrategyConfig(),
 	}
 	analyzer := NewExpressionAnalyzer(g)
 

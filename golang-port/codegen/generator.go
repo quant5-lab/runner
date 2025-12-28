@@ -34,7 +34,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		varInits:         make(map[string]ast.Expression),
 		constants:        make(map[string]interface{}),
 		reassignedVars:   make(map[string]bool),
-		strategyName:     "Generated Strategy",
+		strategyConfig:   NewStrategyConfig(),
 		limits:           NewCodeGenerationLimits(),
 		safetyGuard:      NewRuntimeSafetyGuard(),
 		constantRegistry: constantRegistry,
@@ -75,7 +75,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
 		FunctionBody:         body,
-		StrategyName:         gen.strategyName,
+		StrategyName:         gen.strategyConfig.Name,
 	}
 
 	return code, nil
@@ -86,15 +86,15 @@ type generator struct {
 	variables                map[string]string
 	varInits                 map[string]ast.Expression
 	constants                map[string]interface{}
-	reassignedVars           map[string]bool // Tracks variables with := reassignment to skip initial = assignment
+	reassignedVars           map[string]bool
 	plots                    []string
-	strategyName             string
+	strategyConfig           *StrategyConfig
 	indent                   int
-	userDefinedFunctions     string // Arrow functions to be generated at module level
+	userDefinedFunctions     string
 	taFunctions              []taFunctionCall
 	inSecurityContext        bool
-	inArrowFunctionBody      bool // Track if generating arrow function body
-	hasSecurityCalls         bool // Track if security() calls exist
+	inArrowFunctionBody      bool
+	hasSecurityCalls         bool
 	hasSecurityExprEvals     bool // Track if security() calls with complex expressions exist
 	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
 	limits                   CodeGenerationLimits
@@ -227,30 +227,21 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 					funcName := obj + "." + prop
 
 					if funcName == "indicator" || funcName == "strategy" {
-						// Extract title from first argument or from 'title=' named parameter
-						strategyName := g.extractStrategyName(call.Arguments)
-						if strategyName != "" {
-							g.strategyName = strategyName
-						}
+						metaHandler := NewMetaFunctionHandler()
+						_, _ = metaHandler.GenerateCode(g, call)
 					}
 				}
-				// Handle v4 'study()' and v5 'indicator()' as Identifier calls
 				if id, ok := call.Callee.(*ast.Identifier); ok {
 					if id.Name == "study" || id.Name == "indicator" || id.Name == "strategy" {
-						// Extract title from first argument or from 'title=' named parameter
-						strategyName := g.extractStrategyName(call.Arguments)
-						if strategyName != "" {
-							g.strategyName = strategyName
-						}
+						metaHandler := NewMetaFunctionHandler()
+						_, _ = metaHandler.GenerateCode(g, call)
 					}
 				}
 			}
 		}
 
-		// Collect variable declarations
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				// Handle tuple destructuring (ArrayPattern)
 				if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
 					for _, elem := range arrayPattern.Elements {
 						varName := elem.Name
@@ -465,10 +456,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	code := ""
 
-	// Initialize strategy
-	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
+	code += g.ind() + fmt.Sprintf("strat.Call(%q, %.0f)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital)
 
-	// Generate input constants
 	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
 		code += g.ind() + "// Input constants\n"
 		for _, constCode := range g.inputHandler.inputConstants {
@@ -477,7 +466,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += "\n"
 	}
 
-	/* OHLCV bar fields always declared (unconditionally populated in bar loop) */
 	code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
 	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
 		code += g.ind() + fmt.Sprintf("var %s *series.Series\n", seriesName)
@@ -2812,12 +2800,11 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 
 func (g *generator) generatePlaceholder() string {
 	code := g.ind() + "// Strategy code will be generated here\n"
-	code += g.ind() + fmt.Sprintf("strat.Call(%q, 10000)\n\n", g.strategyName)
+	code += g.ind() + fmt.Sprintf("strat.Call(%q, %.0f)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital)
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)\n"
-	code += g.ind() + "// Strategy logic placeholder\n"
 	g.indent--
 	code += g.ind() + "}\n"
 	return code

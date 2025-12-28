@@ -301,6 +301,7 @@ func createTestGenerator() *generator {
 		variables:         make(map[string]string),
 		varInits:          make(map[string]ast.Expression),
 		constants:         make(map[string]interface{}),
+		strategyConfig:    NewStrategyConfig(),
 		taRegistry:        NewTAFunctionRegistry(),
 		mathHandler:       NewMathHandler(),
 		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),

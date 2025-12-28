@@ -10,7 +10,16 @@ import (
 //
 // Handles: strategy.entry(), strategy.close(), strategy.close_all()
 // Generates: strat.Entry(), strat.Close(), strat.CloseAll() calls
-type StrategyActionHandler struct{}
+type StrategyActionHandler struct {
+	qtyResolver *EntryQuantityResolver
+}
+
+// NewStrategyActionHandler creates a handler.
+func NewStrategyActionHandler() *StrategyActionHandler {
+	return &StrategyActionHandler{
+		qtyResolver: NewEntryQuantityResolver(),
+	}
+}
 
 func (h *StrategyActionHandler) CanHandle(funcName string) bool {
 	switch funcName {
@@ -37,18 +46,17 @@ func (h *StrategyActionHandler) GenerateCode(g *generator, call *ast.CallExpress
 }
 
 func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpression) (string, error) {
-	// strategy.entry(id, direction, qty)
 	if len(call.Arguments) < 2 {
-		// Invalid call - generate TODO comment instead of error for backward compatibility
 		return g.ind() + "// strategy.entry() - invalid arguments\n", nil
 	}
 
 	entryID := g.extractStringLiteral(call.Arguments[0])
 	direction := g.extractDirectionConstant(call.Arguments[1])
-	qty := 1.0
-	if len(call.Arguments) >= 3 {
-		qty = g.extractFloatLiteral(call.Arguments[2])
-	}
+	qty := h.qtyResolver.ResolveQuantity(
+		call.Arguments,
+		g.strategyConfig.DefaultQtyValue,
+		g.extractFloatLiteral,
+	)
 
 	return g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f)\n", entryID, direction, qty), nil
 }

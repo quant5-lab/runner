@@ -35,7 +35,7 @@ func TestMetaFunctionHandler_CanHandle(t *testing.T) {
 
 // TestMetaFunctionHandler_GenerateCode verifies no code generation for meta functions
 func TestMetaFunctionHandler_GenerateCode(t *testing.T) {
-	handler := &MetaFunctionHandler{}
+	handler := NewMetaFunctionHandler()
 	g := newTestGenerator()
 
 	tests := []struct {

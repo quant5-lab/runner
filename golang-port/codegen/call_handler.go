@@ -36,10 +36,9 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 		handlers: make([]CallExpressionHandler, 0),
 	}
 
-	// Register handlers in priority order
-	router.RegisterHandler(&MetaFunctionHandler{})
+	router.RegisterHandler(NewMetaFunctionHandler())
 	router.RegisterHandler(&PlotFunctionHandler{})
-	router.RegisterHandler(&StrategyActionHandler{})
+	router.RegisterHandler(NewStrategyActionHandler())
 	router.RegisterHandler(&MathCallHandler{})
 	router.RegisterHandler(&TAIndicatorCallHandler{})
 	router.RegisterHandler(&UserDefinedFunctionHandler{})

@@ -23,6 +23,45 @@ require github.com/quant5-lab/runner v0.0.0
 	return os.WriteFile(goModPath, []byte(goModContent), 0644)
 }
 
+/* generateTestOHLCV creates synthetic OHLCV data with specified bar count */
+func generateTestOHLCV(barCount int, intervalSeconds int64) string {
+	type Bar struct {
+		Time   int64   `json:"time"`
+		Open   float64 `json:"open"`
+		High   float64 `json:"high"`
+		Low    float64 `json:"low"`
+		Close  float64 `json:"close"`
+		Volume float64 `json:"volume"`
+	}
+	type OHLCVData struct {
+		Timezone string `json:"timezone"`
+		Bars     []Bar  `json:"bars"`
+	}
+
+	startTime := int64(1640000000)
+	bars := make([]Bar, barCount)
+	basePrice := 50000.0
+
+	for i := 0; i < barCount; i++ {
+		bars[i] = Bar{
+			Time:   startTime + int64(i)*intervalSeconds,
+			Open:   basePrice + float64(i),
+			High:   basePrice + float64(i) + 100,
+			Low:    basePrice + float64(i) - 100,
+			Close:  basePrice + float64(i) + 50,
+			Volume: 100.0,
+		}
+	}
+
+	data := OHLCVData{
+		Timezone: "UTC",
+		Bars:     bars,
+	}
+
+	jsonData, _ := json.MarshalIndent(data, "", "  ")
+	return string(jsonData)
+}
+
 func TestSecurityDownsampling_1h_to_1D_WithWarmup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
@@ -38,6 +77,20 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 	testDir := t.TempDir()
 	strategyPath := filepath.Join(testDir, "test-downsample.pine")
 	if err := os.WriteFile(strategyPath, []byte(strategyCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	/* Generate 240 bars (10 days of hourly data) */
+	testDataPath := filepath.Join(testDir, "BTCUSDT_1h.json")
+	testData := generateTestOHLCV(240, 3600)
+	if err := os.WriteFile(testDataPath, []byte(testData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	/* Generate 10 bars (10 days of daily data) for security() to fetch */
+	testDataPathDaily := filepath.Join(testDir, "BTCUSDT_1D.json")
+	testDataDaily := generateTestOHLCV(10, 86400)
+	if err := os.WriteFile(testDataPathDaily, []byte(testDataDaily), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,11 +146,9 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
 
-	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1h.json")
-	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", testDataPath, "-datadir", testDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}
@@ -120,13 +171,12 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 		t.Fatal("No indicators in output")
 	}
 
-	/* Downsample 1h→1D must produce values - warmup should provide enough daily bars */
 	dailyClose, ok := result.Indicators["Daily Close"]
 	if !ok {
 		t.Fatalf("Expected 'Daily Close' indicator, got: %v", result.Indicators)
 	}
 	if len(dailyClose.Data) == 0 {
-		t.Fatal("Downsampling produced zero values - warmup failed")
+		t.Fatal("Downsampling produced zero values")
 	}
 
 	nonNullCount := 0
@@ -136,9 +186,9 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 		}
 	}
 
-	/* 200h bars → ~8 days of 1D data, expect >5 values */
-	if nonNullCount < 5 {
-		t.Errorf("Downsampling warmup insufficient: got %d non-null values, expected >5", nonNullCount)
+	/* 240h bars = 10 days → expect at least 8 daily values */
+	if nonNullCount < 8 {
+		t.Errorf("Downsampling insufficient: got %d non-null values, expected >=8 from 240 hourly bars", nonNullCount)
 	}
 }
 
