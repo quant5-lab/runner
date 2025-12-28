@@ -23,41 +23,43 @@ func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 type EMAIIFEGenerator struct{}
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
-	body := fmt.Sprintf("alpha := 2.0 / float64(%d+1); ", period)
-	body += fmt.Sprintf("ema := %s; ", accessor.GenerateInitialValueAccess(period))
-	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-2)
-	body += fmt.Sprintf("ema = alpha*%s + (1-alpha)*ema }; ", accessor.GenerateLoopValueAccess("j"))
-	body += "return ema"
+	context := NewArrowFunctionIndicatorContext()
+	varName := fmt.Sprintf("_ema_%d", period)
 
-	return NewIIFECodeBuilder().
-		WithWarmupCheck(period).
-		WithBody(body).
-		Build()
+	builder := NewStatefulIndicatorBuilder(
+		"ta.ema",
+		varName,
+		period,
+		accessor,
+		false,
+		context,
+	)
+
+	statefulCode := builder.BuildEMA()
+	seriesAccess := context.GenerateSeriesAccess(varName, 0) + ".GetCurrent()"
+
+	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
 type RMAIIFEGenerator struct{}
 
 func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string {
-	preamble := ""
-	if tempAccessor, ok := accessor.(*FixnanCallExpressionAccessor); ok {
-		preamble = tempAccessor.GetPreamble()
-	}
+	context := NewArrowFunctionIndicatorContext()
+	varName := fmt.Sprintf("_rma_%d", period)
 
-	body := fmt.Sprintf("alpha := 1.0 / %d.0; ", period)
-	body += fmt.Sprintf("rma := %s; ", accessor.GenerateInitialValueAccess(period))
-	body += fmt.Sprintf("for j := %d; j >= 0; j-- { ", period-2)
-	body += fmt.Sprintf("rma = alpha*%s + (1-alpha)*rma }; ", accessor.GenerateLoopValueAccess("j"))
-	body += "return rma"
+	builder := NewStatefulIndicatorBuilder(
+		"ta.rma",
+		varName,
+		period,
+		accessor,
+		false,
+		context,
+	)
 
-	iife := NewIIFECodeBuilder().
-		WithWarmupCheck(period).
-		WithBody(body).
-		Build()
+	statefulCode := builder.BuildRMA()
+	seriesAccess := context.GenerateSeriesAccess(varName, 0) + ".GetCurrent()"
 
-	if preamble != "" {
-		return fmt.Sprintf("func() float64 { %s; return %s }()", preamble, iife)
-	}
-	return iife
+	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
 type WMAIIFEGenerator struct{}

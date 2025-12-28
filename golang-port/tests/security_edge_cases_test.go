@@ -23,8 +23,11 @@ require github.com/quant5-lab/runner v0.0.0
 	return os.WriteFile(goModPath, []byte(goModContent), 0644)
 }
 
-/* TestSecurityDownsampling_1h_to_1D_WithWarmup verifies downsampling adds 500 warmup bars */
 func TestSecurityDownsampling_1h_to_1D_WithWarmup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	strategyCode := `
 //@version=5
 indicator("Security Downsample Test", overlay=true)
@@ -91,9 +94,10 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 	}
 
 	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1h.json")
+	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}
@@ -140,6 +144,10 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 
 /* TestSecuritySameTimeframe_1h_to_1h_NoWarmup verifies same-timeframe has no warmup overhead */
 func TestSecuritySameTimeframe_1h_to_1h_NoWarmup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	strategyCode := `
 //@version=5
 indicator("Security Same-TF Test", overlay=true)
@@ -188,9 +196,10 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 	}
 
 	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1h.json")
+	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}
@@ -256,6 +265,10 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 
 /* TestSecurityUpsampling_1D_to_1h_NoWarmup verifies upsampling repeats daily values without warmup */
 func TestSecurityUpsampling_1D_to_1h_NoWarmup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	strategyCode := `
 //@version=5
 indicator("Security Upsample Test", overlay=true)
@@ -305,9 +318,10 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 	}
 
 	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1D.json")
+	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}

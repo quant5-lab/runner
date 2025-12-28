@@ -33,6 +33,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		variables:        variablesRegistry,
 		varInits:         make(map[string]ast.Expression),
 		constants:        make(map[string]interface{}),
+		reassignedVars:   make(map[string]bool),
 		strategyName:     "Generated Strategy",
 		limits:           NewCodeGenerationLimits(),
 		safetyGuard:      NewRuntimeSafetyGuard(),
@@ -85,6 +86,7 @@ type generator struct {
 	variables                map[string]string
 	varInits                 map[string]ast.Expression
 	constants                map[string]interface{}
+	reassignedVars           map[string]bool // Tracks variables with := reassignment to skip initial = assignment
 	plots                    []string
 	strategyName             string
 	indent                   int
@@ -387,6 +389,19 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			g.constEvaluator.AddConstant(varName, floatVal)
 		} else if intVal, ok := value.(int); ok {
 			g.constEvaluator.AddConstant(varName, float64(intVal))
+		}
+	}
+
+	// Scan for reassignments (Kind="var") to skip initial assignments (Kind="let")
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			if varDecl.Kind == "var" {
+				for _, declarator := range varDecl.Declarations {
+					if id, ok := declarator.ID.(*ast.Identifier); ok {
+						g.reassignedVars[id.Name] = true
+					}
+				}
+			}
 		}
 	}
 
@@ -1184,6 +1199,13 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			return g.generateTupleDestructuringDeclaration(declarator)
 		}
 		varName := id.Name
+
+		// Skip initial assignment (Kind="let") if variable has reassignment (Kind="var")
+		// This prevents double Set() calls that overwrite reassignment logic
+		// Example: sr_xup = 0.0 (skip) + sr_xup := ternary (generate)
+		if decl.Kind == "let" && g.reassignedVars[varName] {
+			continue
+		}
 
 		// Handle arrow function declarations (user-defined functions)
 		if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
