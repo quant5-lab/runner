@@ -169,8 +169,7 @@
 - [x] `bb7-dissect-potential.pine` - manual validation PASSED
 - [x] `bb7-dissect-sl.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
 - [x] `bb7-dissect-tp.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
-- [ ] `bb7-dissect-adx.pine` - RMA IIFE unused variable fix (4 lines removed, 245 lines tests added, 28/28 E2E pass)
-- [x] All bb7-dissect components compile successfully with arrow function scalar access fix
+- [x] `bb7-dissect-adx.pine` - manual validation PASSED
 
 ## Phase 5: Strategy Validation
 - [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully
@@ -183,10 +182,10 @@
 - [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
 - [x] Parse bb-strategy-7-rus.pine successfully (N-level member expressions: strategy.commission.percent)
 - [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
-- [ ] `./bin/strategy` on BB7 produces 9 trades (current: 0 trades, 7 indicators generated)
+- [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
 - [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
-- [ ] `./bin/strategy` on BB8 produces expected trades
-- [ ] `./bin/strategy` on BB9 produces expected trades
+- [ ] `./bin/strategy` on BB8 produces expected trades (blocked: request.security() inline in conditions)
+- [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)
 - [ ] `ldd ./bin/strategy` shows no external deps (static binary)
