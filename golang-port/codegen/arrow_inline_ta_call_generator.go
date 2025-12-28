@@ -69,7 +69,11 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 		return "", false, fmt.Errorf("failed to create accessor for '%s': %w", funcName, err)
 	}
 
-	iifeCode, exists := g.iifeRegistry.Generate(funcName, accessor, period)
+	// Generate hash from source expression to prevent series name collisions
+	hasher := &ExpressionHasher{}
+	sourceHash := hasher.Hash(sourceExpr)
+
+	iifeCode, exists := g.iifeRegistry.Generate(funcName, accessor, period, sourceHash)
 	if !exists {
 		return "", false, fmt.Errorf("IIFE generator not found for '%s'", funcName)
 	}

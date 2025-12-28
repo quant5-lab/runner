@@ -46,7 +46,14 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return "", fmt.Errorf("failed to extract TA arguments: %w", err)
 	}
 
-	code, ok := a.iifeRegistry.Generate(funcName, accessor, period)
+	// Generate hash from source expression to prevent series name collisions
+	sourceHash := ""
+	if len(call.Arguments) > 0 {
+		hasher := &ExpressionHasher{}
+		sourceHash = hasher.Hash(call.Arguments[0])
+	}
+
+	code, ok := a.iifeRegistry.Generate(funcName, accessor, period, sourceHash)
 	if !ok {
 		return "", fmt.Errorf("failed to generate IIFE for %s", funcName)
 	}

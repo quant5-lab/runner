@@ -131,7 +131,11 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 		funcName = "ta." + funcName
 	}
 
-	code, ok := h.taRegistry.Generate(funcName, accessor, period)
+	// Generate hash from source expression for unique series naming
+	hasher := &ExpressionHasher{}
+	sourceHash := hasher.Hash(call.Arguments[0])
+
+	code, ok := h.taRegistry.Generate(funcName, accessor, period, sourceHash)
 	if !ok {
 		return "", fmt.Errorf("inline plot() not implemented for %s", funcName)
 	}
