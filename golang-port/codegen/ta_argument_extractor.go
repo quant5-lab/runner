@@ -14,6 +14,7 @@ type TAArgumentComponents struct {
 	SourceInfo    SourceInfo
 	AccessGen     AccessGenerator
 	NeedsNaNCheck bool
+	Preamble      string
 }
 
 /* TAArgumentExtractor prepares TA function arguments for code generation.
@@ -52,6 +53,18 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 	sourceInfo := e.classifier.ClassifyAST(sourceExpr)
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
+	preamble := ""
+
+	if e.requiresExpressionAccessor(sourceExpr, sourceInfo) {
+		exprCode := e.generator.extractSeriesExpression(sourceExpr)
+		preambleCode, err := e.registerNestedTempVars(sourceExpr)
+		if err != nil {
+			return nil, err
+		}
+		preamble += preambleCode
+		accessGen = NewExpressionAccessGenerator(e.generator, exprCode)
+		needsNaN = true
+	}
 
 	return &TAArgumentComponents{
 		SourceExpr:    sourceExpr,
@@ -59,7 +72,80 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 		SourceInfo:    sourceInfo,
 		AccessGen:     accessGen,
 		NeedsNaNCheck: needsNaN,
+		Preamble:      preamble,
 	}, nil
+}
+
+// requiresExpressionAccessor returns true when the source expression is not a simple OHLCV field/series
+// and therefore needs expression-aware offset rewriting instead of the default classifier fallback.
+func (e *TAArgumentExtractor) requiresExpressionAccessor(sourceExpr ast.Expression, info SourceInfo) bool {
+	if info.IsSeriesVariable() {
+		return false
+	}
+
+	if id, ok := sourceExpr.(*ast.Identifier); ok {
+		return !e.classifier.isBuiltinOHLCVField(id.Name)
+	}
+
+	if mem, ok := sourceExpr.(*ast.MemberExpression); ok {
+		if obj, ok := mem.Object.(*ast.Identifier); ok && mem.Computed {
+			if e.classifier.isBuiltinOHLCVField(obj.Name) {
+				_, isLiteral := mem.Property.(*ast.Literal)
+				return !isLiteral
+			}
+		}
+		return true
+	}
+
+	// Anything else (BinaryExpression, CallExpression, ConditionalExpression, etc.)
+	return true
+}
+
+// registerNestedTempVars materializes nested TA calls inside complex expressions so they can be referenced with offsets.
+func (e *TAArgumentExtractor) registerNestedTempVars(expr ast.Expression) (string, error) {
+	nestedCalls := e.generator.exprAnalyzer.FindNestedCalls(expr)
+	code := ""
+
+	if len(nestedCalls) == 0 {
+		return code, nil
+	}
+
+	for i := len(nestedCalls) - 1; i >= 0; i-- {
+		callInfo := nestedCalls[i]
+
+		if callInfo.Call == expr {
+			continue
+		}
+
+		if e.generator.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {
+			continue
+		}
+
+		isTAFunction := e.generator.taRegistry.IsSupported(callInfo.FuncName)
+		containsNestedTA := false
+		if !isTAFunction {
+			mathNestedCalls := e.generator.exprAnalyzer.FindNestedCalls(callInfo.Call)
+			for _, mathNested := range mathNestedCalls {
+				if mathNested.Call != callInfo.Call && e.generator.taRegistry.IsSupported(mathNested.FuncName) {
+					containsNestedTA = true
+					break
+				}
+			}
+		}
+
+		if !isTAFunction && !containsNestedTA {
+			continue
+		}
+
+		tempVarName := e.generator.tempVarMgr.GetOrCreate(callInfo)
+		tempCode, err := e.generator.generateVariableFromCall(tempVarName, callInfo.Call)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate temp var %s: %w", tempVarName, err)
+		}
+		code += tempCode
+	}
+
+	return code, nil
 }
 
 func (e *TAArgumentExtractor) extractPeriod(periodArg ast.Expression, funcName string) (int, error) {

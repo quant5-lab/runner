@@ -94,8 +94,8 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 		if !strings.Contains(code, "if math.IsNaN(val)") {
 			t.Error("Missing NaN check in initialization")
 		}
-		if !strings.Contains(code, "return") {
-			t.Error("Missing early return on NaN in initialization")
+		if !strings.Contains(code, "break") {
+			t.Error("Missing break statement on NaN in initialization (should break loop, not return from function)")
 		}
 	})
 

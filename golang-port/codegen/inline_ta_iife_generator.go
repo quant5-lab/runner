@@ -36,7 +36,7 @@ func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 	)
 
 	statefulCode := builder.BuildEMA()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0) + ".GetCurrent()"
+	seriesAccess := context.GenerateSeriesAccess(varName, 0)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
@@ -57,7 +57,7 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int) string
 	)
 
 	statefulCode := builder.BuildRMA()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0) + ".GetCurrent()"
+	seriesAccess := context.GenerateSeriesAccess(varName, 0)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }

@@ -101,7 +101,7 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 		code += b.indenter.Line("if math.IsNaN(val) {")
 		b.indenter.IncreaseIndent()
 		code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "math.NaN()"))
-		code += b.indenter.Line("return")
+		code += b.indenter.Line("break")
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("}")
 		code += b.indenter.Line("sum += val")

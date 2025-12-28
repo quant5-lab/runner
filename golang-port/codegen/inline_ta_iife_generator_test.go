@@ -112,7 +112,7 @@ func TestRMAIIFEGenerator(t *testing.T) {
 		t.Error("Missing IIFE wrapper")
 	}
 
-	if !contains(result, "return arrowCtx.GetOrCreateSeries(\"_rma_14\").Get(0).GetCurrent()") {
+	if !contains(result, "return arrowCtx.GetOrCreateSeries(\"_rma_14\").Get(0)") {
 		t.Error("Missing IIFE return statement")
 	}
 }

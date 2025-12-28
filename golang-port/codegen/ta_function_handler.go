@@ -50,6 +50,8 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&FixnanHandler{},
 			&SumHandler{},
 			&ValuewhenHandler{},
+			&HighestHandler{},
+			&LowestHandler{},
 		},
 	}
 }

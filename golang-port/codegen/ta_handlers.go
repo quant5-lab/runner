@@ -24,7 +24,7 @@ func (h *SMAHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 
 	builder := NewTAIndicatorBuilder("ta.sma", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
 	builder.WithAccumulator(NewSumAccumulator())
-	return g.indentCode(builder.Build()), nil
+	return g.indentCode(comp.Preamble + builder.Build()), nil
 }
 
 // EMAHandler generates inline code for Exponential Moving Average calculations
@@ -42,7 +42,7 @@ func (h *EMAHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	}
 
 	builder := NewTAIndicatorBuilder("ta.ema", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
-	return g.indentCode(builder.BuildEMA()), nil
+	return g.indentCode(comp.Preamble + builder.BuildEMA()), nil
 }
 
 // STDEVHandler generates inline code for Standard Deviation calculations
@@ -60,7 +60,7 @@ func (h *STDEVHandler) GenerateCode(g *generator, varName string, call *ast.Call
 	}
 
 	builder := NewTAIndicatorBuilder("ta.stdev", varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
-	return g.indentCode(builder.BuildSTDEV()), nil
+	return g.indentCode(comp.Preamble + builder.BuildSTDEV()), nil
 }
 
 // ATRHandler generates inline code for Average True Range calculations
@@ -102,7 +102,11 @@ func (h *RMAHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		return "", err
 	}
 
-	return g.generateRMA(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	code, err := g.generateRMA(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	if err != nil {
+		return "", err
+	}
+	return comp.Preamble + code, nil
 }
 
 // RSIHandler generates inline code for Relative Strength Index calculations
@@ -119,7 +123,11 @@ func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		return "", err
 	}
 
-	return g.generateRSI(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	code, err := g.generateRSI(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	if err != nil {
+		return "", err
+	}
+	return comp.Preamble + code, nil
 }
 
 // ChangeHandler generates inline code for change calculations
@@ -496,4 +504,120 @@ func (h *ValuewhenHandler) GenerateCode(g *generator, varName string, call *ast.
 	}
 
 	return g.generateValuewhen(varName, conditionExpr, sourceExpr, occurrence)
+}
+
+// HighestHandler generates inline code for highest value over period
+type HighestHandler struct{}
+
+func (h *HighestHandler) CanHandle(funcName string) bool {
+	return funcName == "ta.highest" || funcName == "highest"
+}
+
+func (h *HighestHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	var accessGen AccessGenerator
+	var period int
+
+	if len(call.Arguments) == 1 {
+		// Single argument: period only, use HIGH as implicit source (Pine default)
+		periodArg := call.Arguments[0]
+		periodLit, ok := periodArg.(*ast.Literal)
+		if !ok {
+			periodValue := g.constEvaluator.EvaluateConstant(periodArg)
+			if math.IsNaN(periodValue) || periodValue <= 0 {
+				if g.inArrowFunctionBody {
+					period = -1
+				} else {
+					return "", fmt.Errorf("ta.highest period must be compile-time constant")
+				}
+			} else {
+				period = int(periodValue)
+			}
+		} else {
+			var err error
+			period, err = extractPeriod(periodLit)
+			if err != nil {
+				return "", err
+			}
+		}
+
+		// Use high as implicit source (PineScript default)
+		highIdent := &ast.Identifier{Name: "high"}
+		classifier := NewSeriesSourceClassifier()
+		highInfo := classifier.ClassifyAST(highIdent)
+		accessGen = CreateAccessGenerator(highInfo)
+	} else if len(call.Arguments) >= 2 {
+		// Two arguments: source + period
+		extractor := NewTAArgumentExtractor(g)
+		comp, err := extractor.Extract(call, "ta.highest")
+		if err != nil {
+			return "", err
+		}
+		accessGen = comp.AccessGen
+		period = comp.Period
+	} else {
+		return "", fmt.Errorf("ta.highest requires 1 or 2 arguments")
+	}
+
+	iifeGen := &HighestIIFEGenerator{}
+	iifeCode := iifeGen.Generate(accessGen, period)
+
+	return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
+}
+
+// LowestHandler generates inline code for lowest value over period
+type LowestHandler struct{}
+
+func (h *LowestHandler) CanHandle(funcName string) bool {
+	return funcName == "ta.lowest" || funcName == "lowest"
+}
+
+func (h *LowestHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	var accessGen AccessGenerator
+	var period int
+
+	if len(call.Arguments) == 1 {
+		// Single argument: period only, use LOW as implicit source (Pine default)
+		periodArg := call.Arguments[0]
+		periodLit, ok := periodArg.(*ast.Literal)
+		if !ok {
+			periodValue := g.constEvaluator.EvaluateConstant(periodArg)
+			if math.IsNaN(periodValue) || periodValue <= 0 {
+				if g.inArrowFunctionBody {
+					period = -1
+				} else {
+					return "", fmt.Errorf("ta.lowest period must be compile-time constant")
+				}
+			} else {
+				period = int(periodValue)
+			}
+		} else {
+			var err error
+			period, err = extractPeriod(periodLit)
+			if err != nil {
+				return "", err
+			}
+		}
+
+		// Use low as implicit source (PineScript default)
+		lowIdent := &ast.Identifier{Name: "low"}
+		classifier := NewSeriesSourceClassifier()
+		lowInfo := classifier.ClassifyAST(lowIdent)
+		accessGen = CreateAccessGenerator(lowInfo)
+	} else if len(call.Arguments) >= 2 {
+		// Two arguments: source + period
+		extractor := NewTAArgumentExtractor(g)
+		comp, err := extractor.Extract(call, "ta.lowest")
+		if err != nil {
+			return "", err
+		}
+		accessGen = comp.AccessGen
+		period = comp.Period
+	} else {
+		return "", fmt.Errorf("ta.lowest requires 1 or 2 arguments")
+	}
+
+	iifeGen := &LowestIIFEGenerator{}
+	iifeCode := iifeGen.Generate(accessGen, period)
+
+	return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
 }

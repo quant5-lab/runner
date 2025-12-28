@@ -315,10 +315,12 @@ func (b *TAIndicatorBuilder) BuildDEV() string {
 
 	code += b.indenter.Line(fmt.Sprintf("mean := sum / float64(%d)", b.period))
 
-	// Current value - mean (use current bar Get(0), not loop variable j)
-	// GenerateLoopValueAccess("0") produces: variableSeries.Get(0) or ctx.Data[ctx.BarIndex-0].Close
-	currentValueAccess := b.accessor.GenerateLoopValueAccess("0")
-	code += b.indenter.Line(fmt.Sprintf("dev := %s - mean", currentValueAccess))
+	// Mean absolute deviation: average(|value - mean|) over the window
+	code += b.indenter.Line("devSum := 0.0")
+	code += b.BuildLoop(func(val string) string {
+		return b.indenter.Line(fmt.Sprintf("devSum += math.Abs(%s - mean)", val))
+	})
+	code += b.indenter.Line(fmt.Sprintf("dev := devSum / float64(%d)", b.period))
 	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(dev)", b.varName))
 
 	b.indenter.DecreaseIndent()
@@ -335,50 +337,62 @@ func (b *TAIndicatorBuilder) BuildRMA() string {
 	b.indenter.IncreaseIndent()
 
 	code := b.BuildHeader()
-	code += b.BuildWarmupCheck()
-
+	// Warmup: need period bars
+	code += b.indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d {", b.period-1))
 	b.indenter.IncreaseIndent()
-
-	// RMA alpha = 1/period (vs EMA's 2/(period+1))
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else if ctx.BarIndex == " + fmt.Sprintf("%d", b.period-1) + " {")
+	b.indenter.IncreaseIndent()
+	// Seed with SMA of first period values (Pine RMA init)
+	code += b.indenter.Line("sum := 0.0")
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("hasNaN := false")
+	}
+	code += b.loopGen.GenerateForwardLoop(&b.indenter)
+	b.indenter.IncreaseIndent()
+	valueAccess := b.loopGen.GenerateValueAccess()
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
+		code += b.indenter.Line("if math.IsNaN(val) { hasNaN = true; break }")
+		code += b.indenter.Line("sum += val")
+	} else {
+		code += b.indenter.Line(fmt.Sprintf("sum += %s", valueAccess))
+	}
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line("if hasNaN {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else {")
+		b.indenter.IncreaseIndent()
+	}
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(sum / %d.0)", b.varName, b.period))
+	if b.loopGen.RequiresNaNCheck() {
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+	}
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else {")
+	b.indenter.IncreaseIndent()
+	// Recursive RMA: rma = alpha*current + (1-alpha)*prev
 	code += b.indenter.Line(fmt.Sprintf("alpha := 1.0 / float64(%d)", b.period))
-	initialAccess := b.loopGen.accessor.GenerateInitialValueAccess(b.period)
-	code += b.indenter.Line(fmt.Sprintf("rma := %s", initialAccess))
-
-	// Check if initial value is NaN
-	code += b.indenter.Line("if math.IsNaN(rma) {")
+	code += b.indenter.Line(fmt.Sprintf("prev := %sSeries.Get(1)", b.varName))
+	code += b.indenter.Line(fmt.Sprintf("curr := %s", b.accessor.GenerateLoopValueAccess("0")))
+	code += b.indenter.Line("if math.IsNaN(prev) || math.IsNaN(curr) {")
 	b.indenter.IncreaseIndent()
 	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
-
-	// Loop backwards from period-2 to 0
-	code += b.loopGen.GenerateBackwardLoop(&b.indenter)
-	b.indenter.IncreaseIndent()
-
-	valueAccess := b.loopGen.GenerateValueAccess()
-
-	if b.loopGen.RequiresNaNCheck() {
-		code += b.indenter.Line(fmt.Sprintf("val := %s", valueAccess))
-		code += b.indenter.Line("if math.IsNaN(val) {")
-		b.indenter.IncreaseIndent()
-		code += b.indenter.Line("rma = math.NaN()")
-		code += b.indenter.Line("break")
-		b.indenter.DecreaseIndent()
-		code += b.indenter.Line("}")
-		code += b.indenter.Line("rma = alpha*val + (1-alpha)*rma")
-	} else {
-		code += b.indenter.Line(fmt.Sprintf("rma = alpha*%s + (1-alpha)*rma", valueAccess))
-	}
-
+	code += b.indenter.Line(fmt.Sprintf("rma := alpha*curr + (1-alpha)*prev"))
+	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(rma)", b.varName))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}")
-
-	// Set final result
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(rma)", b.varName))
-
 	b.indenter.DecreaseIndent()
-	code += b.indenter.Line("}") // end else (initial value check)
+	code += b.indenter.Line("}")
 
 	code += b.CloseBlock()
 

@@ -2667,9 +2667,11 @@ func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar str
 		return fmt.Sprintf("ctx.Data[i-%s].%s", offsetVar, field)
 	}
 
-	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
-		seriesName := strings.TrimSuffix(seriesCode, "Series.GetCurrent()")
-		return fmt.Sprintf("%sSeries.Get(%s)", seriesName, offsetVar)
+	// Handle expressions with GetCurrent() patterns
+	if strings.Contains(seriesCode, "Series.GetCurrent()") {
+		re := regexp.MustCompile(`(\w+Series)\.GetCurrent\(\)`)
+		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetVar))
+		return result
 	}
 
 	if strings.Contains(seriesCode, "Series.Get(") {
@@ -2695,9 +2697,11 @@ func (g *generator) convertSeriesAccessToIntOffset(seriesCode string, offset int
 		return fmt.Sprintf("ctx.Data[i-%d].%s", offset, field)
 	}
 
-	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
-		seriesName := strings.TrimSuffix(seriesCode, "Series.GetCurrent()")
-		return fmt.Sprintf("%sSeries.Get(%d)", seriesName, offset)
+	// Handle expressions with GetCurrent() patterns
+	if strings.Contains(seriesCode, "Series.GetCurrent()") {
+		re := regexp.MustCompile(`(\w+Series)\.GetCurrent\(\)`)
+		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetStr))
+		return result
 	}
 
 	if strings.Contains(seriesCode, "Series.Get(") {
