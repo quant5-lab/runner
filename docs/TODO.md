@@ -165,11 +165,11 @@
 - [x] `bb7-dissect-session.pine` - manual validation PASSED
 - [x] `bb7-dissect-sma.pine` - manual validation PASSED
 - [x] `bb7-dissect-bb.pine` - manual validation PASSED
-- [x] `bb7-dissect-vol.pine` - Temp var calculation emission for expressions (BinaryExpression, UnaryExpression)
+- [x] `bb7-dissect-vol.pine` - manual validation PASSED
 - [x] `bb7-dissect-potential.pine` - manual validation PASSED
-- [x] `bb7-dissect-adx.pine` - RMA IIFE unused variable fix (4 lines removed, 245 lines tests added, 28/28 E2E pass)
-- [x] `bb7-dissect-sl.pine` - Fixed: plot() scope extraction (1.7ms, 4 indicators: Fixed SL, Low Vol, Stop Level, Trail Step)
-- [x] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
+- [x] `bb7-dissect-sl.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
+- [ ] `bb7-dissect-tp.pine` - Fixed: Non-boolean conditions (ta.dev() result as ternary condition)
+- [ ] `bb7-dissect-adx.pine` - RMA IIFE unused variable fix (4 lines removed, 245 lines tests added, 28/28 E2E pass)
 - [x] All bb7-dissect components compile successfully with arrow function scalar access fix
 
 ## Phase 5: Strategy Validation
