@@ -88,6 +88,13 @@ func (bc *BooleanConverter) IsFloat64SeriesAccess(code string) bool {
 }
 
 func (bc *BooleanConverter) ConvertBoolSeriesForIfStatement(expr ast.Expression, generatedCode string) string {
+	// UnaryExpression with 'not' is already boolean
+	if unary, ok := expr.(*ast.UnaryExpression); ok {
+		if unary.Operator == "not" || unary.Operator == "!" {
+			return generatedCode
+		}
+	}
+
 	if call, isCall := expr.(*ast.CallExpression); isCall {
 		if bc.IsBooleanFunction(call) {
 			return generatedCode

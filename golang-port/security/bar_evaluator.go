@@ -10,14 +10,18 @@ type BarEvaluator interface {
 }
 
 type StreamingBarEvaluator struct {
-	taStateCache     map[string]TAStateManager
-	fixnanStateCache map[string]*FixnanState
+	taStateCache    map[string]TAStateManager
+	fixnanEvaluator *FixnanEvaluator
 }
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
-		taStateCache:     make(map[string]TAStateManager),
-		fixnanStateCache: make(map[string]*FixnanState),
+		taStateCache: make(map[string]TAStateManager),
+		fixnanEvaluator: NewFixnanEvaluator(
+			NewMapStateStorage(),
+			NewSequentialWarmupStrategy(),
+			NewHashExpressionIdentifier(),
+		),
 	}
 }
 
@@ -85,7 +89,7 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 	case "ta.pivotlow":
 		return e.evaluatePivotLowAtBar(call, secCtx, barIdx)
 	case "fixnan", "ta.fixnan":
-		return e.evaluateFixnanAtBar(call, secCtx, barIdx)
+		return e.fixnanEvaluator.EvaluateAtBar(e, call, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedFunctionError(funcName)
 	}

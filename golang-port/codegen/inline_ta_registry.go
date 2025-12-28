@@ -79,15 +79,10 @@ type LowestIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 type ChangeIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	context := NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("sma", period, sourceHash)
+	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %d; j++ { sum += %s }; ", period, accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("return sum / %d.0", period)
 
-	builder := NewTAIndicatorBuilder("ta.sma", varName, period, accessor, false)
-	builder.WithAccumulator(NewSumAccumulator())
-	statefulCode := builder.Build()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0)
-
-	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
+	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
 }
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
@@ -96,7 +91,8 @@ func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int, source
 
 	builder := NewStatefulIndicatorBuilder("ta.ema", varName, period, accessor, false, context)
 	statefulCode := builder.BuildEMA()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0)
+	// Direct series buffer access - returns float64, no .GetCurrent() needed
+	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
@@ -107,21 +103,17 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int, source
 
 	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, false, context)
 	statefulCode := builder.BuildRMA()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0)
+	// Direct series buffer access - returns float64, no .GetCurrent() needed
+	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
 func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	context := NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("wma", period, sourceHash)
+	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %d; j++ { weight := float64(%d - j); sum += weight * %s; weightSum += weight }; ", period, period, accessor.GenerateLoopValueAccess("j"))
+	body += "return sum / weightSum"
 
-	builder := NewTAIndicatorBuilder("ta.wma", varName, period, accessor, false)
-	builder.WithAccumulator(NewWeightedSumAccumulator(period))
-	statefulCode := builder.Build()
-	seriesAccess := context.GenerateSeriesAccess(varName, 0)
-
-	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
+	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
 }
 
 func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {

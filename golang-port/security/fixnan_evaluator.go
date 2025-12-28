@@ -1,53 +1,43 @@
 package security
 
 import (
-	"crypto/sha256"
-	"encoding/json"
-	"fmt"
-	"math"
-
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-type FixnanState struct {
-	lastValidValue float64
+type FixnanEvaluator struct {
+	stateStorage StateStorage
+	warmup       WarmupStrategy
+	identifier   ExpressionIdentifier
 }
 
-func NewFixnanState() *FixnanState {
-	return &FixnanState{
-		lastValidValue: math.NaN(),
+func NewFixnanEvaluator(storage StateStorage, warmup WarmupStrategy, identifier ExpressionIdentifier) *FixnanEvaluator {
+	return &FixnanEvaluator{
+		stateStorage: storage,
+		warmup:       warmup,
+		identifier:   identifier,
 	}
 }
 
-func (s *FixnanState) ForwardFill(value float64) float64 {
-	if !math.IsNaN(value) {
-		s.lastValidValue = value
-		return value
-	}
-	return s.lastValidValue
-}
-
-func computeExpressionHash(expr ast.Expression) string {
-	data, _ := json.Marshal(expr)
-	hash := sha256.Sum256(data)
-	return fmt.Sprintf("%x", hash[:4])
-}
-
-func (e *StreamingBarEvaluator) evaluateFixnanAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+func (e *FixnanEvaluator) EvaluateAtBar(evaluator BarEvaluator, call *ast.CallExpression, ctx *context.Context, barIdx int) (float64, error) {
 	if len(call.Arguments) < 1 {
 		return 0.0, newInsufficientArgumentsError("fixnan", 1, len(call.Arguments))
 	}
 
-	cacheKey := "fixnan_" + computeExpressionHash(call.Arguments[0])
+	cacheKey := "fixnan_" + e.identifier.Identify(call.Arguments[0])
 
-	state, exists := e.fixnanStateCache[cacheKey]
-	if !exists {
+	var state *FixnanState
+	if cached, exists := e.stateStorage.Get(cacheKey); exists {
+		state = cached.(*FixnanState)
+	} else {
 		state = NewFixnanState()
-		e.fixnanStateCache[cacheKey] = state
+		e.stateStorage.Set(cacheKey, state)
+		if err := e.warmup.Warmup(evaluator, call.Arguments[0], ctx, barIdx, state); err != nil {
+			return 0.0, err
+		}
 	}
 
-	value, err := e.EvaluateAtBar(call.Arguments[0], secCtx, barIdx)
+	value, err := evaluator.EvaluateAtBar(call.Arguments[0], ctx, barIdx)
 	if err != nil {
 		return 0.0, err
 	}

@@ -35,14 +35,15 @@ import "fmt"
 //   - Single Responsibility: Each component handles one concern
 //   - Open/Closed: Easy to extend with new indicator types
 type TAIndicatorBuilder struct {
-	indicatorName string              // Name of the indicator (SMA, EMA, STDEV)
-	varName       string              // Variable name for the Series
-	period        int                 // Lookback period
-	accessor      AccessGenerator     // Data access strategy (Series or OHLCV field)
-	warmupChecker *WarmupChecker      // Handles warmup period validation
-	loopGen       *LoopGenerator      // Generates for loops with NaN handling
-	accumulator   AccumulatorStrategy // Accumulation logic (sum, variance, ema)
-	indenter      CodeIndenter        // Manages code indentation
+	indicatorName  string               // Name of the indicator (SMA, EMA, STDEV)
+	varName        string               // Variable name for the Series
+	period         int                  // Lookback period
+	accessor       AccessGenerator      // Data access strategy (Series or OHLCV field)
+	warmupChecker  *WarmupChecker       // Handles warmup period validation
+	loopGen        *LoopGenerator       // Generates for loops with NaN handling
+	accumulator    AccumulatorStrategy  // Accumulation logic (sum, variance, ema)
+	indenter       CodeIndenter         // Manages code indentation
+	seriesStrategy SeriesAccessStrategy // Series access pattern (top-level vs arrow context)
 }
 
 // NewTAIndicatorBuilder creates a new builder for generating TA indicator code.
@@ -65,24 +66,37 @@ func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGene
 	}
 
 	return &TAIndicatorBuilder{
-		indicatorName: name,
-		varName:       varName,
-		period:        period,
-		accessor:      accessor,
-		warmupChecker: NewWarmupCheckerWithOffset(period, baseOffset),
-		loopGen:       NewLoopGenerator(period, accessor, needsNaN),
-		indenter:      NewCodeIndenter(),
+		indicatorName:  name,
+		varName:        varName,
+		period:         period,
+		accessor:       accessor,
+		warmupChecker:  NewWarmupCheckerWithOffset(period, baseOffset),
+		loopGen:        NewLoopGenerator(period, accessor, needsNaN),
+		indenter:       NewCodeIndenter(),
+		seriesStrategy: NewTopLevelSeriesAccessStrategy(),
 	}
 }
 
-// WithAccumulator sets the accumulation strategy for this indicator.
-//
-// Common strategies:
-//   - NewSumAccumulator(): For SMA calculations
-//   - NewEMAAccumulator(alpha): For EMA calculations
-//   - NewVarianceAccumulator(meanVar): For STDEV variance calculation
-//
-// Returns the builder for method chaining.
+/* WithSeriesStrategy configures series access pattern (top-level vs arrow context).
+ *
+ * DIP: Depend on SeriesAccessStrategy abstraction
+ * OCP: Open for new strategies without modifying builder
+ */
+func (b *TAIndicatorBuilder) WithSeriesStrategy(strategy SeriesAccessStrategy) *TAIndicatorBuilder {
+	b.seriesStrategy = strategy
+	b.warmupChecker.WithSeriesStrategy(strategy)
+	return b
+}
+
+/* WithAccumulator sets accumulation strategy for indicator calculation.
+ *
+ * Common strategies:
+ *   - NewSumAccumulator(): For SMA calculations
+ *   - NewEMAAccumulator(alpha): For EMA calculations
+ *   - NewVarianceAccumulator(meanVar): For STDEV variance calculation
+ *
+ * Returns builder for method chaining.
+ */
 func (b *TAIndicatorBuilder) WithAccumulator(acc AccumulatorStrategy) *TAIndicatorBuilder {
 	b.accumulator = acc
 	return b
@@ -148,15 +162,15 @@ func (b *TAIndicatorBuilder) BuildFinalization(resultExpr string) string {
 	if b.accumulator.NeedsNaNGuard() {
 		code += b.indenter.Line("if hasNaN {")
 		b.indenter.IncreaseIndent()
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("} else {")
 		b.indenter.IncreaseIndent()
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(%s)", b.varName, resultExpr))
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, resultExpr))
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("}")
 	} else {
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(%s)", b.varName, resultExpr))
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, resultExpr))
 	}
 
 	return code
@@ -208,7 +222,7 @@ func (b *TAIndicatorBuilder) BuildEMA() string {
 	// Check if initial value is NaN
 	code += b.indenter.Line("if math.IsNaN(ema) {")
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
@@ -236,7 +250,7 @@ func (b *TAIndicatorBuilder) BuildEMA() string {
 	code += b.indenter.Line("}")
 
 	// Set final result
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(ema)", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "ema"))
 
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}") // end else (initial value check)
@@ -265,7 +279,7 @@ func (b *TAIndicatorBuilder) BuildSTDEV() string {
 
 	code += b.indenter.Line("if hasNaN {")
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
@@ -279,7 +293,7 @@ func (b *TAIndicatorBuilder) BuildSTDEV() string {
 	})
 
 	code += b.indenter.Line(fmt.Sprintf("stdev := math.Sqrt(variance / float64(%d))", b.period))
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(stdev)", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "stdev"))
 
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}") // end else
@@ -308,7 +322,7 @@ func (b *TAIndicatorBuilder) BuildDEV() string {
 
 	code += b.indenter.Line("if hasNaN {")
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
@@ -321,7 +335,7 @@ func (b *TAIndicatorBuilder) BuildDEV() string {
 		return b.indenter.Line(fmt.Sprintf("devSum += math.Abs(%s - mean)", val))
 	})
 	code += b.indenter.Line(fmt.Sprintf("dev := devSum / float64(%d)", b.period))
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(dev)", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "dev"))
 
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}") // end else
@@ -340,7 +354,7 @@ func (b *TAIndicatorBuilder) BuildRMA() string {
 	// Warmup: need period bars
 	code += b.indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d {", b.period-1))
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else if ctx.BarIndex == " + fmt.Sprintf("%d", b.period-1) + " {")
 	b.indenter.IncreaseIndent()
@@ -364,12 +378,12 @@ func (b *TAIndicatorBuilder) BuildRMA() string {
 	if b.loopGen.RequiresNaNCheck() {
 		code += b.indenter.Line("if hasNaN {")
 		b.indenter.IncreaseIndent()
-		code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("} else {")
 		b.indenter.IncreaseIndent()
 	}
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(sum / %d.0)", b.varName, b.period))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, fmt.Sprintf("sum / %d.0", b.period)))
 	if b.loopGen.RequiresNaNCheck() {
 		b.indenter.DecreaseIndent()
 		code += b.indenter.Line("}")
@@ -383,12 +397,12 @@ func (b *TAIndicatorBuilder) BuildRMA() string {
 	code += b.indenter.Line(fmt.Sprintf("curr := %s", b.accessor.GenerateLoopValueAccess("0")))
 	code += b.indenter.Line("if math.IsNaN(prev) || math.IsNaN(curr) {")
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
 	code += b.indenter.Line(fmt.Sprintf("rma := alpha*curr + (1-alpha)*prev"))
-	code += b.indenter.Line(fmt.Sprintf("%sSeries.Set(rma)", b.varName))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "rma"))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}")
 	b.indenter.DecreaseIndent()

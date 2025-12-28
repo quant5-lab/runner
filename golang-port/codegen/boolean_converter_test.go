@@ -6,6 +6,239 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+func TestBooleanConverter_UnaryExpression_BooleanOperators(t *testing.T) {
+	tests := []struct {
+		name          string
+		expr          *ast.UnaryExpression
+		generatedCode string
+		shouldConvert bool
+	}{
+		{
+			name: "not operator with na() function",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.CallExpression{
+					Callee: &ast.Identifier{Name: "na"},
+				},
+			},
+			generatedCode: "!math.IsNaN(valueSeries.GetCurrent())",
+			shouldConvert: false,
+		},
+		{
+			name: "! operator with math.IsNaN",
+			expr: &ast.UnaryExpression{
+				Operator: "!",
+				Argument: &ast.CallExpression{
+					Callee: &ast.Identifier{Name: "na"},
+				},
+			},
+			generatedCode: "!math.IsNaN(buySeries.GetCurrent())",
+			shouldConvert: false,
+		},
+		{
+			name: "not operator with comparison expression",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Literal{Value: 100.0},
+				},
+			},
+			generatedCode: "!(closeSeries.GetCurrent() > 100.0)",
+			shouldConvert: false,
+		},
+		{
+			name: "not operator with crossover function",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: "crossover"},
+					},
+				},
+			},
+			generatedCode: "!ta.Crossover(fast, slow)",
+			shouldConvert: false,
+		},
+		{
+			name: "not operator with logical and expression",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.LogicalExpression{
+					Operator: "and",
+					Left:     &ast.Identifier{Name: "cond1"},
+					Right:    &ast.Identifier{Name: "cond2"},
+				},
+			},
+			generatedCode: "!(cond1Series.GetCurrent() != 0 && cond2Series.GetCurrent() != 0)",
+			shouldConvert: false,
+		},
+		{
+			name: "minus operator (numeric unary)",
+			expr: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Identifier{Name: "value"},
+			},
+			generatedCode: "-valueSeries.GetCurrent()",
+			shouldConvert: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			typeSystem := NewTypeInferenceEngine()
+			converter := NewBooleanConverter(typeSystem)
+
+			// Test IsAlreadyBoolean recognition
+			isBool := converter.IsAlreadyBoolean(tt.expr)
+			expectedBool := !tt.shouldConvert
+			if isBool != expectedBool {
+				t.Errorf("IsAlreadyBoolean: expected %v, got %v", expectedBool, isBool)
+			}
+
+			// Test ConvertBoolSeriesForIfStatement behavior
+			result := converter.ConvertBoolSeriesForIfStatement(tt.expr, tt.generatedCode)
+			if tt.shouldConvert {
+				expected := tt.generatedCode + " != 0"
+				if result != expected {
+					t.Errorf("ConvertBoolSeriesForIfStatement: expected conversion\nwant: %q\ngot:  %q", expected, result)
+				}
+			} else {
+				if result != tt.generatedCode {
+					t.Errorf("ConvertBoolSeriesForIfStatement: expected no conversion\nwant: %q\ngot:  %q", tt.generatedCode, result)
+				}
+			}
+		})
+	}
+}
+
+func TestBooleanConverter_UnaryExpression_NestedStructures(t *testing.T) {
+	tests := []struct {
+		name          string
+		expr          ast.Expression
+		generatedCode string
+		expected      string
+	}{
+		{
+			name: "double negation not not",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.UnaryExpression{
+					Operator: "not",
+					Argument: &ast.Identifier{Name: "enabled"},
+				},
+			},
+			generatedCode: "!(!enabledSeries.GetCurrent())",
+			expected:      "!(!enabledSeries.GetCurrent())",
+		},
+		{
+			name: "not with nested ternary",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.ConditionalExpression{
+					Test: &ast.BinaryExpression{
+						Operator: ">",
+						Left:     &ast.Identifier{Name: "price"},
+						Right:    &ast.Literal{Value: 100.0},
+					},
+					Consequent: &ast.Literal{Value: true},
+					Alternate:  &ast.Literal{Value: false},
+				},
+			},
+			generatedCode: "!(func() bool { if priceSeries.GetCurrent() > 100.0 { return true } else { return false } }())",
+			expected:      "!(func() bool { if priceSeries.GetCurrent() > 100.0 { return true } else { return false } }())",
+		},
+		{
+			name: "not with function returning float64 needing conversion",
+			expr: &ast.UnaryExpression{
+				Operator: "not",
+				Argument: &ast.CallExpression{
+					Callee: &ast.Identifier{Name: "customFunc"},
+				},
+			},
+			generatedCode: "!customFunc()",
+			expected:      "!customFunc()",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			typeSystem := NewTypeInferenceEngine()
+			converter := NewBooleanConverter(typeSystem)
+
+			result := converter.ConvertBoolSeriesForIfStatement(tt.expr, tt.generatedCode)
+			if result != tt.expected {
+				t.Errorf("expected:\n%q\ngot:\n%q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestBooleanConverter_UnaryExpression_EdgeCases(t *testing.T) {
+	t.Run("empty operator string", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		expr := &ast.UnaryExpression{
+			Operator: "",
+			Argument: &ast.Identifier{Name: "value"},
+		}
+
+		result := converter.IsAlreadyBoolean(expr)
+		if result {
+			t.Error("expected false for empty operator")
+		}
+	})
+
+	t.Run("unknown unary operator", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		expr := &ast.UnaryExpression{
+			Operator: "++",
+			Argument: &ast.Identifier{Name: "counter"},
+		}
+
+		result := converter.IsAlreadyBoolean(expr)
+		if result {
+			t.Error("expected false for non-boolean operator")
+		}
+	})
+
+	t.Run("nil argument in UnaryExpression", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		expr := &ast.UnaryExpression{
+			Operator: "not",
+			Argument: nil,
+		}
+
+		// Should not crash, should recognize as boolean operator
+		result := converter.IsAlreadyBoolean(expr)
+		if !result {
+			t.Error("expected true for 'not' operator regardless of argument")
+		}
+	})
+
+	t.Run("UnaryExpression with empty generated code", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		expr := &ast.UnaryExpression{
+			Operator: "not",
+			Argument: &ast.Identifier{Name: "test"},
+		}
+
+		result := converter.ConvertBoolSeriesForIfStatement(expr, "")
+		if result != "" {
+			t.Errorf("expected empty string, got %q", result)
+		}
+	})
+}
+
 func TestBooleanConverter_EnsureBooleanOperand_BooleanOperands(t *testing.T) {
 	tests := []struct {
 		name          string

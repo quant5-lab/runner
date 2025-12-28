@@ -1,0 +1,15 @@
+//@version=5
+strategy("Unary Conditional Test", overlay=true)
+
+sma5 = ta.sma(close, 5)
+
+buy_sig = close > sma5 ? close : na
+sell_sig = close < sma5 ? close : na
+
+if not na(buy_sig)
+    strategy.entry("long", strategy.long)
+    
+if not na(sell_sig)
+    strategy.close("long")
+
+plot(close, title="Close")

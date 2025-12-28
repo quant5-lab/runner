@@ -29,24 +29,38 @@ import "fmt"
 //   - Reusable: Works with any indicator that needs warmup handling
 //   - Testable: Easy to verify warmup boundary conditions
 type WarmupChecker struct {
-	period     int // Minimum bars required for valid calculation
-	baseOffset int // Additional offset from expressions like close[4]
+	period     int
+	baseOffset int
+	strategy   SeriesAccessStrategy
 }
 
 func NewWarmupChecker(period int) *WarmupChecker {
-	return &WarmupChecker{period: period, baseOffset: 0}
+	return &WarmupChecker{
+		period:     period,
+		baseOffset: 0,
+		strategy:   NewTopLevelSeriesAccessStrategy(),
+	}
 }
 
 func NewWarmupCheckerWithOffset(period int, baseOffset int) *WarmupChecker {
-	return &WarmupChecker{period: period, baseOffset: baseOffset}
+	return &WarmupChecker{
+		period:     period,
+		baseOffset: baseOffset,
+		strategy:   NewTopLevelSeriesAccessStrategy(),
+	}
+}
+
+/* WithSeriesStrategy configures context-aware series access for warmup check. */
+func (w *WarmupChecker) WithSeriesStrategy(strategy SeriesAccessStrategy) *WarmupChecker {
+	w.strategy = strategy
+	return w
 }
 
 func (w *WarmupChecker) GenerateCheck(varName string, indenter *CodeIndenter) string {
-	// Total warmup = period + baseOffset. For sma(close[4], 20), need 20+4-1 = 23 bars minimum
 	totalWarmup := w.period + w.baseOffset - 1
 	code := indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d {", totalWarmup))
 	indenter.IncreaseIndent()
-	code += indenter.Line(fmt.Sprintf("%sSeries.Set(math.NaN())", varName))
+	code += indenter.Line(w.strategy.GenerateSet(varName, "math.NaN()"))
 	indenter.DecreaseIndent()
 	code += indenter.Line("} else {")
 	return code

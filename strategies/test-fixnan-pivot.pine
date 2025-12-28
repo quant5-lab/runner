@@ -1,0 +1,13 @@
+//@version=4
+strategy("Test Fixnan Pivot", overlay=true)
+
+leftBars = 15
+rightBars = 15
+
+// Test security() with fixnan(pivothigh()[1])
+highPivot = security(syminfo.tickerid, "1D", fixnan(pivothigh(leftBars, rightBars)[1]))
+lowPivot = security(syminfo.tickerid, "1D", fixnan(pivotlow(leftBars, rightBars)[1]))
+
+// Plot the values
+plot(highPivot, color=color.red, linewidth=2, title="High Pivot")
+plot(lowPivot, color=color.blue, linewidth=2, title="Low Pivot")
