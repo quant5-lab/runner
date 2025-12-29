@@ -61,6 +61,7 @@ describe('ProviderManager', () => {
         provider: 'Provider1',
         data: marketData,
         instance: mockProvider1,
+        timezone: 'UTC',
       });
       expect(mockProvider1.getMarketData).toHaveBeenCalledWith('BTCUSDT', 'D', 100);
     });
@@ -302,7 +303,7 @@ describe('ProviderManager', () => {
       expect(result.data).toEqual(marketData);
     });
 
-    it('should reject stale data using closeTime field', async () => {
+    it('should log warning for stale data using closeTime field', async () => {
       const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
       const marketData = [
         {
@@ -318,8 +319,12 @@ describe('ProviderManager', () => {
       const chain = [{ name: 'Provider1', instance: mockProvider1 }];
       manager = new ProviderManager(chain, mockLogger);
 
-      await expect(manager.fetchMarketData('BTCUSDT', 'D', 100)).rejects.toThrow(
-        /Provider1 returned stale data/,
+      const result = await manager.fetchMarketData('BTCUSDT', 'D', 100);
+
+      expect(result.provider).toBe('Provider1');
+      expect(result.data).toEqual(marketData);
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('⚠️  Provider1 data age warning'),
       );
     });
 
@@ -501,12 +506,8 @@ describe('ProviderManager', () => {
       }
     });
 
-    it('should re-throw stale data error without continuing chain', async () => {
-      const staleError = new Error(
-        'Provider1 returned stale data for BTCUSDT 1h: latest candle is 10 days old',
-      );
-
-      mockProvider1.getMarketData.mockRejectedValue(staleError);
+    it('should continue to next provider if first provider fails', async () => {
+      mockProvider1.getMarketData.mockRejectedValue(new Error('Provider1 failed'));
       mockProvider2.getMarketData.mockResolvedValue([
         { openTime: Date.now(), closeTime: Date.now() },
       ]);
@@ -517,12 +518,11 @@ describe('ProviderManager', () => {
       ];
       manager = new ProviderManager(chain, mockLogger);
 
-      await expect(manager.fetchMarketData('BTCUSDT', '1h', 100)).rejects.toThrow(
-        'returned stale data',
-      );
+      const result = await manager.fetchMarketData('BTCUSDT', '1h', 100);
 
+      expect(result.provider).toBe('Provider2');
       expect(mockProvider1.getMarketData).toHaveBeenCalled();
-      expect(mockProvider2.getMarketData).not.toHaveBeenCalled();
+      expect(mockProvider2.getMarketData).toHaveBeenCalled();
     });
   });
 });

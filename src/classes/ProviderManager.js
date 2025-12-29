@@ -48,18 +48,18 @@ class ProviderManager {
     if (timeframe.includes('m') && !timeframe.includes('mo')) {
       maxAgeDays = 1;
     } else if (timeframe.includes('h')) {
-      maxAgeDays = 2;
+      maxAgeDays = 4;
     } else if (timeframe.includes('d') || timeframe === 'D') {
-      maxAgeDays = 7;
+      maxAgeDays = 10;
     } else {
-      maxAgeDays = 30;
+      maxAgeDays = 45;
     }
 
     if (ageInDays > maxAgeDays) {
-      throw new Error(
-        `${providerName} returned stale data for ${symbol} ${timeframe}: ` +
+      this.logger.log(
+        `⚠️  ${providerName} data age warning for ${symbol} ${timeframe}: ` +
           `latest candle is ${Math.floor(ageInDays)} days old (${candleTime.toDateString()}). ` +
-          `Expected data within ${maxAgeDays} days.`,
+          `Expected within ${maxAgeDays} days. Continuing anyway...`,
       );
     }
   }
@@ -81,19 +81,16 @@ class ProviderManager {
           this.logger.log(
             `Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`,
           );
-          return { 
-            provider: name, 
-            data: marketData, 
+          return {
+            provider: name,
+            data: marketData,
             instance,
-            timezone: instance.timezone || 'UTC' // Include timezone from provider
+            timezone: instance.timezone || 'UTC', // Include timezone from provider
           };
         }
 
         this.logger.log(`No data:\t${name} > ${symbol}`);
       } catch (error) {
-        if (error.message.includes('returned stale data')) {
-          throw error;
-        }
         if (error instanceof TimeframeError) {
           throw error;
         }

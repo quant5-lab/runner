@@ -126,7 +126,8 @@ for SEC_TF in $SECURITY_TFS; do
         FETCH_NEEDED=true
     else
         # Check file age: refetch if older than 1 day for intraday/daily, 7 days for weekly/monthly
-        FILE_AGE_HOURS=$(( ($(date +%s) - $(stat -f %m "$SEC_FILE" 2>/dev/null || stat -c %Y "$SEC_FILE" 2>/dev/null || echo 0)) / 3600 ))
+        FILE_MOD_TIME=$(stat -c %Y "$SEC_FILE" 2>/dev/null || stat -f %m "$SEC_FILE" 2>/dev/null || echo 0)
+        FILE_AGE_HOURS=$(( ($(date +%s) - FILE_MOD_TIME) / 3600 ))
         
         case "$NORM_TF" in
             *m|*h|D|1D)
