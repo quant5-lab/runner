@@ -23,6 +23,7 @@ func NewInlineConditionHandlerRegistry() *InlineConditionHandlerRegistry {
 			NewCrossoverInlineHandler(),
 			NewCrossunderInlineHandler(),
 			NewChangeInlineHandler(),
+			NewSecurityInlineHandler(),
 		},
 	}
 }
