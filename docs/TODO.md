@@ -161,6 +161,13 @@
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
+## PineScript Support Blockers (13)
+- Codegen: security inline, RSI inline
+- Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
+- Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
+- Type: string variables
+- Runtime: multi-symbol security, syminfo.tickerid mapping
+
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - manual validation PASSED
 - [x] `bb7-dissect-sma.pine` - manual validation PASSED
@@ -183,7 +190,7 @@
 - [x] Parse bb-strategy-7-rus.pine successfully (N-level member expressions: strategy.commission.percent)
 - [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
 - [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
-- [ ] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
+- [x] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
 - [ ] `./bin/strategy` on BB8 produces expected trades (blocked: request.security() inline in conditions)
 - [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
@@ -205,7 +212,7 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 570+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29) - 100% pass rate for core features
+- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)

@@ -1,0 +1,16 @@
+//@version=5
+indicator("Test Operators", overlay=false)
+
+// Test null coalescing
+val1 = na
+val2 = close
+result = val1 ?? val2
+
+// Test modulo
+mod = close % 5
+
+// Test bitwise (if supported)
+bit = 5 & 3
+
+plot(result, "Null Coalesce")
+plot(mod, "Modulo")

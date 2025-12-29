@@ -1,0 +1,9 @@
+//@version=5
+indicator("Test Map Functions", overlay=false)
+
+// Test map functions
+myMap = map.new<string, float>()
+map.put(myMap, "key1", close)
+val = map.get(myMap, "key1")
+
+plot(val, "Map Value")

@@ -1,0 +1,8 @@
+//@version=5
+indicator("Test Var Declaration", overlay=true)
+
+// Test var keyword
+var float total = 0.0
+total := total + close
+
+plot(total, "Cumulative Close", color=color.green)

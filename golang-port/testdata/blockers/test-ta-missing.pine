@@ -1,0 +1,15 @@
+//@version=5
+indicator("Test TA Functions", overlay=false)
+
+// Test WMA
+wma_val = ta.wma(close, 14)
+
+// Test CCI
+cci_val = ta.cci(close, 20)
+
+// Test VWAP
+vwap_val = ta.vwap(close)
+
+plot(wma_val, "WMA")
+plot(cci_val, "CCI")
+plot(vwap_val, "VWAP")

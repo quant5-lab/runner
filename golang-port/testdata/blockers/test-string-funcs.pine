@@ -1,0 +1,13 @@
+//@version=5
+indicator("Test String Functions", overlay=false)
+
+// Test str.tostring
+txt = str.tostring(close)
+
+// Test str.tonumber  
+num = str.tonumber("123.45")
+
+// Test str.split
+parts = str.split("A,B,C", ",")
+
+plot(num, "Number from String")
