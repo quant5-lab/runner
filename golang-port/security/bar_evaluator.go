@@ -1,6 +1,8 @@
 package security
 
 import (
+	"math"
+
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
 )
@@ -88,6 +90,8 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
 	case "ta.pivotlow":
 		return e.evaluatePivotLowAtBar(call, secCtx, barIdx)
+	case "ta.valuewhen", "valuewhen":
+		return e.evaluateValuewhenAtBar(call, secCtx, barIdx)
 	case "fixnan", "ta.fixnan":
 		return e.fixnanEvaluator.EvaluateAtBar(e, call, secCtx, barIdx)
 	default:
@@ -210,6 +214,32 @@ func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, 
 
 	evaluator := NewDelayedPivotLowEvaluator(leftBars, rightBars)
 	return evaluator.EvaluateAtBar(secCtx.Data, sourceID.Name, barIdx), nil
+}
+
+func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	conditionExpr, sourceExpr, occurrence, err := extractValuewhenArguments(call)
+	if err != nil {
+		return 0.0, err
+	}
+
+	occurrenceCount := 0
+	for lookbackOffset := 0; lookbackOffset <= barIdx; lookbackOffset++ {
+		lookbackBarIdx := barIdx - lookbackOffset
+
+		conditionValue, err := e.EvaluateAtBar(conditionExpr, secCtx, lookbackBarIdx)
+		if err != nil {
+			return 0.0, err
+		}
+
+		if conditionValue != 0.0 {
+			if occurrenceCount == occurrence {
+				return e.EvaluateAtBar(sourceExpr, secCtx, lookbackBarIdx)
+			}
+			occurrenceCount++
+		}
+	}
+
+	return math.NaN(), nil
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {

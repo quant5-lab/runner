@@ -47,3 +47,21 @@ func extractPeriodArgument(call *ast.CallExpression, funcName string) (int, erro
 
 	return int(periodFloat), nil
 }
+
+func extractValuewhenArguments(call *ast.CallExpression) (ast.Expression, ast.Expression, int, error) {
+	funcName := extractCallFunctionName(call.Callee)
+
+	if len(call.Arguments) < 3 {
+		return nil, nil, 0, newInsufficientArgumentsError(funcName, 3, len(call.Arguments))
+	}
+
+	conditionExpr := call.Arguments[0]
+	sourceExpr := call.Arguments[1]
+
+	occurrence, err := extractNumberLiteral(call.Arguments[2])
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return conditionExpr, sourceExpr, int(occurrence), nil
+}
