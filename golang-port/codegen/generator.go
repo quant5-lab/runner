@@ -3208,6 +3208,7 @@ func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
 /* preAnalyzeSecurityCalls scans AST for ALL expressions with nested TA calls,
  * registers temp vars BEFORE declaration phase to prevent "undefined: ta_sma_XXX" errors.
  * Skips pivot/fixnan (runtime-only evaluation) and inline-only functions.
+ * EXCEPTION: Inline functions inside security() need Series for runtime evaluation.
  */
 func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 	for _, stmt := range program.Body {
@@ -3220,7 +3221,10 @@ func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
 						callInfo := nestedCalls[i]
 
 						if g.inlineRegistry != nil && g.inlineRegistry.IsInlineOnly(callInfo.FuncName) {
-							continue
+							// Inline functions need Series when inside security() runtime context
+							if !g.exprAnalyzer.IsInsideSecurityCall(callInfo.Call, declarator.Init) {
+								continue
+							}
 						}
 
 						if g.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {

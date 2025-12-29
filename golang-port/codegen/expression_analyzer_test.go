@@ -6,7 +6,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestExpressionAnalyzer_SimpleCallExpression tests detection of single TA function call */
 func TestExpressionAnalyzer_SimpleCallExpression(t *testing.T) {
 	g := &generator{
 		variables:      make(map[string]string),
@@ -42,7 +41,6 @@ func TestExpressionAnalyzer_SimpleCallExpression(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_NestedCalls tests detection of nested TA calls */
 func TestExpressionAnalyzer_NestedCalls(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -76,7 +74,6 @@ func TestExpressionAnalyzer_NestedCalls(t *testing.T) {
 
 	calls := analyzer.FindNestedCalls(outerCall)
 
-	// Should find: rma, max, change (outer to inner order)
 	if len(calls) != 3 {
 		t.Fatalf("Expected 3 calls, got %d", len(calls))
 	}
@@ -89,7 +86,6 @@ func TestExpressionAnalyzer_NestedCalls(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_BinaryExpression tests detection in binary operations */
 func TestExpressionAnalyzer_BinaryExpression(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -132,7 +128,6 @@ func TestExpressionAnalyzer_BinaryExpression(t *testing.T) {
 		t.Fatalf("Expected 2 calls, got %d", len(calls))
 	}
 
-	// Both should be ta.sma but with different hashes (different periods)
 	if calls[0].FuncName != "ta.sma" || calls[1].FuncName != "ta.sma" {
 		t.Error("Expected both calls to be ta.sma")
 	}
@@ -142,7 +137,6 @@ func TestExpressionAnalyzer_BinaryExpression(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_HashUniqueness tests that different arguments produce different hashes */
 func TestExpressionAnalyzer_HashUniqueness(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -182,7 +176,6 @@ func TestExpressionAnalyzer_HashUniqueness(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_HashConsistency tests that same arguments produce same hash */
 func TestExpressionAnalyzer_HashConsistency(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -215,7 +208,6 @@ func TestExpressionAnalyzer_HashConsistency(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_NoCallsInLiterals tests that literals don't produce calls */
 func TestExpressionAnalyzer_NoCallsInLiterals(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -231,7 +223,6 @@ func TestExpressionAnalyzer_NoCallsInLiterals(t *testing.T) {
 	}
 }
 
-/* TestExpressionAnalyzer_ConditionalExpression tests detection in ternary operators */
 func TestExpressionAnalyzer_ConditionalExpression(t *testing.T) {
 	g := &generator{
 		variables: make(map[string]string),
@@ -287,5 +278,405 @@ func TestExpressionAnalyzer_ConditionalExpression(t *testing.T) {
 	}
 	if !hasSma || !hasEma {
 		t.Errorf("Expected ta.sma and ta.ema, got %v", funcNames)
+	}
+}
+
+// TestExpressionAnalyzer_ContextDetection validates nested call detection algorithm.
+// Tests if target call is nested inside parent call (security, fixnan, etc).
+func TestExpressionAnalyzer_ContextDetection(t *testing.T) {
+	tests := []struct {
+		name         string
+		expr         ast.Expression
+		targetFunc   string
+		parentFunc   string
+		expectInside bool
+	}{
+		{
+			name: "direct child call in parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.CallExpression{
+						Callee:    &ast.Identifier{Name: "valuewhen"},
+						Arguments: []ast.Expression{},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call nested in binary expression within parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.BinaryExpression{
+						Left: &ast.CallExpression{
+							Callee:    &ast.Identifier{Name: "valuewhen"},
+							Arguments: []ast.Expression{},
+						},
+						Right:    &ast.Literal{Value: 1.0},
+						Operator: "+",
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call nested in logical expression within parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.LogicalExpression{
+						Left: &ast.Identifier{Name: "condition"},
+						Right: &ast.CallExpression{
+							Callee:    &ast.Identifier{Name: "valuewhen"},
+							Arguments: []ast.Expression{},
+						},
+						Operator: "and",
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call nested in unary expression within parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.UnaryExpression{
+						Operator: "not",
+						Argument: &ast.CallExpression{
+							Callee:    &ast.Identifier{Name: "valuewhen"},
+							Arguments: []ast.Expression{},
+						},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call nested in conditional within parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.ConditionalExpression{
+						Test: &ast.Identifier{Name: "condition"},
+						Consequent: &ast.CallExpression{
+							Callee:    &ast.Identifier{Name: "valuewhen"},
+							Arguments: []ast.Expression{},
+						},
+						Alternate: &ast.Identifier{Name: "na"},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "deeply nested call 5 levels",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.BinaryExpression{
+						Left: &ast.ConditionalExpression{
+							Test: &ast.Identifier{Name: "cond"},
+							Consequent: &ast.BinaryExpression{
+								Left: &ast.CallExpression{
+									Callee:    &ast.Identifier{Name: "max"},
+									Arguments: []ast.Expression{},
+								},
+								Right: &ast.CallExpression{
+									Callee:    &ast.Identifier{Name: "valuewhen"},
+									Arguments: []ast.Expression{},
+								},
+								Operator: "+",
+							},
+							Alternate: &ast.Literal{Value: 0.0},
+						},
+						Right:    &ast.Literal{Value: 1.0},
+						Operator: "*",
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call NOT inside parent - standalone",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "valuewhen"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "condition"},
+					&ast.Identifier{Name: "high"},
+					&ast.Literal{Value: 0.0},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: false,
+		},
+		{
+			name: "call NOT inside parent - in different context",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.Identifier{Name: "condition"},
+				Consequent: &ast.CallExpression{
+					Callee:    &ast.Identifier{Name: "valuewhen"},
+					Arguments: []ast.Expression{},
+				},
+				Alternate: &ast.Identifier{Name: "na"},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: false,
+		},
+		{
+			name: "parent with namespace variant",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "request"},
+					Property: &ast.Identifier{Name: "security"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.CallExpression{
+						Callee:    &ast.Identifier{Name: "valuewhen"},
+						Arguments: []ast.Expression{},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "request.security",
+			expectInside: true,
+		},
+		{
+			name: "nested parent calls - target in inner parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "ticker1"},
+					&ast.Literal{Value: "1D"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "security"},
+						Arguments: []ast.Expression{
+							&ast.Identifier{Name: "ticker2"},
+							&ast.Literal{Value: "1H"},
+							&ast.CallExpression{
+								Callee:    &ast.Identifier{Name: "valuewhen"},
+								Arguments: []ast.Expression{},
+							},
+						},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "call chain - target inside parent inside another parent",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "fixnan"},
+						Arguments: []ast.Expression{
+							&ast.CallExpression{
+								Callee:    &ast.Identifier{Name: "valuewhen"},
+								Arguments: []ast.Expression{},
+							},
+						},
+					},
+				},
+			},
+			targetFunc:   "valuewhen",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+		{
+			name: "different inline function - barcolor in security",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.CallExpression{
+						Callee:    &ast.Identifier{Name: "barcolor"},
+						Arguments: []ast.Expression{},
+					},
+				},
+			},
+			targetFunc:   "barcolor",
+			parentFunc:   "security",
+			expectInside: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := &generator{
+				variables: make(map[string]string),
+			}
+			analyzer := NewExpressionAnalyzer(gen)
+
+			calls := analyzer.FindNestedCalls(tt.expr)
+
+			var targetCall *ast.CallExpression
+			for _, callInfo := range calls {
+				funcName := gen.extractFunctionName(callInfo.Call.Callee)
+				if funcName == tt.targetFunc {
+					targetCall = callInfo.Call
+					break
+				}
+			}
+
+			if targetCall == nil {
+				t.Fatalf("Target function %q not found in expression", tt.targetFunc)
+			}
+
+			isInside := analyzer.IsInsideSecurityCall(targetCall, tt.expr)
+
+			if isInside != tt.expectInside {
+				t.Errorf("IsInsideSecurityCall() = %v, want %v", isInside, tt.expectInside)
+			}
+		})
+	}
+}
+
+func TestExpressionAnalyzer_MultipleCallsInContext(t *testing.T) {
+	gen := &generator{
+		variables: make(map[string]string),
+	}
+	analyzer := NewExpressionAnalyzer(gen)
+
+	call1 := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "valuewhen"},
+		Arguments: []ast.Expression{&ast.Literal{Value: 1}},
+	}
+	call2 := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "valuewhen"},
+		Arguments: []ast.Expression{&ast.Literal{Value: 2}},
+	}
+
+	expr := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "security"},
+		Arguments: []ast.Expression{
+			&ast.Identifier{Name: "tickerid"},
+			&ast.Literal{Value: "1D"},
+			&ast.BinaryExpression{
+				Left:     call1,
+				Right:    call2,
+				Operator: "+",
+			},
+		},
+	}
+
+	isInside1 := analyzer.IsInsideSecurityCall(call1, expr)
+	isInside2 := analyzer.IsInsideSecurityCall(call2, expr)
+
+	if !isInside1 {
+		t.Error("First valuewhen should be inside security")
+	}
+	if !isInside2 {
+		t.Error("Second valuewhen should be inside security")
+	}
+}
+
+func TestExpressionAnalyzer_ContextDetectionEdgeCases(t *testing.T) {
+	tests := []struct {
+		name         string
+		expr         ast.Expression
+		targetFunc   string
+		expectInside bool
+	}{
+		{
+			name: "security with only 2 args - no expression arg",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+				},
+			},
+			targetFunc:   "valuewhen",
+			expectInside: false,
+		},
+		{
+			name: "target call is security itself",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tickerid"},
+					&ast.Literal{Value: "1D"},
+					&ast.Literal{Value: 0},
+				},
+			},
+			targetFunc:   "security",
+			expectInside: false,
+		},
+		{
+			name:         "empty expression tree",
+			expr:         &ast.Literal{Value: 42},
+			targetFunc:   "valuewhen",
+			expectInside: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := &generator{
+				variables: make(map[string]string),
+			}
+			analyzer := NewExpressionAnalyzer(gen)
+
+			calls := analyzer.FindNestedCalls(tt.expr)
+
+			var targetCall *ast.CallExpression
+			for _, callInfo := range calls {
+				funcName := gen.extractFunctionName(callInfo.Call.Callee)
+				if funcName == tt.targetFunc {
+					targetCall = callInfo.Call
+					break
+				}
+			}
+
+			if targetCall == nil && !tt.expectInside {
+				return
+			}
+
+			if targetCall == nil {
+				t.Fatalf("Target function %q not found but was expected", tt.targetFunc)
+			}
+
+			isInside := analyzer.IsInsideSecurityCall(targetCall, tt.expr)
+
+			if isInside != tt.expectInside {
+				t.Errorf("IsInsideSecurityCall() = %v, want %v", isInside, tt.expectInside)
+			}
+		})
 	}
 }

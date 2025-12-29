@@ -15,32 +15,116 @@ type CallInfo struct {
 }
 
 // ExpressionAnalyzer traverses AST expressions to find nested TA function calls.
-//
-// Purpose: Single Responsibility - detect CallExpression nodes in ANY expression context
-// Usage: Reusable across BinaryExpression, ConditionalExpression, security(), fixnan()
-//
-// Example:
-//
-//	analyzer := NewExpressionAnalyzer(g)
-//	calls := analyzer.FindNestedCalls(binaryExpr)
-//	// Returns: [CallInfo{sma(close,50)}, CallInfo{sma(close,200)}]
+// Reusable across BinaryExpression, ConditionalExpression, security(), fixnan()
 type ExpressionAnalyzer struct {
-	gen *generator // Reference to generator for extractFunctionName()
+	gen *generator
 }
 
-// NewExpressionAnalyzer creates analyzer with generator context
 func NewExpressionAnalyzer(g *generator) *ExpressionAnalyzer {
 	return &ExpressionAnalyzer{gen: g}
 }
 
-// FindNestedCalls recursively traverses expression tree to find all CallExpression nodes
+// FindNestedCalls recursively finds all CallExpression nodes in expression tree
 func (ea *ExpressionAnalyzer) FindNestedCalls(expr ast.Expression) []CallInfo {
 	calls := []CallInfo{}
 	ea.traverse(expr, &calls)
 	return calls
 }
 
-// traverse implements recursive descent through expression AST
+// IsInsideSecurityCall detects if targetCall is nested inside security() call
+func (ea *ExpressionAnalyzer) IsInsideSecurityCall(targetCall *ast.CallExpression, rootExpr ast.Expression) bool {
+	return ea.findSecurityCallContaining(targetCall, rootExpr)
+}
+
+func (ea *ExpressionAnalyzer) findSecurityCallContaining(targetCall *ast.CallExpression, expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.CallExpression:
+		if ea.isSecurityCall(e) && len(e.Arguments) >= 3 {
+			return ea.expressionContainsCall(targetCall, e.Arguments[2])
+		}
+		return ea.anyChildMatches(e.Arguments, func(arg ast.Expression) bool {
+			return ea.findSecurityCallContaining(targetCall, arg)
+		})
+
+	case *ast.BinaryExpression:
+		return ea.findSecurityCallContaining(targetCall, e.Left) ||
+			ea.findSecurityCallContaining(targetCall, e.Right)
+
+	case *ast.LogicalExpression:
+		return ea.findSecurityCallContaining(targetCall, e.Left) ||
+			ea.findSecurityCallContaining(targetCall, e.Right)
+
+	case *ast.ConditionalExpression:
+		return ea.findSecurityCallContaining(targetCall, e.Test) ||
+			ea.findSecurityCallContaining(targetCall, e.Consequent) ||
+			ea.findSecurityCallContaining(targetCall, e.Alternate)
+
+	case *ast.UnaryExpression:
+		return ea.findSecurityCallContaining(targetCall, e.Argument)
+
+	case *ast.MemberExpression:
+		return ea.findSecurityCallContaining(targetCall, e.Object) ||
+			ea.findSecurityCallContaining(targetCall, e.Property)
+	}
+
+	return false
+}
+
+func (ea *ExpressionAnalyzer) isSecurityCall(call *ast.CallExpression) bool {
+	funcName := ea.gen.extractFunctionName(call.Callee)
+	return funcName == "security" || funcName == "request.security"
+}
+
+func (ea *ExpressionAnalyzer) expressionContainsCall(targetCall *ast.CallExpression, expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	if callExpr, ok := expr.(*ast.CallExpression); ok {
+		if callExpr == targetCall {
+			return true
+		}
+		if ea.anyChildMatches(callExpr.Arguments, func(arg ast.Expression) bool {
+			return ea.expressionContainsCall(targetCall, arg)
+		}) {
+			return true
+		}
+	}
+
+	return ea.traverseExpression(expr, func(child ast.Expression) bool {
+		return ea.expressionContainsCall(targetCall, child)
+	})
+}
+
+func (ea *ExpressionAnalyzer) traverseExpression(expr ast.Expression, visitor func(ast.Expression) bool) bool {
+	switch e := expr.(type) {
+	case *ast.BinaryExpression:
+		return visitor(e.Left) || visitor(e.Right)
+	case *ast.LogicalExpression:
+		return visitor(e.Left) || visitor(e.Right)
+	case *ast.ConditionalExpression:
+		return visitor(e.Test) || visitor(e.Consequent) || visitor(e.Alternate)
+	case *ast.UnaryExpression:
+		return visitor(e.Argument)
+	case *ast.MemberExpression:
+		return visitor(e.Object) || visitor(e.Property)
+	}
+	return false
+}
+
+func (ea *ExpressionAnalyzer) anyChildMatches(exprs []ast.Expression, visitor func(ast.Expression) bool) bool {
+	for _, expr := range exprs {
+		if visitor(expr) {
+			return true
+		}
+	}
+	return false
+}
+
 func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 	if expr == nil {
 		return
@@ -48,7 +132,6 @@ func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 
 	switch e := expr.(type) {
 	case *ast.CallExpression:
-		// Found TA function call - extract metadata
 		funcName := ea.gen.extractFunctionName(e.Callee)
 		argHash := ea.ComputeArgHash(e)
 		*calls = append(*calls, CallInfo{
@@ -56,7 +139,6 @@ func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 			FuncName: funcName,
 			ArgHash:  argHash,
 		})
-		// Continue traversing arguments (nested calls possible)
 		for _, arg := range e.Arguments {
 			ea.traverse(arg, calls)
 		}
@@ -82,37 +164,29 @@ func (ea *ExpressionAnalyzer) traverse(expr ast.Expression, calls *[]CallInfo) {
 		ea.traverse(e.Property, calls)
 
 	case *ast.Identifier, *ast.Literal:
-		// Leaf nodes - no traversal needed
 		return
 
 	default:
-		// Unknown expression type - safe to skip
 		return
 	}
 }
 
-// ComputeArgHash creates unique identifier for call based on arguments
-//
-// Purpose: Differentiate sma(close,50) from sma(close,200)
-// Method: Hash function name + argument string representations
+// ComputeArgHash creates unique identifier for call based on function name and arguments.
+// Differentiates sma(close,50) from sma(close,200) for temp variable registration.
 func (ea *ExpressionAnalyzer) ComputeArgHash(call *ast.CallExpression) string {
 	h := sha256.New()
 
-	// Include function name in hash
 	funcName := ea.gen.extractFunctionName(call.Callee)
 	h.Write([]byte(funcName))
 
-	// Include each argument
 	for _, arg := range call.Arguments {
 		argStr := ea.argToString(arg)
 		h.Write([]byte(argStr))
 	}
 
-	// Return first 8 hex chars (sufficient for uniqueness)
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]
 }
 
-// argToString converts argument expression to string representation for hashing
 func (ea *ExpressionAnalyzer) argToString(expr ast.Expression) string {
 	switch e := expr.(type) {
 	case *ast.Literal:
