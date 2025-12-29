@@ -156,13 +156,14 @@
 - [x] `dev()` function for deviation detection (DEVHandler implemented and registered)
 - [x] `strategy.position_avg_price` built-in variable (StateManager + codegen sampling order fixed)
 - [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
+- [x] `valuewhen()` runtime evaluation in security() contexts (StreamingBarEvaluator support, 7 test functions, 25 subtests, occurrence/boundary/expression/condition/validation/progression/state coverage)
 - [x] Arrow function preamble extraction (ArrowVarInitResult, PreambleExtractor, module-level functions, 100+ tests, double-assignment syntax fixed)
-- [x] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code)
+- [ ] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code) - BLOCKED: valuewhen inline temp var not registered with TempVariableManager
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
-## PineScript Support Blockers (12)
-- Codegen: RSI inline, valuewhen undefined series
+## PineScript Support Blockers (13)
+- Codegen: valuewhen temp var registration (ta_valuewhen_XXXSeries undefined), RSI inline
 - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
 - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
 - Type: string variables
@@ -191,7 +192,7 @@
 - [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
 - [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
 - [x] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
-- [ ] `./bin/strategy` on BB8 produces expected trades (blocked: ta.valuewhen undefined series)
+- [ ] `./bin/strategy` on BB8 produces expected trades (BLOCKED: valuewhen temp var declaration - ta_valuewhen_XXXSeries undefined)
 - [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)
@@ -212,7 +213,7 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 7, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 259, valuewhen: 6, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
+- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 10, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 266, valuewhen: 66+7, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
