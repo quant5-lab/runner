@@ -161,8 +161,8 @@
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
-## PineScript Support Blockers (13)
-- Codegen: security inline, RSI inline
+## PineScript Support Blockers (12)
+- Codegen: RSI inline, valuewhen undefined series
 - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
 - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
 - Type: string variables
@@ -191,7 +191,7 @@
 - [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
 - [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
 - [x] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
-- [ ] `./bin/strategy` on BB8 produces expected trades (blocked: request.security() inline in conditions)
+- [ ] `./bin/strategy` on BB8 produces expected trades (blocked: ta.valuewhen undefined series)
 - [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)
