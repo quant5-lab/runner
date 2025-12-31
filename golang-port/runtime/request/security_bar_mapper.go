@@ -1,8 +1,6 @@
 package request
 
 import (
-	"time"
-
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
@@ -20,32 +18,49 @@ func (m *SecurityBarMapper) BuildMapping(
 	higherTimeframeBars []context.OHLCV,
 	lowerTimeframeBars []context.OHLCV,
 ) {
+	m.BuildMappingWithDateFilter(higherTimeframeBars, lowerTimeframeBars, DateRange{}, "UTC")
+}
+
+func (m *SecurityBarMapper) BuildMappingWithDateFilter(
+	higherTimeframeBars []context.OHLCV,
+	lowerTimeframeBars []context.OHLCV,
+	baseDateRange DateRange,
+	timezone string,
+) {
 	if len(higherTimeframeBars) == 0 || len(lowerTimeframeBars) == 0 {
 		return
 	}
 
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
 	m.ranges = make([]BarRange, 0, len(higherTimeframeBars))
-	lowerIdx := 0
 
 	for dailyIdx, dailyBar := range higherTimeframeBars {
-		startIdx := lowerIdx
-		dailyDate := extractDate(dailyBar.Time)
+		dailyDate := ExtractDateInTimezone(dailyBar.Time, timezone)
 
-		for lowerIdx < len(lowerTimeframeBars) {
-			lowerBarDate := extractDate(lowerTimeframeBars[lowerIdx].Time)
+		startIdx := -1
+		endIdx := -1
 
-			if lowerBarDate != dailyDate {
-				break
+		for hourlyIdx, hourlyBar := range lowerTimeframeBars {
+			hourlyDate := ExtractDateInTimezone(hourlyBar.Time, timezone)
+
+			if hourlyDate == dailyDate {
+				if startIdx == -1 {
+					startIdx = hourlyIdx
+				}
+				endIdx = hourlyIdx
 			}
-
-			lowerIdx++
 		}
 
-		endIdx := lowerIdx - 1
-
-		if endIdx >= startIdx {
-			m.ranges = append(m.ranges, NewBarRange(dailyIdx, startIdx, endIdx))
+		/* Ensures ATR calculations use same daily bar indices regardless of base TF length */
+		if startIdx < 0 {
+			startIdx = -1
+			endIdx = -1
 		}
+
+		m.ranges = append(m.ranges, NewBarRange(dailyIdx, startIdx, endIdx))
 	}
 }
 
@@ -121,7 +136,6 @@ func (m *SecurityBarMapper) handleAfterLastRange(lookahead bool) int {
 	return m.ranges[lastIdx].DailyBarIndex
 }
 
-func extractDate(timestamp int64) string {
-	t := time.Unix(timestamp, 0).UTC()
-	return t.Format("2006-01-02")
+func (m *SecurityBarMapper) GetRanges() []BarRange {
+	return m.ranges
 }

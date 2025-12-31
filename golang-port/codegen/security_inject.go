@@ -59,6 +59,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
 	codeBuilder.WriteString("\tvar secTimeframeSeconds int64\n")
+	codeBuilder.WriteString("\tbaseDateRange := request.NewDateRangeFromBars(ctx.Data, ctx.Timezone)\n")
 
 	/* Generate fetch and store code for each unique symbol:timeframe */
 	for key, callsForKey := range dedupMap {
@@ -83,9 +84,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			runtimeKey = fmt.Sprintf("%%s:%s", tf)
 		}
 
-		codeBuilder.WriteString(fmt.Sprintf("\t/* Fetch %s data */\n", key))
 		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
-		codeBuilder.WriteString("\t/* Empty timeframe means use base timeframe (same timeframe) */\n")
 		codeBuilder.WriteString("\tif secTimeframeSeconds == 0 {\n")
 		codeBuilder.WriteString("\t\tsecTimeframeSeconds = baseTimeframeSeconds\n")
 		codeBuilder.WriteString("\t}\n")
@@ -97,18 +96,25 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 				maxPeriod = period
 			}
 		}
-		/* Default minimum warmup if no periods found or very small periods */
+		/* Minimum warmup if no periods found or very small periods */
 		warmupBars := maxPeriod
 		if warmupBars < 50 {
-			warmupBars = 50 /* Minimum warmup for basic indicators */
+			warmupBars = 50
 		}
 
-		codeBuilder.WriteString(fmt.Sprintf("\t/* Dynamic warmup based on indicators: %d bars */\n", warmupBars))
-
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
-		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds {\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t\ttimeframeRatio := float64(secTimeframeSeconds) / float64(baseTimeframeSeconds)\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = int(float64(len(ctx.Data)) * timeframeRatio) + %d\n", varName, warmupBars))
+		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds && len(ctx.Data) > 0 {\n")
+		codeBuilder.WriteString("\t\tfirstBarTime := ctx.Data[0].Time\n")
+		codeBuilder.WriteString("\t\tlastBarTime := ctx.Data[len(ctx.Data)-1].Time\n")
+		codeBuilder.WriteString("\t\ttimeSpanSeconds := lastBarTime - firstBarTime\n")
+		codeBuilder.WriteString(fmt.Sprintf("\t\tbaseSecurityBars := int(timeSpanSeconds/secTimeframeSeconds) + 1\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tdetectedWarmup := %d\n", warmupBars))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfixedMinimumWarmup := 500\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\trequiredWarmup := fixedMinimumWarmup\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tif detectedWarmup > requiredWarmup {\n"))
+		codeBuilder.WriteString(fmt.Sprintf("\t\t\trequiredWarmup = detectedWarmup\n"))
+		codeBuilder.WriteString("\t\t}\n")
+		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = baseSecurityBars + requiredWarmup\n", varName))
 		codeBuilder.WriteString("\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %q, %s_limit)\n",
 			varName, varName, symbolCode, timeframe, varName))
@@ -116,6 +122,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %s: %%v\\n\", %s_err)\n", key, varName))
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
 		codeBuilder.WriteString("\t}\n")
+
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %q, len(%s_data))\n",
 			varName, symbolCode, timeframe, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
@@ -125,12 +132,12 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		if isPlaceholder {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n", runtimeKey, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMapping(%s_ctx.Data, ctx.Data)\n", varName, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[fmt.Sprintf(%q, ctx.Symbol)] = %s_mapper\n\n", runtimeKey, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", key, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMapping(%s_ctx.Data, ctx.Data)\n", varName, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", key, varName))
 		}
 	}

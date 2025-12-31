@@ -82,6 +82,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	/* Infer timezone for MOEX symbols if not specified */
+	if timezone == "" || timezone == "UTC" {
+		symbol := *symbolFlag
+		if len(symbol) >= 2 && (symbol[len(symbol)-2:] == "RU" || 
+			symbol == "CNRU" || symbol == "SBER" || symbol == "GAZP" || 
+			symbol == "LKOH" || symbol == "YNDX") {
+			timezone = "Europe/Moscow"
+		}
+	}
+
 	/* Create runtime context with timezone from data source */
 	ctx := context.New(*symbolFlag, *timeframeFlag, len(bars))
 	ctx.Timezone = timezone

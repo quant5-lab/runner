@@ -15,6 +15,10 @@ func NewBarRange(dailyIdx, startHourly, endHourly int) BarRange {
 }
 
 func (r BarRange) Contains(hourlyIndex int) bool {
+	/* Ranges with no hourly bars (-1) cannot contain any index */
+	if r.StartHourlyIndex < 0 || r.EndHourlyIndex < 0 {
+		return false
+	}
 	return hourlyIndex >= r.StartHourlyIndex && hourlyIndex <= r.EndHourlyIndex
 }
 
