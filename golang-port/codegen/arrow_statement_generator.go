@@ -11,17 +11,20 @@ type ArrowStatementGenerator struct {
 	gen           *generator
 	localStorage  *ArrowLocalVariableStorage
 	exprGenerator *ArrowExpressionGeneratorImpl
+	symbolTable   SymbolTable
 }
 
 func NewArrowStatementGenerator(
 	gen *generator,
 	localStorage *ArrowLocalVariableStorage,
 	exprGen *ArrowExpressionGeneratorImpl,
+	symbolTable SymbolTable,
 ) *ArrowStatementGenerator {
 	return &ArrowStatementGenerator{
 		gen:           gen,
 		localStorage:  localStorage,
 		exprGenerator: exprGen,
+		symbolTable:   symbolTable,
 	}
 }
 
@@ -55,6 +58,11 @@ func (s *ArrowStatementGenerator) generateVariableDeclaration(varDecl *ast.Varia
 }
 
 func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(varName string, initExpr ast.Expression) (string, error) {
+	// Register in symbol table as series (arrow function variables are always series)
+	if s.symbolTable != nil {
+		s.symbolTable.Register(varName, VariableTypeSeries)
+	}
+
 	exprCode, err := s.exprGenerator.Generate(initExpr)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate init expression for '%s': %w", varName, err)
@@ -67,6 +75,10 @@ func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.Arr
 	varNames := make([]string, len(arrayPattern.Elements))
 	for i, elem := range arrayPattern.Elements {
 		varNames[i] = elem.Name
+		// Register each tuple element in symbol table as series
+		if s.symbolTable != nil {
+			s.symbolTable.Register(varNames[i], VariableTypeSeries)
+		}
 	}
 
 	exprCode, err := s.exprGenerator.Generate(initExpr)

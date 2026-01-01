@@ -7,7 +7,7 @@ import (
 )
 
 type InlineTAIIFEGenerator interface {
-	Generate(accessor AccessGenerator, period int, sourceHash string) string
+	Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string
 }
 
 type InlineTAIIFERegistry struct {
@@ -52,7 +52,7 @@ func (r *InlineTAIIFERegistry) IsSupported(funcName string) bool {
 	return ok
 }
 
-func (r *InlineTAIIFERegistry) Generate(funcName string, accessor AccessGenerator, period int, sourceHash string) (string, bool) {
+func (r *InlineTAIIFERegistry) Generate(funcName string, accessor AccessGenerator, period PeriodExpression, sourceHash string) (string, bool) {
 	gen, ok := r.generators[funcName]
 	if !ok {
 		return "", false
@@ -78,77 +78,78 @@ type LowestIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type ChangeIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
-func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %d; j++ { sum += %s }; ", period, accessor.GenerateLoopValueAccess("j"))
-	body += fmt.Sprintf("return sum / %d.0", period)
+func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("return sum / %s", period.AsFloat64Cast())
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
 }
 
-func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
+func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	context := NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("ema", period, sourceHash)
+	varName := g.namingStrategy.GenerateName("ema", period.AsSeriesNamePart(), sourceHash)
 
 	builder := NewStatefulIndicatorBuilder("ta.ema", varName, period, accessor, false, context)
 	statefulCode := builder.BuildEMA()
-	// Direct series buffer access - returns float64, no .GetCurrent() needed
 	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
-func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
+func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	context := NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("rma", period, sourceHash)
+	varName := g.namingStrategy.GenerateName("rma", period.AsSeriesNamePart(), sourceHash)
 
 	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, false, context)
 	statefulCode := builder.BuildRMA()
-	// Direct series buffer access - returns float64, no .GetCurrent() needed
 	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
-func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %d; j++ { weight := float64(%d - j); sum += weight * %s; weightSum += weight }; ", period, period, accessor.GenerateLoopValueAccess("j"))
+func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := float64(%s - j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsGoExpr(), accessor.GenerateLoopValueAccess("j"))
 	body += "return sum / weightSum"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
 }
 
-func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %d; j++ { sum += %s }; ", period, accessor.GenerateLoopValueAccess("j"))
-	body += fmt.Sprintf("mean := sum / %d.0; ", period)
-	body += fmt.Sprintf("variance := 0.0; for j := 0; j < %d; j++ { diff := %s - mean; variance += diff * diff }; ", period, accessor.GenerateLoopValueAccess("j"))
-	body += fmt.Sprintf("return math.Sqrt(variance / %d.0)", period)
+func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("mean := sum / %s; ", period.AsFloat64Cast())
+	body += fmt.Sprintf("variance := 0.0; for j := 0; j < %s; j++ { diff := %s - mean; variance += diff * diff }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("return math.Sqrt(variance / %s)", period.AsFloat64Cast())
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
 }
 
-func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(period))
-	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v > highest { highest = v } }; ", period-1, accessor.GenerateLoopValueAccess("j"))
+func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	periodInt := period.AsInt()
+	body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
+	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return highest"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
 }
 
-func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
-	body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(period))
-	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v < lowest { lowest = v } }; ", period-1, accessor.GenerateLoopValueAccess("j"))
+func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	periodInt := period.AsInt()
+	body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
+	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return lowest"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
 }
 
-func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset int, sourceHash string) string {
-	if offset <= 0 {
-		offset = 1
+func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset PeriodExpression, sourceHash string) string {
+	offsetInt := offset.AsInt()
+	if offsetInt <= 0 {
+		offsetInt = 1
 	}
 
 	body := fmt.Sprintf("current := %s; ", accessor.GenerateLoopValueAccess("0"))
-	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offset)))
+	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offsetInt)))
 	body += "return current - previous"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(offset + 1).WithBody(body).Build()
+	return NewIIFECodeBuilder().WithWarmupCheck(offsetInt + 1).WithBody(body).Build()
 }

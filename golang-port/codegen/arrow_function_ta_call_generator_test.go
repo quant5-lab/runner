@@ -52,10 +52,12 @@ func TestArrowFunctionTACallGenerator_CanHandle(t *testing.T) {
 /* TestArrowFunctionTACallGenerator_ArgumentExtraction validates argument parsing */
 func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 	tests := []struct {
-		name           string
-		call           *ast.CallExpression
-		expectError    bool
-		expectedPeriod int
+		name                string
+		call                *ast.CallExpression
+		expectError         bool
+		expectedPeriod      int
+		expectRuntimePeriod bool
+		runtimeVariableName string
 	}{
 		{
 			name: "literal arguments",
@@ -94,7 +96,7 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 			expectedPeriod: 50,
 		},
 		{
-			name: "parameter period - uses default",
+			name: "parameter period - creates runtime period",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "sma"},
 				Arguments: []ast.Expression{
@@ -102,8 +104,9 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 					&ast.Identifier{Name: "period"},
 				},
 			},
-			expectError:    false,
-			expectedPeriod: 20,
+			expectError:         false,
+			expectRuntimePeriod: true,
+			runtimeVariableName: "period",
 		},
 		{
 			name: "insufficient arguments",
@@ -149,8 +152,25 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 				t.Error("Expected accessor, got nil")
 			}
 
-			if period != tt.expectedPeriod {
-				t.Errorf("Period = %d, want %d", period, tt.expectedPeriod)
+			/* Validate period type and value */
+			if tt.expectRuntimePeriod {
+				runtimePeriod, ok := period.(*RuntimePeriod)
+				if !ok {
+					t.Errorf("Expected RuntimePeriod, got %T", period)
+					return
+				}
+				if runtimePeriod.variableName != tt.runtimeVariableName {
+					t.Errorf("RuntimePeriod variable = %q, want %q", runtimePeriod.variableName, tt.runtimeVariableName)
+				}
+			} else {
+				constPeriod, ok := period.(*ConstantPeriod)
+				if !ok {
+					t.Errorf("Expected ConstantPeriod, got %T", period)
+					return
+				}
+				if constPeriod.value != tt.expectedPeriod {
+					t.Errorf("Period = %d, want %d", constPeriod.value, tt.expectedPeriod)
+				}
 			}
 		})
 	}
@@ -159,10 +179,12 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 /* TestArrowFunctionTACallGenerator_ExtractChangeArguments validates change() argument parsing */
 func TestArrowFunctionTACallGenerator_ExtractChangeArguments(t *testing.T) {
 	tests := []struct {
-		name           string
-		call           *ast.CallExpression
-		expectError    bool
-		expectedOffset int
+		name                string
+		call                *ast.CallExpression
+		expectError         bool
+		expectedOffset      int
+		expectRuntimeOffset bool
+		runtimeVariableName string
 	}{
 		{
 			name: "change with source only",
@@ -228,8 +250,9 @@ func TestArrowFunctionTACallGenerator_ExtractChangeArguments(t *testing.T) {
 					&ast.Identifier{Name: "period"},
 				},
 			},
-			expectError:    false,
-			expectedOffset: 20,
+			expectError:         false,
+			expectRuntimeOffset: true,
+			runtimeVariableName: "period",
 		},
 	}
 
@@ -256,8 +279,25 @@ func TestArrowFunctionTACallGenerator_ExtractChangeArguments(t *testing.T) {
 				t.Error("Expected accessor, got nil")
 			}
 
-			if offset != tt.expectedOffset {
-				t.Errorf("Offset = %d, want %d", offset, tt.expectedOffset)
+			/* Validate offset type and value */
+			if tt.expectRuntimeOffset {
+				runtimeOffset, ok := offset.(*RuntimePeriod)
+				if !ok {
+					t.Errorf("Expected RuntimePeriod offset, got %T", offset)
+					return
+				}
+				if runtimeOffset.variableName != tt.runtimeVariableName {
+					t.Errorf("RuntimePeriod variable = %q, want %q", runtimeOffset.variableName, tt.runtimeVariableName)
+				}
+			} else {
+				constOffset, ok := offset.(*ConstantPeriod)
+				if !ok {
+					t.Errorf("Expected ConstantPeriod offset, got %T", offset)
+					return
+				}
+				if constOffset.value != tt.expectedOffset {
+					t.Errorf("Offset = %d, want %d", constOffset.value, tt.expectedOffset)
+				}
 			}
 		})
 	}
@@ -450,11 +490,13 @@ func TestArrowFunctionTACallGenerator_IIFEGeneration(t *testing.T) {
 /* TestArrowFunctionTACallGenerator_PeriodExtraction validates period value parsing */
 func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 	tests := []struct {
-		name        string
-		expr        ast.Expression
-		variables   map[string]string
-		expected    int
-		expectError bool
+		name                string
+		expr                ast.Expression
+		variables           map[string]string
+		expected            int
+		expectRuntimePeriod bool
+		runtimeVariableName string
+		expectError         bool
 	}{
 		{
 			name:     "float literal",
@@ -477,10 +519,11 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:      "parameter identifier - uses default",
-			expr:      &ast.Identifier{Name: "len"},
-			variables: map[string]string{"len": "float"},
-			expected:  20,
+			name:                "parameter identifier - creates runtime period",
+			expr:                &ast.Identifier{Name: "len"},
+			variables:           map[string]string{"len": "float"},
+			expectRuntimePeriod: true,
+			runtimeVariableName: "len",
 		},
 		{
 			name:        "global constant identifier",
@@ -510,7 +553,7 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 			}
 			gen := newTestArrowTAGenerator(g)
 
-			period, err := gen.extractPeriodValue(tt.expr)
+			period, err := gen.extractPeriodExpression(tt.expr)
 
 			if tt.expectError {
 				if err == nil {
@@ -523,8 +566,25 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			if period != tt.expected {
-				t.Errorf("Period = %d, want %d", period, tt.expected)
+			/* Validate period type and value */
+			if tt.expectRuntimePeriod {
+				runtimePeriod, ok := period.(*RuntimePeriod)
+				if !ok {
+					t.Errorf("Expected RuntimePeriod, got %T", period)
+					return
+				}
+				if runtimePeriod.variableName != tt.runtimeVariableName {
+					t.Errorf("RuntimePeriod variable = %q, want %q", runtimePeriod.variableName, tt.runtimeVariableName)
+				}
+			} else {
+				constPeriod, ok := period.(*ConstantPeriod)
+				if !ok {
+					t.Errorf("Expected ConstantPeriod, got %T", period)
+					return
+				}
+				if constPeriod.value != tt.expected {
+					t.Errorf("Period = %d, want %d", constPeriod.value, tt.expected)
+				}
 			}
 		})
 	}
@@ -605,15 +665,18 @@ func TestArrowFunctionTACallGenerator_EdgeCases(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "change with invalid offset type",
+			name: "change with runtime parameter offset",
+			setup: func(g *generator) {
+				g.variables["offset"] = "float"
+			},
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "change"},
 				Arguments: []ast.Expression{
 					&ast.Identifier{Name: "low"},
-					&ast.Identifier{Name: "nonExistentVar"},
+					&ast.Identifier{Name: "offset"},
 				},
 			},
-			expectError: true,
+			expectError: false,
 		},
 	}
 

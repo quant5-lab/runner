@@ -110,7 +110,7 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false, NewTopLevelIndicatorContext())
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
 
 	code := builder.BuildRMA()
 
@@ -121,10 +121,10 @@ func TestTAIndicatorBuilder_RMA(t *testing.T) {
 		"} else {",
 		"if ctx.BarIndex == 19",
 		"/* First valid value: calculate SMA as initial state */",
-		"sum := 0.0",
+		"_sma_accumulator := 0.0",
 		"for j := 0; j < 20; j++",
-		"sum += closeSeries.Get(j)",
-		"initialValue := sum / float64(20)",
+		"_sma_accumulator += closeSeries.Get(j)",
+		"initialValue := _sma_accumulator / float64(20)",
 		"rma20Series.Set(initialValue)",
 		"} else {",
 		"/* Recursive phase: use previous indicator value */",

@@ -173,7 +173,7 @@ func TestStatefulIndicatorBuilder_ContextIntegration(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			builder := NewStatefulIndicatorBuilder("ta.rma", tc.varName, tc.period, mockAccessor, tc.needsNaN, tc.context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", tc.varName, P(tc.period), mockAccessor, tc.needsNaN, tc.context)
 			code := builder.BuildRMA()
 
 			if !strings.Contains(code, tc.expectedPreviousAccess) {
@@ -322,10 +322,10 @@ func TestStatefulIndicatorBuilder_MultiIndicatorContext(t *testing.T) {
 	t.Run("TopLevel: multiple RMA indicators share context", func(t *testing.T) {
 		ctx := NewTopLevelIndicatorContext()
 
-		builder1 := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false, ctx)
+		builder1 := NewStatefulIndicatorBuilder("ta.rma", "rma14", P(14), mockAccessor, false, ctx)
 		code1 := builder1.BuildRMA()
 
-		builder2 := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false, ctx)
+		builder2 := NewStatefulIndicatorBuilder("ta.rma", "rma20", P(20), mockAccessor, false, ctx)
 		code2 := builder2.BuildRMA()
 
 		// Both should use top-level series access
@@ -345,10 +345,10 @@ func TestStatefulIndicatorBuilder_MultiIndicatorContext(t *testing.T) {
 	t.Run("Arrow: multiple indicators share arrowCtx", func(t *testing.T) {
 		ctx := NewArrowFunctionIndicatorContext()
 
-		builder1 := NewStatefulIndicatorBuilder("ta.rma", "plus", 18, mockAccessor, false, ctx)
+		builder1 := NewStatefulIndicatorBuilder("ta.rma", "plus", P(18), mockAccessor, false, ctx)
 		code1 := builder1.BuildRMA()
 
-		builder2 := NewStatefulIndicatorBuilder("ta.ema", "minus", 18, mockAccessor, false, ctx)
+		builder2 := NewStatefulIndicatorBuilder("ta.ema", "minus", P(18), mockAccessor, false, ctx)
 		code2 := builder2.BuildEMA()
 
 		// Both should use arrowCtx-mediated access

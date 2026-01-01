@@ -114,7 +114,7 @@ func TestStatefulIndicatorBuilder_PeriodBoundaries(t *testing.T) {
 			varName := fmt.Sprintf("test%d", tc.period)
 
 			t.Run("RMA", func(t *testing.T) {
-				builder := NewStatefulIndicatorBuilder("ta.rma", varName, tc.period, mockAccessor, false, NewTopLevelIndicatorContext())
+				builder := NewStatefulIndicatorBuilder("ta.rma", varName, P(tc.period), mockAccessor, false, NewTopLevelIndicatorContext())
 				code := builder.BuildRMA()
 
 				warmupCheck := fmt.Sprintf("if ctx.BarIndex < %d", tc.warmupBar)
@@ -143,7 +143,7 @@ func TestStatefulIndicatorBuilder_PeriodBoundaries(t *testing.T) {
 			})
 
 			t.Run("EMA", func(t *testing.T) {
-				builder := NewStatefulIndicatorBuilder("ta.ema", varName, tc.period, mockAccessor, false, NewTopLevelIndicatorContext())
+				builder := NewStatefulIndicatorBuilder("ta.ema", varName, P(tc.period), mockAccessor, false, NewTopLevelIndicatorContext())
 				code := builder.BuildEMA()
 
 				if !strings.Contains(code, tc.alphaEMA) {
@@ -199,7 +199,7 @@ func TestStatefulIndicatorBuilder_NaNPropagation(t *testing.T) {
 			name:     "NaN checks disabled",
 			needsNaN: false,
 			shouldHave: []string{
-				"sum += ",
+				"_sma_accumulator += ",
 			},
 			shouldNotHave: []string{
 				"val := ",
@@ -216,7 +216,7 @@ func TestStatefulIndicatorBuilder_NaNPropagation(t *testing.T) {
 				},
 			}
 
-			builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", 10, mockAccessor, tc.needsNaN, NewTopLevelIndicatorContext())
+			builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", P(10), mockAccessor, tc.needsNaN, NewTopLevelIndicatorContext())
 			code := builder.BuildRMA()
 
 			for _, expected := range tc.shouldHave {
@@ -253,8 +253,9 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 	}
 
 	t.Run("Three-phase structure", func(t *testing.T) {
-		builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, false, NewTopLevelIndicatorContext())
+		builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
 		code := builder.BuildRMA()
+		t.Logf("Generated code:\n%s", code)
 
 		if !strings.Contains(code, "if ctx.BarIndex < 19") {
 			t.Error("Missing warmup condition")
@@ -269,7 +270,7 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 		if !strings.Contains(code, "if ctx.BarIndex == 19") {
 			t.Error("Missing initialization condition")
 		}
-		if !strings.Contains(code, "sum := 0.0") {
+		if !strings.Contains(code, "_sma_accumulator := 0.0") {
 			t.Error("Missing accumulator initialization")
 		}
 
@@ -285,7 +286,7 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 	})
 
 	t.Run("Forward loops only", func(t *testing.T) {
-		builder := NewStatefulIndicatorBuilder("ta.rma", "rma30", 30, mockAccessor, false, NewTopLevelIndicatorContext())
+		builder := NewStatefulIndicatorBuilder("ta.rma", "rma30", P(30), mockAccessor, false, NewTopLevelIndicatorContext())
 		code := builder.BuildRMA()
 
 		if strings.Contains(code, "j--") {
@@ -300,7 +301,7 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 	})
 
 	t.Run("Self-reference pattern", func(t *testing.T) {
-		builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false, NewTopLevelIndicatorContext())
+		builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", P(14), mockAccessor, false, NewTopLevelIndicatorContext())
 		code := builder.BuildRMA()
 
 		if !strings.Contains(code, "rma14Series.Get(1)") {
@@ -317,7 +318,7 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 	})
 
 	t.Run("No recalculation from scratch", func(t *testing.T) {
-		builder := NewStatefulIndicatorBuilder("ta.rma", "rma25", 25, mockAccessor, false, NewTopLevelIndicatorContext())
+		builder := NewStatefulIndicatorBuilder("ta.rma", "rma25", P(25), mockAccessor, false, NewTopLevelIndicatorContext())
 		code := builder.BuildRMA()
 
 		loopCount := strings.Count(code, "for j :=")
@@ -360,10 +361,10 @@ func TestStatefulIndicatorBuilder_RMA_vs_EMA_Distinction(t *testing.T) {
 		t.Run(fmt.Sprintf("Period %d", period), func(t *testing.T) {
 			varName := fmt.Sprintf("test%d", period)
 
-			rmaBuilder := NewStatefulIndicatorBuilder("ta.rma", varName, period, mockAccessor, false, NewTopLevelIndicatorContext())
+			rmaBuilder := NewStatefulIndicatorBuilder("ta.rma", varName, P(period), mockAccessor, false, NewTopLevelIndicatorContext())
 			rmaCode := rmaBuilder.BuildRMA()
 
-			emaBuilder := NewStatefulIndicatorBuilder("ta.ema", varName, period, mockAccessor, false, NewTopLevelIndicatorContext())
+			emaBuilder := NewStatefulIndicatorBuilder("ta.ema", varName, P(period), mockAccessor, false, NewTopLevelIndicatorContext())
 			emaCode := emaBuilder.BuildEMA()
 
 			rmaAlpha := fmt.Sprintf("alpha := 1.0 / float64(%d)", period)
@@ -450,7 +451,7 @@ func TestStatefulIndicatorBuilder_VariableNaming(t *testing.T) {
 				},
 			}
 
-			builder := NewStatefulIndicatorBuilder("ta.rma", tc.varName, 10, mockAccessor, false, NewTopLevelIndicatorContext())
+			builder := NewStatefulIndicatorBuilder("ta.rma", tc.varName, P(10), mockAccessor, false, NewTopLevelIndicatorContext())
 			code := builder.BuildRMA()
 
 			if !strings.Contains(code, tc.expectedSeries+".Set(math.NaN())") {
@@ -458,7 +459,7 @@ func TestStatefulIndicatorBuilder_VariableNaming(t *testing.T) {
 			}
 
 			requiredVars := []string{
-				"sum := 0.0",
+				"_sma_accumulator := 0.0",
 				"alpha := ",
 				"previousValue := ",
 				"currentSource := ",
@@ -489,7 +490,7 @@ func TestStatefulIndicatorBuilder_CodeStructure(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", 20, mockAccessor, true, NewTopLevelIndicatorContext())
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", P(20), mockAccessor, true, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Run("Has documentation comments", func(t *testing.T) {

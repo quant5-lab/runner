@@ -14,9 +14,9 @@ func NewRMAGenerator(namer SeriesNamer) *RMAGenerator {
 	return &RMAGenerator{namingStrategy: namer}
 }
 
-func (g *RMAGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
+func (g *RMAGenerator) Generate(accessor AccessGenerator, period codegen.PeriodExpression, sourceHash string) string {
 	context := codegen.NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("rma", period, sourceHash)
+	varName := g.namingStrategy.GenerateName("rma", period.AsSeriesNamePart(), sourceHash)
 
 	builder := codegen.NewStatefulIndicatorBuilder(
 		"ta.rma",
@@ -34,5 +34,5 @@ func (g *RMAGenerator) Generate(accessor AccessGenerator, period int, sourceHash
 }
 
 type SeriesNamer interface {
-	GenerateName(indicatorType string, period int, sourceHash string) string
+	GenerateName(indicatorType string, period string, sourceHash string) string
 }

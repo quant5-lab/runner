@@ -56,13 +56,12 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 	preamble := ""
 
 	if e.requiresExpressionAccessor(sourceExpr, sourceInfo) {
-		exprCode := e.generator.extractSeriesExpression(sourceExpr)
 		preambleCode, err := e.registerNestedTempVars(sourceExpr)
 		if err != nil {
 			return nil, err
 		}
 		preamble += preambleCode
-		accessGen = NewExpressionAccessGenerator(e.generator, exprCode)
+		accessGen = NewSeriesExpressionAccessor(sourceExpr, e.generator.symbolTable)
 		needsNaN = true
 	}
 
@@ -79,11 +78,11 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 // requiresExpressionAccessor returns true when the source expression is not a simple OHLCV field/series
 // and therefore needs expression-aware offset rewriting instead of the default classifier fallback.
 func (e *TAArgumentExtractor) requiresExpressionAccessor(sourceExpr ast.Expression, info SourceInfo) bool {
-	if info.IsSeriesVariable() {
-		return false
-	}
-
+	// Simple series identifier: use default accessor
 	if id, ok := sourceExpr.(*ast.Identifier); ok {
+		if info.IsSeriesVariable() {
+			return false
+		}
 		return !e.classifier.isBuiltinOHLCVField(id.Name)
 	}
 

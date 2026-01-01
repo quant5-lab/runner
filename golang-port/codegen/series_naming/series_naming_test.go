@@ -1,6 +1,7 @@
 package series_naming
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/quant5-lab/runner/codegen/source_identity"
@@ -43,7 +44,7 @@ func TestStatefulIndicatorNamer_GenerateName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := namer.GenerateName(tt.indicatorName, tt.period, tt.sourceHash)
+			result := namer.GenerateName(tt.indicatorName, fmt.Sprintf("%d", tt.period), tt.sourceHash)
 
 			/* Check all required substrings are present */
 			for _, substr := range tt.wantContains {
@@ -67,9 +68,9 @@ func TestStatefulIndicatorNamer_UniqueNamesForDifferentSources(t *testing.T) {
 	namer := NewStatefulIndicatorNamer()
 
 	/* Same indicator and period but different source expressions */
-	name1 := namer.GenerateName("rma", 14, "source1hash")
-	name2 := namer.GenerateName("rma", 14, "source2hash")
-	name3 := namer.GenerateName("rma", 14, "source3hash")
+	name1 := namer.GenerateName("rma", "14", "source1hash")
+	name2 := namer.GenerateName("rma", "14", "source2hash")
+	name3 := namer.GenerateName("rma", "14", "source3hash")
 
 	/* All should be unique */
 	if name1 == name2 {
@@ -88,9 +89,9 @@ func TestStatefulIndicatorNamer_DeterministicNaming(t *testing.T) {
 	namer := NewStatefulIndicatorNamer()
 
 	/* Generate same name multiple times */
-	name1 := namer.GenerateName("ema", 20, "testhash")
-	name2 := namer.GenerateName("ema", 20, "testhash")
-	name3 := namer.GenerateName("ema", 20, "testhash")
+	name1 := namer.GenerateName("ema", "20", "testhash")
+	name2 := namer.GenerateName("ema", "20", "testhash")
+	name3 := namer.GenerateName("ema", "20", "testhash")
 
 	/* All should be identical */
 	if name1 != name2 {
@@ -133,7 +134,7 @@ func TestWindowBasedNamer_GenerateName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := namer.GenerateName(tt.indicatorName, tt.period, tt.sourceHash)
+			result := namer.GenerateName(tt.indicatorName, fmt.Sprintf("%d", tt.period), tt.sourceHash)
 
 			/* Check required substrings */
 			for _, substr := range tt.wantContains {
@@ -157,9 +158,9 @@ func TestWindowBasedNamer_SameNameForSamePeriod(t *testing.T) {
 	namer := NewWindowBasedNamer()
 
 	/* Same indicator and period but different source hashes */
-	name1 := namer.GenerateName("highest", 20, "hash1")
-	name2 := namer.GenerateName("highest", 20, "hash2")
-	name3 := namer.GenerateName("highest", 20, "hash3")
+	name1 := namer.GenerateName("highest", "20", "hash1")
+	name2 := namer.GenerateName("highest", "20", "hash2")
+	name3 := namer.GenerateName("highest", "20", "hash3")
 
 	/* All should be identical (source hash ignored) */
 	if name1 != name2 {
@@ -226,7 +227,7 @@ func TestNamingStrategy_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			/* Should not panic */
-			result := tt.namer.GenerateName(tt.indName, tt.period, tt.hash)
+			result := tt.namer.GenerateName(tt.indName, fmt.Sprintf("%d", tt.period), tt.hash)
 
 			/* Should produce non-empty result */
 			if result == "" {
@@ -234,7 +235,7 @@ func TestNamingStrategy_EdgeCases(t *testing.T) {
 			}
 
 			/* Should be deterministic even for edge cases */
-			result2 := tt.namer.GenerateName(tt.indName, tt.period, tt.hash)
+			result2 := tt.namer.GenerateName(tt.indName, fmt.Sprintf("%d", tt.period), tt.hash)
 			if result != result2 {
 				t.Errorf("edge case naming unstable: %q != %q", result, result2)
 			}
@@ -252,8 +253,8 @@ func TestNamingStrategy_IntegrationWithSourceIdentity(t *testing.T) {
 	id2 := factory.CreateFromExpression(nil) // Should be same
 
 	/* Names with same source should be identical */
-	name1 := namer.GenerateName("rma", 14, id1.Hash())
-	name2 := namer.GenerateName("rma", 14, id2.Hash())
+	name1 := namer.GenerateName("rma", "14", id1.Hash())
+	name2 := namer.GenerateName("rma", "14", id2.Hash())
 
 	if name1 != name2 {
 		t.Errorf("identical source identifiers should produce same name: %q != %q", name1, name2)
@@ -269,7 +270,7 @@ func TestNamingStrategy_PeriodVariations(t *testing.T) {
 	names := make(map[string]bool)
 
 	for _, period := range periods {
-		name := namer.GenerateName("rma", period, hash)
+		name := namer.GenerateName("rma", fmt.Sprintf("%d", period), hash)
 
 		/* Each period should produce unique name */
 		if names[name] {

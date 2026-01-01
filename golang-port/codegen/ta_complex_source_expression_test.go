@@ -8,22 +8,24 @@ import (
 	"github.com/quant5-lab/runner/runtime/validation"
 )
 
-/* TestTAArgumentExtractor_ComplexExpressions tests handling of non-simple source expressions.
- * Ensures complex sources (binary ops, function calls, conditionals) generate expression accessors
- * and proper temp var preambles instead of falling back to default OHLCV fields.
- *
- * Critical for:
- * - RSI with gains/losses: rma(max(change(src), 0), len)
- * - Conditional sources: rma(cond ? high : low, len)
- * - Arithmetic sources: sma(close * 2, len)
- * - Nested TA: ema(sma(close, 10), 20)
- */
+/*
+	 TestTAArgumentExtractor_ComplexExpressions tests handling of non-simple source expressions.
+	 * Ensures complex sources (binary ops, function calls, conditionals) generate 					if _, ok := comp.AccessGen.(*SeriesExpressionAccessor); !ok {
+							t.Errorf("AccessGen type = %T, want *SeriesExpressionAccessor for nested TA",pression accessors
+	 * and proper temp var preambles instead of falling back to default OHLCV fields.
+	 *
+	 * Critical for:
+	 * - RSI with gains/losses: rma(max(change(src), 0), len)
+	 * - Conditional sources: rma(cond ? high : low, len)
+	 * - Arithmetic sources: sma(close * 2, len)
+	 * - Nested TA: ema(sma(close, 10), 20)
+*/
 func TestTAArgumentExtractor_ComplexExpressions(t *testing.T) {
 	tests := []struct {
 		name             string
 		sourceExpr       ast.Expression
 		period           int
-		wantExprAccessor bool // Should use ExpressionAccessGenerator
+		wantExprAccessor bool // Should use SeriesExpressionAccessor
 		wantPreamble     bool // Should generate temp var preamble
 		wantTempVarCount int  // Expected number of temp vars in preamble
 		description      string
@@ -140,8 +142,8 @@ func TestTAArgumentExtractor_ComplexExpressions(t *testing.T) {
 
 			// Verify expression accessor is used for complex expressions
 			if tt.wantExprAccessor {
-				if _, ok := comp.AccessGen.(*ExpressionAccessGenerator); !ok {
-					t.Errorf("AccessGen type = %T, want *ExpressionAccessGenerator (reason: %s)",
+				if _, ok := comp.AccessGen.(*SeriesExpressionAccessor); !ok {
+					t.Errorf("AccessGen type = %T, want *SeriesExpressionAccessor (reason: %s)",
 						comp.AccessGen, tt.description)
 				}
 			}
@@ -207,8 +209,8 @@ func TestTAArgumentExtractor_RSIGainsLosses(t *testing.T) {
 	}
 
 	// Must use expression accessor (not OHLCV field accessor)
-	if _, ok := comp.AccessGen.(*ExpressionAccessGenerator); !ok {
-		t.Errorf("AccessGen type = %T, want *ExpressionAccessGenerator for RSI gains pattern", comp.AccessGen)
+	if _, ok := comp.AccessGen.(*SeriesExpressionAccessor); !ok {
+		t.Errorf("AccessGen type = %T, want *SeriesExpressionAccessor for RSI gains pattern", comp.AccessGen)
 	}
 
 	// Must generate preamble with change() temp var
@@ -311,8 +313,8 @@ func TestTAArgumentExtractor_NestedTADepth(t *testing.T) {
 			// Note: Direct TA call as source doesn't generate preamble here;
 			// it will be handled by tempVarMgr during full code generation.
 			// The expression accessor is still created for offset rewriting.
-			if _, ok := comp.AccessGen.(*ExpressionAccessGenerator); !ok {
-				t.Errorf("AccessGen type = %T, want *ExpressionAccessGenerator for nested TA",
+			if _, ok := comp.AccessGen.(*SeriesExpressionAccessor); !ok {
+				t.Errorf("AccessGen type = %T, want *SeriesExpressionAccessor for nested TA",
 					comp.AccessGen)
 			}
 
@@ -457,13 +459,13 @@ func TestTAArgumentExtractor_FallbackPrevention(t *testing.T) {
 			// Should NOT use simple OHLCV accessor
 			if ohlcvGen, ok := comp.AccessGen.(*OHLCVFieldAccessGenerator); ok {
 				t.Errorf("Complex expression incorrectly using OHLCVFieldAccessGenerator with field=%s, "+
-					"should use ExpressionAccessGenerator to avoid 'close' fallback",
+					"should use SeriesExpressionAccessor to avoid 'close' fallback",
 					ohlcvGen.fieldName)
 			}
 
 			// Should use expression accessor
-			if _, ok := comp.AccessGen.(*ExpressionAccessGenerator); !ok {
-				t.Errorf("Complex expression using %T, want *ExpressionAccessGenerator to prevent fallback",
+			if _, ok := comp.AccessGen.(*SeriesExpressionAccessor); !ok {
+				t.Errorf("Complex expression using %T, want *SeriesExpressionAccessor to prevent fallback",
 					comp.AccessGen)
 			}
 		})

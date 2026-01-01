@@ -56,7 +56,7 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	// Initialize local variable storage and statement generator with proper indentation
 	a.localStorage = NewArrowLocalVariableStorage(a.gen.ind())
 	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
-	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen)
+	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen, a.gen.symbolTable)
 
 	body, err := a.generateFunctionBody(arrowFunc)
 	if err != nil {

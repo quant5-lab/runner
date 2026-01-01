@@ -63,6 +63,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
+	gen.symbolTable = NewSymbolTable()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -126,6 +127,7 @@ type generator struct {
 	signatureRegistrar      *SignatureRegistrar
 	arrowContextLifecycle   *ArrowContextLifecycleManager
 	returnValueStorage      *ReturnValueSeriesStorageHandler
+	symbolTable             SymbolTable // Tracks variable types for type-aware code generation
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -469,18 +471,32 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
 	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
 		code += g.ind() + fmt.Sprintf("var %s *series.Series\n", seriesName)
+		// Register as series type (remove "Series" suffix to get variable name)
+		if g.symbolTable != nil && len(seriesName) > 6 && seriesName[len(seriesName)-6:] == "Series" {
+			varName := seriesName[:len(seriesName)-6]
+			g.symbolTable.Register(varName, VariableTypeSeries)
+		}
 	}
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
 			if varType == "function" {
+				if g.symbolTable != nil {
+					g.symbolTable.Register(varName, VariableTypeFunction)
+				}
 				continue
 			}
 			if varType == "string" {
 				code += g.ind() + fmt.Sprintf("var %s string\n", varName)
+				if g.symbolTable != nil {
+					g.symbolTable.Register(varName, VariableTypeScalar)
+				}
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
+			if g.symbolTable != nil {
+				g.symbolTable.Register(varName, VariableTypeSeries)
+			}
 		}
 	}
 	code += "\n"
@@ -2923,7 +2939,7 @@ func (g *generator) generateRMA(varName string, period int, accessor AccessGener
 	} else {
 		context = NewTopLevelIndicatorContext()
 	}
-	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, needsNaN, context)
+	builder := NewStatefulIndicatorBuilder("ta.rma", varName, NewConstantPeriod(period), accessor, needsNaN, context)
 	return g.indentCode(builder.BuildRMA()), nil
 }
 

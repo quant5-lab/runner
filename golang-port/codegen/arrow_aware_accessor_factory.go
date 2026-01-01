@@ -22,15 +22,18 @@ Design Rationale:
 type ArrowAwareAccessorFactory struct {
 	identifierResolver *ArrowIdentifierResolver
 	exprGenerator      *ArrowExpressionGeneratorImpl
+	symbolTable        SymbolTable
 }
 
 func NewArrowAwareAccessorFactory(
 	resolver *ArrowIdentifierResolver,
 	exprGen *ArrowExpressionGeneratorImpl,
+	symbolTable SymbolTable,
 ) *ArrowAwareAccessorFactory {
 	return &ArrowAwareAccessorFactory{
 		identifierResolver: resolver,
 		exprGenerator:      exprGen,
+		symbolTable:        symbolTable,
 	}
 }
 
@@ -39,6 +42,7 @@ CreateAccessorForExpression creates an arrow-aware accessor for any expression.
 Supports identifiers, binary expressions, call expressions, and conditionals.
 */
 func (f *ArrowAwareAccessorFactory) CreateAccessorForExpression(expr ast.Expression) (AccessGenerator, error) {
+
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return f.createIdentifierAccessor(e)
@@ -83,6 +87,10 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 }
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {
+	if f.symbolTable != nil {
+		return NewSeriesExpressionAccessor(binExpr, f.symbolTable), nil
+	}
+
 	tempVarName := "binary_source_temp"
 
 	binaryCode, err := f.exprGenerator.Generate(binExpr)
@@ -113,6 +121,10 @@ func (f *ArrowAwareAccessorFactory) createCallAccessor(call *ast.CallExpression)
 }
 
 func (f *ArrowAwareAccessorFactory) createConditionalAccessor(cond *ast.ConditionalExpression) (AccessGenerator, error) {
+	if f.symbolTable != nil {
+		return NewSeriesExpressionAccessor(cond, f.symbolTable), nil
+	}
+
 	tempVarName := "ternary_source_temp"
 
 	condCode, err := f.exprGenerator.Generate(cond)

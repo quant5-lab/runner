@@ -14,9 +14,9 @@ func NewEMAGenerator(namer SeriesNamer) *EMAGenerator {
 	return &EMAGenerator{namingStrategy: namer}
 }
 
-func (g *EMAGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
+func (g *EMAGenerator) Generate(accessor AccessGenerator, period codegen.PeriodExpression, sourceHash string) string {
 	context := codegen.NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("ema", period, sourceHash)
+	varName := g.namingStrategy.GenerateName("ema", period.AsSeriesNamePart(), sourceHash)
 
 	builder := codegen.NewStatefulIndicatorBuilder(
 		"ta.ema",

@@ -62,7 +62,7 @@ func (h *LowestHandler) GenerateCode(g *generator, varName string, call *ast.Cal
 	if len(call.Arguments) > 0 {
 		sourceHash = hasher.Hash(call.Arguments[0])
 	}
-	iifeCode, ok := registry.Generate("ta.lowest", accessGen, period, sourceHash)
+	iifeCode, ok := registry.Generate("ta.lowest", accessGen, NewConstantPeriod(period), sourceHash)
 	if !ok {
 		return "", fmt.Errorf("ta.lowest IIFE generation failed")
 	}

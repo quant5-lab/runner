@@ -14,14 +14,20 @@ func NewSMAGenerator(namer SeriesNamer) *SMAGenerator {
 	return &SMAGenerator{namingStrategy: namer}
 }
 
-func (g *SMAGenerator) Generate(accessor AccessGenerator, period int, sourceHash string) string {
+func (g *SMAGenerator) Generate(accessor AccessGenerator, period codegen.PeriodExpression, sourceHash string) string {
 	context := codegen.NewArrowFunctionIndicatorContext()
-	varName := g.namingStrategy.GenerateName("sma", period, sourceHash)
+	varName := g.namingStrategy.GenerateName("sma", period.AsSeriesNamePart(), sourceHash)
+
+	/* Extract int value for TAIndicatorBuilder */
+	periodInt := 0
+	if constPeriod, ok := period.(*codegen.ConstantPeriod); ok {
+		periodInt = constPeriod.Value()
+	}
 
 	builder := codegen.NewTAIndicatorBuilder(
 		"ta.sma",
 		varName,
-		period,
+		periodInt,
 		accessor,
 		false,
 	)

@@ -16,7 +16,7 @@ func TestStatefulIndicatorBuilder_RMA_Structure(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", 14, mockAccessor, false, NewTopLevelIndicatorContext())
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma14", P(14), mockAccessor, false, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Run("HasWarmupPhase", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestStatefulIndicatorBuilder_RMA_Structure(t *testing.T) {
 		if !strings.Contains(code, "for j := 0; j < 14; j++") {
 			t.Error("Missing forward loop for SMA calculation")
 		}
-		if !strings.Contains(code, "initialValue := sum / float64(14)") {
+		if !strings.Contains(code, "initialValue := _sma_accumulator / float64(14)") {
 			t.Error("Missing SMA calculation")
 		}
 	})
@@ -84,7 +84,7 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", 10, mockAccessor, true, NewTopLevelIndicatorContext())
+	builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", P(10), mockAccessor, true, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
 	t.Run("HasNaNCheckInInitialization", func(t *testing.T) {
@@ -113,8 +113,9 @@ func TestStatefulIndicatorBuilder_EMA_Structure(t *testing.T) {
 		},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", 20, mockAccessor, false, NewTopLevelIndicatorContext())
+	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
 	code := builder.BuildEMA()
+	t.Logf("EMA code:\n%s", code)
 
 	t.Run("HasCorrectAlpha", func(t *testing.T) {
 		if !strings.Contains(code, "alpha := 2.0 / float64(20+1)") {
@@ -156,7 +157,7 @@ func TestStatefulIndicatorBuilder_DifferentPeriods(t *testing.T) {
 				},
 			}
 
-			builder := NewStatefulIndicatorBuilder("ta.rma", "test", tc.period, mockAccessor, false, NewTopLevelIndicatorContext())
+			builder := NewStatefulIndicatorBuilder("ta.rma", "test", P(tc.period), mockAccessor, false, NewTopLevelIndicatorContext())
 			code := builder.BuildRMA()
 
 			warmupCheck := fmt.Sprintf("if ctx.BarIndex < %d", tc.warmupBar)

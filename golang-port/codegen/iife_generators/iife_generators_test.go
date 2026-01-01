@@ -17,7 +17,7 @@ func TestRMAGenerator_BasicGeneration(t *testing.T) {
 	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Close")
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
-	code := gen.Generate(accessor, 14, "testhash")
+	code := gen.Generate(accessor, codegen.P(14), "testhash")
 
 	/* Should generate IIFE wrapper */
 	if !strings.Contains(code, "func()") {
@@ -49,7 +49,7 @@ func TestEMAGenerator_BasicGeneration(t *testing.T) {
 	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Open")
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
-	code := gen.Generate(accessor, 20, "emahash")
+	code := gen.Generate(accessor, codegen.P(20), "emahash")
 
 	/* Should generate valid Go code structure */
 	if !strings.Contains(code, "func()") {
@@ -74,7 +74,7 @@ func TestSMAGenerator_BasicGeneration(t *testing.T) {
 	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].High")
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
-	code := gen.Generate(accessor, 50, "smahash")
+	code := gen.Generate(accessor, codegen.P(50), "smahash")
 
 	if !strings.Contains(code, "func()") {
 		t.Error("generated code should contain IIFE wrapper")
@@ -95,9 +95,9 @@ func TestGenerators_UniquenessAcrossDifferentSources(t *testing.T) {
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
 	/* Same period, different source hashes */
-	code1 := gen.Generate(accessor, 14, "source1")
-	code2 := gen.Generate(accessor, 14, "source2")
-	code3 := gen.Generate(accessor, 14, "source3")
+	code1 := gen.Generate(accessor, codegen.P(14), "source1")
+	code2 := gen.Generate(accessor, codegen.P(14), "source2")
+	code3 := gen.Generate(accessor, codegen.P(14), "source3")
 
 	/* All should be different due to different hashes */
 	if code1 == code2 {
@@ -128,9 +128,9 @@ func TestGenerators_DeterministicGeneration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			/* Generate same code multiple times */
-			code1 := tt.generator.Generate(accessor, 14, "consistency")
-			code2 := tt.generator.Generate(accessor, 14, "consistency")
-			code3 := tt.generator.Generate(accessor, 14, "consistency")
+			code1 := tt.generator.Generate(accessor, codegen.P(14), "consistency")
+			code2 := tt.generator.Generate(accessor, codegen.P(14), "consistency")
+			code3 := tt.generator.Generate(accessor, codegen.P(14), "consistency")
 
 			/* All should be identical */
 			if code1 != code2 {
@@ -152,7 +152,7 @@ func TestHighestGenerator_WindowBased(t *testing.T) {
 	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].High")
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
-	code := gen.Generate(accessor, 10, "shouldbeignored")
+	code := gen.Generate(accessor, codegen.P(10), "shouldbeignored")
 
 	/* Should not include hash (window-based) */
 	if strings.Contains(code, "shouldbeignored") {
@@ -178,7 +178,7 @@ func TestLowestGenerator_WindowBased(t *testing.T) {
 	sourceInfo := classifier.Classify("ctx.Data[ctx.BarIndex].Low")
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
-	code := gen.Generate(accessor, 5, "ignored")
+	code := gen.Generate(accessor, codegen.P(5), "ignored")
 
 	if strings.Contains(code, "ignored") {
 		t.Error("window-based generator should not include source hash")
@@ -216,7 +216,7 @@ func TestChangeGenerator_OffsetHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			/* Should not panic for any offset */
-			code := gen.Generate(accessor, tt.offset, "hash")
+			code := gen.Generate(accessor, codegen.P(tt.offset), "hash")
 
 			/* Should generate subtraction */
 			if !strings.Contains(code, "-") {
@@ -244,7 +244,7 @@ func TestGenerators_PeriodVariations(t *testing.T) {
 	generated := make(map[string]bool)
 
 	for _, period := range periods {
-		code := gen.Generate(accessor, period, "constanthash")
+		code := gen.Generate(accessor, codegen.P(period), "constanthash")
 
 		/* Each period should produce unique code */
 		if generated[code] {
@@ -269,8 +269,8 @@ func TestGenerators_NamingStrategyInjection(t *testing.T) {
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
 	/* Different naming strategies should produce different results */
-	code1 := statefulGen.Generate(accessor, 14, "testhash")
-	code2 := windowGen.Generate(accessor, 14, "testhash")
+	code1 := statefulGen.Generate(accessor, codegen.P(14), "testhash")
+	code2 := windowGen.Generate(accessor, codegen.P(14), "testhash")
 
 	/* Stateful should include hash, window should not */
 	hasHash1 := strings.Contains(code1, "testhash")
@@ -307,7 +307,7 @@ func TestGenerators_AccessorIntegration(t *testing.T) {
 			accessor := codegen.CreateAccessGenerator(sourceInfo)
 
 			/* Should generate valid code for any accessor */
-			code := gen.Generate(accessor, 14, "hash")
+			code := gen.Generate(accessor, codegen.P(14), "hash")
 
 			if code == "" {
 				t.Error("generator should produce non-empty code")
@@ -330,14 +330,14 @@ func TestGenerators_EmptyHashHandling(t *testing.T) {
 	accessor := codegen.CreateAccessGenerator(sourceInfo)
 
 	/* Should handle empty hash gracefully */
-	code := gen.Generate(accessor, 14, "")
+	code := gen.Generate(accessor, codegen.P(14), "")
 
 	if code == "" {
 		t.Error("generator should produce code even with empty hash")
 	}
 
 	/* Should be deterministic */
-	code2 := gen.Generate(accessor, 14, "")
+	code2 := gen.Generate(accessor, codegen.P(14), "")
 	if code != code2 {
 		t.Error("generation with empty hash should be deterministic")
 	}

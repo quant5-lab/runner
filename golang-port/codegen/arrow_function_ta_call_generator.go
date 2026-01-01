@@ -27,7 +27,6 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 	// Check if this is a user-defined function first
 	detector := NewUserDefinedFunctionDetector(a.gen.variables)
 	if detector.IsUserDefinedFunction(funcName) {
-		// User-defined arrow function call - delegate to user-defined handler
 		handler := &UserDefinedFunctionHandler{}
 		return handler.GenerateCode(a.gen, call)
 	}
@@ -41,7 +40,7 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return "", fmt.Errorf("TA function %s not supported in arrow function context", funcName)
 	}
 
-	accessor, period, err := a.extractTAArguments(funcName, call)
+	accessor, periodExpr, err := a.extractTAArguments(funcName, call)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract TA arguments: %w", err)
 	}
@@ -53,7 +52,7 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		sourceHash = hasher.Hash(call.Arguments[0])
 	}
 
-	code, ok := a.iifeRegistry.Generate(funcName, accessor, period, sourceHash)
+	code, ok := a.iifeRegistry.Generate(funcName, accessor, periodExpr, sourceHash)
 	if !ok {
 		return "", fmt.Errorf("failed to generate IIFE for %s", funcName)
 	}
@@ -79,17 +78,13 @@ func (a *ArrowFunctionTACallGenerator) generateFixnanIIFE(call *ast.CallExpressi
 	return fmt.Sprintf("func() float64 { val := %s; if math.IsNaN(val) { return 0.0 }; return val }()", sourceCode), nil
 }
 
-func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, int, error) {
+func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {
 	if funcName == "ta.change" || funcName == "change" {
 		return a.extractChangeArguments(call)
 	}
 
-	if len(call.Arguments) == 1 {
-		return a.extractSingleArgumentForm(funcName, call)
-	}
-
 	if len(call.Arguments) < 2 {
-		return nil, 0, fmt.Errorf("TA function requires at least 1 argument")
+		return nil, nil, fmt.Errorf("TA function requires 2 arguments (source, period), got %d", len(call.Arguments))
 	}
 
 	sourceArg := call.Arguments[0]
@@ -97,50 +92,50 @@ func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call 
 
 	accessor, err := a.createAccessorFromExpression(sourceArg)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create accessor: %w", err)
+		return nil, nil, fmt.Errorf("failed to create accessor: %w", err)
 	}
 
-	period, err := a.extractPeriodValue(periodArg)
+	periodExpr, err := a.extractPeriodExpression(periodArg)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to extract period: %w", err)
+		return nil, nil, fmt.Errorf("failed to extract period: %w", err)
 	}
 
-	return accessor, period, nil
+	return accessor, periodExpr, nil
 }
 
-func (a *ArrowFunctionTACallGenerator) extractChangeArguments(call *ast.CallExpression) (AccessGenerator, int, error) {
+func (a *ArrowFunctionTACallGenerator) extractChangeArguments(call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {
 	if len(call.Arguments) < 1 {
-		return nil, 0, fmt.Errorf("change() requires at least 1 argument (source)")
+		return nil, nil, fmt.Errorf("change() requires at least 1 argument (source)")
 	}
 
 	sourceArg := call.Arguments[0]
 	accessor, err := a.createAccessorFromExpression(sourceArg)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create accessor for change(): %w", err)
+		return nil, nil, fmt.Errorf("failed to create accessor for change(): %w", err)
 	}
 
-	offset := 1
+	offsetExpr := PeriodExpression(NewConstantPeriod(1))
 	if len(call.Arguments) >= 2 {
-		offsetValue, err := a.extractPeriodValue(call.Arguments[1])
+		extracted, err := a.extractPeriodExpression(call.Arguments[1])
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to extract offset for change(): %w", err)
+			return nil, nil, fmt.Errorf("failed to extract offset for change(): %w", err)
 		}
-		offset = offsetValue
+		offsetExpr = extracted
 	}
 
-	return accessor, offset, nil
+	return accessor, offsetExpr, nil
 }
 
-func (a *ArrowFunctionTACallGenerator) extractSingleArgumentForm(funcName string, call *ast.CallExpression) (AccessGenerator, int, error) {
+func (a *ArrowFunctionTACallGenerator) extractSingleArgumentForm(funcName string, call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {
 	periodArg := call.Arguments[0]
 
-	period, err := a.extractPeriodValue(periodArg)
+	periodExpr, err := a.extractPeriodExpression(periodArg)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to extract period: %w", err)
+		return nil, nil, fmt.Errorf("failed to extract period: %w", err)
 	}
 
 	accessor := a.getDefaultSourceAccessor(funcName)
-	return accessor, period, nil
+	return accessor, periodExpr, nil
 }
 
 func (a *ArrowFunctionTACallGenerator) getDefaultSourceAccessor(funcName string) AccessGenerator {
@@ -182,6 +177,10 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 		return nil, fmt.Errorf("unsupported member expression in TA call")
 
 	case *ast.ConditionalExpression:
+		if a.gen.symbolTable != nil {
+			return NewSeriesExpressionAccessor(e, a.gen.symbolTable), nil
+		}
+
 		tempVarName := "ternary_source_temp"
 		condCode, err := a.exprGen.Generate(e)
 		if err != nil {
@@ -195,6 +194,10 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 		}, nil
 
 	case *ast.BinaryExpression:
+		if a.gen.symbolTable != nil {
+			return NewSeriesExpressionAccessor(e, a.gen.symbolTable), nil
+		}
+
 		tempVarName := "binary_source_temp"
 		binaryCode, err := a.exprGen.Generate(e)
 		if err != nil {
@@ -212,28 +215,33 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 	}
 }
 
-func (a *ArrowFunctionTACallGenerator) extractPeriodValue(expr ast.Expression) (int, error) {
+func (a *ArrowFunctionTACallGenerator) extractPeriodExpression(expr ast.Expression) (PeriodExpression, error) {
 	switch e := expr.(type) {
 	case *ast.Literal:
 		if floatVal, ok := e.Value.(float64); ok {
-			return int(floatVal), nil
+			return NewConstantPeriod(int(floatVal)), nil
 		}
 		if intVal, ok := e.Value.(int); ok {
-			return intVal, nil
+			return NewConstantPeriod(intVal), nil
 		}
 		if strVal, ok := e.Value.(string); ok {
-			return strconv.Atoi(strVal)
+			periodInt, err := strconv.Atoi(strVal)
+			if err != nil {
+				return nil, fmt.Errorf("period string is not numeric: %s", strVal)
+			}
+			return NewConstantPeriod(periodInt), nil
 		}
-		return 0, fmt.Errorf("period literal is not numeric: %v", e.Value)
+		return nil, fmt.Errorf("period literal is not numeric: %v", e.Value)
 
 	case *ast.Identifier:
-		if varType, exists := a.gen.variables[e.Name]; exists && varType == "float" {
-			return 20, nil
+		/* Check if identifier is a known variable (arrow function parameter) */
+		if _, exists := a.gen.variables[e.Name]; !exists {
+			return nil, fmt.Errorf("unknown period identifier: %s (not an arrow function parameter)", e.Name)
 		}
-		return 0, fmt.Errorf("period identifier %s not supported", e.Name)
+		return NewRuntimePeriod(e.Name), nil
 
 	default:
-		return 0, fmt.Errorf("unsupported period expression type: %T", expr)
+		return nil, fmt.Errorf("unsupported period expression type: %T", expr)
 	}
 }
 

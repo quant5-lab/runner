@@ -8,7 +8,7 @@ func NewStatefulRMAGenerator(varName string, period int, accessor AccessGenerato
 	builder := NewStatefulIndicatorBuilder(
 		"ta.rma",
 		varName,
-		period,
+		NewConstantPeriod(period),
 		accessor,
 		false,
 		context,
@@ -20,7 +20,7 @@ func NewStatefulEMAGenerator(varName string, period int, accessor AccessGenerato
 	builder := NewStatefulIndicatorBuilder(
 		"ta.ema",
 		varName,
-		period,
+		NewConstantPeriod(period),
 		accessor,
 		false,
 		context,

@@ -46,7 +46,7 @@ func TestStatefulIndicatorBuilder_NaNHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			accessor := NewOHLCVFieldAccessGenerator("Close")
 			context := NewTopLevelIndicatorContext()
-			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", 14, accessor, tt.needsNaN, context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", P(14), accessor, tt.needsNaN, context)
 
 			code := builder.BuildRMA()
 
@@ -108,7 +108,7 @@ func TestStatefulIndicatorBuilder_WarmupPhases(t *testing.T) {
 
 	for _, period := range periods {
 		t.Run(string(rune('0'+period/100))+string(rune('0'+(period/10)%10))+string(rune('0'+period%10))+" period", func(t *testing.T) {
-			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", period, accessor, true, context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", P(period), accessor, true, context)
 			code := builder.BuildRMA()
 
 			// Phase 1: Pre-warmup check
@@ -122,8 +122,8 @@ func TestStatefulIndicatorBuilder_WarmupPhases(t *testing.T) {
 			}
 
 			// Should have SMA calculation in warmup
-			if !strings.Contains(code, "sum") {
-				t.Error("Warmup phase missing SMA calculation (sum accumulation)")
+			if !strings.Contains(code, "_sma_accumulator") {
+				t.Error("Warmup phase missing SMA calculation (_sma_accumulator)")
 			}
 
 			// Should have loop over period for SMA seed
@@ -197,7 +197,7 @@ func TestStatefulIndicatorBuilder_AccessorTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			context := NewTopLevelIndicatorContext()
-			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", 14, tt.accessor, true, context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", P(14), tt.accessor, true, context)
 			code := builder.BuildRMA()
 
 			// Check warmup loop value access
@@ -250,7 +250,7 @@ func TestStatefulIndicatorBuilder_ContextTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			accessor := NewOHLCVFieldAccessGenerator("Close")
-			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", 14, accessor, false, tt.context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", P(14), accessor, false, tt.context)
 			code := builder.BuildRMA()
 
 			if !strings.Contains(code, tt.expectSetPattern) {
@@ -278,7 +278,7 @@ func TestStatefulIndicatorBuilder_EdgeCasePeriods(t *testing.T) {
 		t.Run(string(rune('0'+period/100))+string(rune('0'+(period/10)%10))+string(rune('0'+period%10)), func(t *testing.T) {
 			accessor := NewOHLCVFieldAccessGenerator("Close")
 			context := NewTopLevelIndicatorContext()
-			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", period, accessor, false, context)
+			builder := NewStatefulIndicatorBuilder("ta.rma", "testRma", P(period), accessor, false, context)
 
 			code := builder.BuildRMA()
 

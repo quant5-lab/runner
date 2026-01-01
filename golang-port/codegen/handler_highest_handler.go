@@ -62,7 +62,7 @@ func (h *HighestHandler) GenerateCode(g *generator, varName string, call *ast.Ca
 	if len(call.Arguments) > 0 {
 		sourceHash = hasher.Hash(call.Arguments[0])
 	}
-	iifeCode, ok := registry.Generate("ta.highest", accessGen, period, sourceHash)
+	iifeCode, ok := registry.Generate("ta.highest", accessGen, NewConstantPeriod(period), sourceHash)
 	if !ok {
 		return "", fmt.Errorf("ta.highest IIFE generation failed")
 	}

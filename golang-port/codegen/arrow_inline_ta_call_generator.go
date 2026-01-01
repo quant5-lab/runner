@@ -50,18 +50,17 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 
 	sourceExpr := call.Arguments[0]
 
-	period := 1
+	periodExpr := NewConstantPeriod(1)
 	if len(call.Arguments) >= 2 {
-		periodExpr := call.Arguments[1]
-		extractedPeriod, err := g.extractPeriod(periodExpr)
+		periodArg := call.Arguments[1]
+		extractedPeriod, err := g.extractPeriod(periodArg)
 		if err != nil {
 			return "", false, fmt.Errorf("failed to extract period for '%s': %w", funcName, err)
 		}
 		if extractedPeriod == 0 {
-			// Runtime parameter detected - return NOT HANDLED
 			return "", false, nil
 		}
-		period = extractedPeriod
+		periodExpr = NewConstantPeriod(extractedPeriod)
 	}
 
 	accessor, err := g.accessorFactory.CreateAccessorForExpression(sourceExpr)
@@ -69,11 +68,10 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 		return "", false, fmt.Errorf("failed to create accessor for '%s': %w", funcName, err)
 	}
 
-	// Generate hash from source expression to prevent series name collisions
 	hasher := &ExpressionHasher{}
 	sourceHash := hasher.Hash(sourceExpr)
 
-	iifeCode, exists := g.iifeRegistry.Generate(funcName, accessor, period, sourceHash)
+	iifeCode, exists := g.iifeRegistry.Generate(funcName, accessor, periodExpr, sourceHash)
 	if !exists {
 		return "", false, fmt.Errorf("IIFE generator not found for '%s'", funcName)
 	}
