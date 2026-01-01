@@ -13,23 +13,21 @@ type BarEvaluator interface {
 }
 
 type StreamingRequest struct {
-	ctx            *context.Context
-	fetcher        SecurityDataFetcher
-	cache          map[string]*context.Context
-	mapperCache    map[string]*SecurityBarMapper
-	evaluator      BarEvaluator
-	pivotEvaluator *PivotEvaluator
-	currentBar     int
+	ctx         *context.Context
+	fetcher     SecurityDataFetcher
+	cache       map[string]*context.Context
+	mapperCache map[string]*SecurityBarMapper
+	evaluator   BarEvaluator
+	currentBar  int
 }
 
 func NewStreamingRequest(ctx *context.Context, fetcher SecurityDataFetcher, evaluator BarEvaluator) *StreamingRequest {
 	return &StreamingRequest{
-		ctx:            ctx,
-		fetcher:        fetcher,
-		cache:          make(map[string]*context.Context),
-		mapperCache:    make(map[string]*SecurityBarMapper),
-		evaluator:      evaluator,
-		pivotEvaluator: NewPivotEvaluator(),
+		ctx:         ctx,
+		fetcher:     fetcher,
+		cache:       make(map[string]*context.Context),
+		mapperCache: make(map[string]*SecurityBarMapper),
+		evaluator:   evaluator,
 	}
 }
 
@@ -48,10 +46,6 @@ func (r *StreamingRequest) SecurityWithExpression(symbol, timeframe string, expr
 		return math.NaN(), nil
 	}
 
-	if pivotValue, evaluated := r.pivotEvaluator.TryEvaluate(expr, secCtx, secBarIdx); evaluated {
-		return pivotValue, nil
-	}
-
 	return r.evaluator.EvaluateAtBar(expr, secCtx, secBarIdx)
 }
 
@@ -62,7 +56,6 @@ func (r *StreamingRequest) SetCurrentBar(bar int) {
 func (r *StreamingRequest) ClearCache() {
 	r.cache = make(map[string]*context.Context)
 	r.mapperCache = make(map[string]*SecurityBarMapper)
-	r.pivotEvaluator.ClearCache()
 }
 
 func (r *StreamingRequest) getOrFetchContext(cacheKey, symbol, timeframe string) (*context.Context, error) {
