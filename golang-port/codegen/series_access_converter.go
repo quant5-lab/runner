@@ -6,19 +6,25 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+// CallVarLookup resolves temp variable name for CallExpression (decoupled from TempVariableManager)
+// Returns empty string if no temp var exists for the call
+type CallVarLookup func(*ast.CallExpression) string
+
 // SeriesAccessConverter transforms AST expressions by converting series variable identifiers
 // to their historical access form (e.g., "sum" → "sumSeries.Get(offset)")
 // Responsibility: AST transformation for type-aware series access
 type SeriesAccessConverter struct {
-	symbolTable SymbolTable
-	offset      string // Variable name for dynamic offset (e.g., "j" in loops)
+	symbolTable   SymbolTable
+	offset        string
+	lookupCallVar CallVarLookup
 }
 
 // NewSeriesAccessConverter creates a converter with symbol type information
-func NewSeriesAccessConverter(symbolTable SymbolTable, offset string) *SeriesAccessConverter {
+func NewSeriesAccessConverter(symbolTable SymbolTable, offset string, lookupCallVar CallVarLookup) *SeriesAccessConverter {
 	return &SeriesAccessConverter{
-		symbolTable: symbolTable,
-		offset:      offset,
+		symbolTable:   symbolTable,
+		offset:        offset,
+		lookupCallVar: lookupCallVar,
 	}
 }
 
@@ -98,6 +104,13 @@ func (c *SeriesAccessConverter) convertMemberExpression(mem *ast.MemberExpressio
 }
 
 func (c *SeriesAccessConverter) convertCallExpression(call *ast.CallExpression) (string, error) {
+	// Check if call has materialized temp variable - reuse instead of regenerating
+	if c.lookupCallVar != nil {
+		if tempVarName := c.lookupCallVar(call); tempVarName != "" {
+			return fmt.Sprintf("%sSeries.Get(%s)", tempVarName, c.offset), nil
+		}
+	}
+
 	// Function names should not be converted with series access logic
 	// They are either builtin functions (abs → math.Abs) or user-defined functions
 	var funcCode string

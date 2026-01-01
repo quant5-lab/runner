@@ -61,7 +61,7 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 			return nil, err
 		}
 		preamble += preambleCode
-		accessGen = NewSeriesExpressionAccessor(sourceExpr, e.generator.symbolTable)
+		accessGen = NewSeriesExpressionAccessor(sourceExpr, e.generator.symbolTable, e.generator.tempVarMgr.GetVarNameForCall)
 		needsNaN = true
 	}
 

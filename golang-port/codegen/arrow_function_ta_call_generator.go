@@ -178,7 +178,7 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 
 	case *ast.ConditionalExpression:
 		if a.gen.symbolTable != nil {
-			return NewSeriesExpressionAccessor(e, a.gen.symbolTable), nil
+			return NewSeriesExpressionAccessor(e, a.gen.symbolTable, nil), nil
 		}
 
 		tempVarName := "ternary_source_temp"
@@ -195,7 +195,7 @@ func (a *ArrowFunctionTACallGenerator) createAccessorFromExpression(expr ast.Exp
 
 	case *ast.BinaryExpression:
 		if a.gen.symbolTable != nil {
-			return NewSeriesExpressionAccessor(e, a.gen.symbolTable), nil
+			return NewSeriesExpressionAccessor(e, a.gen.symbolTable, nil), nil
 		}
 
 		tempVarName := "binary_source_temp"

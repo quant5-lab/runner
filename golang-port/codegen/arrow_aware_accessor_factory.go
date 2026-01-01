@@ -88,7 +88,7 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {
 	if f.symbolTable != nil {
-		return NewSeriesExpressionAccessor(binExpr, f.symbolTable), nil
+		return NewSeriesExpressionAccessor(binExpr, f.symbolTable, nil), nil
 	}
 
 	tempVarName := "binary_source_temp"
@@ -122,7 +122,7 @@ func (f *ArrowAwareAccessorFactory) createCallAccessor(call *ast.CallExpression)
 
 func (f *ArrowAwareAccessorFactory) createConditionalAccessor(cond *ast.ConditionalExpression) (AccessGenerator, error) {
 	if f.symbolTable != nil {
-		return NewSeriesExpressionAccessor(cond, f.symbolTable), nil
+		return NewSeriesExpressionAccessor(cond, f.symbolTable, nil), nil
 	}
 
 	tempVarName := "ternary_source_temp"

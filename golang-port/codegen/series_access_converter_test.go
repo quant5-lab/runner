@@ -12,7 +12,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st := NewSymbolTable()
 		st.Register("period", VariableTypeScalar)
 
-		conv := NewSeriesAccessConverter(st, "0")
+		conv := NewSeriesAccessConverter(st, "0", nil)
 		expr := &ast.Identifier{Name: "period"}
 
 		code, err := conv.ConvertExpression(expr)
@@ -28,7 +28,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st := NewSymbolTable()
 		st.Register("sum", VariableTypeSeries)
 
-		conv := NewSeriesAccessConverter(st, "0")
+		conv := NewSeriesAccessConverter(st, "0", nil)
 		expr := &ast.Identifier{Name: "sum"}
 
 		code, err := conv.ConvertExpression(expr)
@@ -44,7 +44,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st := NewSymbolTable()
 		st.Register("plus", VariableTypeSeries)
 
-		conv := NewSeriesAccessConverter(st, "j")
+		conv := NewSeriesAccessConverter(st, "j", nil)
 		expr := &ast.Identifier{Name: "plus"}
 
 		code, err := conv.ConvertExpression(expr)
@@ -58,7 +58,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 
 	t.Run("builtin field converted", func(t *testing.T) {
 		st := NewSymbolTable()
-		conv := NewSeriesAccessConverter(st, "0")
+		conv := NewSeriesAccessConverter(st, "0", nil)
 
 		tests := []struct {
 			field string
@@ -87,7 +87,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st.Register("plus", VariableTypeSeries)
 		st.Register("minus", VariableTypeSeries)
 
-		conv := NewSeriesAccessConverter(st, "j")
+		conv := NewSeriesAccessConverter(st, "j", nil)
 		expr := &ast.BinaryExpression{
 			Left:     &ast.Identifier{Name: "plus"},
 			Operator: "+",
@@ -109,7 +109,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st := NewSymbolTable()
 		st.Register("sum", VariableTypeSeries)
 
-		conv := NewSeriesAccessConverter(st, "j")
+		conv := NewSeriesAccessConverter(st, "j", nil)
 		expr := &ast.ConditionalExpression{
 			Test: &ast.BinaryExpression{
 				Left:     &ast.Identifier{Name: "sum"},
@@ -136,7 +136,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 		st.Register("minus", VariableTypeSeries)
 		st.Register("sum", VariableTypeSeries)
 
-		conv := NewSeriesAccessConverter(st, "j")
+		conv := NewSeriesAccessConverter(st, "j", nil)
 
 		// abs(plus - minus) / sum
 		expr := &ast.BinaryExpression{
@@ -174,7 +174,7 @@ func TestSeriesAccessConverter(t *testing.T) {
 
 	t.Run("literal values", func(t *testing.T) {
 		st := NewSymbolTable()
-		conv := NewSeriesAccessConverter(st, "0")
+		conv := NewSeriesAccessConverter(st, "0", nil)
 
 		tests := []struct {
 			name  string
