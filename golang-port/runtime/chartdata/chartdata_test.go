@@ -81,9 +81,9 @@ func TestAddStrategy(t *testing.T) {
 	strat.Call("Test Strategy", 10000)
 
 	// Place and execute trade
-	strat.Entry("long1", strategy.Long, 10)
+	strat.Entry("long1", strategy.Long, 10, "")
 	strat.OnBarUpdate(1, 100, 1000)
-	strat.Close("long1", 110, 2000)
+	strat.Close("long1", 110, 2000, "")
 
 	cd.AddStrategy(strat, 110)
 
@@ -148,14 +148,14 @@ func TestStrategyDataStructure(t *testing.T) {
 	strat.Call("Test Strategy", 10000)
 
 	// Open trade
-	strat.Entry("long1", strategy.Long, 5)
+	strat.Entry("long1", strategy.Long, 5, "")
 	strat.OnBarUpdate(1, 100, 1000)
 
 	// Close trade
-	strat.Close("long1", 110, 2000)
+	strat.Close("long1", 110, 2000, "")
 
 	// Another open trade
-	strat.Entry("long2", strategy.Long, 3)
+	strat.Entry("long2", strategy.Long, 3, "")
 	strat.OnBarUpdate(2, 110, 3000)
 
 	cd.AddStrategy(strat, 115)
@@ -183,5 +183,172 @@ func TestStrategyDataStructure(t *testing.T) {
 	openTrade := cd.Strategy.OpenTrades[0]
 	if openTrade.EntryID != "long2" {
 		t.Errorf("Expected EntryID 'long2', got '%s'", openTrade.EntryID)
+	}
+}
+
+/* TestTradeCommentSerialization verifies JSON serialization with comments */
+func TestTradeCommentSerialization(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
+
+	strat := strategy.NewStrategy()
+	strat.Call("Test Strategy", 10000)
+
+	/* Trade with both entry and exit comments */
+	strat.Entry("long1", strategy.Long, 10, "Buy on breakout")
+	strat.OnBarUpdate(1, 100, 1000)
+	strat.Close("long1", 110, 2000, "Take profit")
+
+	/* Trade with entry comment only */
+	strat.Entry("long2", strategy.Long, 5, "Second entry")
+	strat.OnBarUpdate(2, 110, 3000)
+	strat.Close("long2", 115, 4000, "")
+
+	cd.AddStrategy(strat, 115)
+
+	jsonBytes, err := cd.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() failed: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("JSON unmarshal failed: %v", err)
+	}
+
+	strategyData := parsed["strategy"].(map[string]interface{})
+	trades := strategyData["trades"].([]interface{})
+
+	if len(trades) != 2 {
+		t.Fatalf("Expected 2 trades, got %d", len(trades))
+	}
+
+	/* Verify first trade has both comments */
+	trade1 := trades[0].(map[string]interface{})
+	if entryComment, ok := trade1["entryComment"]; ok {
+		if entryComment != "Buy on breakout" {
+			t.Errorf("Expected 'Buy on breakout', got %v", entryComment)
+		}
+	} else {
+		t.Error("Trade 1 should have entryComment field")
+	}
+	if exitComment, ok := trade1["exitComment"]; ok {
+		if exitComment != "Take profit" {
+			t.Errorf("Expected 'Take profit', got %v", exitComment)
+		}
+	} else {
+		t.Error("Trade 1 should have exitComment field")
+	}
+
+	/* Verify second trade has entry comment, exit comment omitted */
+	trade2 := trades[1].(map[string]interface{})
+	if entryComment, ok := trade2["entryComment"]; ok {
+		if entryComment != "Second entry" {
+			t.Errorf("Expected 'Second entry', got %v", entryComment)
+		}
+	} else {
+		t.Error("Trade 2 should have entryComment field")
+	}
+	/* exitComment should be omitted (omitempty behavior) */
+	if _, ok := trade2["exitComment"]; ok {
+		t.Error("Trade 2 should not have exitComment field (omitempty)")
+	}
+}
+
+/* TestOpenTradeCommentSerialization verifies OpenTrade JSON serialization */
+func TestOpenTradeCommentSerialization(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
+
+	strat := strategy.NewStrategy()
+	strat.Call("Test Strategy", 10000)
+
+	/* Open trade with entry comment */
+	strat.Entry("long1", strategy.Long, 10, "Trend entry")
+	strat.OnBarUpdate(1, 100, 1000)
+
+	/* Open trade without entry comment */
+	strat.Entry("long2", strategy.Long, 5, "")
+	strat.OnBarUpdate(2, 105, 2000)
+
+	cd.AddStrategy(strat, 108)
+
+	jsonBytes, err := cd.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() failed: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("JSON unmarshal failed: %v", err)
+	}
+
+	strategyData := parsed["strategy"].(map[string]interface{})
+	openTrades := strategyData["openTrades"].([]interface{})
+
+	if len(openTrades) != 2 {
+		t.Fatalf("Expected 2 open trades, got %d", len(openTrades))
+	}
+
+	/* Verify first open trade has entry comment */
+	openTrade1 := openTrades[0].(map[string]interface{})
+	if entryComment, ok := openTrade1["entryComment"]; ok {
+		if entryComment != "Trend entry" {
+			t.Errorf("Expected 'Trend entry', got %v", entryComment)
+		}
+	} else {
+		t.Error("Open trade 1 should have entryComment field")
+	}
+
+	/* Verify second open trade omits empty comment */
+	openTrade2 := openTrades[1].(map[string]interface{})
+	if _, ok := openTrade2["entryComment"]; ok {
+		t.Error("Open trade 2 should not have entryComment field (omitempty)")
+	}
+}
+
+/* TestTradeCommentOmitEmpty verifies omitempty behavior for empty comments */
+func TestTradeCommentOmitEmpty(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
+
+	strat := strategy.NewStrategy()
+	strat.Call("Test Strategy", 10000)
+
+	/* Trade with no comments (empty strings) */
+	strat.Entry("long1", strategy.Long, 10, "")
+	strat.OnBarUpdate(1, 100, 1000)
+	strat.Close("long1", 110, 2000, "")
+
+	cd.AddStrategy(strat, 110)
+
+	jsonBytes, err := cd.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() failed: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	err = json.Unmarshal(jsonBytes, &parsed)
+	if err != nil {
+		t.Fatalf("JSON unmarshal failed: %v", err)
+	}
+
+	strategyData := parsed["strategy"].(map[string]interface{})
+	trades := strategyData["trades"].([]interface{})
+
+	if len(trades) != 1 {
+		t.Fatalf("Expected 1 trade, got %d", len(trades))
+	}
+
+	trade := trades[0].(map[string]interface{})
+
+	/* Both comment fields should be omitted due to omitempty */
+	if _, ok := trade["entryComment"]; ok {
+		t.Error("Trade should not have entryComment field (omitempty)")
+	}
+	if _, ok := trade["exitComment"]; ok {
+		t.Error("Trade should not have exitComment field (omitempty)")
 	}
 }

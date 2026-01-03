@@ -1,0 +1,8 @@
+//@version=4
+strategy("Stop and Limit Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+if close > 105.0 and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0
+    strategy.exit("Exit", "Long", stop=104.0, limit=112.0)

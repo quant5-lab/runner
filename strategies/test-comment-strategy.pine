@@ -1,0 +1,11 @@
+//@version=5
+strategy("Trade Comment Test", overlay=true)
+
+// Inline crossover strategy with comments (CallExpression requirement)
+if ta.crossover(ta.sma(close, 10), ta.sma(close, 20))
+    strategy.entry("Long", strategy.long, comment="Bullish crossover signal")
+if ta.crossunder(ta.sma(close, 10), ta.sma(close, 20))
+    strategy.close("Long", comment="Bearish crossunder exit")
+
+plot(ta.sma(close, 10), "Fast SMA", color=color.blue)
+plot(ta.sma(close, 20), "Slow SMA", color=color.red)

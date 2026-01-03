@@ -1,5 +1,0 @@
-Codegen limitation: Inline request.security() in conditions not supported
-Parse: ✅ Success
-Generate: ❌ Fails
-Error: "Codegen error: unsupported inline function in condition: request.security"
-Blocker: Code generator doesn't support security() calls inside conditional expressions

@@ -1,9 +1,7 @@
 package parser
 
 import (
-	"fmt"
 	"io"
-	"os"
 
 	"github.com/alecthomas/participle/v2/lexer"
 )
@@ -81,19 +79,8 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 		return token, err
 	}
 
-	if token.Pos.Line >= 3 {
-		fmt.Printf("LEXER_DEBUG L%d:C%d type=%d val=%q\n",
-			token.Pos.Line, token.Pos.Column, token.Type, token.Value)
-	}
-
 	if l.isWhitespaceToken(token) {
-		if token.Pos.Line == 4 {
-			fmt.Fprintf(os.Stderr, "INDENT_DEBUG line 4 whitespace: atLineStart=%v value=%q\n", l.atLineStart, token.Value)
-		}
 		if l.atLineStart {
-			if token.Pos.Line == 4 {
-				fmt.Fprintf(os.Stderr, "INDENT_DEBUG calling handleIndentation for line 4\n")
-			}
 			return l.handleIndentation(token)
 		}
 		return l.Next()
@@ -140,12 +127,6 @@ func (l *IndentationLexer) handleIndentation(wsToken lexer.Token) (lexer.Token, 
 		return lexer.Token{}, err
 	}
 
-	// Debug for problematic lines
-	if wsToken.Pos.Line == 4 {
-		fmt.Fprintf(os.Stderr, "INDENT_DEBUG L%d: indentLevel=%d currentIndent=%d expectingIndent=%v nextToken=%q\n",
-			wsToken.Pos.Line, indentLevel, currentIndent, l.expectingIndent, nextToken.Value)
-	}
-
 	if l.isNewlineToken(nextToken) {
 		l.atLineStart = true
 		return l.emitNewline(nextToken.Pos), nil
@@ -190,9 +171,6 @@ func (l *IndentationLexer) handleIndentation(wsToken lexer.Token) (lexer.Token, 
 	}
 
 	l.expectingIndent = false
-	if wsToken.Pos.Line >= 340 && wsToken.Pos.Line <= 345 {
-		fmt.Fprintf(os.Stderr, "DEBUG returning nextToken at line %d: %q\n", wsToken.Pos.Line, nextToken.Value)
-	}
 	return nextToken, nil
 }
 

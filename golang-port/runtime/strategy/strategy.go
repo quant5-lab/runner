@@ -13,25 +13,28 @@ const (
 
 /* Trade represents a single trade (open or closed) */
 type Trade struct {
-	EntryID    string
-	Direction  string
-	Size       float64
-	EntryPrice float64
-	EntryBar   int
-	EntryTime  int64
-	ExitPrice  float64
-	ExitBar    int
-	ExitTime   int64
-	Profit     float64
+	EntryID      string  `json:"entryId"`
+	Direction    string  `json:"direction"`
+	Size         float64 `json:"size"`
+	EntryPrice   float64 `json:"entryPrice"`
+	EntryBar     int     `json:"entryBar"`
+	EntryTime    int64   `json:"entryTime"`
+	EntryComment string  `json:"entryComment"`
+	ExitPrice    float64 `json:"exitPrice"`
+	ExitBar      int     `json:"exitBar"`
+	ExitTime     int64   `json:"exitTime"`
+	ExitComment  string  `json:"exitComment"`
+	Profit       float64 `json:"profit"`
 }
 
 /* Order represents a pending order */
 type Order struct {
-	ID         string
-	Direction  string
-	Qty        float64
-	Type       string
-	CreatedBar int
+	ID           string
+	Direction    string
+	Qty          float64
+	Type         string
+	CreatedBar   int
+	EntryComment string
 }
 
 /* OrderManager manages pending orders */
@@ -49,7 +52,7 @@ func NewOrderManager() *OrderManager {
 }
 
 /* CreateOrder creates or replaces an order */
-func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBar int) Order {
+func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBar int, comment string) Order {
 	// Remove existing order with same ID
 	for i, order := range om.orders {
 		if order.ID == id {
@@ -59,11 +62,12 @@ func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBa
 	}
 
 	order := Order{
-		ID:         id,
-		Direction:  direction,
-		Qty:        qty,
-		Type:       "market",
-		CreatedBar: createdBar,
+		ID:           id,
+		Direction:    direction,
+		Qty:          qty,
+		Type:         "market",
+		CreatedBar:   createdBar,
+		EntryComment: comment,
 	}
 	om.orders = append(om.orders, order)
 	return order
@@ -162,12 +166,13 @@ func (th *TradeHistory) AddOpenTrade(trade Trade) {
 }
 
 /* CloseTrade closes a trade by entry ID */
-func (th *TradeHistory) CloseTrade(entryID string, exitPrice float64, exitBar int, exitTime int64) *Trade {
+func (th *TradeHistory) CloseTrade(entryID string, exitPrice float64, exitBar int, exitTime int64, exitComment string) *Trade {
 	for i, trade := range th.openTrades {
 		if trade.EntryID == entryID {
 			trade.ExitPrice = exitPrice
 			trade.ExitBar = exitBar
 			trade.ExitTime = exitTime
+			trade.ExitComment = exitComment
 
 			// Calculate profit
 			priceDiff := exitPrice - trade.EntryPrice
@@ -253,16 +258,16 @@ func (s *Strategy) Call(strategyName string, initialCapital float64) {
 }
 
 /* Entry places an entry order */
-func (s *Strategy) Entry(id, direction string, qty float64) error {
+func (s *Strategy) Entry(id, direction string, qty float64, comment string) error {
 	if !s.initialized {
 		return fmt.Errorf("strategy not initialized")
 	}
-	s.orderManager.CreateOrder(id, direction, qty, s.currentBar)
+	s.orderManager.CreateOrder(id, direction, qty, s.currentBar, comment)
 	return nil
 }
 
 /* Close closes position by entry ID */
-func (s *Strategy) Close(id string, currentPrice float64, currentTime int64) {
+func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
@@ -270,7 +275,7 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64) {
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
 		if trade.EntryID == id {
-			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime)
+			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime, comment)
 			if closedTrade != nil {
 				// Update position tracker
 				oppositeDir := Long
@@ -287,14 +292,14 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64) {
 }
 
 /* CloseAll closes all open positions */
-func (s *Strategy) CloseAll(currentPrice float64, currentTime int64) {
+func (s *Strategy) CloseAll(currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
 
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
-		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime)
+		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime, comment)
 		if closedTrade != nil {
 			// Update position tracker
 			oppositeDir := Long
@@ -310,8 +315,53 @@ func (s *Strategy) CloseAll(currentPrice float64, currentTime int64) {
 }
 
 /* Exit exits with stop/limit orders (simplified - just closes) */
-func (s *Strategy) Exit(id, fromEntry string, currentPrice float64, currentTime int64) {
-	s.Close(fromEntry, currentPrice, currentTime)
+func (s *Strategy) Exit(id, fromEntry string, currentPrice float64, currentTime int64, comment string) {
+	s.Close(fromEntry, currentPrice, currentTime, comment)
+}
+
+/* ExitWithLevels checks stop/limit levels and closes if triggered */
+func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLevel, barHigh, barLow, barClose float64, barTime int64, comment string) {
+	if !s.initialized {
+		return
+	}
+
+	// Find open trade by entry ID
+	openTrades := s.tradeHistory.GetOpenTrades()
+	var trade *Trade
+	for i := range openTrades {
+		if openTrades[i].EntryID == fromEntry {
+			trade = &openTrades[i]
+			break
+		}
+	}
+
+	if trade == nil {
+		return
+	}
+
+	// Check stop loss (long: low <= stop, short: high >= stop)
+	if !math.IsNaN(stopLevel) {
+		if trade.Direction == Long && barLow <= stopLevel {
+			s.Close(fromEntry, stopLevel, barTime, comment)
+			return
+		}
+		if trade.Direction == Short && barHigh >= stopLevel {
+			s.Close(fromEntry, stopLevel, barTime, comment)
+			return
+		}
+	}
+
+	// Check take profit (long: high >= limit, short: low <= limit)
+	if !math.IsNaN(limitLevel) {
+		if trade.Direction == Long && barHigh >= limitLevel {
+			s.Close(fromEntry, limitLevel, barTime, comment)
+			return
+		}
+		if trade.Direction == Short && barLow <= limitLevel {
+			s.Close(fromEntry, limitLevel, barTime, comment)
+			return
+		}
+	}
 }
 
 /* OnBarUpdate processes pending orders at bar open */
@@ -329,12 +379,13 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 
 		// Add to open trades
 		s.tradeHistory.AddOpenTrade(Trade{
-			EntryID:    order.ID,
-			Direction:  order.Direction,
-			Size:       order.Qty,
-			EntryPrice: openPrice,
-			EntryBar:   currentBar,
-			EntryTime:  openTime,
+			EntryID:      order.ID,
+			Direction:    order.Direction,
+			Size:         order.Qty,
+			EntryPrice:   openPrice,
+			EntryBar:     currentBar,
+			EntryTime:    openTime,
+			EntryComment: order.EntryComment,
 		})
 
 		// Remove order

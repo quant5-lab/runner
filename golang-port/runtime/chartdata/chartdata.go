@@ -48,26 +48,29 @@ type UIConfig struct {
 
 /* Trade represents a closed trade in chart data */
 type Trade struct {
-	EntryID    string  `json:"entryId"`
-	EntryPrice float64 `json:"entryPrice"`
-	EntryBar   int     `json:"entryBar"`
-	EntryTime  int64   `json:"entryTime"`
-	ExitPrice  float64 `json:"exitPrice"`
-	ExitBar    int     `json:"exitBar"`
-	ExitTime   int64   `json:"exitTime"`
-	Size       float64 `json:"size"`
-	Profit     float64 `json:"profit"`
-	Direction  string  `json:"direction"`
+	EntryID      string  `json:"entryId"`
+	EntryPrice   float64 `json:"entryPrice"`
+	EntryBar     int     `json:"entryBar"`
+	EntryTime    int64   `json:"entryTime"`
+	EntryComment string  `json:"entryComment,omitempty"`
+	ExitPrice    float64 `json:"exitPrice"`
+	ExitBar      int     `json:"exitBar"`
+	ExitTime     int64   `json:"exitTime"`
+	ExitComment  string  `json:"exitComment,omitempty"`
+	Size         float64 `json:"size"`
+	Profit       float64 `json:"profit"`
+	Direction    string  `json:"direction"`
 }
 
 /* OpenTrade represents an open trade in chart data */
 type OpenTrade struct {
-	EntryID    string  `json:"entryId"`
-	EntryPrice float64 `json:"entryPrice"`
-	EntryBar   int     `json:"entryBar"`
-	EntryTime  int64   `json:"entryTime"`
-	Size       float64 `json:"size"`
-	Direction  string  `json:"direction"`
+	EntryID      string  `json:"entryId"`
+	EntryPrice   float64 `json:"entryPrice"`
+	EntryBar     int     `json:"entryBar"`
+	EntryTime    int64   `json:"entryTime"`
+	EntryComment string  `json:"entryComment,omitempty"`
+	Size         float64 `json:"size"`
+	Direction    string  `json:"direction"`
 }
 
 /* StrategyData represents strategy execution results */
@@ -197,28 +200,31 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	trades := make([]Trade, len(closedTrades))
 	for i, t := range closedTrades {
 		trades[i] = Trade{
-			EntryID:    t.EntryID,
-			EntryPrice: t.EntryPrice,
-			EntryBar:   t.EntryBar,
-			EntryTime:  t.EntryTime,
-			ExitPrice:  t.ExitPrice,
-			ExitBar:    t.ExitBar,
-			ExitTime:   t.ExitTime,
-			Size:       t.Size,
-			Profit:     t.Profit,
-			Direction:  t.Direction,
+			EntryID:      t.EntryID,
+			EntryPrice:   t.EntryPrice,
+			EntryBar:     t.EntryBar,
+			EntryTime:    t.EntryTime,
+			EntryComment: t.EntryComment,
+			ExitPrice:    t.ExitPrice,
+			ExitBar:      t.ExitBar,
+			ExitTime:     t.ExitTime,
+			ExitComment:  t.ExitComment,
+			Size:         t.Size,
+			Profit:       t.Profit,
+			Direction:    t.Direction,
 		}
 	}
 
 	openTradesData := make([]OpenTrade, len(openTrades))
 	for i, t := range openTrades {
 		openTradesData[i] = OpenTrade{
-			EntryID:    t.EntryID,
-			EntryPrice: t.EntryPrice,
-			EntryBar:   t.EntryBar,
-			EntryTime:  t.EntryTime,
-			Size:       t.Size,
-			Direction:  t.Direction,
+			EntryID:      t.EntryID,
+			EntryPrice:   t.EntryPrice,
+			EntryBar:     t.EntryBar,
+			EntryTime:    t.EntryTime,
+			EntryComment: t.EntryComment,
+			Size:         t.Size,
+			Direction:    t.Direction,
 		}
 	}
 

@@ -16,6 +16,7 @@ export class TradeDataFormatter {
   }
 
   formatPrice(price) {
+    if (price === null || price === undefined) return '$0.00';
     return `$${price.toFixed(2)}`;
   }
 
@@ -24,14 +25,23 @@ export class TradeDataFormatter {
     return profit >= 0 ? `+${formatted}` : `-${formatted}`;
   }
 
-  getTradeDate(trade) {
-    if (trade.entryTime) {
-      return this.formatDate(trade.entryTime);
+  getTradeDate(trade, isEntry = true) {
+    const timeField = isEntry ? 'entryTime' : 'exitTime';
+    const barField = isEntry ? 'entryBar' : 'exitBar';
+    
+    if (trade[timeField]) {
+      return this.formatDate(trade[timeField] * 1000);
     }
-    if (trade.entryBar < this.candlestickData.length) {
-      const timestamp = this.candlestickData[trade.entryBar].time * 1000;
-      return this.formatDate(timestamp);
+    
+    const barIndex = trade[barField];
+    if (barIndex !== undefined && barIndex >= 0 && barIndex < this.candlestickData.length) {
+      const bar = this.candlestickData[barIndex];
+      if (bar && bar.time !== undefined) {
+        const timestamp = bar.time * 1000;
+        return this.formatDate(timestamp);
+      }
     }
+    
     return 'N/A';
   }
 
@@ -45,15 +55,23 @@ export class TradeDataFormatter {
     const isOpen = trade.status === 'open';
     const unrealizedProfit = this.calculateUnrealizedProfit(trade, currentPrice);
     
+    const exitPrice = isOpen 
+      ? (currentPrice !== null && currentPrice !== undefined ? currentPrice : trade.entryPrice)
+      : (trade.exitPrice !== null && trade.exitPrice !== undefined ? trade.exitPrice : 0);
+    
     return {
       number: index + 1,
-      date: this.getTradeDate(trade),
+      entryDate: this.getTradeDate(trade, true),
+      entryBar: trade.entryBar !== undefined ? trade.entryBar : 'N/A',
+      exitDate: isOpen ? 'Open' : this.getTradeDate(trade, false),
+      exitBar: isOpen ? '-' : (trade.exitBar !== undefined ? trade.exitBar : 'N/A'),
       direction: trade.direction,
       entryPrice: this.formatPrice(trade.entryPrice),
-      exitPrice: isOpen ? this.formatPrice(currentPrice) : this.formatPrice(trade.exitPrice),
+      exitPrice: this.formatPrice(exitPrice),
       size: trade.size.toFixed(2),
       profit: isOpen ? this.formatProfit(unrealizedProfit) : this.formatProfit(trade.profit),
       profitRaw: isOpen ? unrealizedProfit : trade.profit,
+      entryId: trade.entryId || trade.entryID || 'N/A',
       isOpen: isOpen,
     };
   }
@@ -82,12 +100,16 @@ export class TradeTableRenderer {
         return `
           <tr>
             <td>${formatted.number}</td>
-            <td>${formatted.date}</td>
+            <td>${formatted.entryDate}</td>
+            <td>${formatted.entryBar}</td>
             <td class="${directionClass}">${formatted.direction.toUpperCase()}</td>
             <td>${formatted.entryPrice}</td>
+            <td>${formatted.exitDate}</td>
+            <td>${formatted.exitBar}</td>
             <td>${formatted.exitPrice}</td>
             <td>${formatted.size}</td>
             <td class="${profitClass}">${formatted.profit}</td>
+            <td>${formatted.entryId}</td>
           </tr>
         `;
       })

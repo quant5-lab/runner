@@ -3,7 +3,9 @@ import { PaneAssigner } from './PaneAssigner.js';
 import { PaneManager } from './PaneManager.js';
 import { SeriesRouter } from './SeriesRouter.js';
 import { ChartManager } from './ChartManager.js';
-import { TradeDataFormatter, TradeTableRenderer } from './TradeTable.js';
+import { TradeDataFormatter } from './TradeTable.js';
+import { TradeRowspanTransformer } from './TradeRowspanTransformer.js';
+import { TradeRowspanRenderer } from './TradeRowspanRenderer.js';
 import { TimeIndexBuilder } from './TimeIndexBuilder.js';
 import { PlotOffsetTransformer } from './PlotOffsetTransformer.js';
 import { SeriesDataMapper } from './SeriesDataMapper.js';
@@ -187,6 +189,9 @@ export class ChartApplication {
       ...(strategy.openTrades || []).map((t) => ({ ...t, status: 'open' })),
     ];
 
+    // Sort trades: latest first (by entryTime descending)
+    allTrades.sort((a, b) => (b.entryTime || 0) - (a.entryTime || 0));
+
     const tbody = document.getElementById('trades-tbody');
     const summary = document.getElementById('trades-summary');
 
@@ -202,8 +207,11 @@ export class ChartApplication {
       : null;
 
     const formatter = new TradeDataFormatter(candlestickData);
-    const renderer = new TradeTableRenderer(formatter);
-    tbody.innerHTML = renderer.renderRows(allTrades, currentPrice);
+    const transformer = new TradeRowspanTransformer(formatter);
+    const renderer = new TradeRowspanRenderer();
+    
+    const tradeRows = transformer.transformTrades(allTrades, currentPrice);
+    tbody.innerHTML = renderer.renderRows(tradeRows);
 
     const realizedProfit = strategy.netProfit || 0;
     const unrealizedProfit = currentPrice

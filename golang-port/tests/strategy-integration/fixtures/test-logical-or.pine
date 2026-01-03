@@ -1,0 +1,5 @@
+//@version=4
+strategy("Logical OR Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+if (strategy.position_size <= 0 or close > 110.0) and close > 105.0
+    strategy.entry("Long", strategy.long)

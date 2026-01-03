@@ -18,8 +18,8 @@ func TestStrategyActionHandler_CanHandle(t *testing.T) {
 		{"strategy.entry", true},
 		{"strategy.close", true},
 		{"strategy.close_all", true},
+		{"strategy.exit", true},
 		{"strategy", false},
-		{"strategy.exit", false},
 		{"ta.entry", false},
 		{"entry", false},
 		{"", false},
@@ -326,5 +326,109 @@ func TestStrategyActionHandler_EdgeCases(t *testing.T) {
 			}
 			_ = code
 		})
+	}
+}
+
+/* Test strategy.exit() with named arguments */
+func TestStrategyExit_NamedArguments(t *testing.T) {
+	handler := NewStrategyActionHandler()
+	g := newTestGenerator()
+
+	/* strategy.exit("Exit", "Long", stop=95.0, limit=110.0) */
+	call := &ast.CallExpression{
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "Exit"},
+			&ast.Literal{Value: "Long"},
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 95.0}},
+					{Key: &ast.Identifier{Name: "limit"}, Value: &ast.Literal{Value: 110.0}},
+				},
+			},
+		},
+	}
+
+	code, err := handler.generateExit(g, call)
+	if err != nil {
+		t.Fatalf("generateExit failed: %v", err)
+	}
+
+	/* Verify stop and limit extracted correctly (not NaN) */
+	if !strings.Contains(code, "95.00") {
+		t.Errorf("Expected stop value 95.00 in generated code, got:\n%s", code)
+	}
+	if !strings.Contains(code, "110.00") {
+		t.Errorf("Expected limit value 110.00 in generated code, got:\n%s", code)
+	}
+	if strings.Contains(code, "math.NaN()") {
+		t.Errorf("Should not contain math.NaN() when named args provided, got:\n%s", code)
+	}
+}
+
+/* Test with identifier variables */
+func TestStrategyExit_NamedVariables(t *testing.T) {
+	handler := NewStrategyActionHandler()
+	g := newTestGenerator()
+	g.variables["stop_level"] = "float64"
+	g.variables["limit_level"] = "float64"
+
+	/* strategy.exit("Exit", "Long", stop=stop_level, limit=limit_level) */
+	call := &ast.CallExpression{
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "Exit"},
+			&ast.Literal{Value: "Long"},
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Identifier{Name: "stop_level"}},
+					{Key: &ast.Identifier{Name: "limit"}, Value: &ast.Identifier{Name: "limit_level"}},
+				},
+			},
+		},
+	}
+
+	code, err := handler.generateExit(g, call)
+	if err != nil {
+		t.Fatalf("generateExit failed: %v", err)
+	}
+
+	/* Verify series access generated */
+	if !strings.Contains(code, "stop_levelSeries.GetCurrent()") {
+		t.Errorf("Expected stop_levelSeries.GetCurrent() in code, got:\n%s", code)
+	}
+	if !strings.Contains(code, "limit_levelSeries.GetCurrent()") {
+		t.Errorf("Expected limit_levelSeries.GetCurrent() in code, got:\n%s", code)
+	}
+}
+
+/* Test with only stop (no limit) */
+func TestStrategyExit_OnlyStop(t *testing.T) {
+	handler := NewStrategyActionHandler()
+	g := newTestGenerator()
+
+	/* strategy.exit("Exit", "Long", stop=95.0) */
+	call := &ast.CallExpression{
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "Exit"},
+			&ast.Literal{Value: "Long"},
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 95.0}},
+				},
+			},
+		},
+	}
+
+	code, err := handler.generateExit(g, call)
+	if err != nil {
+		t.Fatalf("generateExit failed: %v", err)
+	}
+
+	/* stop=95.0, limit=NaN */
+	if !strings.Contains(code, "95.00") {
+		t.Errorf("Expected stop value 95.00, got:\n%s", code)
+	}
+	/* Limit should be NaN (not provided) */
+	if !strings.Contains(code, "math.NaN()") {
+		t.Errorf("Expected limit=math.NaN() when not provided, got:\n%s", code)
 	}
 }

@@ -54,7 +54,7 @@ func TestStateManagerLongPosition(t *testing.T) {
 	strat := NewStrategy()
 	strat.Call("Test", 10000)
 
-	strat.Entry("Long", Long, 10)
+	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
 	sm.SampleCurrentBar(strat, 105.0)
 
@@ -71,7 +71,7 @@ func TestStateManagerShortPosition(t *testing.T) {
 	strat := NewStrategy()
 	strat.Call("Test", 10000)
 
-	strat.Entry("Short", Short, 5)
+	strat.Entry("Short", Short, 5, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 	sm.SampleCurrentBar(strat, 100.0)
 
@@ -92,7 +92,7 @@ func TestStateManagerHistoricalAccess(t *testing.T) {
 	sm.SampleCurrentBar(strat, 100.0)
 	sm.AdvanceCursors()
 
-	strat.Entry("Long", Long, 10)
+	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
 	sm.SampleCurrentBar(strat, 105.0)
 
@@ -116,7 +116,7 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 	}
 	sm.AdvanceCursors()
 
-	strat.Entry("Long", Long, 10)
+	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
 	sm.SampleCurrentBar(strat, 105.0)
 	if sm.PositionSizeSeries().Get(0) != 10.0 {
@@ -124,7 +124,7 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 	}
 	sm.AdvanceCursors()
 
-	strat.Close("Long", 110.0, 1002)
+	strat.Close("Long", 110.0, 1002, "")
 	strat.OnBarUpdate(2, 110.0, 1002)
 	sm.SampleCurrentBar(strat, 110.0)
 	if !math.IsNaN(sm.PositionAvgPriceSeries().Get(0)) {
@@ -140,7 +140,7 @@ func TestStateManagerPositionReversal(t *testing.T) {
 	strat := NewStrategy()
 	strat.Call("Test", 10000)
 
-	strat.Entry("Long", Long, 10)
+	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 	sm.SampleCurrentBar(strat, 100.0)
 	if sm.PositionSizeSeries().Get(0) != 10.0 {
@@ -148,8 +148,8 @@ func TestStateManagerPositionReversal(t *testing.T) {
 	}
 	sm.AdvanceCursors()
 
-	strat.Close("Long", 105.0, 1002)
-	strat.Entry("Short", Short, 5)
+	strat.Close("Long", 105.0, 1002, "")
+	strat.Entry("Short", Short, 5, "")
 	strat.OnBarUpdate(2, 105.0, 1002)
 	strat.OnBarUpdate(3, 105.0, 1003)
 	sm.SampleCurrentBar(strat, 105.0)
@@ -163,7 +163,7 @@ func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 	strat := NewStrategy()
 	strat.Call("Test", 10000)
 
-	strat.Entry("Long", Long, 10)
+	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 	sm.SampleCurrentBar(strat, 100.0)
 
@@ -190,12 +190,12 @@ func TestStateManagerMultipleClosedTrades(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		tradeID := "trade" + string(rune('A'+i))
 
-		strat.Entry(tradeID, Long, 10)
+		strat.Entry(tradeID, Long, 10, "")
 		barIndex++
 		strat.OnBarUpdate(barIndex, 100.0, int64(1000+barIndex))
 
 		barIndex++
-		strat.Close(tradeID, 105.0, int64(1000+barIndex))
+		strat.Close(tradeID, 105.0, int64(1000+barIndex), "")
 	}
 
 	sm.SampleCurrentBar(strat, 105.0)
@@ -233,7 +233,7 @@ func TestStateManagerCursorAdvancement(t *testing.T) {
 
 	for i, price := range values {
 		if i == 2 {
-			strat.Entry("Long", Long, 10)
+			strat.Entry("Long", Long, 10, "")
 			strat.OnBarUpdate(i, price, int64(1000+i))
 		}
 		sm.SampleCurrentBar(strat, price)

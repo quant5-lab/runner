@@ -1,0 +1,5 @@
+//@version=4
+strategy("Short Entry Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+if close < 108.0 and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)

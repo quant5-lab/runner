@@ -3519,6 +3519,8 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 		}
 	case *ast.BinaryExpression:
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
+	case *ast.LogicalExpression:
+		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
 	}

@@ -40,7 +40,7 @@ type ParsedArgument struct {
 	IsLiteral  bool           // true if literal value, false if identifier/expression
 	Value      interface{}    // The parsed value (string, int, float64, bool)
 	Identifier string         // Identifier name if IsLiteral=false
-	SourceExpr ast.Expression // Original expression for debugging
+	SourceExpr ast.Expression // Original expression for error reporting
 }
 
 // ============================================================================

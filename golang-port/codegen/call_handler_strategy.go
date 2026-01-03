@@ -23,7 +23,7 @@ func NewStrategyActionHandler() *StrategyActionHandler {
 
 func (h *StrategyActionHandler) CanHandle(funcName string) bool {
 	switch funcName {
-	case "strategy.entry", "strategy.close", "strategy.close_all":
+	case "strategy.entry", "strategy.close", "strategy.close_all", "strategy.exit":
 		return true
 	default:
 		return false
@@ -40,6 +40,8 @@ func (h *StrategyActionHandler) GenerateCode(g *generator, call *ast.CallExpress
 		return h.generateClose(g, call)
 	case "strategy.close_all":
 		return h.generateCloseAll(g, call)
+	case "strategy.exit":
+		return h.generateExit(g, call)
 	default:
 		return "", nil
 	}
@@ -58,7 +60,10 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 		g.extractFloatLiteral,
 	)
 
-	return g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f)\n", entryID, direction, qty), nil
+	extractor := &ArgumentExtractor{generator: g}
+	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
+
+	return g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f, %s)\n", entryID, direction, qty, comment), nil
 }
 
 func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpression) (string, error) {
@@ -69,10 +74,36 @@ func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpres
 	}
 
 	entryID := g.extractStringLiteral(call.Arguments[0])
-	return g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time)\n", entryID), nil
+
+	extractor := &ArgumentExtractor{generator: g}
+	comment := extractor.ExtractCommentArgument(call.Arguments[1:], "comment", 0, `""`)
+
+	return g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time, %s)\n", entryID, comment), nil
 }
 
 func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExpression) (string, error) {
 	// strategy.close_all()
-	return g.ind() + "strat.CloseAll(bar.Close, bar.Time)\n", nil
+	extractor := &ArgumentExtractor{generator: g}
+	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", 0, `""`)
+
+	return g.ind() + fmt.Sprintf("strat.CloseAll(bar.Close, bar.Time, %s)\n", comment), nil
+}
+
+func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpression) (string, error) {
+	// strategy.exit(id, from_entry, qty, qty_percent, profit, limit, loss, stop, ...)
+	//               0   1           2    3           4       5      6     7
+	if len(call.Arguments) < 2 {
+		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
+	}
+
+	exitID := g.extractStringLiteral(call.Arguments[0])
+	fromEntry := g.extractStringLiteral(call.Arguments[1])
+
+	extractor := &ArgumentExtractor{generator: g}
+	limitExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "limit", 3, "math.NaN()")
+	stopExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "stop", 5, "math.NaN()")
+	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 6, `""`)
+
+	return g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
+		exitID, fromEntry, stopExpr, limitExpr, comment), nil
 }

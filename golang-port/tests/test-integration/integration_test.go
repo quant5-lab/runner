@@ -143,9 +143,9 @@ func TestChartDataGeneration(t *testing.T) {
 	// Add mock strategy
 	strat := strategy.NewStrategy()
 	strat.Call("Test Strategy", 10000)
-	strat.Entry("long1", strategy.Long, 10)
+	strat.Entry("long1", strategy.Long, 10, "")
 	strat.OnBarUpdate(1, 100, 1700000000)
-	strat.Close("long1", 110, 1700003600)
+	strat.Close("long1", 110, 1700003600, "")
 	cd.AddStrategy(strat, 110)
 
 	// Generate JSON
@@ -277,10 +277,10 @@ func TestRuntimeIntegration(t *testing.T) {
 
 		// Simple strategy logic: buy on uptrend, sell on downtrend
 		if i > 25 && i < 30 && strat.GetPositionSize() == 0 {
-			strat.Entry("long", strategy.Long, 1)
+			strat.Entry("long", strategy.Long, 1, "")
 		}
 		if i > 45 && i < 50 && strat.GetPositionSize() > 0 {
-			strat.Close("long", ctx.Data[i].Close, ctx.Data[i].Time)
+			strat.Close("long", ctx.Data[i].Close, ctx.Data[i].Time, "")
 		}
 	}
 
