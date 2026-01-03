@@ -198,7 +198,7 @@ func TestParseAllFixtures(t *testing.T) {
 	successCount := 0
 	failCount := 0
 	knownLimitations := map[string]string{
-		"test-builtin-function.pine": "user-defined functions with => syntax",
+		// All known limitations resolved as of inline arrow function support
 	}
 
 	for _, entry := range entries {

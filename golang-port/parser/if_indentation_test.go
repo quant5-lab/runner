@@ -339,8 +339,13 @@ func TestIfStatement_InsideFunctionBody(t *testing.T) {
 				t.Fatal("Expected function declaration")
 			}
 
+			body := funcDecl.MultiLineBody
+			if body == nil {
+				body = []*Statement{}
+			}
+
 			hasIf := false
-			for _, stmt := range funcDecl.Body {
+			for _, stmt := range body {
 				if stmt.If != nil {
 					hasIf = true
 					break

@@ -26,18 +26,20 @@ type Statement struct {
 }
 
 type IfStatement struct {
-	Condition *OrExpr      `parser:"'if' ( '(' @@ ')' | @@ )"`
-	Indent    *string      `parser:"@Indent?"`
+	Condition *OrExpr      `parser:"'if' @@"`
+	Indent    *string      `parser:"@Indent"`
 	Body      []*Statement `parser:"@@+"`
-	Dedent    *string      `parser:"@Dedent?"`
+	Dedent    *string      `parser:"@Dedent"`
 }
 
 type FunctionDecl struct {
-	Name   string       `parser:"@Ident"`
-	Params []string     `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
-	Arrow  string       `parser:"@'=>' Newline? @Indent"`
-	Body   []*Statement `parser:"@@+"`
-	Dedent string       `parser:"@Dedent"`
+	Name            string       `parser:"@Ident"`
+	Params          []string     `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
+	Arrow           string       `parser:"@'=>'"`
+	InlineBody      *Expression  `parser:"( Newline? @@"`
+	MultiLineIndent *string      `parser:"| Newline? @Indent"`
+	MultiLineBody   []*Statement `parser:"@@+"`
+	MultiLineDedent *string      `parser:"@Dedent )"`
 }
 
 type TupleAssignment struct {
@@ -77,8 +79,8 @@ type Expression struct {
 
 type TernaryExpr struct {
 	Condition *OrExpr     `parser:"@@"`
-	TrueVal   *Expression `parser:"( '?' @@"`
-	FalseVal  *Expression `parser:"':' @@ )?"`
+	TrueVal   *Expression `parser:"( '?' ( Newline | Indent | Dedent )* @@"`
+	FalseVal  *Expression `parser:"( Newline | Indent | Dedent )* ':' ( Newline | Indent | Dedent )* @@ )?"`
 }
 
 type OrExpr struct {

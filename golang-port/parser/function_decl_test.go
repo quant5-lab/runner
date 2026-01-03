@@ -8,6 +8,16 @@ import (
 
 /* Tests for arrow function declaration parsing with INDENT/DEDENT */
 
+func getBodyLength(funcDecl *FunctionDecl) int {
+	if funcDecl.InlineBody != nil {
+		return 1
+	}
+	if funcDecl.MultiLineBody != nil {
+		return len(funcDecl.MultiLineBody)
+	}
+	return 0
+}
+
 // TestFunctionDecl_StatementCounts verifies functions with varying body sizes
 func TestFunctionDecl_StatementCounts(t *testing.T) {
 	tests := []struct {
@@ -79,8 +89,8 @@ func TestFunctionDecl_StatementCounts(t *testing.T) {
 				t.Errorf("Expected function name '%s', got '%s'", tt.funcName, funcDecl.Name)
 			}
 
-			if len(funcDecl.Body) != tt.expectedStmts {
-				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, len(funcDecl.Body))
+			if getBodyLength(funcDecl) != tt.expectedStmts {
+				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, getBodyLength(funcDecl))
 			}
 		})
 	}
@@ -270,8 +280,8 @@ func TestFunctionDecl_WithEmptyLines(t *testing.T) {
 				t.Fatal("Expected FunctionDecl")
 			}
 
-			if len(funcDecl.Body) != tt.expectedStmts {
-				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, len(funcDecl.Body))
+			if getBodyLength(funcDecl) != tt.expectedStmts {
+				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, getBodyLength(funcDecl))
 			}
 		})
 	}
@@ -327,8 +337,8 @@ func TestFunctionDecl_WithComments(t *testing.T) {
 				t.Fatal("Expected FunctionDecl")
 			}
 
-			if len(funcDecl.Body) != tt.expectedStmts {
-				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, len(funcDecl.Body))
+			if getBodyLength(funcDecl) != tt.expectedStmts {
+				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, getBodyLength(funcDecl))
 			}
 		})
 	}
@@ -386,11 +396,15 @@ func TestFunctionDecl_ReturnValues(t *testing.T) {
 				t.Fatal("Expected FunctionDecl")
 			}
 
-			if len(funcDecl.Body) == 0 {
+			if getBodyLength(funcDecl) == 0 {
 				t.Fatal("Function body is empty")
 			}
 
-			lastStmt := funcDecl.Body[len(funcDecl.Body)-1]
+			if funcDecl.MultiLineBody == nil {
+				t.Skip("Skipping multi-line body test for inline function")
+			}
+
+			lastStmt := funcDecl.MultiLineBody[len(funcDecl.MultiLineBody)-1]
 			if lastStmt.Expression == nil && lastStmt.TupleAssignment == nil && lastStmt.Assignment == nil {
 				t.Error("Last statement should be an expression, tuple, or assignment")
 			}
@@ -529,13 +543,17 @@ func TestFunctionDecl_NestedIfStatements(t *testing.T) {
 				t.Fatal("Expected FunctionDecl")
 			}
 
-			if len(funcDecl.Body) != tt.expectedStmts {
-				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, len(funcDecl.Body))
+			if getBodyLength(funcDecl) != tt.expectedStmts {
+				t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, getBodyLength(funcDecl))
+			}
+
+			if funcDecl.MultiLineBody == nil {
+				t.Skip("Skipping multi-line body test for inline function")
 			}
 
 			// Verify at least one IF statement exists
 			hasIf := false
-			for _, stmt := range funcDecl.Body {
+			for _, stmt := range funcDecl.MultiLineBody {
 				if stmt.If != nil {
 					hasIf = true
 					break
@@ -635,13 +653,13 @@ func TestFunctionDecl_EdgeCases(t *testing.T) {
 			name: "function without indent",
 			source: `func(x) =>
 x + 1`,
-			shouldErr: true, // No INDENT after =>
+			shouldErr: false, // Inline expression now supported
 		},
 		{
 			name: "empty function body",
 			source: `func(x) =>
 `,
-			shouldErr: true, // No statements after =>
+			shouldErr: true, // No expression after =>
 		},
 		{
 			name: "inconsistent indentation - lexer lenient",

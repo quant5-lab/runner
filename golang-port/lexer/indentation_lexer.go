@@ -16,10 +16,10 @@ func NewIndentationDefinition(base lexer.Definition) *IndentationDefinition {
 
 func (d *IndentationDefinition) Symbols() map[string]lexer.TokenType {
 	symbols := d.base.Symbols()
-	symbols["Indent"] = lexer.TokenType(-100)
-	symbols["Dedent"] = lexer.TokenType(-101)
-	symbols["Newline"] = lexer.TokenType(-102)
-	symbols["Whitespace"] = symbols["Whitespace"] // Track for filtering
+	nextType := lexer.TokenType(len(symbols) + 1)
+	symbols["Indent"] = nextType
+	symbols["Dedent"] = nextType + 1
+	symbols["Newline"] = nextType + 2
 	return symbols
 }
 
@@ -90,9 +90,9 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 			continue
 		}
 
-		// Skip whitespace for indentation tracking but still return it
+		// Skip whitespace but track lines
 		if token.Type == l.whitespaceType {
-			return token, nil
+			continue
 		}
 
 		// Track if we just saw => keyword or if keyword
