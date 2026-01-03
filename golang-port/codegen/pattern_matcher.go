@@ -9,7 +9,7 @@ type PatternMatcher interface {
 type seriesAccessPattern struct{}
 
 func (p *seriesAccessPattern) Matches(code string) bool {
-	return strings.Contains(code, ".GetCurrent()")
+	return strings.Contains(code, ".GetCurrent()") || strings.Contains(code, "Series.Get(")
 }
 
 type comparisonPattern struct{}

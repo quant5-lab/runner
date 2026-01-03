@@ -51,7 +51,7 @@ func TestConvertSeriesAccessRule_ShouldConvert(t *testing.T) {
 		{"skip literal", "100", false},
 		{"skip empty", "", false},
 		{"convert multiple Series", "aSeries.GetCurrent() + bSeries.GetCurrent()", true},
-		{"skip historical access", "priceSeries.Get(1)", false},
+		{"convert historical access Series.Get(N)", "priceSeries.Get(1)", true},
 	}
 
 	for _, tt := range tests {
@@ -77,22 +77,22 @@ func TestTypeBasedRule_ShouldConvert(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "convert bool variable",
+			name:     "skip bool variable (already bool)",
 			expr:     &ast.Identifier{Name: "enabled"},
+			expected: false,
+		},
+		{
+			name:     "convert float64 variable (needs != 0)",
+			expr:     &ast.Identifier{Name: "price"},
 			expected: true,
 		},
 		{
-			name:     "skip float64 variable",
-			expr:     &ast.Identifier{Name: "price"},
-			expected: false,
-		},
-		{
-			name:     "skip int variable",
+			name:     "convert int variable (needs != 0)",
 			expr:     &ast.Identifier{Name: "count"},
-			expected: false,
+			expected: true,
 		},
 		{
-			name:     "skip unregistered variable",
+			name:     "skip unregistered variable (conservative)",
 			expr:     &ast.Identifier{Name: "unknown"},
 			expected: false,
 		},
@@ -102,20 +102,20 @@ func TestTypeBasedRule_ShouldConvert(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "convert bool member expression",
+			name: "skip bool member expression (already bool)",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "enabled"},
 				Property: &ast.Identifier{Name: "value"},
 			},
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "skip float64 member expression",
+			name: "convert float64 member expression (needs != 0)",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "price"},
 				Property: &ast.Identifier{Name: "value"},
 			},
-			expected: false,
+			expected: true,
 		},
 	}
 
@@ -153,8 +153,8 @@ func TestConversionRule_Composition(t *testing.T) {
 			expr:             &ast.Identifier{Name: "price"},
 			expectSkip:       false,
 			expectSeries:     false,
-			expectType:       false,
-			expectedDecision: "skip conversion",
+			expectType:       false, // unregistered identifier → conservative, don't convert
+			expectedDecision: "skip conversion due to comparison",
 		},
 		{
 			name:             "Series without comparison converts",
@@ -162,26 +162,26 @@ func TestConversionRule_Composition(t *testing.T) {
 			expr:             &ast.Identifier{Name: "price"},
 			expectSkip:       true,
 			expectSeries:     true,
-			expectType:       false,
-			expectedDecision: "convert via Series rule",
+			expectType:       false, // unregistered identifier → conservative
+			expectedDecision: "convert via Series rule (takes precedence)",
 		},
 		{
-			name:             "bool type without Series converts",
+			name:             "bool type without Series skips conversion",
 			code:             "enabled",
 			expr:             &ast.Identifier{Name: "enabled"},
 			expectSkip:       true,
 			expectSeries:     false,
-			expectType:       true,
-			expectedDecision: "convert via type rule",
+			expectType:       false, // bool variable → don't convert
+			expectedDecision: "no conversion (already bool)",
 		},
 		{
-			name:             "neither pattern nor type",
+			name:             "neither pattern nor type - conservative",
 			code:             "bar.Close",
 			expr:             &ast.Identifier{Name: "close"},
 			expectSkip:       true,
 			expectSeries:     false,
-			expectType:       false,
-			expectedDecision: "no conversion",
+			expectType:       false, // unregistered identifier → conservative
+			expectedDecision: "no conversion (unregistered, conservative)",
 		},
 	}
 

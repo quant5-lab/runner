@@ -25,19 +25,19 @@ func TestBoolConstantConversionRuleLogic(t *testing.T) {
 			name:          "bool constant no conversion",
 			identifier:    "show_trades",
 			shouldConvert: false,
-			description:   "Bool constants from input.bool bypass conversion",
+			description:   "Bool constants from input.bool are already bool",
 		},
 		{
-			name:          "bool variable needs conversion",
+			name:          "bool variable no conversion",
 			identifier:    "signal",
-			shouldConvert: true,
-			description:   "Bool variables from comparisons get != 0 conversion",
+			shouldConvert: false,
+			description:   "Bool variables are already bool type",
 		},
 		{
 			name:          "unknown identifier no conversion",
 			identifier:    "unknown",
 			shouldConvert: false,
-			description:   "Unknown identifiers return false (other rules apply)",
+			description:   "Unknown identifiers conservative - don't convert",
 		},
 	}
 

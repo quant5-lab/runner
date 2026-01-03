@@ -170,9 +170,9 @@ func TestBooleanConverter_Integration_RuleOrdering(t *testing.T) {
 			name:            "type rule as fallback",
 			expr:            &ast.Identifier{Name: "signal"},
 			code:            "signal",
-			expectedIf:      "signal != 0",
-			expectedOperand: "(signal != 0)",
-			description:     "Type rule applies when no Series pattern",
+			expectedIf:      "signal",
+			expectedOperand: "signal",
+			description:     "Bool variable not wrapped (already bool type)",
 		},
 	}
 

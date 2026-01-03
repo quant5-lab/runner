@@ -13,7 +13,7 @@ func TestSeriesAccessPattern_Matches(t *testing.T) {
 		{"simple Series access", "priceSeries.GetCurrent()", true},
 		{"different variable name", "enabledSeries.GetCurrent()", true},
 		{"with whitespace", "price Series . GetCurrent ( )", false},
-		{"historical access Get(N)", "varSeries.Get(1)", false},
+		{"historical access Get(N)", "varSeries.Get(1)", true},
 		{"partial match Series only", "priceSeries", false},
 		{"partial match method only", "GetCurrent()", false},
 		{"identifier without Series", "price", false},

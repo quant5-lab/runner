@@ -31,7 +31,14 @@ func (r *typeBasedRule) ShouldConvert(expr ast.Expression, code string) bool {
 		if r.typeSystem.IsBoolConstant(ident.Name) {
 			return false
 		}
-		return r.typeSystem.IsBoolVariableByName(ident.Name)
+		if r.typeSystem.IsBoolVariableByName(ident.Name) {
+			return false
+		}
+		varType, exists := r.typeSystem.variables[ident.Name]
+		if exists && varType != "bool" {
+			return true
+		}
+		return false
 	}
 
 	if member, ok := expr.(*ast.MemberExpression); ok {
@@ -39,7 +46,14 @@ func (r *typeBasedRule) ShouldConvert(expr ast.Expression, code string) bool {
 			if r.typeSystem.IsBoolConstant(ident.Name) {
 				return false
 			}
-			return r.typeSystem.IsBoolVariableByName(ident.Name)
+			if r.typeSystem.IsBoolVariableByName(ident.Name) {
+				return false
+			}
+			varType, exists := r.typeSystem.variables[ident.Name]
+			if exists && varType != "bool" {
+				return true
+			}
+			return false
 		}
 	}
 

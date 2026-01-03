@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"strings"
+
 	"github.com/quant5-lab/runner/ast"
 )
 
@@ -28,8 +30,22 @@ func NewBooleanConverter(typeSystem *TypeInferenceEngine) *BooleanConverter {
 }
 
 func (bc *BooleanConverter) EnsureBooleanOperand(expr ast.Expression, generatedCode string) string {
+	if expr == nil {
+		return generatedCode
+	}
+
 	if bc.IsAlreadyBoolean(expr) {
 		return generatedCode
+	}
+
+	if _, ok := expr.(*ast.Literal); ok {
+		return generatedCode
+	}
+
+	if unary, ok := expr.(*ast.UnaryExpression); ok {
+		if _, isLit := unary.Argument.(*ast.Literal); isLit {
+			return generatedCode
+		}
 	}
 
 	if bc.seriesAccessRule.ShouldConvert(expr, generatedCode) {
@@ -39,12 +55,16 @@ func (bc *BooleanConverter) EnsureBooleanOperand(expr ast.Expression, generatedC
 	}
 
 	if bc.typeSystem.IsBoolVariable(expr) {
-		return bc.parenthesesTransform.Transform(
-			bc.notEqualZeroTransform.Transform(generatedCode),
-		)
+		return generatedCode
 	}
 
-	return generatedCode
+	if _, ok := expr.(*ast.Identifier); ok && !strings.Contains(generatedCode, "Series") {
+		return generatedCode
+	}
+
+	return bc.parenthesesTransform.Transform(
+		bc.notEqualZeroTransform.Transform(generatedCode),
+	)
 }
 
 func (bc *BooleanConverter) IsAlreadyBoolean(expr ast.Expression) bool {
