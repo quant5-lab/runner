@@ -1,4 +1,0 @@
-Parser limitation: Unexpected token at line 342
-Parse: ❌ Fails
-Error: "Parse error: bb-strategy-9-rus.pine:342:5: unexpected token ''"
-Blocker: Parser cannot handle syntax at line 342

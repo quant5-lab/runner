@@ -201,7 +201,7 @@
 - [ ] E2E: 26/26 tests pass with Go binary
 
 ## Current Status
-- **Parser**: 39/40 Pine fixtures parse successfully (97.5% coverage, 1 known limitation: single-line arrow functions)
+- **Parser**: 40/40 Pine fixtures parse successfully (100% coverage)
 - **Runtime**: 15 packages (codegen, parser, chartdata, context, input, math, output, request, series, strategy, ta, value, visual, integration, validation)
 - **Codegen**: ForwardSeriesBuffer paradigm (ALL variables → Series storage, cursor-based, forward-only, immutable history, O(1) advance)
 - **TA Functions**: ta.sma/ema/rma/rsi/atr/bbands/macd/stoch/crossover/crossunder/stdev/change/pivothigh/pivotlow/valuewhen, wma, dev
