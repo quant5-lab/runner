@@ -24,7 +24,7 @@ len = 5
 result = dev(close, len) ? 1 : 0
 plot(result)`,
 			mustContain: []string{
-				"!= 0",
+				"value.IsTrue",
 				"devSum := 0.0",
 				"resultSeries.Set",
 			},
@@ -59,9 +59,9 @@ if dev(close, len)
     signal := 1
 plot(signal)`,
 			mustContain: []string{
-				"!= 0",
+				"value.IsTrue",
 				"devSum := 0.0",
-				"if (func() float64",
+				"if value.IsTrue((func() float64",
 			},
 			mustNotContain: []string{
 				"undefined:",
@@ -81,7 +81,7 @@ plot(dev_signal + comp_signal)`,
 				"dev_signalSeries.Set",
 				"comp_signalSeries.Set",
 				"devSum := 0.0",
-				"!= 0",
+				"value.IsTrue",
 			},
 			mustNotContain: []string{
 				"undefined:",
@@ -99,7 +99,7 @@ result = dev(close, len) ? (dev(open, len) ? 1 : 2) : 3
 plot(result)`,
 			mustContain: []string{
 				"resultSeries.Set",
-				"!= 0",
+				"value.IsTrue",
 				"devSum := 0.0",
 			},
 			mustNotContain: []string{
@@ -117,7 +117,7 @@ h1 = dev(h, len) ? na : h
 plot(h1)`,
 			mustContain: []string{
 				"h1Series.Set",
-				"!= 0",
+				"value.IsTrue",
 				"ctx.BarIndex < length-1",
 				"math.NaN()",
 			},
@@ -213,7 +213,7 @@ plot(signal)`
 	}
 
 	// Comparison should not add != 0 (already boolean)
-	if strings.Contains(code, "avgSeries.GetCurrent() > bar.Close) != 0") {
+	if strings.Contains(code, "value.IsTrue(avgSeries.GetCurrent() > bar.Close)") {
 		t.Error("Comparison expression should not get != 0 conversion")
 	}
 }
@@ -341,7 +341,7 @@ plot(l1, title="L1", color=color.blue)`
 		"h1Series.Set",
 		"l1Series.Set",
 		"signalSeries.Set",
-		"!= 0",
+		"value.IsTrue",
 		"math.NaN()",
 		"devSum := 0.0",
 		"Series.Get(",
@@ -398,7 +398,7 @@ b1 = cross_up ? 1 : 0
 b2 = cross_down ? 1 : 0
 b3 = na(close) ? 1 : 0
 plot(b1 + b2 + b3)`,
-			mustHaveConversion: false,
+			mustHaveConversion: true,
 			functionType:       "boolean",
 		},
 		{
@@ -439,7 +439,7 @@ plot(c1 + c2 + c3 + c4)`,
 			}
 
 			code := result.FunctionBody
-			hasConversion := strings.Contains(code, "!= 0")
+			hasConversion := strings.Contains(code, "value.IsTrue")
 
 			if tt.mustHaveConversion && !hasConversion {
 				t.Errorf("%s functions should have != 0 conversion but none found",
@@ -447,8 +447,8 @@ plot(c1 + c2 + c3 + c4)`,
 			}
 
 			if !tt.mustHaveConversion && tt.functionType == "boolean" {
-				if strings.Contains(code, "cross_upSeries.GetCurrent()) != 0") ||
-					strings.Contains(code, "cross_downSeries.GetCurrent()) != 0") {
+				if strings.Contains(code, "value.IsTrue(cross_upSeries.GetCurrent())") ||
+					strings.Contains(code, "value.IsTrue(cross_downSeries.GetCurrent())") {
 					t.Errorf("boolean variables should not have != 0 conversion")
 				}
 			}
@@ -500,7 +500,7 @@ plot(result1 + result2 + result3 + result4 + result5)`
 	code := result.FunctionBody
 
 	// Should have multiple != 0 conversions for conditional contexts
-	conversionCount := strings.Count(code, "!= 0")
+	conversionCount := strings.Count(code, "value.IsTrue")
 	if conversionCount < 3 {
 		t.Errorf("Expected at least 3 != 0 conversions for conditional contexts, found %d", conversionCount)
 	}

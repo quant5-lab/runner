@@ -9,7 +9,7 @@ type CodeTransformer interface {
 type addNotEqualZeroTransformer struct{}
 
 func (t *addNotEqualZeroTransformer) Transform(code string) string {
-	return fmt.Sprintf("%s != 0", code)
+	return fmt.Sprintf("value.IsTrue(%s)", code)
 }
 
 type addParenthesesTransformer struct{}

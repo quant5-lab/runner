@@ -154,7 +154,7 @@ func TestBooleanConverter_UnaryWithSeries(t *testing.T) {
 				Operator: "not",
 				Argument: &ast.Identifier{Name: "enabled"},
 			},
-			expected: "(enabledSeries.GetCurrent() != 0)",
+			expected: "(value.IsTrue(enabledSeries.GetCurrent()))",
 		},
 		{
 			name: "not with comparison unchanged",
@@ -190,7 +190,7 @@ func TestBooleanConverter_UnaryWithSeries(t *testing.T) {
 				Operator: "-",
 				Argument: &ast.Identifier{Name: "value"},
 			},
-			expected: "(valueSeries.GetCurrent() != 0)",
+			expected: "(value.IsTrue(valueSeries.GetCurrent()))",
 		},
 	}
 

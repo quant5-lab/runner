@@ -101,7 +101,7 @@ func TestBooleanConverter_UnaryExpression_BooleanOperators(t *testing.T) {
 			// Test ConvertBoolSeriesForIfStatement behavior
 			result := converter.ConvertBoolSeriesForIfStatement(tt.expr, tt.generatedCode)
 			if tt.shouldConvert {
-				expected := tt.generatedCode + " != 0"
+				expected := "value.IsTrue(" + tt.generatedCode + ")"
 				if result != expected {
 					t.Errorf("ConvertBoolSeriesForIfStatement: expected conversion\nwant: %q\ngot:  %q", expected, result)
 				}
@@ -302,7 +302,7 @@ func TestBooleanConverter_EnsureBooleanOperand_Float64Series(t *testing.T) {
 			name:          "float64 Series identifier wrapped",
 			generatedCode: "enabledSeries.GetCurrent()",
 			expr:          &ast.Identifier{Name: "enabled"},
-			expected:      "(enabledSeries.GetCurrent() != 0)",
+			expected:      "(value.IsTrue(enabledSeries.GetCurrent()))",
 		},
 		{
 			name:          "float64 Series member access wrapped",
@@ -311,7 +311,7 @@ func TestBooleanConverter_EnsureBooleanOperand_Float64Series(t *testing.T) {
 				Object:   &ast.Identifier{Name: "value"},
 				Property: &ast.Identifier{Name: "prop"},
 			},
-			expected: "(valueSeries.GetCurrent() != 0)",
+			expected: "(value.IsTrue(valueSeries.GetCurrent()))",
 		},
 	}
 
@@ -506,7 +506,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement(t *testing.T) {
 			expr:          &ast.Identifier{Name: "enabled"},
 			varName:       "enabled",
 			varType:       "bool",
-			expected:      "enabledSeries.GetCurrent() != 0",
+			expected:      "value.IsTrue(enabledSeries.GetCurrent())",
 		},
 		{
 			name:          "float64 variable converted (Pine bool model)",
@@ -514,7 +514,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement(t *testing.T) {
 			expr:          &ast.Identifier{Name: "price"},
 			varName:       "price",
 			varType:       "float64",
-			expected:      "priceSeries.GetCurrent() != 0",
+			expected:      "value.IsTrue(priceSeries.GetCurrent())",
 		},
 		{
 			name:          "unregistered variable converted (pattern-based)",
@@ -522,7 +522,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement(t *testing.T) {
 			expr:          &ast.Identifier{Name: "unknown"},
 			varName:       "unknown",
 			varType:       "",
-			expected:      "unknownSeries.GetCurrent() != 0",
+			expected:      "value.IsTrue(unknownSeries.GetCurrent())",
 		},
 	}
 
@@ -640,7 +640,7 @@ func TestBooleanConverter_Integration_MixedTypes(t *testing.T) {
 			name:          "bool variable Series wrapped",
 			generatedCode: "enabledSeries.GetCurrent()",
 			expr:          &ast.Identifier{Name: "enabled"},
-			expected:      "(enabledSeries.GetCurrent() != 0)",
+			expected:      "(value.IsTrue(enabledSeries.GetCurrent()))",
 		},
 		{
 			name:          "comparison already bool not wrapped",
@@ -691,7 +691,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement_CallExpression(t *test
 				Callee: &ast.Identifier{Name: "dev"},
 			},
 			generatedCode: "devResult.GetCurrent()",
-			expected:      "devResult.GetCurrent() != 0",
+			expected:      "value.IsTrue(devResult.GetCurrent())",
 		},
 		{
 			name: "boolean function unchanged",
@@ -710,7 +710,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement_CallExpression(t *test
 				Callee: &ast.Identifier{Name: "custom"},
 			},
 			generatedCode: "(func() float64 { if ctx.BarIndex < length { return 1 }; return 0 }())",
-			expected:      "(func() float64 { if ctx.BarIndex < length { return 1 }; return 0 }()) != 0",
+			expected:      "value.IsTrue((func() float64 { if ctx.BarIndex < length { return 1 }; return 0 }()))",
 		},
 		{
 			name: "IIFE with Series.Get()",
@@ -718,7 +718,7 @@ func TestBooleanConverter_ConvertBoolSeriesForIfStatement_CallExpression(t *test
 				Callee: &ast.Identifier{Name: "inline"},
 			},
 			generatedCode: "(func() float64 { sum := 0.0; for j := 0; j < len; j++ { sum += series.Get(j) }; return sum }())",
-			expected:      "(func() float64 { sum := 0.0; for j := 0; j < len; j++ { sum += series.Get(j) }; return sum }()) != 0",
+			expected:      "value.IsTrue((func() float64 { sum := 0.0; for j := 0; j < len; j++ { sum += series.Get(j) }; return sum }()))",
 		},
 		{
 			name: "na() with Series pattern",

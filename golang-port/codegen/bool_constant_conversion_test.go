@@ -161,7 +161,7 @@ func TestAddBoolConversionIfNeeded(t *testing.T) {
 			},
 			expr:        &ast.Identifier{Name: "signal"},
 			code:        "signalSeries.GetCurrent()",
-			expectCode:  "signalSeries.GetCurrent() != 0",
+			expectCode:  "value.IsTrue(signalSeries.GetCurrent())",
 			description: "Bool variable gets != 0 conversion",
 		},
 		{

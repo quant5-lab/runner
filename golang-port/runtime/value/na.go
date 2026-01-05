@@ -10,6 +10,11 @@ func IsNa(v float64) bool {
 	return math.IsNaN(v)
 }
 
+/* IsTrue checks if value is true (not NaN and not 0) */
+func IsTrue(v float64) bool {
+	return !math.IsNaN(v) && v != 0
+}
+
 /* Nz replaces NaN with replacement value (default 0) */
 func Nz(value, replacement float64) float64 {
 	if math.IsNaN(value) {

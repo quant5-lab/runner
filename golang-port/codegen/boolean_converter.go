@@ -115,6 +115,11 @@ func (bc *BooleanConverter) ConvertBoolSeriesForIfStatement(expr ast.Expression,
 		}
 	}
 
+	// LogicalExpression is already boolean
+	if _, ok := expr.(*ast.LogicalExpression); ok {
+		return generatedCode
+	}
+
 	if call, isCall := expr.(*ast.CallExpression); isCall {
 		if bc.IsBooleanFunction(call) {
 			return generatedCode

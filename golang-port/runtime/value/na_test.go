@@ -110,3 +110,27 @@ func TestFixnan(t *testing.T) {
 		})
 	}
 }
+
+func TestIsTrue(t *testing.T) {
+	tests := []struct {
+		name  string
+		value float64
+		want  bool
+	}{
+		{"NaN is false", math.NaN(), false},
+		{"Zero is false", 0.0, false},
+		{"Positive is true", 42.5, true},
+		{"Negative is true", -10.0, true},
+		{"Small positive is true", 1e-10, true},
+		{"Small negative is true", -1e-10, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsTrue(tt.value)
+			if got != tt.want {
+				t.Errorf("IsTrue(%v) = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
+}

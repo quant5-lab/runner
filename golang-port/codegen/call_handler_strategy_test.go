@@ -269,8 +269,8 @@ func TestStrategyActionHandler_IntegrationWithGenerator(t *testing.T) {
 		t.Error("Expected strat.Entry call in generated code")
 	}
 
-	if !strings.Contains(code.FunctionBody, "if signal") {
-		t.Error("Expected if statement in generated code")
+	if !strings.Contains(code.FunctionBody, "if value.IsTrue(signalSeries.GetCurrent())") {
+		t.Errorf("Expected if statement in generated code. Got:\n%s", code.FunctionBody)
 	}
 }
 

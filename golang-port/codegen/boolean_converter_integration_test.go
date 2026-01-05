@@ -25,7 +25,7 @@ func TestBooleanConverter_Integration_EndToEnd(t *testing.T) {
 			method:      "EnsureBooleanOperand",
 			expr:        &ast.Identifier{Name: "signal"},
 			code:        "signalSeries.GetCurrent()",
-			expected:    "(signalSeries.GetCurrent() != 0)",
+			expected:    "(value.IsTrue(signalSeries.GetCurrent()))",
 			description: "Series variables in logical expressions need parentheses",
 		},
 		{
@@ -45,7 +45,7 @@ func TestBooleanConverter_Integration_EndToEnd(t *testing.T) {
 			method:      "ConvertBoolSeriesForIfStatement",
 			expr:        &ast.Identifier{Name: "value"},
 			code:        "valueSeries.GetCurrent()",
-			expected:    "valueSeries.GetCurrent() != 0",
+			expected:    "value.IsTrue(valueSeries.GetCurrent())",
 			description: "If conditions need explicit != 0 for Series",
 		},
 		{
@@ -65,7 +65,7 @@ func TestBooleanConverter_Integration_EndToEnd(t *testing.T) {
 			method:      "ConvertBoolSeriesForIfStatement",
 			expr:        &ast.Identifier{Name: "enabled"},
 			code:        "enabledSeries.GetCurrent()",
-			expected:    "enabledSeries.GetCurrent() != 0",
+			expected:    "value.IsTrue(enabledSeries.GetCurrent())",
 			description: "Bool-typed variables converted even without pattern",
 		},
 	}
@@ -105,19 +105,19 @@ func TestBooleanConverter_Integration_ComplexExpressions(t *testing.T) {
 			name:     "nested ternary with Series",
 			expr:     &ast.Identifier{Name: "signal"},
 			code:     "func() float64 { if sma_bullishSeries.GetCurrent() { return 1.0 } else { return 0.0 } }()",
-			expected: "(func() float64 { if sma_bullishSeries.GetCurrent() { return 1.0 } else { return 0.0 } }() != 0)",
+			expected: "(value.IsTrue(func() float64 { if sma_bullishSeries.GetCurrent() { return 1.0 } else { return 0.0 } }()))",
 		},
 		{
 			name:     "multiple Series in expression",
 			expr:     &ast.Identifier{Name: "combined"},
 			code:     "aSeries.GetCurrent() + bSeries.GetCurrent()",
-			expected: "(aSeries.GetCurrent() + bSeries.GetCurrent() != 0)",
+			expected: "(value.IsTrue(aSeries.GetCurrent() + bSeries.GetCurrent()))",
 		},
 		{
 			name:     "Series within function call",
 			expr:     &ast.Identifier{Name: "result"},
 			code:     "ta.sma(closeSeries.GetCurrent(), 20)",
-			expected: "(ta.sma(closeSeries.GetCurrent(), 20) != 0)",
+			expected: "(value.IsTrue(ta.sma(closeSeries.GetCurrent(), 20)))",
 		},
 		{
 			name:     "empty code handled",
@@ -155,15 +155,15 @@ func TestBooleanConverter_Integration_RuleOrdering(t *testing.T) {
 			expr:            &ast.Identifier{Name: "signal"},
 			code:            "signalSeries.GetCurrent() > 0",
 			expectedIf:      "signalSeries.GetCurrent() > 0",
-			expectedOperand: "(signalSeries.GetCurrent() > 0 != 0)",
+			expectedOperand: "(value.IsTrue(signalSeries.GetCurrent() > 0))",
 			description:     "If statement: comparison blocks conversion; Operand: Series pattern still applies",
 		},
 		{
 			name:            "Series pattern applies before type",
 			expr:            &ast.Identifier{Name: "signal"},
 			code:            "signalSeries.GetCurrent()",
-			expectedIf:      "signalSeries.GetCurrent() != 0",
-			expectedOperand: "(signalSeries.GetCurrent() != 0)",
+			expectedIf:      "value.IsTrue(signalSeries.GetCurrent())",
+			expectedOperand: "(value.IsTrue(signalSeries.GetCurrent()))",
 			description:     "Series rule takes precedence over type rule",
 		},
 		{
@@ -209,7 +209,7 @@ func TestBooleanConverter_Integration_EdgeCases(t *testing.T) {
 		expr := &ast.Identifier{Name: "unknown"}
 		code := "unknownSeries.GetCurrent()"
 		result := converter.ConvertBoolSeriesForIfStatement(expr, code)
-		expected := "unknownSeries.GetCurrent() != 0"
+		expected := "value.IsTrue(unknownSeries.GetCurrent())"
 		if result != expected {
 			t.Errorf("expected %q, got %q", expected, result)
 		}

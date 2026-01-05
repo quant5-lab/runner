@@ -10,13 +10,13 @@ func TestAddNotEqualZeroTransformer_Transform(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"simple Series access", "priceSeries.GetCurrent()", "priceSeries.GetCurrent() != 0"},
-		{"identifier", "enabled", "enabled != 0"},
-		{"bar property", "bar.Close", "bar.Close != 0"},
-		{"empty string", "", " != 0"},
-		{"already has comparison", "price > 100", "price > 100 != 0"},
-		{"expression with spaces", "  value  ", "  value   != 0"},
-		{"complex expression", "(a + b) * 2", "(a + b) * 2 != 0"},
+		{"simple Series access", "priceSeries.GetCurrent()", "value.IsTrue(priceSeries.GetCurrent())"},
+		{"identifier", "enabled", "value.IsTrue(enabled)"},
+		{"bar property", "bar.Close", "value.IsTrue(bar.Close)"},
+		{"empty string", "", "value.IsTrue()"},
+		{"already has comparison", "price > 100", "value.IsTrue(price > 100)"},
+		{"expression with spaces", "  value  ", "value.IsTrue(  value  )"},
+		{"complex expression", "(a + b) * 2", "value.IsTrue((a + b) * 2)"},
 	}
 
 	for _, tt := range tests {
@@ -67,20 +67,20 @@ func TestTransformer_Composition(t *testing.T) {
 		{
 			name:   "parentheses then != 0",
 			input:  "value",
-			order1: "(value) != 0",
-			order2: "(value != 0)",
+			order1: "value.IsTrue((value))",
+			order2: "(value.IsTrue(value))",
 		},
 		{
 			name:   "!= 0 then parentheses",
 			input:  "enabled",
-			order1: "(enabled) != 0",
-			order2: "(enabled != 0)",
+			order1: "value.IsTrue((enabled))",
+			order2: "(value.IsTrue(enabled))",
 		},
 		{
 			name:   "empty string composition",
 			input:  "",
-			order1: "() != 0",
-			order2: "( != 0)",
+			order1: "value.IsTrue(())",
+			order2: "(value.IsTrue())",
 		},
 	}
 
@@ -116,8 +116,8 @@ func TestTransformer_Idempotency(t *testing.T) {
 			transformer: notEqualZero,
 			input:       "value",
 			idempotent:  false,
-			firstPass:   "value != 0",
-			secondPass:  "value != 0 != 0",
+			firstPass:   "value.IsTrue(value)",
+			secondPass:  "value.IsTrue(value.IsTrue(value))",
 		},
 		{
 			name:        "parentheses is not idempotent",
