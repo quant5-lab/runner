@@ -96,6 +96,7 @@ func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager
 }
 
 func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+	/* Fill buffer up to requested bar */
 	for s.computed <= barIdx {
 		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
 		if err != nil {
@@ -111,9 +112,15 @@ func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		return math.NaN(), nil
 	}
 
+	/* Compute SMA using the last `period` bars ending at barIdx */
 	sum := 0.0
 	for i := 0; i < s.period; i++ {
-		sum += s.buffer[i]
+		barOffset := barIdx - s.period + 1 + i
+		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
+		if err != nil {
+			return math.NaN(), err
+		}
+		sum += sourceVal
 	}
 
 	return sum / float64(s.period), nil

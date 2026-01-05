@@ -185,7 +185,7 @@ func (h *SecurityInlineHandler) generateStreamingEvaluation(exprArg ast.Expressi
 
 	var code strings.Builder
 	code.WriteString("\t\tif secBarEvaluator == nil {\n")
-	code.WriteString("\t\t\tsecBarEvaluator = security.NewStreamingBarEvaluator()\n")
+	code.WriteString("\t\t\tsecBarEvaluator = security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n")
 	code.WriteString("\t\t}\n")
 	code.WriteString(fmt.Sprintf("\t\tsecValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON))
 	code.WriteString("\t\tif err != nil { return math.NaN() }\n")

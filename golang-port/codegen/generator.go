@@ -503,7 +503,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	if g.hasSecurityCalls {
 		code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
-		code += g.ind() + "var secBarEvaluator *security.StreamingBarEvaluator\n"
+		code += g.ind() + "var secBarEvaluator security.BarEvaluator\n"
 		code += "\n"
 	}
 
@@ -1847,69 +1847,19 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 		exprArg := call.Arguments[2]
 
-		if ident, ok := exprArg.(*ast.Identifier); ok {
-			fieldName := ident.Name
-			switch fieldName {
-			case "close":
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Close)\n", varName)
-			case "open":
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Open)\n", varName)
-			case "high":
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].High)\n", varName)
-			case "low":
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Low)\n", varName)
-			case "volume":
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(secCtx.Data[secBarIdx].Volume)\n", varName)
-			default:
-				code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-			}
-		} else if callExpr, ok := exprArg.(*ast.CallExpression); ok {
-			g.hasSecurityExprEvals = true
-			code += g.ind() + "if secBarEvaluator == nil {\n"
-			g.indent++
-			code += g.ind() + "secBarEvaluator = security.NewStreamingBarEvaluator()\n"
-			g.indent--
-			code += g.ind() + "}\n"
-
-			exprJSON, err := g.serializeExpressionForRuntime(callExpr)
-			if err != nil {
-				return "", fmt.Errorf("failed to serialize security expression: %w", err)
-			}
-
-			code += g.ind() + fmt.Sprintf("secValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON)
-			code += g.ind() + "if err != nil {\n"
-			g.indent++
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-			g.indent--
-			code += g.ind() + "} else {\n"
-			g.indent++
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
-			g.indent--
-			code += g.ind() + "}\n"
-		} else {
-			g.hasSecurityExprEvals = true
-			code += g.ind() + "if secBarEvaluator == nil {\n"
-			g.indent++
-			code += g.ind() + "secBarEvaluator = security.NewStreamingBarEvaluator()\n"
-			g.indent--
-			code += g.ind() + "}\n"
-
-			exprJSON, err := g.serializeExpressionForRuntime(exprArg)
-			if err != nil {
-				return "", fmt.Errorf("failed to serialize security expression: %w", err)
-			}
-
-			code += g.ind() + fmt.Sprintf("secValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON)
-			code += g.ind() + "if err != nil {\n"
-			g.indent++
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-			g.indent--
-			code += g.ind() + "} else {\n"
-			g.indent++
-			code += g.ind() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
-			g.indent--
-			code += g.ind() + "}\n"
+		// Use SecurityExpressionHandler for consistent evaluation with offset handling
+		secExprHandler := NewSecurityExpressionHandler(SecurityExpressionConfig{
+			IndentFunc:           g.ind,
+			IncrementIndent:      func() { g.indent++ },
+			DecrementIndent:      func() { g.indent-- },
+			SerializeExpr:        g.serializeExpressionForRuntime,
+			MarkSecurityExprEval: func() { g.hasSecurityExprEvals = true },
+		})
+		evalCode, err := secExprHandler.GenerateEvaluationCode(varName, exprArg, "secBarIdx")
+		if err != nil {
+			return "", err
 		}
+		code += evalCode
 
 		g.indent--
 		code += g.ind() + "}\n"

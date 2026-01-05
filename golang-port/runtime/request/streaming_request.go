@@ -6,6 +6,8 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/series"
+	"github.com/quant5-lab/runner/security"
 )
 
 type BarEvaluator interface {
@@ -13,21 +15,25 @@ type BarEvaluator interface {
 }
 
 type StreamingRequest struct {
-	ctx         *context.Context
-	fetcher     SecurityDataFetcher
-	cache       map[string]*context.Context
-	mapperCache map[string]*SecurityBarMapper
-	evaluator   BarEvaluator
-	currentBar  int
+	ctx           *context.Context
+	fetcher       SecurityDataFetcher
+	cache         map[string]*context.Context
+	mapperCache   map[string]*SecurityBarMapper
+	seriesCache   *SeriesCache
+	seriesBuilder *ExpressionSeriesBuilder
+	evaluator     BarEvaluator
+	currentBar    int
 }
 
 func NewStreamingRequest(ctx *context.Context, fetcher SecurityDataFetcher, evaluator BarEvaluator) *StreamingRequest {
 	return &StreamingRequest{
-		ctx:         ctx,
-		fetcher:     fetcher,
-		cache:       make(map[string]*context.Context),
-		mapperCache: make(map[string]*SecurityBarMapper),
-		evaluator:   evaluator,
+		ctx:           ctx,
+		fetcher:       fetcher,
+		cache:         make(map[string]*context.Context),
+		mapperCache:   make(map[string]*SecurityBarMapper),
+		seriesCache:   NewSeriesCache(),
+		seriesBuilder: NewExpressionSeriesBuilder(evaluator),
+		evaluator:     evaluator,
 	}
 }
 
@@ -46,7 +52,20 @@ func (r *StreamingRequest) SecurityWithExpression(symbol, timeframe string, expr
 		return math.NaN(), nil
 	}
 
-	return r.evaluator.EvaluateAtBar(expr, secCtx, secBarIdx)
+	// Extract historical offset recursively to handle fixnan(pivothigh()[1])
+	extractor := security.NewHistoricalOffsetExtractor()
+	exprForSeries, offset := extractor.ExtractRecursive(expr)
+
+	seriesBuffer, err := r.getOrBuildSeries(symbol, timeframe, exprForSeries, secCtx)
+	if err != nil {
+		return math.NaN(), err
+	}
+
+	lookbackOffset := (len(secCtx.Data) - 1 - secBarIdx) + offset
+	if lookbackOffset < 0 || lookbackOffset >= len(secCtx.Data) {
+		return math.NaN(), nil
+	}
+	return seriesBuffer.Get(lookbackOffset), nil
 }
 
 func (r *StreamingRequest) SetCurrentBar(bar int) {
@@ -56,6 +75,7 @@ func (r *StreamingRequest) SetCurrentBar(bar int) {
 func (r *StreamingRequest) ClearCache() {
 	r.cache = make(map[string]*context.Context)
 	r.mapperCache = make(map[string]*SecurityBarMapper)
+	r.seriesCache.Clear()
 }
 
 func (r *StreamingRequest) getOrFetchContext(cacheKey, symbol, timeframe string) (*context.Context, error) {
@@ -94,4 +114,39 @@ func buildSecurityKey(symbol, timeframe string) string {
 
 func isValidBarIndex(barIdx int, secCtx *context.Context) bool {
 	return barIdx >= 0 && barIdx < len(secCtx.Data)
+}
+
+func (r *StreamingRequest) getOrBuildSeries(symbol, timeframe string, expr ast.Expression, secCtx *context.Context) (*series.Series, error) {
+	seriesCacheKey := BuildSeriesCacheKey(symbol, timeframe, expr)
+
+	if cachedSeries, found := r.seriesCache.Get(seriesCacheKey); found {
+		return cachedSeries, nil
+	}
+
+	builtSeries, err := r.seriesBuilder.BuildSeries(expr, secCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	r.seriesCache.Set(seriesCacheKey, builtSeries)
+	return builtSeries, nil
+}
+
+func extractOffsetExpression(expr ast.Expression) (float64, bool) {
+	memberExpr, ok := expr.(*ast.MemberExpression)
+	if !ok {
+		return 0, false
+	}
+
+	literalProp, ok := memberExpr.Property.(*ast.Literal)
+	if !ok {
+		return 0, false
+	}
+
+	offset, ok := literalProp.Value.(float64)
+	if !ok {
+		return 0, false
+	}
+
+	return offset, true
 }

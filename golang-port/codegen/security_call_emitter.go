@@ -178,7 +178,7 @@ func (e *SecurityCallEmitter) emitTAFunctionEvaluation(varName string, call *ast
 	evaluatorVar := "secBarEvaluator"
 	code += e.gen.ind() + fmt.Sprintf("if %s == nil {\n", evaluatorVar)
 	e.gen.indent++
-	code += e.gen.ind() + fmt.Sprintf("%s = security.NewStreamingBarEvaluator()\n", evaluatorVar)
+	code += e.gen.ind() + fmt.Sprintf("%s = security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n", evaluatorVar)
 	e.gen.indent--
 	code += e.gen.ind() + "}\n"
 
@@ -207,7 +207,7 @@ func (e *SecurityCallEmitter) emitBinaryExpressionEvaluation(varName string, bin
 	evaluatorVar := "secBarEvaluator"
 	code += e.gen.ind() + fmt.Sprintf("if %s == nil {\n", evaluatorVar)
 	e.gen.indent++
-	code += e.gen.ind() + fmt.Sprintf("%s = security.NewStreamingBarEvaluator()\n", evaluatorVar)
+	code += e.gen.ind() + fmt.Sprintf("%s = security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n", evaluatorVar)
 	e.gen.indent--
 	code += e.gen.ind() + "}\n"
 
