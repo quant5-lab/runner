@@ -245,7 +245,6 @@ func TestBlockerDocumentation(t *testing.T) {
 	}
 
 	expectedBlockers := []string{
-		"security inline",
 		"RSI inline",
 		"while loops",
 		"map generics",

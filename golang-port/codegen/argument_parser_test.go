@@ -267,6 +267,121 @@ func TestArgumentParser_ParseIdentifier(t *testing.T) {
 			},
 			expectValid: false,
 		},
+		// MemberExpression cases - strategy namespace
+		{
+			name: "member expression strategy.cash",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "cash"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.cash",
+			expectLiteral:    false,
+		},
+		{
+			name: "member expression strategy.fixed",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "fixed"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.fixed",
+			expectLiteral:    false,
+		},
+		{
+			name: "member expression strategy.percent_of_equity",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "percent_of_equity"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.percent_of_equity",
+			expectLiteral:    false,
+		},
+		{
+			name: "member expression strategy.long",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "long"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.long",
+			expectLiteral:    false,
+		},
+		// MemberExpression cases - syminfo namespace
+		{
+			name: "member expression syminfo.tickerid",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "syminfo"},
+				Property: &ast.Identifier{Name: "tickerid"},
+			},
+			expectValid:      true,
+			expectIdentifier: "syminfo.tickerid",
+			expectLiteral:    false,
+		},
+		{
+			name: "member expression timeframe.period",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "timeframe"},
+				Property: &ast.Identifier{Name: "period"},
+			},
+			expectValid:      true,
+			expectIdentifier: "timeframe.period",
+			expectLiteral:    false,
+		},
+		// Generic MemberExpression (user-defined)
+		{
+			name: "member expression generic obj.prop",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "myObject"},
+				Property: &ast.Identifier{Name: "myProperty"},
+			},
+			expectValid:      true,
+			expectIdentifier: "myObject.myProperty",
+			expectLiteral:    false,
+		},
+		// Invalid MemberExpression cases
+		{
+			name: "member expression with non-identifier object",
+			input: &ast.MemberExpression{
+				Object:   &ast.Literal{Value: 42},
+				Property: &ast.Identifier{Name: "prop"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "member expression with non-identifier property",
+			input: &ast.MemberExpression{
+				Object: &ast.Identifier{Name: "obj"},
+				Property: &ast.Literal{Value: "prop"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "member expression with both non-identifiers",
+			input: &ast.MemberExpression{
+				Object:   &ast.Literal{Value: "obj"},
+				Property: &ast.Literal{Value: "prop"},
+			},
+			expectValid: false,
+		},
+		// Other invalid expression types
+		{
+			name: "call expression",
+			input: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "myFunc"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "binary expression",
+			input: &ast.BinaryExpression{
+				Left:     &ast.Identifier{Name: "a"},
+				Operator: "+",
+				Right:    &ast.Identifier{Name: "b"},
+			},
+			expectValid: false,
+		},
 	}
 
 	for _, tt := range tests {

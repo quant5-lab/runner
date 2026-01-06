@@ -432,3 +432,162 @@ func TestStrategyExit_OnlyStop(t *testing.T) {
 		t.Errorf("Expected limit=math.NaN() when not provided, got:\n%s", code)
 	}
 }
+
+/* TestStrategyEntry_QuantityCalculation verifies runtime qty calculation based on default_qty_type */
+func TestStrategyEntry_QuantityCalculation(t *testing.T) {
+	handler := NewStrategyActionHandler()
+
+	tests := []struct {
+		name           string
+		defaultQtyType string
+		defaultQtyVal  float64
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:           "strategy.cash generates runtime division",
+			defaultQtyType: "strategy.cash",
+			defaultQtyVal:  600000.0,
+			wantContains: []string{
+				"entryQty := 600000 / closeSeries.GetCurrent()",
+				"strat.Entry",
+				"entryQty",
+			},
+			wantNotContain: []string{
+				"600000,",
+			},
+		},
+		{
+			name:           "cash unprefixed generates runtime division",
+			defaultQtyType: "cash",
+			defaultQtyVal:  50000.0,
+			wantContains: []string{
+				"entryQty := 50000 / closeSeries.GetCurrent()",
+				"strat.Entry",
+				"entryQty",
+			},
+			wantNotContain: []string{
+				"50000,",
+			},
+		},
+		{
+			name:           "strategy.percent_of_equity generates equity percentage",
+			defaultQtyType: "strategy.percent_of_equity",
+			defaultQtyVal:  10.0,
+			wantContains: []string{
+				"entryQty := (strat.Equity() * 10.00 / 100) / closeSeries.GetCurrent()",
+				"strat.Entry",
+				"entryQty",
+			},
+			wantNotContain: []string{
+				"10,",
+			},
+		},
+		{
+			name:           "percent_of_equity unprefixed generates equity percentage",
+			defaultQtyType: "percent_of_equity",
+			defaultQtyVal:  25.5,
+			wantContains: []string{
+				"entryQty := (strat.Equity() * 25.50 / 100) / closeSeries.GetCurrent()",
+				"strat.Entry",
+				"entryQty",
+			},
+			wantNotContain: []string{
+				"25.50,",
+			},
+		},
+		{
+			name:           "strategy.fixed uses qty directly",
+			defaultQtyType: "strategy.fixed",
+			defaultQtyVal:  100.0,
+			wantContains: []string{
+				"strat.Entry",
+				"100,",
+			},
+			wantNotContain: []string{
+				"entryQty :=",
+				"GetCurrent()",
+			},
+		},
+		{
+			name:           "fixed unprefixed uses qty directly",
+			defaultQtyType: "fixed",
+			defaultQtyVal:  50.0,
+			wantContains: []string{
+				"strat.Entry",
+				"50,",
+			},
+			wantNotContain: []string{
+				"entryQty :=",
+			},
+		},
+		{
+			name:           "empty string defaults to fixed",
+			defaultQtyType: "",
+			defaultQtyVal:  75.0,
+			wantContains: []string{
+				"strat.Entry",
+				"75,",
+			},
+			wantNotContain: []string{
+				"entryQty :=",
+			},
+		},
+		{
+			name:           "unknown type uses fixed with warning",
+			defaultQtyType: "invalid_type",
+			defaultQtyVal:  123.0,
+			wantContains: []string{
+				"// WARNING: Unknown default_qty_type 'invalid_type'",
+				"strat.Entry",
+				"123,",
+			},
+			wantNotContain: []string{
+				"entryQty :=",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			g.strategyConfig.DefaultQtyType = tt.defaultQtyType
+			g.strategyConfig.DefaultQtyValue = tt.defaultQtyVal
+
+			// strategy.entry("Buy", strategy.long)
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "entry"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Buy"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "strategy"},
+						Property: &ast.Identifier{Name: "long"},
+					},
+				},
+			}
+
+			code, err := handler.GenerateCode(g, call)
+			if err != nil {
+				t.Fatalf("GenerateCode failed: %v", err)
+			}
+
+			// Check expected strings are present
+			for _, want := range tt.wantContains {
+				if !strings.Contains(code, want) {
+					t.Errorf("Expected code to contain %q, got:\n%s", want, code)
+				}
+			}
+
+			// Check unwanted strings are absent
+			for _, unwant := range tt.wantNotContain {
+				if strings.Contains(code, unwant) {
+					t.Errorf("Expected code NOT to contain %q, but it does:\n%s", unwant, code)
+				}
+			}
+		})
+	}
+}
+

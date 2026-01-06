@@ -225,25 +225,45 @@ func (p *ArgumentParser) ParseBool(expr ast.Expression) ParsedArgument {
 
 /*
 ParseIdentifier extracts an identifier name from an AST expression.
+Handles simple identifiers and member expressions.
 
 Returns:
 
 	ParsedArgument.IsValid = true if identifier found
-	ParsedArgument.IsLiteral = false (it's a variable reference)
-	ParsedArgument.Identifier = identifier name
+	ParsedArgument.IsLiteral = false (variable reference)
+	ParsedArgument.Identifier = identifier name or "object.property"
 */
 func (p *ArgumentParser) ParseIdentifier(expr ast.Expression) ParsedArgument {
-	ident, ok := expr.(*ast.Identifier)
-	if !ok {
-		return ParsedArgument{IsValid: false, SourceExpr: expr}
+	if ident, ok := expr.(*ast.Identifier); ok {
+		return ParsedArgument{
+			IsValid:    true,
+			IsLiteral:  false,
+			Identifier: ident.Name,
+			SourceExpr: expr,
+		}
 	}
 
-	return ParsedArgument{
-		IsValid:    true,
-		IsLiteral:  false,
-		Identifier: ident.Name,
-		SourceExpr: expr,
+	/* MemberExpression: strategy.cash, syminfo.tickerid, etc. */
+	if mem, ok := expr.(*ast.MemberExpression); ok {
+		obj := ""
+		if id, ok := mem.Object.(*ast.Identifier); ok {
+			obj = id.Name
+		}
+		prop := ""
+		if id, ok := mem.Property.(*ast.Identifier); ok {
+			prop = id.Name
+		}
+		if obj != "" && prop != "" {
+			return ParsedArgument{
+				IsValid:    true,
+				IsLiteral:  false,
+				Identifier: obj + "." + prop,
+				SourceExpr: expr,
+			}
+		}
 	}
+
+	return ParsedArgument{IsValid: false, SourceExpr: expr}
 }
 
 // ============================================================================

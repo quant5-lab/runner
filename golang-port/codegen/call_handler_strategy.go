@@ -63,7 +63,23 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
 
-	return g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f, %s)\n", entryID, direction, qty, comment), nil
+	/* Runtime qty calculation per PineScript spec: https://www.tradingview.com/pine-script-reference/v5/#fun_strategy */
+	var code string
+	switch g.strategyConfig.DefaultQtyType {
+	case "strategy.cash", "cash":
+		code = g.ind() + fmt.Sprintf("entryQty := %.0f / closeSeries.GetCurrent()\n", qty)
+		code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, entryQty, %s)\n", entryID, direction, comment)
+	case "strategy.percent_of_equity", "percent_of_equity":
+		code = g.ind() + fmt.Sprintf("entryQty := (strat.Equity() * %.2f / 100) / closeSeries.GetCurrent()\n", qty)
+		code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, entryQty, %s)\n", entryID, direction, comment)
+	case "strategy.fixed", "fixed", "":
+		code = g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f, %s)\n", entryID, direction, qty, comment)
+	default:
+		code = g.ind() + fmt.Sprintf("// WARNING: Unknown default_qty_type '%s', using qty as fixed\n", g.strategyConfig.DefaultQtyType)
+		code += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f, %s)\n", entryID, direction, qty, comment)
+	}
+
+	return code, nil
 }
 
 func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpression) (string, error) {

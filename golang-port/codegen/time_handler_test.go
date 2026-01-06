@@ -138,7 +138,8 @@ func TestSessionArgumentParser_ParseWrappedIdentifier(t *testing.T) {
 				},
 			},
 			expected: SessionArgument{
-				Type: ArgumentTypeUnknown,
+				Type:  ArgumentTypeWrappedIdentifier,
+				Value: "obj.prop",
 			},
 		},
 		{

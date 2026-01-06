@@ -185,15 +185,16 @@ func TestStrategyConfigExtractor_DefaultQtyValue(t *testing.T) {
 	}
 }
 
-/* TestStrategyConfigExtractor_DefaultQtyType verifies default_qty_type extraction from simple identifiers */
+/* TestStrategyConfigExtractor_DefaultQtyType verifies default_qty_type extraction from identifiers and member expressions */
 func TestStrategyConfigExtractor_DefaultQtyType(t *testing.T) {
 	tests := []struct {
 		name         string
 		value        ast.Expression
 		expectedType string
 	}{
+		// Simple identifiers (unprefixed)
 		{
-			name:         "simple identifier",
+			name:         "simple identifier fixed",
 			value:        &ast.Identifier{Name: "fixed"},
 			expectedType: "fixed",
 		},
@@ -203,11 +204,63 @@ func TestStrategyConfigExtractor_DefaultQtyType(t *testing.T) {
 			expectedType: "cash",
 		},
 		{
-			name: "member expression not supported",
+			name:         "simple identifier percent_of_equity",
+			value:        &ast.Identifier{Name: "percent_of_equity"},
+			expectedType: "percent_of_equity",
+		},
+		// Member expressions (strategy.* prefix)
+		{
+			name: "member expression strategy.fixed",
+			value: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "fixed"},
+			},
+			expectedType: "strategy.fixed",
+		},
+		{
+			name: "member expression strategy.cash",
 			value: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "strategy"},
 				Property: &ast.Identifier{Name: "cash"},
 			},
+			expectedType: "strategy.cash",
+		},
+		{
+			name: "member expression strategy.percent_of_equity",
+			value: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "percent_of_equity"},
+			},
+			expectedType: "strategy.percent_of_equity",
+		},
+		// Edge cases - testing parser behavior with invalid inputs
+		{
+			name:         "string literal (invalid - should not parse as identifier)",
+			value:        &ast.Literal{Value: "fixed"},
+			expectedType: "",
+		},
+		{
+			name:         "string literal strategy.cash (invalid - should not parse as identifier)",
+			value:        &ast.Literal{Value: "strategy.cash"},
+			expectedType: "",
+		},
+		// Empty/invalid cases
+		{
+			name:         "empty identifier",
+			value:        &ast.Identifier{Name: ""},
+			expectedType: "",
+		},
+		{
+			name: "invalid member expression - non-identifier object",
+			value: &ast.MemberExpression{
+				Object:   &ast.Literal{Value: 42},
+				Property: &ast.Identifier{Name: "cash"},
+			},
+			expectedType: "",
+		},
+		{
+			name:         "numeric literal (invalid)",
+			value:        &ast.Literal{Value: 100},
 			expectedType: "",
 		},
 	}

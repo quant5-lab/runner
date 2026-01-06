@@ -24,6 +24,22 @@ func (h *MetaFunctionHandler) CanHandle(funcName string) bool {
 }
 
 func (h *MetaFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
+	/* Extract function name for validation */
+	funcName := ""
+	if id, ok := call.Callee.(*ast.Identifier); ok {
+		funcName = id.Name
+	} else if member, ok := call.Callee.(*ast.MemberExpression); ok {
+		if obj, ok := member.Object.(*ast.Identifier); ok {
+			if prop, ok := member.Property.(*ast.Identifier); ok {
+				funcName = obj.Name + "." + prop.Name
+			}
+		}
+	}
+
+	if !h.CanHandle(funcName) {
+		return "", nil
+	}
+
 	extractedConfig := h.configExtractor.ExtractFromCall(call)
 	g.strategyConfig.MergeFrom(extractedConfig)
 	return "", nil
