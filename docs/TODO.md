@@ -175,8 +175,8 @@
 - [x] `bb7-dissect-bb.pine` - manual validation PASSED
 - [x] `bb7-dissect-vol.pine` - manual validation PASSED
 - [x] `bb7-dissect-potential.pine` - manual validation PASSED
-- [x] `bb7-dissect-sl.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
-- [x] `bb7-dissect-tp.pine` - manual validation PASSED (TODO: trade history to be validated both visually and data-wise)
+- [x] `bb7-dissect-sl.pine` - manual validation PASSED (trade history visual validation pending - quantity/equity bugs block data validation)
+- [x] `bb7-dissect-tp.pine` - manual validation PASSED (trade history visual validation pending - quantity/equity bugs block data validation)
 - [x] `bb7-dissect-adx.pine` - manual validation PASSED
 
 ## Phase 5: Strategy Validation
@@ -192,7 +192,8 @@
 - [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
 - [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
 - [x] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
-- [ ] `./bin/strategy` on BB8 produces expected trades (BLOCKED: valuewhen temp var declaration - ta_valuewhen_XXXSeries undefined)
+- [x] Compile bb-strategy-8-rus.pine to working binary (3.5MB static binary)
+- [ ] `./bin/strategy` on BB8 produces expected trades (3 bugs: qty=1 vs 843, exit never triggers, equity=9884 vs 2M)
 - [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
 - [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)

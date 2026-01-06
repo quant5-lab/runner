@@ -5,11 +5,11 @@
 ## CODEGEN LIMITATIONS
 
 ### Inline Call Support
-- ❌ `request.security()` inline in conditionals
-  - File: `bb-strategy-8-rus.pine:284,285,351`
-  - Pattern: `security(...) ? a : b` or `cond and security(...)`
-  - Error: `codegen/inline_condition_handler_registry.go:37` - "unsupported inline function in condition"
-  - Fix: Add `SecurityInlineHandler` to registry
+- ✅ `request.security()` with inline `valuewhen()` calls
+  - File: `bb-strategy-8-rus.pine:288-291`
+  - Pattern: `security(..., "1D", valuewhen(...))`
+  - Fixed: `preAnalyzeSecurityCalls` now creates temp vars for inline-only functions inside security()
+  - Impact: BB8 now compiles and runs
 
 - ❌ `ta.rsi()` inline generation not implemented
   - File: `codegen/generator.go:2933`
@@ -185,15 +185,15 @@
 - ⚠️ UNVERIFIED (no evidence either way)
 
 ## SUMMARY
-- **Documented Blockers:** 13
-  - Codegen: security inline, RSI inline
+- **Documented Blockers:** 12
+  - Codegen: RSI inline
   - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
   - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
   - Type: string variables
   - Runtime: multi-symbol security, syminfo.tickerid mapping
-- **Verified Working:** 25+ features
-  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo)
+- **Verified Working:** 26+ features
+  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security()
 - **Untested:** 10+ features
   - varip, line/box/table drawing, matrix functions, strategy.order/cancel, OBV/SAR/HMA/Supertrend/Ichimoku, null coalescing
 
-**CONCLUSION:** 13 blocking issues prevent 100% arbitrary PineScript support. Most core features work.
+**CONCLUSION:** 12 blocking issues prevent 100% arbitrary PineScript support. Most core features work.
