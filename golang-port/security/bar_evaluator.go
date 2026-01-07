@@ -87,6 +87,19 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 		return val, err
 	}
 
+	if secCtx != nil {
+		result := secCtx.ResolveVariable(id.Name)
+		if result.Found {
+			if result.SourceBarIdx < 0 {
+				return math.NaN(), nil
+			}
+			offset := result.Series.Position() - result.SourceBarIdx
+			if offset >= 0 && offset < result.Series.Capacity() {
+				return result.Series.Get(offset), nil
+			}
+		}
+	}
+
 	/* Try variable registry first (for security-context variables) */
 	if e.varRegistry != nil {
 		if varSeries, ok := e.varRegistry.Get(id.Name); ok {
@@ -97,6 +110,10 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 					if offset >= 0 && offset < varSeries.Capacity() {
 						return varSeries.Get(offset), nil
 					}
+				}
+				/* Warmup period: security bar has no corresponding main bar yet */
+				if mainIdx < 0 {
+					return math.NaN(), nil
 				}
 			}
 		}
@@ -113,6 +130,10 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 				if offset >= 0 && offset < varSeries.Capacity() {
 					return varSeries.Get(offset), nil
 				}
+			}
+			/* Warmup period: security bar has no corresponding main bar yet */
+			if mainIdx < 0 {
+				return math.NaN(), nil
 			}
 		}
 	}

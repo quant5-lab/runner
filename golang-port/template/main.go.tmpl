@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 /* Prevent unused import errors */
 var (
 	_ = math.IsNaN
+	_ = log.Printf
 	_ = session.Parse
 	_ = series.NewSeries
 	_ = datafetcher.NewFileFetcher

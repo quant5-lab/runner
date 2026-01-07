@@ -57,26 +57,47 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 	h.markSecurityExprEval()
 	code += h.indentFunc() + "if secBarEvaluator == nil {\n"
 	h.incrementIndent()
+
+	// EVIDENCE GATHERING: Log security context initialization
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] Creating evaluator for security() expression\")\n"
+
 	code += h.indentFunc() + "baseEvaluator := security.NewStreamingBarEvaluator()\n"
 	code += h.indentFunc() + "varRegistry := security.NewVariableRegistry()\n"
 	code += h.indentFunc() + "baseEvaluator.SetVariableRegistry(varRegistry)\n"
 	code += h.indentFunc() + "barMapper := security.NewBarIndexMapper()\n"
+
+	// EVIDENCE GATHERING: Log bar mapping setup
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] Setting up bar mapper\")\n"
+
 	// Convert request.BarRange to security.BarRange to populate mapper
 	code += h.indentFunc() + "requestRanges := securityBarMapper.GetRanges()\n"
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] Bar mapper has %d ranges\", len(requestRanges))\n"
 	code += h.indentFunc() + "for _, rr := range requestRanges {\n"
 	h.incrementIndent()
 	code += h.indentFunc() + "if rr.StartHourlyIndex >= 0 {\n"
 	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] Mapping: DailyBarIndex=%d → StartHourlyIndex=%d\", rr.DailyBarIndex, rr.StartHourlyIndex)\n"
 	code += h.indentFunc() + "barMapper.SetMapping(rr.DailyBarIndex, rr.StartHourlyIndex)\n"
+	h.decrementIndent()
+	code += h.indentFunc() + "} else {\n"
+	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] ⚠️  SKIPPED: DailyBarIndex=%d has negative StartHourlyIndex=%d\", rr.DailyBarIndex, rr.StartHourlyIndex)\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "}\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "}\n"
 	code += h.indentFunc() + "baseEvaluator.SetBarIndexMapper(barMapper)\n"
 
+	// CRITICAL ASSESSMENT: Is bar mapper complete?
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] ✅ Bar mapper configured with %d mappings\", len(requestRanges))\n"
+
 	// Set up main context variable lookup fallback (PineScript lexical scoping)
 	code += h.indentFunc() + "baseEvaluator.SetVarLookup(func(varName string, secBarIdx int) (*series.Series, int, bool) {\n"
 	h.incrementIndent()
+
+	// EVIDENCE GATHERING: Log variable lookup attempts
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] Request: varName=%q secBarIdx=%d\", varName, secBarIdx)\n"
+
 	code += h.indentFunc() + "var varSeries *series.Series\n"
 	code += h.indentFunc() + "switch varName {\n"
 
@@ -103,16 +124,39 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 
 	code += h.indentFunc() + "default:\n"
 	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] ❌ UNKNOWN VARIABLE: %q not in symbol table\", varName)\n"
 	code += h.indentFunc() + "return nil, -1, false\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "}\n"
-	code += h.indentFunc() + "if varSeries == nil { return nil, -1, false }\n"
+	code += h.indentFunc() + "if varSeries == nil {\n"
+	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] ❌ NIL SERIES: %q found in switch but Series is nil\", varName)\n"
+	code += h.indentFunc() + "return nil, -1, false\n"
+	h.decrementIndent()
+	code += h.indentFunc() + "}\n"
+
+	// EVIDENCE GATHERING: Bar mapping assessment
 	code += h.indentFunc() + "mainIdx := barMapper.GetMainBarIndexForSecurityBar(secBarIdx)\n"
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] ✅ Resolved: varName=%q secBarIdx=%d → mainIdx=%d seriesCursor=%d seriesCapacity=%d\", varName, secBarIdx, mainIdx, varSeries.Position(), varSeries.Capacity())\n"
+
+	// CRITICAL ASSESSMENT: Check if this is a bandaid
+	code += h.indentFunc() + "if mainIdx < 0 {\n"
+	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] ⚠️  NEGATIVE MAIN INDEX: secBarIdx=%d mapped to mainIdx=%d (warmup period?)\", secBarIdx, mainIdx)\n"
+	h.decrementIndent()
+	code += h.indentFunc() + "}\n"
+	code += h.indentFunc() + "if mainIdx >= varSeries.Capacity() {\n"
+	h.incrementIndent()
+	code += h.indentFunc() + "log.Printf(\"[VARLOOKUP] ❌ INDEX OUT OF BOUNDS: mainIdx=%d >= capacity=%d\", mainIdx, varSeries.Capacity())\n"
+	h.decrementIndent()
+	code += h.indentFunc() + "}\n"
+
 	code += h.indentFunc() + "return varSeries, mainIdx, true\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "})\n"
 
 	code += h.indentFunc() + "secBarEvaluator = security.NewSeriesCachingEvaluator(baseEvaluator)\n"
+	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] ✅ Evaluator created and cached\")\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "}\n"
 
@@ -124,14 +168,19 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 		return "", fmt.Errorf("failed to serialize security expression: %w", err)
 	}
 
+	// EVIDENCE GATHERING: Log expression evaluation
+	code += h.indentFunc() + fmt.Sprintf("log.Printf(\"[SECURITY-EVAL] Evaluating expression at secBarIdx=%%d\", %s)\n", secBarIdxVar)
+
 	// Generate EvaluateAtBar call - runtime will extract/apply offset
 	code += h.indentFunc() + fmt.Sprintf("secValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, %s)\n", exprJSON, secBarIdxVar)
 	code += h.indentFunc() + "if err != nil {\n"
 	h.incrementIndent()
+	code += h.indentFunc() + fmt.Sprintf("log.Printf(\"[SECURITY-EVAL] ❌ ERROR: %%v\", err)\n")
 	code += h.indentFunc() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 	h.decrementIndent()
 	code += h.indentFunc() + "} else {\n"
 	h.incrementIndent()
+	code += h.indentFunc() + fmt.Sprintf("log.Printf(\"[SECURITY-EVAL] ✅ Result: secValue=%%f for %s\", secValue)\n", varName)
 	code += h.indentFunc() + fmt.Sprintf("%sSeries.Set(secValue)\n", varName)
 	h.decrementIndent()
 	code += h.indentFunc() + "}\n"

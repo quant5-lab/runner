@@ -234,17 +234,17 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 			name:           "offset_exceeds_capacity",
 			seriesCapacity: 10,
 			seriesPosition: 5,
-			mainBarIdx:     -6,
+			mainBarIdx:     15,
 			expectError:    true,
-			description:    "Offset > capacity should result in error",
+			description:    "Offset > capacity falls through to unknown identifier error",
 		},
 		{
 			name:           "negative_mainBarIdx",
 			seriesCapacity: 10,
 			seriesPosition: 5,
 			mainBarIdx:     -1,
-			expectError:    true,
-			description:    "Negative main bar index should be handled gracefully",
+			expectError:    false,
+			description:    "Negative main bar index returns NaN for warmup period",
 		},
 	}
 
@@ -273,7 +273,7 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 			})
 
 			expr := &ast.Identifier{Name: "boundaryTest"}
-			_, err := evaluator.EvaluateAtBar(expr, ctx, 0)
+			result, err := evaluator.EvaluateAtBar(expr, ctx, 0)
 
 			if tt.expectError {
 				if err == nil {
@@ -282,6 +282,10 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Fatalf("%s: unexpected error: %v", tt.description, err)
+				}
+				// For negative mainBarIdx (warmup), verify NaN is returned
+				if tt.mainBarIdx < 0 && !math.IsNaN(result) {
+					t.Errorf("%s: expected NaN for warmup, got %v", tt.description, result)
 				}
 			}
 		})

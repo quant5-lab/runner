@@ -551,6 +551,26 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += "\n"
 
+	/* Register series in main context for security() variable resolution */
+	if len(g.variables) > 0 || len(g.barFieldRegistry.AllSeriesNames()) > 0 {
+		code += g.ind() + "// Register series for context hierarchy variable resolution\n"
+
+		/* Register OHLCV bar fields */
+		for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
+			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", seriesName, seriesName)
+		}
+
+		/* Register user variables */
+		for varName, varType := range g.variables {
+			if varType == "function" || varType == "string" {
+				continue
+			}
+			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %sSeries)\n", varName, varName)
+		}
+
+		code += "\n"
+	}
+
 	// StateManager for strategy.* runtime values (Series storage)
 	if g.hasStrategyRuntimeAccess {
 		code += g.ind() + "sm := strategy.NewStateManager(len(ctx.Data))\n"
@@ -1831,12 +1851,24 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
+		/* Calculate lookahead for bar mapper */
 		code += g.ind() + fmt.Sprintf("secLookahead := %v\n", lookahead)
 		code += g.ind() + fmt.Sprintf("if %q == ctx.Timeframe {\n", timeframeStr)
 		g.indent++
 		code += g.ind() + "secLookahead = true\n"
 		g.indent--
 		code += g.ind() + "}\n"
+		code += g.ind() + "\n"
+
+		/* Context hierarchy setup: link security context → main context */
+		code += g.ind() + "if secCtx.GetParent() == nil {\n"
+		g.indent++
+		code += g.ind() + "barAligner := request.NewSecurityBarMapperAligner(securityBarMapper, secLookahead)\n"
+		code += g.ind() + "secCtx.SetParent(ctx, barAligner)\n"
+		code += g.ind() + "log.Printf(\"[CONTEXT-HIERARCHY] Linked secCtx %s → mainCtx\", secKey)\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + "\n"
 
 		code += g.ind() + "secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)\n"
 		code += g.ind() + "if secBarIdx < 0 {\n"
@@ -2940,6 +2972,10 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 
 func (g *generator) generateValuewhen(varName string, conditionExpr string, sourceExpr string, occurrence int) (string, error) {
 	code := g.ind() + fmt.Sprintf("/* Inline valuewhen(%s, %s, %d) */\n", conditionExpr, sourceExpr, occurrence)
+
+	// EVIDENCE GATHERING: Log valuewhen execution
+	code += g.ind() + "log.Printf(\"[VALUEWHEN] Evaluating valuewhen at bar i=%d\", i)\n"
+
 	code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 {\n", varName)
 	g.indent++
 
@@ -2961,11 +2997,18 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	}
 	g.indent++
 
+	// CRITICAL ASSESSMENT: Log when condition is true
+	code += g.ind() + "log.Printf(\"[VALUEWHEN] ✅ Condition TRUE at lookbackOffset=%d (bar %d), occurrenceCount=%d\", lookbackOffset, i-lookbackOffset, occurrenceCount)\n"
+
 	code += g.ind() + fmt.Sprintf("if occurrenceCount == %d {\n", occurrence)
 	g.indent++
 
 	sourceAccess := g.convertSeriesAccessToOffset(sourceExpr, "lookbackOffset")
-	code += g.ind() + fmt.Sprintf("return %s\n", sourceAccess)
+
+	// EVIDENCE GATHERING: Log the retrieved value
+	code += g.ind() + fmt.Sprintf("retrievedValue := %s\n", sourceAccess)
+	code += g.ind() + "log.Printf(\"[VALUEWHEN] 🎯 MATCH: occurrence reached, returning value=%f from lookbackOffset=%d\", retrievedValue, lookbackOffset)\n"
+	code += g.ind() + "return retrievedValue\n"
 
 	g.indent--
 	code += g.ind() + "}\n"
@@ -2976,6 +3019,9 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 
 	g.indent--
 	code += g.ind() + "}\n"
+
+	// CRITICAL ASSESSMENT: Log when no match found (potential bandaid indicator)
+	code += g.ind() + "log.Printf(\"[VALUEWHEN] ⚠️  NO MATCH: condition never met in history up to bar i=%d\", i)\n"
 	code += g.ind() + "return math.NaN()\n"
 
 	g.indent--

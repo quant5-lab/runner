@@ -1,6 +1,10 @@
 package context
 
-import "time"
+import (
+	"time"
+
+	"github.com/quant5-lab/runner/runtime/series"
+)
 
 type OHLCV struct {
 	Time   int64   `json:"time"`
@@ -22,6 +26,10 @@ type Context struct {
 	IsDaily    bool
 	IsWeekly   bool
 	IsIntraday bool
+
+	parent           *Context
+	variableResolver VariableResolver
+	seriesRegistry   SeriesRegistry
 }
 
 func New(symbol, timeframe string, bars int) *Context {
@@ -93,6 +101,43 @@ func (c *Context) GetTime(offset int) time.Time {
 
 func (c *Context) LastBarIndex() int {
 	return len(c.Data) - 1
+}
+
+func (c *Context) SetParent(parent *Context, barAligner BarAligner) {
+	c.parent = parent
+
+	if c.seriesRegistry == nil {
+		c.seriesRegistry = NewMapBasedRegistry()
+	}
+
+	var parentResolver VariableResolver
+	if parent != nil && parent.variableResolver != nil {
+		parentResolver = parent.variableResolver
+	}
+
+	c.variableResolver = NewRecursiveResolver(
+		c.seriesRegistry,
+		barAligner,
+		parentResolver,
+	)
+}
+
+func (c *Context) ResolveVariable(name string) VariableResolutionResult {
+	if c.variableResolver == nil {
+		return VariableResolutionResult{Found: false}
+	}
+	return c.variableResolver.Resolve(name, c.BarIndex)
+}
+
+func (c *Context) RegisterSeries(name string, series *series.Series) {
+	if c.seriesRegistry == nil {
+		c.seriesRegistry = NewMapBasedRegistry()
+	}
+	c.seriesRegistry.Set(name, series)
+}
+
+func (c *Context) GetParent() *Context {
+	return c.parent
 }
 
 /* Timeframe type detection helpers */
