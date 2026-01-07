@@ -590,4 +590,3 @@ func TestStrategyEntry_QuantityCalculation(t *testing.T) {
 		})
 	}
 }
-

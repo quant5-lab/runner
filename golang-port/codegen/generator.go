@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"strings"
 
@@ -796,8 +797,6 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	g.indent--
 	code += g.ind() + "}\n"
 
-	// TODO: Handle alternate (else) if needed
-
 	return code, nil
 }
 
@@ -1203,6 +1202,10 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			return g.generateTupleDestructuringDeclaration(declarator)
 		}
 		varName := id.Name
+
+		// CODEGEN DEBUG - log all variables reaching this point
+		fmt.Fprintf(os.Stderr, "⚡ VARDECL: varName=%s Kind=%s reassigned=%v\n", varName, decl.Kind, g.reassignedVars[varName])
+		os.Stderr.Sync()
 
 		// Skip initial assignment (Kind="let") if variable has reassignment (Kind="var")
 		// This prevents double Set() calls that overwrite reassignment logic
@@ -1680,12 +1683,10 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		}
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
 	case *ast.LogicalExpression:
-		// Logical expression like (a and b) or (c and d) → bool needs float64 conversion
 		logicalCode, err := g.generateConditionExpression(expr)
 		if err != nil {
 			return "", err
 		}
-		// Convert bool to float64 for Series storage
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, logicalCode), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
@@ -1854,6 +1855,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			DecrementIndent:      func() { g.indent-- },
 			SerializeExpr:        g.serializeExpressionForRuntime,
 			MarkSecurityExprEval: func() { g.hasSecurityExprEvals = true },
+			SymbolTable:          g.symbolTable,
 		})
 		evalCode, err := secExprHandler.GenerateEvaluationCode(varName, exprArg, "secBarIdx")
 		if err != nil {
@@ -2946,14 +2948,16 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	g.indent++
 
 	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
-	// Check if condition is boolean expression (contains comparison/logical operators)
-	isBoolExpr := strings.ContainsAny(conditionAccess, "><!=") && !strings.Contains(conditionAccess, ".Get(")
-	if isBoolExpr {
-		// Wrap boolean expression in float conversion for condition check
-		code += g.ind() + fmt.Sprintf("if (func() float64 { if %s { return 1.0 } else { return 0.0 } }() != 0) {\n", conditionAccess)
+	// Detect if condition is series access (float) or comparison/logical (bool)
+	isDirectSeriesAccess := strings.Contains(conditionAccess, ".Get(") &&
+		!strings.ContainsAny(conditionAccess, "><!=&|")
+
+	if isDirectSeriesAccess {
+		// Direct series value: already float64, use value.IsTrue()
+		code += g.ind() + fmt.Sprintf("if value.IsTrue(%s) {\n", conditionAccess)
 	} else {
-		// Series value comparison (already float64)
-		code += g.ind() + fmt.Sprintf("if %s != 0 {\n", conditionAccess)
+		// Comparison/logical expression: boolean, convert to float
+		code += g.ind() + fmt.Sprintf("if value.IsTrue(func() float64 { if %s { return 1.0 } else { return 0.0 } }()) {\n", conditionAccess)
 	}
 	g.indent++
 

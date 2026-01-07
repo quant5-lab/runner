@@ -182,8 +182,8 @@ func TestValuewhenHandler_GenerateCode_ValidCases(t *testing.T) {
 				t.Error("expected lookback loop")
 			}
 
-			if !strings.Contains(code, tt.expectCondition+" != 0") {
-				t.Errorf("expected condition check %q in generated code", tt.expectCondition)
+			if !strings.Contains(code, "value.IsTrue("+tt.expectCondition+")") {
+				t.Errorf("expected value.IsTrue() with condition %q in generated code", tt.expectCondition)
 			}
 
 			if !strings.Contains(code, "occurrenceCount == "+tt.expectOccur) {
@@ -272,8 +272,12 @@ func TestValuewhenHandler_IntegrationWithGenerator(t *testing.T) {
 				t.Error("expected exactly one lookback loop")
 			}
 
-			if strings.Count(code, "return") != 2 {
-				t.Error("expected two return statements (match and NaN fallback)")
+			if !strings.Contains(code, "return math.NaN()") {
+				t.Error("expected NaN fallback return")
+			}
+
+			if !strings.Contains(code, "occurrenceCount++") {
+				t.Error("expected occurrenceCount increment")
 			}
 		})
 	}

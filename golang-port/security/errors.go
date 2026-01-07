@@ -70,3 +70,10 @@ func newInvalidArgumentError(funcName string, argName string, expected string) e
 		Message: fmt.Sprintf("%s argument %s must be %s", funcName, argName, expected),
 	}
 }
+
+func isUnknownIdentifierError(err error) bool {
+	if secErr, ok := err.(*SecurityError); ok {
+		return secErr.Type == "UnknownIdentifier"
+	}
+	return false
+}

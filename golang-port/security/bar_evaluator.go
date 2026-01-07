@@ -5,15 +5,27 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/series"
 )
 
 type BarEvaluator interface {
 	EvaluateAtBar(expr ast.Expression, secCtx *context.Context, barIdx int) (float64, error)
 }
 
+/*
+VarLookupFunc resolves a variable name to its Series from the main context.
+
+	Returns (series, mainBarIndex, true) if variable exists, or (nil, -1, false) if not found.
+	The mainBarIndex maps the security bar index to the corresponding main context bar index.
+*/
+type VarLookupFunc func(varName string, secBarIdx int) (*series.Series, int, bool)
+
 type StreamingBarEvaluator struct {
 	taStateCache    map[string]TAStateManager
 	fixnanEvaluator *FixnanEvaluator
+	varRegistry     *VariableRegistry
+	secBarMapper    *BarIndexMapper
+	varLookup       VarLookupFunc
 }
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
@@ -24,13 +36,34 @@ func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 			NewSequentialWarmupStrategy(),
 			NewHashExpressionIdentifier(),
 		),
+		varRegistry:  NewVariableRegistry(),
+		secBarMapper: nil,
+		varLookup:    nil,
+	}
+}
+
+func (e *StreamingBarEvaluator) SetVariableRegistry(registry *VariableRegistry) {
+	e.varRegistry = registry
+}
+
+func (e *StreamingBarEvaluator) SetBarIndexMapper(mapper *BarIndexMapper) {
+	e.secBarMapper = mapper
+}
+
+func (e *StreamingBarEvaluator) SetVarLookup(lookup VarLookupFunc) {
+	e.varLookup = lookup
+}
+
+func (e *StreamingBarEvaluator) UpdateBarMapping(secBarIdx, mainBarIdx int) {
+	if e.secBarMapper != nil {
+		e.secBarMapper.SetMapping(secBarIdx, mainBarIdx)
 	}
 }
 
 func (e *StreamingBarEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *context.Context, barIdx int) (float64, error) {
 	switch exp := expr.(type) {
 	case *ast.Identifier:
-		return evaluateOHLCVAtBar(exp, secCtx, barIdx)
+		return e.evaluateIdentifierAtBar(exp, secCtx, barIdx)
 	case *ast.CallExpression:
 		return e.evaluateTACallAtBar(exp, secCtx, barIdx)
 	case *ast.BinaryExpression:
@@ -47,6 +80,44 @@ func (e *StreamingBarEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *conte
 	default:
 		return 0.0, newUnsupportedExpressionError(exp)
 	}
+}
+
+func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secCtx *context.Context, barIdx int) (float64, error) {
+	if val, err := evaluateOHLCVAtBar(id, secCtx, barIdx); err == nil || !isUnknownIdentifierError(err) {
+		return val, err
+	}
+
+	/* Try variable registry first (for security-context variables) */
+	if e.varRegistry != nil {
+		if varSeries, ok := e.varRegistry.Get(id.Name); ok {
+			if e.secBarMapper != nil {
+				mainIdx := e.secBarMapper.GetMainBarIndexForSecurityBar(barIdx)
+				if mainIdx >= 0 {
+					offset := varSeries.Position() - mainIdx
+					if offset >= 0 && offset < varSeries.Capacity() {
+						return varSeries.Get(offset), nil
+					}
+				}
+			}
+		}
+	}
+
+	/* Fallback to main context lookup (PineScript lexical scoping) */
+	if e.varLookup != nil {
+		if varSeries, mainIdx, ok := e.varLookup(id.Name, barIdx); ok {
+			if varSeries == nil {
+				return 0.0, newUnknownIdentifierError(id.Name)
+			}
+			if mainIdx >= 0 {
+				offset := varSeries.Position() - mainIdx
+				if offset >= 0 && offset < varSeries.Capacity() {
+					return varSeries.Get(offset), nil
+				}
+			}
+		}
+	}
+
+	return 0.0, newUnknownIdentifierError(id.Name)
 }
 
 func evaluateOHLCVAtBar(id *ast.Identifier, secCtx *context.Context, barIdx int) (float64, error) {
@@ -243,11 +314,6 @@ func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression,
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	callExpr, ok := expr.Object.(*ast.CallExpression)
-	if !ok {
-		return 0.0, newUnsupportedExpressionError(expr)
-	}
-
 	propertyLit, ok := expr.Property.(*ast.Literal)
 	if !ok {
 		return 0.0, newUnsupportedExpressionError(expr)
@@ -263,5 +329,12 @@ func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberEx
 		return 0.0, newBarIndexOutOfRangeError(targetIdx, len(secCtx.Data))
 	}
 
-	return e.evaluateTACallAtBar(callExpr, secCtx, targetIdx)
+	switch obj := expr.Object.(type) {
+	case *ast.Identifier:
+		return evaluateOHLCVAtBar(obj, secCtx, targetIdx)
+	case *ast.CallExpression:
+		return e.evaluateTACallAtBar(obj, secCtx, targetIdx)
+	default:
+		return 0.0, newUnsupportedExpressionError(expr)
+	}
 }

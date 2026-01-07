@@ -27,6 +27,9 @@ type SymbolTable interface {
 
 	// Merge combines symbols from another table (for scope hierarchies)
 	Merge(other SymbolTable)
+
+	// AllSymbols returns all registered symbols
+	AllSymbols() []SymbolInfo
 }
 
 // NewSymbolTable creates a new symbol table instance
@@ -75,4 +78,12 @@ func (s *symbolTableImpl) Merge(other SymbolTable) {
 			s.symbols[name] = varType
 		}
 	}
+}
+
+func (s *symbolTableImpl) AllSymbols() []SymbolInfo {
+	result := make([]SymbolInfo, 0, len(s.symbols))
+	for name, varType := range s.symbols {
+		result = append(result, SymbolInfo{Name: name, Type: varType})
+	}
+	return result
 }

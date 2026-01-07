@@ -29,6 +29,10 @@ func (e *SeriesCachingEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *cont
 	return e.delegate.EvaluateAtBar(expr, secCtx, barIdx)
 }
 
+func (e *SeriesCachingEvaluator) Unwrap() BarEvaluator {
+	return e.delegate
+}
+
 // extractMemberExpression unwraps CallExpression layers to find nested MemberExpression
 func (e *SeriesCachingEvaluator) extractMemberExpression(expr ast.Expression) *ast.MemberExpression {
 	if memberExpr, ok := expr.(*ast.MemberExpression); ok {

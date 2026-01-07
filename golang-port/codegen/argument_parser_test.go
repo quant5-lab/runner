@@ -352,7 +352,7 @@ func TestArgumentParser_ParseIdentifier(t *testing.T) {
 		{
 			name: "member expression with non-identifier property",
 			input: &ast.MemberExpression{
-				Object: &ast.Identifier{Name: "obj"},
+				Object:   &ast.Identifier{Name: "obj"},
 				Property: &ast.Literal{Value: "prop"},
 			},
 			expectValid: false,
