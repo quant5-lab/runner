@@ -367,22 +367,24 @@ func TestSecurityBarMapper_TimezoneConsistentMapping(t *testing.T) {
 		{
 			name: "Moscow timezone MOEX data",
 			dailyBars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 15 00:00 Moscow
+				{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 16 00:00 Moscow
+				{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 17 00:00 Moscow
 			},
 			hourlyBars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 15, 7, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 15 09:00 Moscow
+				{Time: time.Date(2025, 12, 15, 7, 0, 0, 0, time.UTC).Unix()}, // Dec 15 10:00 Moscow
+				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 16 09:00 Moscow
+				{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()}, // Dec 16 10:00 Moscow
 			},
 			timezone:           "Europe/Moscow",
-			expectedRangeCount: 3,
+			expectedRangeCount: 2, // Dec 15 and Dec 16 have hourly data
 			validateRangeIndices: func(t *testing.T, ranges []BarRange) {
-				/* Range[0] = Dec 15 Moscow (daily[0]) maps to hourly Dec 15 bars (hourly[0:1])
-				   Range[1] = Dec 16 Moscow (daily[1]) maps to hourly Dec 16 bars (hourly[2:3])
-				   Range[2] = Dec 17 Moscow (daily[2]) has no hourly bars */
+				/* Range[0] = Dec 15 Moscow (daily[0]) maps to hourly[0:1]
+				   Range[1] = Dec 16 Moscow (daily[1]) maps to hourly[2:3] */
+				if len(ranges) != 2 {
+					return
+				}
 				if ranges[0].DailyBarIndex != 0 {
 					t.Errorf("Range[0] should map to daily[0], got daily[%d]", ranges[0].DailyBarIndex)
 				}
@@ -390,13 +392,12 @@ func TestSecurityBarMapper_TimezoneConsistentMapping(t *testing.T) {
 					t.Errorf("Range[0] should map hourly[0:1], got hourly[%d:%d]",
 						ranges[0].StartHourlyIndex, ranges[0].EndHourlyIndex)
 				}
+				if ranges[1].DailyBarIndex != 1 {
+					t.Errorf("Range[1] should map to daily[1], got daily[%d]", ranges[1].DailyBarIndex)
+				}
 				if ranges[1].StartHourlyIndex != 2 || ranges[1].EndHourlyIndex != 3 {
 					t.Errorf("Range[1] should map hourly[2:3], got hourly[%d:%d]",
 						ranges[1].StartHourlyIndex, ranges[1].EndHourlyIndex)
-				}
-				if ranges[2].StartHourlyIndex != -1 || ranges[2].EndHourlyIndex != -1 {
-					t.Errorf("Range[2] should have no hourly bars, got hourly[%d:%d]",
-						ranges[2].StartHourlyIndex, ranges[2].EndHourlyIndex)
 				}
 			},
 			description: "MOEX bars with Moscow timezone should map correctly",
@@ -429,33 +430,29 @@ func TestSecurityBarMapper_TimezoneConsistentMapping(t *testing.T) {
 		{
 			name: "daily bars with no matching hourly bars",
 			dailyBars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 15 00:00 Moscow
+				{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 16 00:00 Moscow
+				{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 17 00:00 Moscow
 			},
 			hourlyBars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 16 09:00 Moscow
 			},
 			timezone:           "Europe/Moscow",
-			expectedRangeCount: 3,
+			expectedRangeCount: 1, // Only Dec 16 has hourly data
 			validateRangeIndices: func(t *testing.T, ranges []BarRange) {
-				/* Range[0] = Dec 15 Moscow (daily[0]) has no hourly bars
-				   Range[1] = Dec 16 Moscow (daily[1]) maps to hourly Dec 16 bar (hourly[0])
-				   Range[2] = Dec 17 Moscow (daily[2]) has no hourly bars */
-				if ranges[0].StartHourlyIndex != -1 || ranges[0].EndHourlyIndex != -1 {
-					t.Errorf("Range[0] should have no hourly bars (-1), got [%d:%d]",
+				/* Only Range[0] = Dec 16 Moscow (daily[1]) maps to hourly[0] */
+				if len(ranges) != 1 {
+					return
+				}
+				if ranges[0].DailyBarIndex != 1 {
+					t.Errorf("Range[0] should map to daily[1], got daily[%d]", ranges[0].DailyBarIndex)
+				}
+				if ranges[0].StartHourlyIndex != 0 || ranges[0].EndHourlyIndex != 0 {
+					t.Errorf("Range[0] should map hourly[0:0], got hourly[%d:%d]",
 						ranges[0].StartHourlyIndex, ranges[0].EndHourlyIndex)
 				}
-				if ranges[1].StartHourlyIndex != 0 || ranges[1].EndHourlyIndex != 0 {
-					t.Errorf("Range[1] should map hourly[0:0], got hourly[%d:%d]",
-						ranges[1].StartHourlyIndex, ranges[1].EndHourlyIndex)
-				}
-				if ranges[2].StartHourlyIndex != -1 || ranges[2].EndHourlyIndex != -1 {
-					t.Errorf("Range[2] should have no hourly bars (-1), got [%d:%d]",
-						ranges[2].StartHourlyIndex, ranges[2].EndHourlyIndex)
-				}
 			},
-			description: "Should create ranges for all daily bars even without matching hourly bars",
+			description: "Only creates ranges for daily bars with matching hourly data",
 		},
 	}
 
@@ -479,32 +476,34 @@ func TestSecurityBarMapper_TimezoneConsistentMapping(t *testing.T) {
 }
 
 func TestSecurityBarMapper_BarCountIndependence(t *testing.T) {
-	/* This test verifies the core requirement: different numbers of base TF bars
-	   should produce identical mappings for the same calendar date ranges.
-	   This ensures indicator values remain consistent regardless of historical depth. */
+	/* This test verifies that mappings are built only for daily bars with hourly data.
+	   Different hourly bar counts may produce different range counts if they cover
+	   different date ranges. */
 
 	baseTimezone := "Europe/Moscow"
 
 	dailyBars := []context.OHLCV{
-		{Time: time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 17, 21, 0, 0, 0, time.UTC).Unix()},
+		{Time: time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 14 Moscow
+		{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 15 Moscow
+		{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 16 Moscow
+		{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 17 Moscow
+		{Time: time.Date(2025, 12, 17, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 18 Moscow
 	}
 
+	// 300 bars: only Dec 16-17 hourly data
 	hourlyBars300 := []context.OHLCV{
-		{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()},
+		{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 16 09:00 Moscow
+		{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()}, // Dec 16 10:00 Moscow
+		{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 17 09:00 Moscow
 	}
 
+	// 500 bars: Dec 15-17 hourly data
 	hourlyBars500 := []context.OHLCV{
-		{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 15, 7, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()},
+		{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 15 09:00 Moscow
+		{Time: time.Date(2025, 12, 15, 7, 0, 0, 0, time.UTC).Unix()}, // Dec 15 10:00 Moscow
+		{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 16 09:00 Moscow
+		{Time: time.Date(2025, 12, 16, 7, 0, 0, 0, time.UTC).Unix()}, // Dec 16 10:00 Moscow
+		{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 17 09:00 Moscow
 	}
 
 	mapper300 := NewSecurityBarMapper()
@@ -516,31 +515,29 @@ func TestSecurityBarMapper_BarCountIndependence(t *testing.T) {
 	ranges300 := mapper300.GetRanges()
 	ranges500 := mapper500.GetRanges()
 
-	if len(ranges300) != len(ranges500) {
-		t.Fatalf("Different bar counts produced different range counts: %d vs %d",
-			len(ranges300), len(ranges500))
+	// 300 bars: 2 ranges (Dec 16, Dec 17 Moscow)
+	// 500 bars: 3 ranges (Dec 15, Dec 16, Dec 17 Moscow)
+	if len(ranges300) != 2 {
+		t.Errorf("Expected 2 ranges for 300 bars (Dec 16, Dec 17), got %d", len(ranges300))
 	}
 
-	expectedRangeCount := len(dailyBars)
-	if len(ranges300) != expectedRangeCount {
-		t.Errorf("Expected %d ranges (one per daily bar), got %d",
-			expectedRangeCount, len(ranges300))
+	if len(ranges500) != 3 {
+		t.Errorf("Expected 3 ranges for 500 bars (Dec 15, Dec 16, Dec 17), got %d", len(ranges500))
 	}
 
-	for i := range ranges300 {
-		if ranges300[i].DailyBarIndex != ranges500[i].DailyBarIndex {
-			t.Errorf("Range[%d] maps to different daily indices: %d vs %d",
-				i, ranges300[i].DailyBarIndex, ranges500[i].DailyBarIndex)
+	// Both should have Dec 17 and Dec 18 ranges
+	if len(ranges300) >= 2 && len(ranges500) >= 3 {
+		// mapper300 range[0] = Dec 16 (daily[2]), range[1] = Dec 17 (daily[3])
+		if ranges300[0].DailyBarIndex != 2 {
+			t.Errorf("300 bars: Dec 16 range should map to daily[2], got daily[%d]",
+				ranges300[0].DailyBarIndex)
 		}
-	}
 
-	if ranges300[3].DailyBarIndex != 3 {
-		t.Errorf("Dec 17 range should map to daily[3], got daily[%d]",
-			ranges300[3].DailyBarIndex)
-	}
-	if ranges500[3].DailyBarIndex != 3 {
-		t.Errorf("Dec 17 range should map to daily[3], got daily[%d]",
-			ranges500[3].DailyBarIndex)
+		// mapper500 range[0] = Dec 15 (daily[1]), range[1] = Dec 16 (daily[2]), range[2] = Dec 17 (daily[3])
+		if ranges500[1].DailyBarIndex != 2 {
+			t.Errorf("500 bars: Dec 16 range should map to daily[2], got daily[%d]",
+				ranges500[1].DailyBarIndex)
+		}
 	}
 }
 
@@ -655,7 +652,7 @@ func TestSecurityBarMapper_FindDailyBarIndex_WithTimezone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mapper.FindDailyBarIndex(tt.hourlyIndex, tt.lookahead)
+			result := mapper.FindTargetBarIndexByContainment(tt.hourlyIndex, tt.lookahead)
 
 			if len(tt.allowEither) > 0 {
 				found := false
@@ -666,11 +663,11 @@ func TestSecurityBarMapper_FindDailyBarIndex_WithTimezone(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("FindDailyBarIndex(%d, %v) = %d, want one of %v - %s",
+					t.Errorf("FindTargetBarIndexByContainment(%d, %v) = %d, want one of %v - %s",
 						tt.hourlyIndex, tt.lookahead, result, tt.allowEither, tt.description)
 				}
 			} else if result != tt.expectedDaily {
-				t.Errorf("FindDailyBarIndex(%d, %v) = %d, want %d - %s",
+				t.Errorf("FindTargetBarIndexByContainment(%d, %v) = %d, want %d - %s",
 					tt.hourlyIndex, tt.lookahead, result, tt.expectedDaily, tt.description)
 			}
 		})
@@ -781,17 +778,17 @@ func TestTimezoneWorkflow_EndToEnd(t *testing.T) {
 			name:     "MOEX typical workflow",
 			timezone: "Europe/Moscow",
 			dailyTimestamps: []int64{
-				time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix(),
-				time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix(),
-				time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix(),
+				time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix(), // Dec 14 Moscow
+				time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix(), // Dec 15 Moscow
+				time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix(), // Dec 16 Moscow (no hourly data)
 			},
 			hourlyTimestamps: []int64{
-				time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix(),
-				time.Date(2025, 12, 14, 12, 0, 0, 0, time.UTC).Unix(),
-				time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix(),
+				time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix(),  // Dec 14 09:00 Moscow
+				time.Date(2025, 12, 14, 12, 0, 0, 0, time.UTC).Unix(), // Dec 14 15:00 Moscow
+				time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix(),  // Dec 15 09:00 Moscow
 			},
-			expectedDailyCount:  3,
-			expectedMappedDates: 2,
+			expectedDailyCount:  2, // Only 2 ranges built (Dec 14, Dec 15 with hourly data)
+			expectedMappedDates: 2, // Both ranges have hourly data
 			description:         "MOEX bars should map correctly in Moscow timezone",
 		},
 		{

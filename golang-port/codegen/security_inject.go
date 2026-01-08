@@ -103,7 +103,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		}
 
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
-		codeBuilder.WriteString("\tif secTimeframeSeconds > baseTimeframeSeconds && len(ctx.Data) > 0 {\n")
+		codeBuilder.WriteString("\tif secTimeframeSeconds != baseTimeframeSeconds && len(ctx.Data) > 0 {\n")
 		codeBuilder.WriteString("\t\tfirstBarTime := ctx.Data[0].Time\n")
 		codeBuilder.WriteString("\t\tlastBarTime := ctx.Data[len(ctx.Data)-1].Time\n")
 		codeBuilder.WriteString("\t\ttimeSpanSeconds := lastBarTime - firstBarTime\n")
@@ -132,12 +132,20 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		if isPlaceholder {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n", runtimeKey, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t} else {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t}\n")
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[fmt.Sprintf(%q, ctx.Symbol)] = %s_mapper\n\n", runtimeKey, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", key, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t} else {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t}\n")
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", key, varName))
 		}
 	}

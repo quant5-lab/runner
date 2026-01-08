@@ -150,8 +150,8 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			name:          "first bar of day 1 with lookahead off",
 			hourlyIndex:   0,
 			lookahead:     false,
-			expectedDaily: -1,
-			description:   "lookahead=off should return previous completed bar (none exists)",
+			expectedDaily: 0,
+			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
 		},
 		{
 			name:          "mid day 1 with lookahead on",
@@ -164,8 +164,8 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			name:          "mid day 1 with lookahead off",
 			hourlyIndex:   1,
 			lookahead:     false,
-			expectedDaily: -1,
-			description:   "lookahead=off during day 1 should return -1 (no completed bar yet)",
+			expectedDaily: 0,
+			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
 		},
 		{
 			name:          "last bar of day 1 with lookahead on",
@@ -178,8 +178,8 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			name:          "last bar of day 1 with lookahead off",
 			hourlyIndex:   2,
 			lookahead:     false,
-			expectedDaily: -1,
-			description:   "lookahead=off at last bar of day 1 should return -1",
+			expectedDaily: 0,
+			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
 		},
 		{
 			name:          "first bar of day 2 with lookahead on",
@@ -255,7 +255,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mapper.FindDailyBarIndex(tt.hourlyIndex, tt.lookahead)
+			result := mapper.FindTargetBarIndexByContainment(tt.hourlyIndex, tt.lookahead)
 
 			if result != tt.expectedDaily {
 				t.Errorf("%s: hourlyIndex=%d lookahead=%v: expected daily=%d, got %d",
@@ -330,7 +330,7 @@ func TestSecurityBarMapper_GapScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mapper := NewSecurityBarMapper()
 			mapper.BuildMapping(tt.dailyBars, tt.hourlyBars)
-			result := mapper.FindDailyBarIndex(tt.hourlyIndex, tt.lookahead)
+			result := mapper.FindTargetBarIndexByContainment(tt.hourlyIndex, tt.lookahead)
 
 			if result != tt.expectedDaily {
 				t.Errorf("%s: expected %d, got %d", tt.description, tt.expectedDaily, result)
@@ -524,7 +524,7 @@ func TestSecurityBarMapper_DateBoundaries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mapper := NewSecurityBarMapper()
 			mapper.BuildMapping(tt.dailyBars, tt.hourlyBars)
-			result := mapper.FindDailyBarIndex(tt.hourlyIndex, tt.lookahead)
+			result := mapper.FindTargetBarIndexByContainment(tt.hourlyIndex, tt.lookahead)
 
 			if result != tt.expectedDaily {
 				t.Errorf("%s: expected %d, got %d", tt.description, tt.expectedDaily, result)

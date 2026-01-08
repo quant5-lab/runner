@@ -453,44 +453,53 @@ func parseDate(dateStr string) (year, month, day int) {
 }
 
 func TestDateRange_SequentialDayMapping(t *testing.T) {
-	/* Test that sequential days map correctly with different bar counts */
+	/* Test that sequential days map correctly with different bar counts.
+	   Note: Ranges are only created for daily bars that have corresponding hourly data */
 
 	timezone := "Europe/Moscow"
 
 	dailyBars := []context.OHLCV{
-		{Time: time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()},
-		{Time: time.Date(2025, 12, 17, 21, 0, 0, 0, time.UTC).Unix()},
+		{Time: time.Date(2025, 12, 13, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 14 Moscow
+		{Time: time.Date(2025, 12, 14, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 15 Moscow
+		{Time: time.Date(2025, 12, 15, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 16 Moscow
+		{Time: time.Date(2025, 12, 16, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 17 Moscow
+		{Time: time.Date(2025, 12, 17, 21, 0, 0, 0, time.UTC).Unix()}, // Dec 18 Moscow
 	}
 
 	/* Test with different hourly bar configurations */
 	hourlyConfigs := []struct {
-		name string
-		bars []context.OHLCV
+		name           string
+		bars           []context.OHLCV
+		expectedRanges int
+		firstDailyIdx  int
 	}{
 		{
 			name: "all days have hourly bars",
 			bars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 14 Moscow
+				{Time: time.Date(2025, 12, 15, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 15 Moscow
+				{Time: time.Date(2025, 12, 16, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 16 Moscow
+				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 17 Moscow
 			},
+			expectedRanges: 4, // 4 daily bars have hourly data
+			firstDailyIdx:  0, // First range maps to dailyBars[0]
 		},
 		{
 			name: "skip middle days",
 			bars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix()},
-				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 14, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 14 Moscow
+				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 17 Moscow
 			},
+			expectedRanges: 2, // Only 2 daily bars have hourly data
+			firstDailyIdx:  0, // First range maps to dailyBars[0]
 		},
 		{
 			name: "only last day",
 			bars: []context.OHLCV{
-				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()},
+				{Time: time.Date(2025, 12, 17, 6, 0, 0, 0, time.UTC).Unix()}, // Dec 17 Moscow
 			},
+			expectedRanges: 1, // Only 1 daily bar has hourly data
+			firstDailyIdx:  3, // First range maps to dailyBars[3] (Dec 17)
 		},
 	}
 
@@ -501,18 +510,15 @@ func TestDateRange_SequentialDayMapping(t *testing.T) {
 
 			ranges := mapper.GetRanges()
 
-			/* Should always create range for every daily bar */
-			if len(ranges) != len(dailyBars) {
-				t.Errorf("Expected %d ranges (one per daily bar), got %d",
-					len(dailyBars), len(ranges))
+			/* Only creates ranges for daily bars with hourly data */
+			if len(ranges) != config.expectedRanges {
+				t.Errorf("Expected %d ranges, got %d", config.expectedRanges, len(ranges))
 			}
 
-			/* Verify daily indices are sequential */
-			for i, r := range ranges {
-				if r.DailyBarIndex != i {
-					t.Errorf("Range[%d] should map to daily[%d], got daily[%d]",
-						i, i, r.DailyBarIndex)
-				}
+			/* Verify first range maps to correct daily bar */
+			if len(ranges) > 0 && ranges[0].DailyBarIndex != config.firstDailyIdx {
+				t.Errorf("First range should map to daily[%d], got daily[%d]",
+					config.firstDailyIdx, ranges[0].DailyBarIndex)
 			}
 		})
 	}
