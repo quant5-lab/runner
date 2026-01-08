@@ -201,6 +201,28 @@ func (ih *InputHandler) GenerateInputSource(call *ast.CallExpression, varName st
 	return fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", varName, source), nil
 }
 
+/* GetInputConstantsMap returns all input constants as map[varName]value for security evaluator */
+func (ih *InputHandler) GetInputConstantsMap() map[string]float64 {
+	result := make(map[string]float64)
+	for varName, code := range ih.inputConstants {
+		var floatVal float64
+		var intVal int
+		var boolVal bool
+		if _, err := fmt.Sscanf(code, "const "+varName+" = %f", &floatVal); err == nil {
+			result[varName] = floatVal
+		} else if _, err := fmt.Sscanf(code, "const "+varName+" = %d", &intVal); err == nil {
+			result[varName] = float64(intVal)
+		} else if _, err := fmt.Sscanf(code, "const "+varName+" = %t", &boolVal); err == nil {
+			if boolVal {
+				result[varName] = 1.0
+			} else {
+				result[varName] = 0.0
+			}
+		}
+	}
+	return result
+}
+
 /* Helper function to extract function name from CallExpression */
 func extractFunctionNameFromCall(call *ast.CallExpression) string {
 	if member, ok := call.Callee.(*ast.MemberExpression); ok {

@@ -6,7 +6,7 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-func extractTAArguments(call *ast.CallExpression) (*ast.Identifier, int, error) {
+func extractTAArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (*ast.Identifier, int, error) {
 	if len(call.Arguments) < 2 {
 		funcName := extractCallFunctionName(call.Callee)
 		return nil, 0, newInsufficientArgumentsError(funcName, 2, len(call.Arguments))
@@ -18,7 +18,7 @@ func extractTAArguments(call *ast.CallExpression) (*ast.Identifier, int, error) 
 		return nil, 0, newInvalidArgumentTypeError(funcName, 0, "identifier")
 	}
 
-	period, err := extractNumberLiteral(call.Arguments[1])
+	period, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -48,7 +48,7 @@ func extractPeriodArgument(call *ast.CallExpression, funcName string) (int, erro
 	return int(periodFloat), nil
 }
 
-func extractValuewhenArguments(call *ast.CallExpression) (ast.Expression, ast.Expression, int, error) {
+func extractValuewhenArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (ast.Expression, ast.Expression, int, error) {
 	funcName := extractCallFunctionName(call.Callee)
 
 	if len(call.Arguments) < 3 {
@@ -58,7 +58,7 @@ func extractValuewhenArguments(call *ast.CallExpression) (ast.Expression, ast.Ex
 	conditionExpr := call.Arguments[0]
 	sourceExpr := call.Arguments[1]
 
-	occurrence, err := extractNumberLiteral(call.Arguments[2])
+	occurrence, err := extractNumberLiteral(call.Arguments[2], inputConstantsMap...)
 	if err != nil {
 		return nil, nil, 0, err
 	}

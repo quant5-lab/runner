@@ -95,7 +95,7 @@ func TestSubscriptResolver_VariableIndex(t *testing.T) {
 				Left:     &ast.Identifier{Name: "period"},
 				Right:    &ast.Literal{Value: 2.0},
 			},
-			expected: "func() float64 { idx := i - int((periodSeries.GetCurrent() * 2.00)); if idx >= 0 && idx < len(ctx.Data) { return ctx.Data[idx].High } else { return math.NaN() } }()",
+			expected: "func() float64 { idx := i - int((periodSeries.GetCurrent() * 2)); if idx >= 0 && idx < len(ctx.Data) { return ctx.Data[idx].High } else { return math.NaN() } }()",
 		},
 	}
 

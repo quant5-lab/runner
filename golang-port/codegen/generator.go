@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -65,6 +64,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 	gen.symbolTable = NewSymbolTable()
+	gen.literalFormatter = NewLiteralFormatter()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -129,6 +129,7 @@ type generator struct {
 	arrowContextLifecycle   *ArrowContextLifecycleManager
 	returnValueStorage      *ReturnValueSeriesStorageHandler
 	symbolTable             SymbolTable // Tracks variable types for type-aware code generation
+	literalFormatter        *LiteralFormatter
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -1181,13 +1182,17 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 	case *ast.Literal:
 		switch v := e.Value.(type) {
 		case float64:
-			return fmt.Sprintf("%.2f", v), nil
+			return g.literalFormatter.FormatFloat(v), nil
 		case bool:
-			return fmt.Sprintf("%t", v), nil
+			return g.literalFormatter.FormatBool(v), nil
 		case string:
-			return fmt.Sprintf("%q", v), nil
+			return g.literalFormatter.FormatString(v), nil
 		default:
-			return fmt.Sprintf("%v", v), nil
+			formatted, err := g.literalFormatter.FormatGeneric(v)
+			if err != nil {
+				return "", fmt.Errorf("failed to format literal in expression: %w", err)
+			}
+			return formatted, nil
 		}
 
 	case *ast.CallExpression:
@@ -1637,15 +1642,18 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		// For session strings, use input.session() instead
 		switch v := expr.Value.(type) {
 		case float64:
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, v), nil
+			formatted := g.literalFormatter.FormatFloat(v)
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, formatted), nil
 		case int:
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, float64(v)), nil
+			formatted := g.literalFormatter.FormatFloat(float64(v))
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, formatted), nil
 		case bool:
 			val := 0.0
 			if v {
 				val = 1.0
 			}
-			return g.ind() + fmt.Sprintf("%sSeries.Set(%.2f)\n", varName, val), nil
+			formatted := g.literalFormatter.FormatFloat(val)
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, formatted), nil
 		case string:
 			// String literals cannot be stored in numeric Series
 			// Generate const declaration instead
@@ -1888,6 +1896,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			SerializeExpr:        g.serializeExpressionForRuntime,
 			MarkSecurityExprEval: func() { g.hasSecurityExprEvals = true },
 			SymbolTable:          g.symbolTable,
+			Generator:            g,
 		})
 		evalCode, err := secExprHandler.GenerateEvaluationCode(varName, exprArg, "secBarIdx")
 		if err != nil {
@@ -2565,7 +2574,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// Numeric literal
 		switch v := e.Value.(type) {
 		case float64:
-			return fmt.Sprintf("%.2f", v)
+			return g.literalFormatter.FormatFloat(v)
 		case int:
 			return fmt.Sprintf("%d", v)
 		}
@@ -2726,14 +2735,20 @@ func (g *generator) extractIntArgument(expr ast.Expression, argName string) (int
 func (g *generator) generateLiteral(lit *ast.Literal) (string, error) {
 	switch v := lit.Value.(type) {
 	case float64:
-		return g.ind() + fmt.Sprintf("%.2f\n", v), nil
+		formatted := g.literalFormatter.FormatFloat(v)
+		return g.ind() + formatted + "\n", nil
 	case string:
-		return g.ind() + fmt.Sprintf("%q\n", v), nil
+		formatted := g.literalFormatter.FormatString(v)
+		return g.ind() + formatted + "\n", nil
 	case bool:
-		return g.ind() + fmt.Sprintf("%t\n", v), nil
+		formatted := g.literalFormatter.FormatBool(v)
+		return g.ind() + formatted + "\n", nil
 	default:
-		jsonBytes, _ := json.Marshal(v)
-		return g.ind() + string(jsonBytes) + "\n", nil
+		formatted, err := g.literalFormatter.FormatGeneric(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to format literal: %w", err)
+		}
+		return g.ind() + formatted + "\n", nil
 	}
 }
 

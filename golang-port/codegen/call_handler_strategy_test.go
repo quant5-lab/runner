@@ -354,11 +354,11 @@ func TestStrategyExit_NamedArguments(t *testing.T) {
 	}
 
 	/* Verify stop and limit extracted correctly (not NaN) */
-	if !strings.Contains(code, "95.00") {
-		t.Errorf("Expected stop value 95.00 in generated code, got:\n%s", code)
+	if !strings.Contains(code, "95") {
+		t.Errorf("Expected stop value 95 in generated code, got:\n%s", code)
 	}
-	if !strings.Contains(code, "110.00") {
-		t.Errorf("Expected limit value 110.00 in generated code, got:\n%s", code)
+	if !strings.Contains(code, "110") {
+		t.Errorf("Expected limit value 110 in generated code, got:\n%s", code)
 	}
 	if strings.Contains(code, "math.NaN()") {
 		t.Errorf("Should not contain math.NaN() when named args provided, got:\n%s", code)
@@ -424,8 +424,8 @@ func TestStrategyExit_OnlyStop(t *testing.T) {
 	}
 
 	/* stop=95.0, limit=NaN */
-	if !strings.Contains(code, "95.00") {
-		t.Errorf("Expected stop value 95.00, got:\n%s", code)
+	if !strings.Contains(code, "95") {
+		t.Errorf("Expected stop value 95, got:\n%s", code)
 	}
 	/* Limit should be NaN (not provided) */
 	if !strings.Contains(code, "math.NaN()") {

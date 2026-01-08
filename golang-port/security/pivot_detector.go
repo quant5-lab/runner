@@ -104,16 +104,16 @@ func (p *PivotDetector) extractFieldValue(bar context.OHLCV, fieldName string) f
 	}
 }
 
-func extractPivotArguments(call *ast.CallExpression) (*ast.Identifier, int, int, error) {
+func extractPivotArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (*ast.Identifier, int, int, error) {
 	funcName := extractCallFunctionName(call.Callee)
 
 	if len(call.Arguments) == 2 {
-		leftBars, err := extractNumberLiteral(call.Arguments[0])
+		leftBars, err := extractNumberLiteral(call.Arguments[0], inputConstantsMap...)
 		if err != nil {
 			return nil, 0, 0, err
 		}
 
-		rightBars, err := extractNumberLiteral(call.Arguments[1])
+		rightBars, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -135,12 +135,12 @@ func extractPivotArguments(call *ast.CallExpression) (*ast.Identifier, int, int,
 		return nil, 0, 0, newInvalidArgumentTypeError(funcName, 0, "identifier")
 	}
 
-	leftBars, err := extractNumberLiteral(call.Arguments[1])
+	leftBars, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
-	rightBars, err := extractNumberLiteral(call.Arguments[2])
+	rightBars, err := extractNumberLiteral(call.Arguments[2], inputConstantsMap...)
 	if err != nil {
 		return nil, 0, 0, err
 	}

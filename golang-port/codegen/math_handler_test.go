@@ -26,7 +26,7 @@ func TestMathHandler_GenerateMathPow(t *testing.T) {
 				&ast.Literal{Value: 2.0},
 				&ast.Literal{Value: 3.0},
 			},
-			expected: "math.Pow(2.00, 3.00)",
+			expected: "math.Pow(2, 3)",
 		},
 		{
 			name: "identifier arguments",
@@ -46,7 +46,7 @@ func TestMathHandler_GenerateMathPow(t *testing.T) {
 				},
 				&ast.Literal{Value: -1.0},
 			},
-			expected: "math.Pow(vfSeries.Get(0), -1.00)",
+			expected: "math.Pow(vfSeries.Get(0), -1)",
 		},
 		{
 			name:    "wrong number of args",
@@ -93,7 +93,7 @@ func TestMathHandler_GenerateUnaryMath(t *testing.T) {
 			args: []ast.Expression{
 				&ast.Literal{Value: -5.0},
 			},
-			expected: "math.Abs(-5.00)",
+			expected: "math.Abs(-5)",
 		},
 		{
 			name:     "math.sqrt with identifier",
@@ -113,7 +113,7 @@ func TestMathHandler_GenerateUnaryMath(t *testing.T) {
 					Right:    &ast.Literal{Value: 10.0},
 				},
 			},
-			expected: "math.Floor((1.50 * 10.00))",
+			expected: "math.Floor((1.5 * 10))",
 		},
 	}
 
@@ -150,7 +150,7 @@ func TestMathHandler_GenerateBinaryMath(t *testing.T) {
 				&ast.Literal{Value: 5.0},
 				&ast.Literal{Value: 10.0},
 			},
-			expected: "math.Max(5.00, 10.00)",
+			expected: "math.Max(5, 10)",
 		},
 		{
 			name:     "math.min with identifiers",

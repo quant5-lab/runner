@@ -53,7 +53,7 @@ func TestValueFunctionsInSeriesExpressions(t *testing.T) {
 					&ast.Literal{Value: -1.0},
 				},
 			},
-			expected: "value.Nz(countSeries.Get(2), -1.00)",
+			expected: "value.Nz(countSeries.Get(2), -1)",
 			desc:     "nz(count[2], -1) generates value.Nz() with custom replacement",
 		},
 		{
@@ -102,7 +102,7 @@ func TestValueFunctionsInSeriesExpressions(t *testing.T) {
 					&ast.Literal{Value: 0.0},
 				},
 			},
-			expected: "value.Nz(100.00, 0.00)",
+			expected: "value.Nz(100, 0)",
 			desc:     "nz(100, 0) handles literal arguments",
 		},
 	}
@@ -283,7 +283,7 @@ func TestValueFunctionsEdgeCases(t *testing.T) {
 					&ast.Literal{Value: 0.0},
 				},
 			},
-			mustHave: []string{"value.Nz", "0.00"},
+			mustHave: []string{"value.Nz", "0"},
 			mustNot:  []string{"nzSeries"},
 		},
 		{
@@ -304,7 +304,7 @@ func TestValueFunctionsEdgeCases(t *testing.T) {
 					&ast.Literal{Value: -999.0},
 				},
 			},
-			mustHave: []string{"value.Nz", "-999.00"},
+			mustHave: []string{"value.Nz", "-999"},
 			mustNot:  []string{"nzSeries"},
 		},
 	}

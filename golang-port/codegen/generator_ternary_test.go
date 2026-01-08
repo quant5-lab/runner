@@ -106,11 +106,11 @@ func TestTernaryWithArithmetic(t *testing.T) {
 	}
 
 	// Verify arithmetic in condition (ForwardSeriesBuffer paradigm)
-	if !strings.Contains(code, "volume_avgSeries.GetCurrent() * 1.50") {
+	if !strings.Contains(code, "volume_avgSeries.GetCurrent() * 1.5") {
 		t.Errorf("Missing arithmetic in ternary condition: got %s", code)
 	}
 
-	if !strings.Contains(code, "bar.Volume > (volume_avgSeries.GetCurrent() * 1.50)") {
+	if !strings.Contains(code, "bar.Volume > (volume_avgSeries.GetCurrent() * 1.5)") {
 		t.Errorf("Missing complete condition with arithmetic: got %s", code)
 	}
 }
@@ -212,7 +212,7 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 				Alternate: &ast.Identifier{Name: "fallback"},
 			},
 			expectCode: []string{
-				"(1.00 - factorSeries.GetCurrent())",
+				"(1 - factorSeries.GetCurrent())",
 			},
 		},
 		{
@@ -230,12 +230,12 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 					Right: &ast.BinaryExpression{
 						Left:     &ast.Identifier{Name: "denominator"},
 						Operator: "+",
-						Right:    &ast.Literal{Value: 1.00},
+						Right:    &ast.Literal{Value: 1},
 					},
 				},
 			},
 			expectCode: []string{
-				"(denominatorSeries.GetCurrent() + 1.00)",
+				"(denominatorSeries.GetCurrent() + 1)",
 			},
 		},
 		{
@@ -258,7 +258,7 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 				Alternate:  &ast.Literal{Value: 0.0},
 			},
 			expectCode: []string{
-				"((aSeries.GetCurrent() + bSeries.GetCurrent()) > (cSeries.GetCurrent() * 2.00))",
+				"((aSeries.GetCurrent() + bSeries.GetCurrent()) > (cSeries.GetCurrent() * 2))",
 			},
 		},
 		{
@@ -281,9 +281,9 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 				Alternate:  &ast.Identifier{Name: "signal_off"},
 			},
 			expectCode: []string{
-				"(priceSeries.GetCurrent() > 100.00)",
+				"(priceSeries.GetCurrent() > 100)",
 				"&&",
-				"bar.Volume > 1000.00",
+				"bar.Volume > 1000",
 			},
 		},
 		{
@@ -327,7 +327,7 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 				Alternate:  &ast.Identifier{Name: "skip"},
 			},
 			expectCode: []string{
-				"((bar_indexSeries.GetCurrent() % 5.00) == 0.00)",
+				"((bar_indexSeries.GetCurrent() % 5) == 0)",
 			},
 		},
 		{

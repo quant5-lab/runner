@@ -42,7 +42,7 @@ func TestTempVarInBinaryExpression(t *testing.T) {
 				if !strings.Contains(code, "ta_stdev_20") && strings.Contains(code, "Series.Set(stdev)") {
 					t.Error("Temp var ta_stdev_20 must have .Set() with calculation")
 				}
-				if !strings.Contains(code, "devSeries.Set((2.00 * ta_stdev_20") {
+				if !strings.Contains(code, "devSeries.Set((2 * ta_stdev_20") {
 					t.Error("Main var must reference temp var in arithmetic expression")
 				}
 			},
@@ -280,7 +280,7 @@ func TestTempVarCalculationOrdering(t *testing.T) {
 	}
 
 	tempVarSetIdx := strings.Index(code, "ta_stdev_20") // First occurrence (Set)
-	mainVarUseIdx := strings.Index(code, "devSeries.Set((2.00 * ta_stdev_20")
+	mainVarUseIdx := strings.Index(code, "devSeries.Set((2 * ta_stdev_20")
 
 	if tempVarSetIdx < 0 {
 		t.Fatal("Temp var ta_stdev_20 calculation not found")

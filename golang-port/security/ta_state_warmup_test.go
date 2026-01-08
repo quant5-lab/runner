@@ -35,6 +35,12 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 		{"ATR warmup mid", "atr_hlc_14", 14, 20, 6, false},
 		{"ATR warmup end", "atr_hlc_14", 14, 20, 12, false},
 		{"ATR sufficient", "atr_hlc_14", 14, 20, 13, false},
+		{"STDEV warmup start", "stdev_close_20", 20, 25, 0, true},
+		{"STDEV warmup mid", "stdev_close_20", 20, 25, 9, true},
+		{"STDEV warmup end", "stdev_close_20", 20, 25, 18, true},
+		{"STDEV sufficient", "stdev_close_20", 20, 25, 19, false},
+		{"STDEV BB8 warmup", "stdev_close_46", 46, 55, 44, true},
+		{"STDEV BB8 sufficient", "stdev_close_46", 46, 55, 45, false},
 	}
 
 	for _, tt := range tests {
@@ -78,6 +84,8 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 		{"RMA period 14", "rma_close_14", 14},
 		{"ATR period 7", "atr_hlc_7", 7},
 		{"ATR period 20", "atr_hlc_20", 20},
+		{"STDEV period 5", "stdev_close_5", 5},
+		{"STDEV period 46", "stdev_close_46", 46},
 	}
 
 	for _, tt := range tests {
@@ -177,6 +185,7 @@ func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 		{"RMA", "rma_close_5", 5},
 		{"RSI", "rsi_close_5", 5},
 		{"ATR", "atr_hlc_5", 5},
+		{"STDEV", "stdev_close_5", 5},
 	}
 
 	for _, tt := range tests {
@@ -207,6 +216,7 @@ func TestTAStateManager_InvalidSourceReturnsError(t *testing.T) {
 		{"RMA", NewTAStateManager("rma_close_10", 10, 20)},
 		{"RSI", NewTAStateManager("rsi_close_10", 10, 20)},
 		{"ATR", NewTAStateManager("atr_hlc_10", 10, 20)},
+		{"STDEV", NewTAStateManager("stdev_close_10", 10, 20)},
 	}
 
 	for _, m := range managers {
@@ -245,6 +255,7 @@ func TestTAStateManager_ConsecutiveNaNsNoGaps(t *testing.T) {
 		{"EMA", "ema_close_10"},
 		{"RMA", "rma_close_10"},
 		{"ATR", "atr_hlc_10"},
+		{"STDEV", "stdev_close_10"},
 	}
 
 	for _, tt := range tests {

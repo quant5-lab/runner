@@ -92,6 +92,10 @@ func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager
 		return NewATRStateManager(cacheKey, period)
 	}
 
+	if contains(cacheKey, "stdev") {
+		return NewSTDEVStateManager(cacheKey, period)
+	}
+
 	panic(fmt.Sprintf("unknown TA function in cache key: %s", cacheKey))
 }
 

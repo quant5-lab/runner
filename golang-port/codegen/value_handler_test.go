@@ -65,7 +65,7 @@ func TestValueHandlerGenerateNa(t *testing.T) {
 			args: []ast.Expression{
 				&ast.Literal{Value: 42.0},
 			},
-			expected: "math.IsNaN(42.00)",
+			expected: "math.IsNaN(42)",
 		},
 		{
 			name: "series historical access",
@@ -130,7 +130,7 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 				&ast.Identifier{Name: "close"},
 				&ast.Literal{Value: 100.0},
 			},
-			expected: "value.Nz(bar.Close, 100.00)",
+			expected: "value.Nz(bar.Close, 100)",
 		},
 		{
 			name: "series historical access with default",
@@ -153,7 +153,7 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 				},
 				&ast.Literal{Value: -1.0},
 			},
-			expected: "value.Nz(valueSeries.Get(2), -1.00)",
+			expected: "value.Nz(valueSeries.Get(2), -1)",
 		},
 		{
 			name: "literal with zero replacement",
@@ -161,7 +161,7 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 				&ast.Literal{Value: 42.0},
 				&ast.Literal{Value: 0.0},
 			},
-			expected: "value.Nz(42.00, 0.00)",
+			expected: "value.Nz(42, 0)",
 		},
 		{
 			name: "negative literal replacement",
@@ -169,7 +169,7 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 				&ast.Identifier{Name: "x"},
 				&ast.Literal{Value: -999.0},
 			},
-			expected: "value.Nz(xSeries.GetCurrent(), -999.00)",
+			expected: "value.Nz(xSeries.GetCurrent(), -999)",
 		},
 	}
 

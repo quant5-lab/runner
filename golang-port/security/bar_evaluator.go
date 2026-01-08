@@ -21,11 +21,12 @@ VarLookupFunc resolves a variable name to its Series from the main context.
 type VarLookupFunc func(varName string, secBarIdx int) (*series.Series, int, bool)
 
 type StreamingBarEvaluator struct {
-	taStateCache    map[string]TAStateManager
-	fixnanEvaluator *FixnanEvaluator
-	varRegistry     *VariableRegistry
-	secBarMapper    *BarIndexMapper
-	varLookup       VarLookupFunc
+	taStateCache      map[string]TAStateManager
+	fixnanEvaluator   *FixnanEvaluator
+	varRegistry       *VariableRegistry
+	secBarMapper      *BarIndexMapper
+	varLookup         VarLookupFunc
+	inputConstantsMap map[string]float64 // input() constants for extractNumberLiteral
 }
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
@@ -36,9 +37,10 @@ func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 			NewSequentialWarmupStrategy(),
 			NewHashExpressionIdentifier(),
 		),
-		varRegistry:  NewVariableRegistry(),
-		secBarMapper: nil,
-		varLookup:    nil,
+		varRegistry:       NewVariableRegistry(),
+		secBarMapper:      nil,
+		varLookup:         nil,
+		inputConstantsMap: nil,
 	}
 }
 
@@ -52,6 +54,10 @@ func (e *StreamingBarEvaluator) SetBarIndexMapper(mapper *BarIndexMapper) {
 
 func (e *StreamingBarEvaluator) SetVarLookup(lookup VarLookupFunc) {
 	e.varLookup = lookup
+}
+
+func (e *StreamingBarEvaluator) SetInputConstantsMap(inputConstants map[string]float64) {
+	e.inputConstantsMap = inputConstants
 }
 
 func (e *StreamingBarEvaluator) UpdateBarMapping(secBarIdx, mainBarIdx int) {
@@ -85,6 +91,13 @@ func (e *StreamingBarEvaluator) EvaluateAtBar(expr ast.Expression, secCtx *conte
 func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secCtx *context.Context, barIdx int) (float64, error) {
 	if val, err := evaluateOHLCVAtBar(id, secCtx, barIdx); err == nil || !isUnknownIdentifierError(err) {
 		return val, err
+	}
+
+	/* Check input constants first (compile-time constants from input()) */
+	if e.inputConstantsMap != nil {
+		if val, ok := e.inputConstantsMap[id.Name]; ok {
+			return val, nil
+		}
 	}
 
 	if secCtx != nil {
@@ -178,6 +191,8 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateRSIAtBar(call, secCtx, barIdx)
 	case "ta.atr":
 		return e.evaluateATRAtBar(call, secCtx, barIdx)
+	case "ta.stdev":
+		return e.evaluateSTDEVAtBar(call, secCtx, barIdx)
 	case "ta.pivothigh":
 		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
 	case "ta.pivotlow":
@@ -192,7 +207,7 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 }
 
 func (e *StreamingBarEvaluator) evaluateSMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, period, err := extractTAArguments(call)
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -204,7 +219,7 @@ func (e *StreamingBarEvaluator) evaluateSMAAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateEMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, period, err := extractTAArguments(call)
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -216,7 +231,7 @@ func (e *StreamingBarEvaluator) evaluateEMAAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateRMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, period, err := extractTAArguments(call)
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -228,7 +243,7 @@ func (e *StreamingBarEvaluator) evaluateRMAAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateRSIAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, period, err := extractTAArguments(call)
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -250,6 +265,18 @@ func (e *StreamingBarEvaluator) evaluateATRAtBar(call *ast.CallExpression, secCt
 
 	dummyID := &ast.Identifier{Name: "close"}
 	return stateManager.ComputeAtBar(secCtx, dummyID, barIdx)
+}
+
+func (e *StreamingBarEvaluator) evaluateSTDEVAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
+	if err != nil {
+		return 0.0, err
+	}
+
+	cacheKey := buildTACacheKey("stdev", sourceID.Name, period)
+	stateManager := e.getOrCreateTAState(cacheKey, period, secCtx)
+
+	return stateManager.ComputeAtBar(secCtx, sourceID, barIdx)
 }
 
 func (e *StreamingBarEvaluator) getOrCreateTAState(cacheKey string, period int, secCtx *context.Context) TAStateManager {
@@ -289,7 +316,7 @@ func (e *StreamingBarEvaluator) evaluateConditionalExpressionAtBar(expr *ast.Con
 }
 
 func (e *StreamingBarEvaluator) evaluatePivotHighAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, leftBars, rightBars, err := extractPivotArguments(call)
+	sourceID, leftBars, rightBars, err := extractPivotArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -299,7 +326,7 @@ func (e *StreamingBarEvaluator) evaluatePivotHighAtBar(call *ast.CallExpression,
 }
 
 func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, leftBars, rightBars, err := extractPivotArguments(call)
+	sourceID, leftBars, rightBars, err := extractPivotArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -309,7 +336,7 @@ func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, 
 }
 
 func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	conditionExpr, sourceExpr, occurrence, err := extractValuewhenArguments(call)
+	conditionExpr, sourceExpr, occurrence, err := extractValuewhenArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}

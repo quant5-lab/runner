@@ -142,11 +142,11 @@ e = myvar ? 1 : 0`
 		t.Fatalf("Codegen failed: %v", err)
 	}
 
-	// Booleans should generate 1.00 or 0.00
+	// Booleans should generate 1 or 0
 	requiredPatterns := []string{
-		"aSeries.Set(1.00)", // a = true
-		"bSeries.Set(0.00)", // b = false
-		"myvarSeries.Set(",  // myvar uses Series (not boolean literal)
+		"aSeries.Set(1)",   // a = true
+		"bSeries.Set(0)",   // b = false
+		"myvarSeries.Set(", // myvar uses Series (not boolean literal)
 	}
 
 	for _, pattern := range requiredPatterns {

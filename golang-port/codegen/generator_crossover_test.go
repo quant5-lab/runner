@@ -56,7 +56,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 		{
 			name:     "float literal",
 			expr:     &ast.Literal{Value: 100.50},
-			expected: "100.50",
+			expected: "100.5",
 		},
 		{
 			name: "arithmetic expression",

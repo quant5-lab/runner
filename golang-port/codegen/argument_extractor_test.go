@@ -29,8 +29,8 @@ func TestExtractNamedArgument_Found(t *testing.T) {
 	if !found {
 		t.Fatal("Expected stop argument to be found")
 	}
-	if code != "48000.00" {
-		t.Errorf("Expected '48000.00', got %q", code)
+	if code != "48000" {
+		t.Errorf("Expected '48000', got %q", code)
 	}
 }
 
@@ -71,8 +71,8 @@ func TestExtractPositionalArgument_Valid(t *testing.T) {
 	if !found {
 		t.Fatal("Expected positional argument at index 0")
 	}
-	if code != "48000.00" {
-		t.Errorf("Expected '48000.00', got %q", code)
+	if code != "48000" {
+		t.Errorf("Expected '48000', got %q", code)
 	}
 }
 
@@ -110,7 +110,7 @@ func TestExtractNamedOrPositional_NamedTakesPrecedence(t *testing.T) {
 	}
 
 	code := extractor.ExtractNamedOrPositional(args, "stop", 0, "math.NaN()")
-	if code != "48000.00" {
+	if code != "48000" {
 		t.Errorf("Expected named argument (48000.00), got %q", code)
 	}
 }
@@ -124,7 +124,7 @@ func TestExtractNamedOrPositional_FallbackToPositional(t *testing.T) {
 	}
 
 	code := extractor.ExtractNamedOrPositional(args, "stop", 0, "math.NaN()")
-	if code != "48000.00" {
+	if code != "48000" {
 		t.Errorf("Expected positional fallback (48000.00), got %q", code)
 	}
 }

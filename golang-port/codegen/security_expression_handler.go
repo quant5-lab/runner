@@ -15,6 +15,7 @@ type SecurityExpressionHandler struct {
 	serializeExpr        func(ast.Expression) (string, error)
 	markSecurityExprEval func()
 	symbolTable          SymbolTable
+	gen                  *generator // Access to generator for input constants
 }
 
 type SecurityExpressionConfig struct {
@@ -24,6 +25,7 @@ type SecurityExpressionConfig struct {
 	SerializeExpr        func(ast.Expression) (string, error)
 	MarkSecurityExprEval func()
 	SymbolTable          SymbolTable
+	Generator            *generator
 }
 
 func NewSecurityExpressionHandler(config SecurityExpressionConfig) *SecurityExpressionHandler {
@@ -34,6 +36,7 @@ func NewSecurityExpressionHandler(config SecurityExpressionConfig) *SecurityExpr
 		serializeExpr:        config.SerializeExpr,
 		markSecurityExprEval: config.MarkSecurityExprEval,
 		symbolTable:          config.SymbolTable,
+		gen:                  config.Generator,
 	}
 }
 
@@ -154,6 +157,10 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 	code += h.indentFunc() + "return varSeries, mainIdx, true\n"
 	h.decrementIndent()
 	code += h.indentFunc() + "})\n"
+
+	// Pass input constants to evaluator for identifier resolution
+	code += h.indentFunc() + "inputConstantsMap := " + h.generateInputConstantsMap() + "\n"
+	code += h.indentFunc() + "baseEvaluator.SetInputConstantsMap(inputConstantsMap)\n"
 
 	code += h.indentFunc() + "secBarEvaluator = security.NewSeriesCachingEvaluator(baseEvaluator)\n"
 	code += h.indentFunc() + "log.Printf(\"[SECURITY-INIT] ✅ Evaluator created and cached\")\n"
@@ -308,4 +315,27 @@ func (h *SecurityExpressionHandler) extractHistoricalOffset(expr ast.Expression)
 	}
 
 	return expr, 0
+}
+
+func (h *SecurityExpressionHandler) generateInputConstantsMap() string {
+	if h.gen.inputHandler == nil {
+		return "map[string]float64(nil)"
+	}
+
+	constantsMap := h.gen.inputHandler.GetInputConstantsMap()
+	if len(constantsMap) == 0 {
+		return "map[string]float64(nil)"
+	}
+
+	result := "map[string]float64{"
+	first := true
+	for varName, value := range constantsMap {
+		if !first {
+			result += ", "
+		}
+		result += fmt.Sprintf("%q: %f", varName, value)
+		first = false
+	}
+	result += "}"
+	return result
 }

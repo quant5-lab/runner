@@ -119,7 +119,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %q, %s_limit)\n",
 			varName, varName, symbolCode, timeframe, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_err != nil {\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %s: %%v\\n\", %s_err)\n", key, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %q, %s_err)\n", symbolCode, timeframe, varName))
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
 		codeBuilder.WriteString("\t}\n")
 

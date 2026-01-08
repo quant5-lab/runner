@@ -28,8 +28,17 @@ func extractCallFunctionName(callee ast.Expression) string {
 }
 
 // extractNumberLiteral converts AST expression to float64
-func extractNumberLiteral(expr ast.Expression) (float64, error) {
+// Supports input constants via optional inputConstantsMap parameter
+func extractNumberLiteral(expr ast.Expression, inputConstantsMap ...map[string]float64) (float64, error) {
 	if id, ok := expr.(*ast.Identifier); ok {
+		/* Check input constants map first if provided */
+		if len(inputConstantsMap) > 0 && inputConstantsMap[0] != nil {
+			if val, ok := inputConstantsMap[0][id.Name]; ok {
+				return val, nil
+			}
+		}
+
+		/* Fallback to hardcoded defaults */
 		switch id.Name {
 		case "leftBars", "rightBars":
 			return 15, nil

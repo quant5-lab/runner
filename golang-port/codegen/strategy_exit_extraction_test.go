@@ -40,7 +40,7 @@ func TestStrategyExitArgumentExtraction(t *testing.T) {
 	if !stopFound {
 		t.Fatal("Expected stop argument to be found in remainingArgs")
 	}
-	if stopCode != "95.00" {
+	if stopCode != "95" {
 		t.Errorf("Expected '95.00', got %q", stopCode)
 	}
 
@@ -48,7 +48,7 @@ func TestStrategyExitArgumentExtraction(t *testing.T) {
 	if !limitFound {
 		t.Fatal("Expected limit argument to be found in remainingArgs")
 	}
-	if limitCode != "110.00" {
+	if limitCode != "110" {
 		t.Errorf("Expected '110.00', got %q", limitCode)
 	}
 }
