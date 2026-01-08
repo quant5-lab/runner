@@ -47,6 +47,7 @@
 - [x] RSI with RMA smoothing
 - [x] TR, ATR calculation (security() support added)
 - [x] Bollinger Bands
+- [x] STDEV calculation (security() support added)
 - [x] MACD
 - [x] Stochastic oscillator
 - [x] Strategy entry/close/exit

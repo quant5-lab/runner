@@ -139,9 +139,9 @@
 
 ## TA FUNCTIONS
 
-### Implemented (13)
+### Implemented (14)
 - ✅ Atr, BBands, Change, Ema, Macd, Pivothigh, Pivotlow
-- ✅ Rma, Rsi, Sma, Stdev, Stoch, Tr
+- ✅ Rma, Rsi, Sma, Stdev (security context support), Stoch, Tr
 
 ### Not Implemented (Common ones)
 - ✅ CCI (Commodity Channel Index)
@@ -186,15 +186,14 @@
 - ⚠️ UNVERIFIED (no evidence either way)
 
 ## SUMMARY
-- **Documented Blockers:** 12
+- **Documented Blockers:** 11
   - Codegen: RSI inline
   - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
   - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
-  - Type: string variables
   - Runtime: multi-symbol security, syminfo.tickerid mapping
 - **Verified Working:** 26+ features
   - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security()
 - **Untested:** 10+ features
   - varip, line/box/table drawing, matrix functions, strategy.order/cancel, OBV/SAR/HMA/Supertrend/Ichimoku, null coalescing
 
-**CONCLUSION:** 12 blocking issues prevent 100% arbitrary PineScript support. Most core features work.
+**CONCLUSION:** 11 blocking issues prevent 100% arbitrary PineScript support. Most core features work.
