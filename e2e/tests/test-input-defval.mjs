@@ -134,12 +134,6 @@ async function testInputIntDeterministic() {
   const nonNullSMA20 = actualSMA20.filter((v) => v !== null && !isNaN(v)).length;
   const nonNullSMA10 = actualSMA10.filter((v) => v !== null && !isNaN(v)).length;
 
-  console.log('  DEBUG SMA14 first 5:', actualSMA14.slice(0, 5));
-  console.log('  DEBUG SMA14 last 5:', actualSMA14.slice(-5));
-  console.log(`  SMA(14): ${nonNullSMA14} valid values (expected 17: bars 14-30)`);
-  console.log(`  SMA(20): ${nonNullSMA20} valid values (expected 11: bars 20-30)`);
-  console.log(`  SMA(10): ${nonNullSMA10} valid values (expected 21: bars 10-30)`);
-
   // Assert correct number of non-null values
   assert.strictEqual(nonNullSMA14, 17, 'SMA(14) should start at bar 14');
   assert.strictEqual(nonNullSMA20, 11, 'SMA(20) should start at bar 20');
