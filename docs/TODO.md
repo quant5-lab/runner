@@ -70,7 +70,7 @@
 - [x] Fetch contexts only
 - [x] Direct OHLCV access
 - [x] Comprehensive edge case tests
-- [x] 256/256 tests PASS
+- [x] 266/266 tests PASS
 
 ### Inline TA States
 - [x] Circular buffer warmup
@@ -214,11 +214,11 @@
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
 - **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 10, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 266 (74 timezone), valuewhen: 66+7, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
+- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 10, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 271 (74 timezone, 5 Pine-based integration), valuewhen: 66+7, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
 - **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
-- **security() Module**: ForwardSeriesBuffer alignment complete (266/266 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete, timezone-aware architecture (ExtractDateInTimezone, BuildMappingWithDateFilter, MOEX inference, 74 timezone tests, bar-count independence verified)
+- **security() Module**: ForwardSeriesBuffer alignment complete (271/271 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete, timezone-aware architecture (ExtractDateInTimezone, BuildMappingWithDateFilter, MOEX inference, 74 timezone tests, bar-count independence verified), Bug #1 & #2 regression tests (Pine-based integration with output validation: first-bar lookahead, non-overlapping ranges, upscaling, downscaling, same-timeframe)
 - **Call Handler Architecture**: Strategy pattern refactoring (6 handlers: Meta, Plot, Strategy, TA, Unknown, Router), SOLID principles, 35 comprehensive tests (CanHandle, GenerateCode, Integration, EdgeCases)
 - **Next Target**: BB7 strategy - arrow function parser

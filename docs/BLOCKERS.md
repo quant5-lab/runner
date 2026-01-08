@@ -10,6 +10,7 @@
   - Pattern: `security(..., "1D", valuewhen(...))`
   - Fixed: `preAnalyzeSecurityCalls` now creates temp vars for inline-only functions inside security()
   - Impact: BB8 now compiles and runs
+  - Tests: 5 Pine-based integration tests with full output validation (Bug #1 first-bar lookahead, Bug #2 non-overlapping ranges, upscaling, downscaling, same-timeframe)
 
 - ❌ `ta.rsi()` inline generation not implemented
   - File: `codegen/generator.go:2933`
