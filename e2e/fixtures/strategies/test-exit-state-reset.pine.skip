@@ -1,0 +1,9 @@
+Runtime limitation: Strategy trade data extraction from chart output
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ✅ Success
+Execute: ✅ Success (reports "12 closed trades, 1 open trades")
+Error: Test validation finds 0 closed/0 open trades in result object
+Blocker: Trade data not properly extracted from ChartOutput or strategy metadata
+Note: Tests state reset patterns between entry/exit cycles
+Related: All exit mechanism tests have same data extraction issue

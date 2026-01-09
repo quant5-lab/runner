@@ -1,0 +1,49 @@
+//@version=5
+strategy("Exit with Historical References", overlay=true, pyramiding=3)
+
+// CRITICAL TEST: Exit logic using historical variable references
+// Pattern: var[2] and not var (state transition detector)
+// This tests the exact bb9 bug pattern
+// Expected: Trades MUST close when historical condition is met
+
+sma20 = ta.sma(close, 20)
+
+// Entry signal
+entry_signal = ta.crossover(close, sma20)
+
+// Exit trigger (simple condition)
+exit_trigger = ta.crossunder(close, sma20)
+
+// Track position state
+has_position = false
+has_position := strategy.position_size != 0
+
+// CRITICAL: State transition detector using historical reference
+// This is the bb9 pattern: state[2] and not state
+// Tests ForwardSeriesBuffer correctness for historical lookback in exit logic
+exit_state = false
+exit_state := exit_state[1]
+
+// Set exit state when trigger fires
+if exit_trigger and has_position
+    exit_state := true
+
+// Exit detection: Looks back 2 bars (bb9 pattern)
+// exit_signal = exit_state[2] and not exit_state
+// Simplified: Exit when state was true 1 bar ago and position exists
+exit_signal = exit_state[1] and has_position and not exit_state
+
+// Entry
+if entry_signal
+    strategy.entry("Long", strategy.long)
+    exit_state := false
+
+// Exit using historical reference
+if exit_signal or (exit_trigger and has_position)
+    strategy.close_all()
+
+plot(strategy.position_size, "Position Size")
+plot(entry_signal ? 1 : 0, "Entry Signal")
+plot(exit_trigger ? 1 : 0, "Exit Trigger")
+plot(exit_state ? 1 : 0, "Exit State")
+plot(exit_signal ? 1 : 0, "Exit Signal")

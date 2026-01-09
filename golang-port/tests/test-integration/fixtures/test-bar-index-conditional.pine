@@ -1,0 +1,34 @@
+//@version=5
+indicator("bar_index Conditional Logic", overlay=false)
+
+// Pattern: bar_index in conditional statements
+// Common use cases: first bar detection, periodic actions
+
+// Test 1: First bar detection
+firstBar = bar_index == 0 ? 1 : 0
+
+// Test 2: Skip first N bars
+afterWarmup = bar_index > 20 ? 1 : 0
+
+// Test 3: Every N bars
+every10Bars = (bar_index % 10) == 0 ? 1 : 0
+every25Bars = (bar_index % 25) == 0 ? 1 : 0
+
+// Test 4: Range checks
+inRange = bar_index >= 10 and bar_index <= 20 ? 1 : 0
+
+// Test 5: If statement with bar_index
+result = 0.0
+if bar_index < 10
+    result := 1.0
+else if bar_index < 50
+    result := 2.0
+else
+    result := 3.0
+
+plot(firstBar, "First Bar Flag", color=color.blue)
+plot(afterWarmup, "After Warmup", color=color.green)
+plot(every10Bars, "Every 10 Bars", color=color.orange)
+plot(every25Bars, "Every 25 Bars", color=color.red)
+plot(inRange, "In Range 10-20", color=color.purple)
+plot(result, "If Statement Result", color=color.gray)

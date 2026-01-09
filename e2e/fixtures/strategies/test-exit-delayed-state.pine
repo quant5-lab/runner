@@ -1,0 +1,34 @@
+//@version=5
+strategy("Delayed Exit - State Machine", overlay=true, pyramiding=3)
+
+// Pattern: Exit based on historical state reference
+// Exit trigger: state[2] and not state (2-bar transition detector)
+// Expected: Trades close with 2-bar delay after condition
+
+sma20 = ta.sma(close, 20)
+entry_signal = ta.crossover(close, sma20)
+exit_trigger = ta.crossunder(close, sma20)
+
+// State tracking variable
+has_position = false
+has_position := strategy.position_size != 0
+
+// Exit pending state (persists across bars)
+exit_pending = false
+exit_pending := exit_pending[1] ? true : exit_trigger
+
+// Entry logic
+if entry_signal
+    strategy.entry("Long", strategy.long)
+    exit_pending := false
+
+// Delayed exit: Trigger when exit_pending transitions from true to false
+// This tests historical reference in exit logic
+exit_now = exit_pending[1] and not exit_pending and strategy.position_size != 0
+
+if exit_now
+    strategy.close_all()
+
+plot(strategy.position_size, "Position Size")
+plot(exit_pending ? 1 : 0, "Exit Pending")
+plot(exit_now ? 1 : 0, "Exit Now")

@@ -1,0 +1,28 @@
+//@version=5
+strategy("Multi-Bar Exit Condition", overlay=true, pyramiding=3)
+
+// Pattern: Exit requires condition to be true for multiple consecutive bars
+// Exit trigger: Condition must persist for 3 bars
+// Expected: Trades only close when condition sustained
+
+sma20 = ta.sma(close, 20)
+entry_condition = ta.crossover(close, sma20)
+
+// Exit requires 3 consecutive bars below SMA
+below_sma = close < sma20
+bars_below = 0
+bars_below := below_sma ? nz(bars_below[1]) + 1 : 0
+
+// Exit only after 3 consecutive bars below SMA
+exit_confirmed = bars_below >= 3
+
+if entry_condition
+    strategy.entry("Long", strategy.long)
+    bars_below := 0
+
+if exit_confirmed and strategy.position_size > 0
+    strategy.close_all()
+
+plot(strategy.position_size, "Position Size")
+plot(bars_below, "Bars Below SMA")
+plot(exit_confirmed ? 1 : 0, "Exit Confirmed")

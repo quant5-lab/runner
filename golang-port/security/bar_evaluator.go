@@ -93,6 +93,11 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 		return val, err
 	}
 
+	/* Handle bar_index builtin - returns security context bar index */
+	if id.Name == "bar_index" {
+		return float64(barIdx), nil
+	}
+
 	/* Check input constants first (compile-time constants from input()) */
 	if e.inputConstantsMap != nil {
 		if val, ok := e.inputConstantsMap[id.Name]; ok {

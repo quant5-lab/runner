@@ -208,6 +208,8 @@ func (h *SecurityExpressionHandler) generateOHLCVAccess(varName string, ident *a
 		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Low)\n", varName, barIdxVar)
 	case "volume":
 		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Volume)\n", varName, barIdxVar)
+	case "bar_index":
+		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(float64(%s))\n", varName, barIdxVar)
 	default:
 		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 	}

@@ -832,6 +832,12 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 		if err != nil {
 			return "", err
 		}
+
+		// Modulo operator requires int operands, wrap float64 values in int()
+		if binExpr.Operator == "%" {
+			return fmt.Sprintf("float64(int(%s) %s int(%s))", left, binExpr.Operator, right), nil
+		}
+
 		return fmt.Sprintf("(%s %s %s)", left, binExpr.Operator, right), nil
 	}
 
@@ -2582,6 +2588,12 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// Arithmetic expression like sma20 * 1.02
 		left := g.extractSeriesExpression(e.Left)
 		right := g.extractSeriesExpression(e.Right)
+
+		// Modulo operator requires int operands, wrap float64 values in int() and convert result back to float64
+		if e.Operator == "%" {
+			return fmt.Sprintf("float64(int(%s) %s int(%s))", left, e.Operator, right)
+		}
+
 		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right)
 	case *ast.UnaryExpression:
 		// Unary expression like -1, +x

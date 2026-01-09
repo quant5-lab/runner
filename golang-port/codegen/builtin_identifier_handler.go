@@ -16,7 +16,7 @@ func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 // IsBuiltinSeriesIdentifier checks if identifier is a Pine built-in series variable.
 func (h *BuiltinIdentifierHandler) IsBuiltinSeriesIdentifier(name string) bool {
 	switch name {
-	case "close", "open", "high", "low", "volume", "tr":
+	case "close", "open", "high", "low", "volume", "tr", "bar_index":
 		return true
 	default:
 		return false
@@ -52,6 +52,8 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return "bar.Volume"
 	case "tr":
 		return h.generateTrueRangeCalculation("bar")
+	case "bar_index":
+		return "float64(i)"
 	default:
 		return ""
 	}
@@ -72,6 +74,8 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return "ctx.Data[ctx.BarIndex].Volume"
 	case "tr":
 		return h.generateTrueRangeCalculation("ctx.Data[ctx.BarIndex]")
+	case "bar_index":
+		return "float64(ctx.BarIndex)"
 	default:
 		return ""
 	}

@@ -1,0 +1,36 @@
+//@version=5
+strategy("Selective Exit Test", overlay=true, pyramiding=5)
+
+// Pattern: Close specific position ID vs close all
+// Exit trigger: Different conditions for different entries
+// Expected: Can close position1 while keeping position2 open
+
+sma20 = ta.sma(close, 20)
+sma50 = ta.sma(close, 50)
+
+// Multiple entry conditions
+entry1 = ta.crossover(close, sma20)
+entry2 = ta.crossover(sma20, sma50)
+
+// Selective exit conditions
+exit1 = ta.crossunder(close, sma20)
+exit_all = ta.crossunder(sma20, sma50)
+
+// Entry logic - multiple IDs
+if entry1
+    strategy.entry("Entry1", strategy.long)
+
+if entry2
+    strategy.entry("Entry2", strategy.long)
+
+// Selective exit - close specific ID
+if exit1
+    strategy.close("Entry1")
+
+// Close all when major trend reverses
+if exit_all
+    strategy.close_all()
+
+plot(strategy.position_size, "Position Size")
+plot(entry1 ? 1 : 0, "Entry1 Signal")
+plot(entry2 ? 1 : 0, "Entry2 Signal")

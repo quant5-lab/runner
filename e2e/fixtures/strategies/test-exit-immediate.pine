@@ -1,0 +1,21 @@
+//@version=5
+strategy("Immediate Exit Test", overlay=true, pyramiding=3)
+
+// Pattern: Direct exit on condition (baseline behavior)
+// Exit trigger: Single boolean condition
+// Expected: Trades close immediately when condition met
+
+sma20 = ta.sma(close, 20)
+entry_condition = ta.crossover(close, sma20)
+exit_condition = ta.crossunder(close, sma20)
+
+if entry_condition
+    strategy.entry("Long", strategy.long)
+
+// IMMEDIATE exit - no delay, no state machine
+if exit_condition
+    strategy.close_all()
+
+plot(strategy.position_size, "Position Size")
+plot(entry_condition ? 1 : 0, "Entry Signal")
+plot(exit_condition ? 1 : 0, "Exit Signal")
