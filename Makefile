@@ -347,7 +347,19 @@ all: ci ## Full validation (format, vet, lint, build, all tests)
 
 install-hooks: ## Install git pre-commit hook
 	@echo "Installing pre-commit hook..."
-	@cp golang-port/hooks/pre-commit .git/hooks/pre-commit
+	@echo '#!/bin/sh' > .git/hooks/pre-commit
+	@echo '# Git pre-commit hook - full validation' >> .git/hooks/pre-commit
+	@echo 'set -e' >> .git/hooks/pre-commit
+	@echo 'export PATH="$$HOME/.local/go/bin:/usr/local/go/bin:$$PATH"' >> .git/hooks/pre-commit
+	@echo 'export GOPATH="$$HOME/go"' >> .git/hooks/pre-commit
+	@echo 'export PATH="$$PATH:$$GOPATH/bin"' >> .git/hooks/pre-commit
+	@echo 'if ! command -v go >/dev/null 2>&1; then' >> .git/hooks/pre-commit
+	@echo '    echo "✗ Go not found. Run: make install"' >> .git/hooks/pre-commit
+	@echo '    exit 1' >> .git/hooks/pre-commit
+	@echo 'fi' >> .git/hooks/pre-commit
+	@echo 'echo "🔍 Running pre-commit validation..."' >> .git/hooks/pre-commit
+	@echo 'make all' >> .git/hooks/pre-commit
+	@echo 'exit 0' >> .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 	@echo "✓ Pre-commit hook installed (runs: make all)"
 
