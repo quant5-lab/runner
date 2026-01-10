@@ -126,7 +126,7 @@ func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExp
 func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	periodInt := period.AsInt()
 	body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
-	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return highest"
 
 	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
@@ -135,7 +135,7 @@ func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodE
 func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	periodInt := period.AsInt()
 	body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
-	body += fmt.Sprintf("for j := %d; j > 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return lowest"
 
 	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
