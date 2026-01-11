@@ -93,6 +93,7 @@
 - [x] Visitor/transformer updates
 - [x] Complex expression parsing
 - [x] 10/10 integration tests (28+ cases)
+- [x] Plot styling parameters (style, linewidth, transp, pane)
 
 ### Integration
 - [x] Builder pipeline integration
@@ -213,13 +214,13 @@
 - **Output**: Unified chart format (metadata + candlestick + indicators + strategy + ui sections)
 - **Visualization**: Config system with filename-based loading (metadata.strategy = source filename)
 - **Config Tools**: Makefile integration (create-config, validate-configs, list-configs, remove-config, clean-configs)
-- **Documentation**: UNIFIED_CHART_FORMAT.md, STRATEGY_RUNTIME_ARCHITECTURE.md, MANUAL_TESTING.md, data-fetching.md, HANDLER_TEST_COVERAGE.md, CONFIG_*.md
 - **Project structure**: Proper .gitignore (bin/, testdata/*-output.json excluded)
-- **Test Suite**: 585+ tests (preprocessor: 48, chartdata: 16, builder: 18, codegen: 8+11 handlers, expression_analyzer: 10, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 271 (74 timezone, 5 Pine-based integration), valuewhen: 66+7, pivot: 95, call_handlers: 35, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
-- **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines)
+- **Test Suite**: 605+ tests (preprocessor: 48, chartdata: 22, builder: 18, codegen: 8+11 handlers, expression_analyzer: 10, temp_variable_manager: 11, inline_function_registry: 10, series_source_classifier_ast: 5, validation: 28/41, integration: 40, runtime, datafetcher: 5, security: 271 (74 timezone, 5 Pine-based integration), valuewhen: 66+7, pivot: 95, call_handlers: 35, plot: 127, parser: 40, preprocessor: 29, blockers: 14) - 100% pass rate
+- **Handler Test Coverage**: input_handler_test.go (6 tests, 14 subtests), math_handler_test.go (6 tests, 13 subtests), subscript_resolver_test.go (5 tests, 16 subtests), call_handler_*.go (35 tests, 6 files, 1600+ lines), plot_*.go (127 tests: 6 options, 6 buildOptions, 3 titleGen, 6 styleExtract, 20 new generalized tests)
 - **Named Parameters**: Full ObjectExpression extraction support (input.float(defval=1.4) → const = 1.40)
 - **Warmup Validation**: Compile-time analyzer detects subscript lookback requirements (close[252] → warns need 253+ bars)
 - **Data Infrastructure**: BTCUSDT_1D.json extended to 1500 bars (4+ years) supporting 5-year CAGR calculations
 - **security() Module**: ForwardSeriesBuffer alignment complete (271/271 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete, timezone-aware architecture (ExtractDateInTimezone, BuildMappingWithDateFilter, MOEX inference, 74 timezone tests, bar-count independence verified), Bug #1 & #2 regression tests (Pine-based integration with output validation: first-bar lookahead, non-overlapping ranges, upscaling, downscaling, same-timeframe)
 - **Call Handler Architecture**: Strategy pattern refactoring (6 handlers: Meta, Plot, Strategy, TA, Unknown, Router), SOLID principles, 35 comprehensive tests (CanHandle, GenerateCode, Integration, EdgeCases)
+- **Plot Module**: Comprehensive test coverage (127 tests), all styling parameters (style, linewidth, transp, pane, color, offset, title), type handling (float64 ↔ int conversion), edge cases, generalization, deduplication
 - **Next Target**: BB7 strategy - arrow function parser

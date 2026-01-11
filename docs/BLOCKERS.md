@@ -191,8 +191,8 @@
   - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
   - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
   - Runtime: multi-symbol security, syminfo.tickerid mapping
-- **Verified Working:** 26+ features
-  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security()
+- **Verified Working:** 27+ features
+  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security(), plot styling (style/linewidth/transp/pane/color/offset/title)
 - **Untested:** 10+ features
   - varip, line/box/table drawing, matrix functions, strategy.order/cancel, OBV/SAR/HMA/Supertrend/Ichimoku, null coalescing
 
