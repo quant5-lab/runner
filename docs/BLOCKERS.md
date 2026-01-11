@@ -30,10 +30,10 @@
   - Status: 39/40 fixtures parse (97.5% success)
   - Workaround: Multi-line arrow functions work
 
-- ❌ BB9 syntax error at line 342
-  - File: `bb-strategy-9-rus.pine:342`
-  - Error: "unexpected token ''"
-  - Needs: Investigation of failing syntax
+- ✅ BB9 parsing fixed
+  - File: `bb-strategy-9-rus.pine`
+  - Status: Parse✅ Generate✅ Compile✅
+  - Fixed: Preprocessor if block atomicity
 
 - ⚠️ `for` loops
   - Status: Parse✅ Generate✅ Compile✅ (literals only, not actual loops)
@@ -186,14 +186,14 @@
 - ⚠️ UNVERIFIED (no evidence either way)
 
 ## SUMMARY
-- **Documented Blockers:** 11
+- **Documented Blockers:** 10
   - Codegen: RSI inline
-  - Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
+  - Parser: arrow functions, while loops, for loops (literals only), map generics, bitwise operators
   - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
   - Runtime: multi-symbol security, syminfo.tickerid mapping
-- **Verified Working:** 27+ features
-  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security(), plot styling (style/linewidth/transp/pane/color/offset/title)
+- **Verified Working:** 28+ features
+  - var declarations, labels, arrays, strategy.exit, colors, visuals, TA (CCI/WMA/VWAP), operators (arithmetic/logical/modulo), valuewhen in security(), plot styling (style/linewidth/transp/pane/color/offset/title), BB9 parsing
 - **Untested:** 10+ features
   - varip, line/box/table drawing, matrix functions, strategy.order/cancel, OBV/SAR/HMA/Supertrend/Ichimoku, null coalescing
 
-**CONCLUSION:** 11 blocking issues prevent 100% arbitrary PineScript support. Most core features work.
+**CONCLUSION:** 10 blocking issues prevent 100% arbitrary PineScript support. Most core features work.

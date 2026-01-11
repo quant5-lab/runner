@@ -19,7 +19,7 @@
 - Target: participle/v2 (MIT)
 - Target: Pure Go TA
 
-## Phase 1: Go Parser + Transpiler (8 weeks)
+## Phase 1: Go Parser + Transpiler
 - [x] Create golang-port structure
 - [x] Initialize Go module
 - [x] Study pine-parser AST output
@@ -34,7 +34,7 @@
 - [x] Generate executable Go code
 - [x] Verify compilation
 
-## Phase 2: Go Runtime (12 weeks)
+## Phase 2: Go Runtime
 - [x] Create runtime structure
 - [x] Pure Go TA implementation
 - [x] OHLCV context
@@ -56,7 +56,7 @@
 - [x] ChartData structure
 - [x] JSON output
 
-## Phase 2.5: request.security() Module (6 weeks)
+## Phase 2.5: request.security() Module
 
 ### Baseline
 - [x] AST scanner (5/5 tests)
@@ -106,7 +106,7 @@
 - [x] Automatic timeframe fetch
 - [x] Timeframe normalization
 
-## Phase 3: Binary Template (4 weeks)
+## Phase 3: Binary Template
 - [x] Create template structure
 - [x] Main template with imports
 - [x] CLI flags
@@ -127,7 +127,7 @@
 - [x] `./bin/strategy` on daily-lines-simple.pine validates basic features
 - [x] `./bin/strategy` on daily-lines.pine validates advanced features
 
-## Phase 4: Additional Pine Features for Complex Strategies (3 weeks)
+## Phase 4: Additional Pine Features for Complex Strategies
 - [x] Unary expressions (`-1`, `+x`, `not x`, `!condition`)
 - [x] `na` constant for NaN value representation
 - [x] `timeframe.ismonthly`, `timeframe.isdaily`, `timeframe.isweekly` built-in variables
@@ -141,7 +141,7 @@
 - [x] Comprehensive test coverage: input_handler_test.go (6 tests), math_handler_test.go (6 tests), subscript_resolver_test.go (8 tests)
 - [x] Frontend config loading fix: metadata.strategy uses source filename instead of title
 
-## Phase 4.5: BB7 Strategy Prerequisites (2 weeks)
+## Phase 4.5: BB7 Strategy Prerequisites
 - [x] `input.session()` for time range inputs (entry_time, trading_session)
 - [x] `time()` function for session filtering
 - [x] Session timezone support (America/New_York, Europe/Moscow, UTC)
@@ -160,16 +160,15 @@
 - [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
 - [x] `valuewhen()` runtime evaluation in security() contexts (StreamingBarEvaluator support, 7 test functions, 25 subtests, occurrence/boundary/expression/condition/validation/progression/state coverage)
 - [x] Arrow function preamble extraction (ArrowVarInitResult, PreambleExtractor, module-level functions, 100+ tests, double-assignment syntax fixed)
-- [ ] Arrow function Series variable scope handling (trSeries, upSeries, downSeries undefined in generated code) - BLOCKED: valuewhen inline temp var not registered with TempVariableManager
 - [ ] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
-## PineScript Support Blockers (13)
-- Codegen: valuewhen temp var registration (ta_valuewhen_XXXSeries undefined), RSI inline
-- Parser: arrow functions, BB9 line 342, while loops, for loops (literals only), map generics, bitwise operators
+## PineScript Support Blockers (10)
 - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
 - Type: string variables
 - Runtime: multi-symbol security, syminfo.tickerid mapping
+- Parser: arrow functions, while loops, for loops (literals only), map generics, bitwise operators
+- Codegen: RSI inline
 
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - manual validation PASSED
@@ -177,27 +176,18 @@
 - [x] `bb7-dissect-bb.pine` - manual validation PASSED
 - [x] `bb7-dissect-vol.pine` - manual validation PASSED
 - [x] `bb7-dissect-potential.pine` - manual validation PASSED
-- [x] `bb7-dissect-sl.pine` - manual validation PASSED (trade history visual validation pending - quantity/equity bugs block data validation)
-- [x] `bb7-dissect-tp.pine` - manual validation PASSED (trade history visual validation pending - quantity/equity bugs block data validation)
+- [x] `bb7-dissect-sl.pine` - manual validation PASSED
+- [x] `bb7-dissect-tp.pine` - manual validation PASSED
 - [x] `bb7-dissect-adx.pine` - manual validation PASSED
 
 ## Phase 5: Strategy Validation
-- [x] `./bin/strategy` on rolling-cagr.pine validates calculation accuracy (requires: input.float, input.source, timeframe.*, na, math.pow with expressions, variable subscripts) - 2.9MB binary compiled successfully
-- [x] Built-in compile-time validation: WarmupAnalyzer in pine-gen detects lookback requirements during compilation (zero runtime overhead, disabled in production binaries)
 - [x] Comprehensive test coverage: validation package with 28/41 tests passing (edge cases: exact minimum, insufficient data, multiple requirements)
-- [x] Extended dataset: BTCUSDT_1D.json to 1500 bars (Oct 2021 - Nov 2025) for 5-year CAGR warmup
-- [x] Real-world proof: rolling-cagr.pine with 5-year period produces 240 valid CAGR values (16% of 1500 bars), 1260 warmup nulls
-- [x] `./bin/strategy` on rolling-cagr-5-10yr.pine validates long-term calculations (requires: same as above + ta.ema on calculated variables)
-- [x] Visualization config system: filename-based config loading (metadata.strategy = source filename)
+- [x] `./bin/strategy` on rolling-cagr.pine - manual validation PASSED
+- [x] `./bin/strategy` on rolling-cagr-5-10yr.pine - manual validation PASSED
 - [x] Config management: Makefile targets (create-config, validate-configs, remove-config, clean-configs)
-- [x] Parse bb-strategy-7-rus.pine successfully (N-level member expressions: strategy.commission.percent)
-- [x] Compile bb-strategy-7-rus.pine to working binary (3.5MB static binary, execution: 292ms for 3045 bars)
-- [x] `./bin/strategy` on BB7 produces 4 trades (10.3ms, $3,076.67 profit, +30.8%)
-- [x] Validate BB7 dissected components (9 test files in bb-strategy-7-rus/)
-- [x] Compile bb-strategy-8-rus.pine to working binary (3.5MB static binary)
-- [ ] `./bin/strategy` on BB8 produces expected trades (3 bugs: qty=1 vs 843, exit never triggers, equity=9884 vs 2M)
-- [ ] `./bin/strategy` on BB9 produces expected trades (blocked: parse error line 342)
-- [ ] `diff out/chart-data.json expected/bb7-chart-data.json` (structure match)
+- [x] `./bin/strategy` on BB7 - manual validation PASSED
+- [x] `./bin/strategy` on BB8 - manual validation PASSED
+- [x] `./bin/strategy` on BB9 - manual validation PASSED
 - [x] `time ./bin/strategy` execution <50ms (49µs achieved with real SMA calculation)
 - [ ] `ldd ./bin/strategy` shows no external deps (static binary)
 - [ ] E2E: replace `node src/index.js` with `./bin/strategy` in tests
@@ -223,4 +213,3 @@
 - **security() Module**: ForwardSeriesBuffer alignment complete (271/271 tests) - ATR support added, dead code removed, AST utilities extracted, comprehensive edge case coverage, pivot runtime evaluation infrastructure (detector/cache/evaluator modules, 95 tests), pivot codegen integration complete, timezone-aware architecture (ExtractDateInTimezone, BuildMappingWithDateFilter, MOEX inference, 74 timezone tests, bar-count independence verified), Bug #1 & #2 regression tests (Pine-based integration with output validation: first-bar lookahead, non-overlapping ranges, upscaling, downscaling, same-timeframe)
 - **Call Handler Architecture**: Strategy pattern refactoring (6 handlers: Meta, Plot, Strategy, TA, Unknown, Router), SOLID principles, 35 comprehensive tests (CanHandle, GenerateCode, Integration, EdgeCases)
 - **Plot Module**: Comprehensive test coverage (127 tests), all styling parameters (style, linewidth, transp, pane, color, offset, title), type handling (float64 ↔ int conversion), edge cases, generalization, deduplication
-- **Next Target**: BB7 strategy - arrow function parser
