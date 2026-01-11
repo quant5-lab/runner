@@ -1,0 +1,46 @@
+//@version=4
+strategy("If Block Atomicity - Consecutive Blocks")
+
+// Test multiple consecutive if blocks to ensure independence
+// Each block should execute atomically without interference from others
+
+block1_a = false
+block1_a := block1_a[1]
+block1_b = false
+block1_b := block1_b[1]
+
+block2_a = false
+block2_a := block2_a[1]
+block2_b = false
+block2_b := block2_b[1]
+
+block3_a = false
+block3_a := block3_a[1]
+block3_b = false
+block3_b := block3_b[1]
+
+// Three independent if blocks, each with multiple assignments
+if close > open
+    block1_a := true
+    block1_b := true
+
+if close > close[1]
+    block2_a := true
+    block2_b := true
+
+if volume > volume[1]
+    block3_a := true
+    block3_b := true
+
+// Reset all
+if close < low[1]
+    block1_a := false
+    block1_b := false
+    block2_a := false
+    block2_b := false
+    block3_a := false
+    block3_b := false
+
+plot(block1_a and block1_b ? 1 : 0, "Block1 Both", color=color.green)
+plot(block2_a and block2_b ? 1 : 0, "Block2 Both", color=color.blue)
+plot(block3_a and block3_b ? 1 : 0, "Block3 Both", color=color.red)

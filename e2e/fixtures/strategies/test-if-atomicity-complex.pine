@@ -1,0 +1,38 @@
+//@version=4
+strategy("If Block Atomicity - Complex Conditions")
+
+// Test that complex multi-line conditions evaluate once for all assignments
+// This ensures condition re-evaluation bug doesn't occur with complex expressions
+
+rsi_val = rsi(close, 14)
+volume_ma = sma(volume, 20)
+price_ma = sma(close, 50)
+
+signal_long = false
+signal_long := signal_long[1]
+
+signal_strength = 0.0
+signal_strength := signal_strength[1]
+
+signal_timestamp = 0
+signal_timestamp := signal_timestamp[1]
+
+confirmation_count = 0
+confirmation_count := confirmation_count[1]
+
+// Complex condition (single line for parser compatibility)
+if close > price_ma and rsi_val < 30 and volume > volume_ma * 1.5 and high > high[1]
+    signal_long := true
+    signal_strength := (volume / volume_ma) * ((price_ma - close) / close * 100)
+    signal_timestamp := time
+    confirmation_count := confirmation_count + 1
+
+// Reset signals
+if close < price_ma or rsi_val > 70
+    signal_long := false
+    signal_strength := 0.0
+    signal_timestamp := 0
+
+plot(signal_long ? 1 : 0, "Signal", color=color.green)
+plot(signal_strength, "Strength", color=color.blue)
+plot(confirmation_count, "Confirmations", color=color.red)

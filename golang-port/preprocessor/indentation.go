@@ -81,11 +81,12 @@ func NormalizeIfBlocks(script string) string {
 				break
 			}
 
-			// Generate single-line if statement for each body statement
-			// Use newline to separate condition from body for parser
-			for _, stmt := range bodyStatements {
+			// Generate single if block with all body statements
+			if len(bodyStatements) > 0 {
 				result = append(result, indentStr+"if "+condition)
-				result = append(result, indentStr+"    "+stmt)
+				for _, stmt := range bodyStatements {
+					result = append(result, indentStr+"    "+stmt)
+				}
 			}
 			continue
 		}

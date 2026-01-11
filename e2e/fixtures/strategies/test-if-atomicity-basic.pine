@@ -1,0 +1,26 @@
+//@version=4
+strategy("If Block Atomicity - Multiple Assignments")
+
+// Test that multiple := assignments in same if block execute atomically
+// Condition should evaluate ONCE, not re-evaluate after each assignment
+
+state = false
+state := state[1]
+
+flag = false
+flag := flag[1]
+
+counter = 0
+counter := counter[1]
+
+// Single condition with three assignments
+// All three should execute when condition is true
+if close > open
+    state := true
+    flag := true
+    counter := counter + 1
+
+// Plot to verify all variables updated together
+plot(state ? 1 : 0, "State", color=color.green)
+plot(flag ? 1 : 0, "Flag", color=color.blue)
+plot(counter, "Counter", color=color.red)

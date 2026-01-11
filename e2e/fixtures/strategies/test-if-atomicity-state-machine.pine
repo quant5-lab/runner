@@ -1,0 +1,37 @@
+//@version=4
+strategy("If Block Atomicity - State Machine")
+
+// Test state machine pattern where multiple state variables must update atomically
+// This is a common pattern in trading strategies for tracking trade lifecycle
+
+has_entry_signal = false
+has_entry_signal := has_entry_signal[1]
+
+has_exit_signal = false  
+has_exit_signal := has_exit_signal[1]
+
+trade_active = false
+trade_active := trade_active[1]
+
+entry_price = 0.0
+entry_price := entry_price[1]
+
+// Entry logic: All entry-related state must update atomically
+entry_condition = close > open and volume > volume[1]
+if not trade_active and entry_condition
+    trade_active := true
+    has_entry_signal := true
+    entry_price := close
+
+// Exit logic: All exit-related state must update atomically
+exit_condition = close < entry_price * 0.95
+if trade_active and exit_condition
+    trade_active := false
+    has_exit_signal := true
+    entry_price := 0.0
+
+// Plots to verify state consistency
+plot(trade_active ? 1 : 0, "Active", color=color.green)
+plot(has_entry_signal ? 1 : 0, "Entry Signal", color=color.blue)
+plot(has_exit_signal ? 1 : 0, "Exit Signal", color=color.red)
+plot(entry_price, "Entry Price", color=color.orange)

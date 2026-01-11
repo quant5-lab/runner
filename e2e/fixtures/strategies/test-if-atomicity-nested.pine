@@ -1,0 +1,45 @@
+//@version=4
+strategy("If Block Atomicity - Nested If")
+
+// Test nested if blocks where inner block has multiple assignments
+// Each nesting level should maintain atomicity independently
+
+outer_flag = false
+outer_flag := outer_flag[1]
+
+inner_flag = false
+inner_flag := inner_flag[1]
+
+deep_flag = false
+deep_flag := deep_flag[1]
+
+outer_count = 0
+outer_count := outer_count[1]
+
+inner_count = 0
+inner_count := inner_count[1]
+
+deep_count = 0
+deep_count := deep_count[1]
+
+// Nested structure with multiple assignments at each level
+if close > open
+    outer_flag := true
+    outer_count := outer_count + 1
+    if volume > volume[1]
+        inner_flag := true
+        inner_count := inner_count + 1
+        if high > high[1] and low > low[1]
+            deep_flag := true
+            deep_count := deep_count + 1
+
+// Reset logic
+if close < open
+    outer_flag := false
+    inner_flag := false
+    deep_flag := false
+
+plot(outer_flag ? 1 : 0, "Outer", color=color.green)
+plot(inner_flag ? 1 : 0, "Inner", color=color.blue)
+plot(deep_flag ? 1 : 0, "Deep", color=color.red)
+plot(outer_count, "Outer Count", color=color.orange)
