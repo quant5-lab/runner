@@ -133,11 +133,49 @@ type generator struct {
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
+	optionsMap := make([]string, 0)
+
+	if opts.ColorExpr != nil {
+		if colorValue := g.evaluateStringConstant(opts.ColorExpr); colorValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %q", colorValue))
+		}
+	}
+
 	if opts.OffsetExpr != nil {
 		offsetValue := g.constEvaluator.EvaluateConstant(opts.OffsetExpr)
 		if !math.IsNaN(offsetValue) && offsetValue != 0 {
-			return fmt.Sprintf("map[string]interface{}{\"offset\": %d}", int(offsetValue))
+			optionsMap = append(optionsMap, fmt.Sprintf("\"offset\": %d", int(offsetValue)))
 		}
+	}
+
+	if opts.StyleExpr != nil {
+		if styleValue := g.evaluateStringConstant(opts.StyleExpr); styleValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"style\": %q", styleValue))
+		}
+	}
+
+	if opts.LineWidthExpr != nil {
+		linewidthValue := g.constEvaluator.EvaluateConstant(opts.LineWidthExpr)
+		if !math.IsNaN(linewidthValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"linewidth\": %d", int(linewidthValue)))
+		}
+	}
+
+	if opts.TranspExpr != nil {
+		transpValue := g.constEvaluator.EvaluateConstant(opts.TranspExpr)
+		if !math.IsNaN(transpValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"transp\": %d", int(transpValue)))
+		}
+	}
+
+	if opts.PaneExpr != nil {
+		if paneValue := g.evaluateStringConstant(opts.PaneExpr); paneValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"pane\": %q", paneValue))
+		}
+	}
+
+	if len(optionsMap) > 0 {
+		return fmt.Sprintf("map[string]interface{}{%s}", strings.Join(optionsMap, ", "))
 	}
 	return "nil"
 }
@@ -150,6 +188,32 @@ func (g *generator) buildPlotOptionsWithNullColor(opts PlotOptions) string {
 		offsetValue := g.constEvaluator.EvaluateConstant(opts.OffsetExpr)
 		if !math.IsNaN(offsetValue) && offsetValue != 0 {
 			optionsMap = append(optionsMap, fmt.Sprintf("\"offset\": %d", int(offsetValue)))
+		}
+	}
+
+	if opts.StyleExpr != nil {
+		if styleValue := g.evaluateStringConstant(opts.StyleExpr); styleValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"style\": %q", styleValue))
+		}
+	}
+
+	if opts.LineWidthExpr != nil {
+		linewidthValue := g.constEvaluator.EvaluateConstant(opts.LineWidthExpr)
+		if !math.IsNaN(linewidthValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"linewidth\": %d", int(linewidthValue)))
+		}
+	}
+
+	if opts.TranspExpr != nil {
+		transpValue := g.constEvaluator.EvaluateConstant(opts.TranspExpr)
+		if !math.IsNaN(transpValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"transp\": %d", int(transpValue)))
+		}
+	}
+
+	if opts.PaneExpr != nil {
+		if paneValue := g.evaluateStringConstant(opts.PaneExpr); paneValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"pane\": %q", paneValue))
 		}
 	}
 
@@ -172,6 +236,32 @@ func (g *generator) buildPlotOptionsWithColor(opts PlotOptions, color string) st
 		}
 	}
 
+	if opts.StyleExpr != nil {
+		if styleValue := g.evaluateStringConstant(opts.StyleExpr); styleValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"style\": %q", styleValue))
+		}
+	}
+
+	if opts.LineWidthExpr != nil {
+		linewidthValue := g.constEvaluator.EvaluateConstant(opts.LineWidthExpr)
+		if !math.IsNaN(linewidthValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"linewidth\": %d", int(linewidthValue)))
+		}
+	}
+
+	if opts.TranspExpr != nil {
+		transpValue := g.constEvaluator.EvaluateConstant(opts.TranspExpr)
+		if !math.IsNaN(transpValue) {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"transp\": %d", int(transpValue)))
+		}
+	}
+
+	if opts.PaneExpr != nil {
+		if paneValue := g.evaluateStringConstant(opts.PaneExpr); paneValue != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"pane\": %q", paneValue))
+		}
+	}
+
 	if len(optionsMap) > 0 {
 		return fmt.Sprintf("map[string]interface{}{%s}", strings.Join(optionsMap, ", "))
 	}
@@ -183,6 +273,21 @@ func (g *generator) extractColorLiteral(expr ast.Expression) string {
 		if colorStr, ok := lit.Value.(string); ok {
 			return colorStr
 		}
+	}
+	return ""
+}
+
+func (g *generator) evaluateStringConstant(expr ast.Expression) string {
+	// Handle string literals
+	if lit, ok := expr.(*ast.Literal); ok {
+		if strVal, ok := lit.Value.(string); ok {
+			return strVal
+		}
+	}
+	// Handle member expressions like plot.style_circles via ConstantResolver
+	resolver := NewConstantResolver()
+	if strVal, ok := resolver.ResolveToString(expr); ok {
+		return strVal
 	}
 	return ""
 }
@@ -1008,12 +1113,9 @@ func (g *generator) generateNumericExpression(expr ast.Expression) (string, erro
 }
 
 // generatePlotExpression generates inline code for plot() argument expressions
-// Handles ternary expressions, identifiers, and literals as immediate values
 func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.ConditionalExpression:
-		// Handle ternary: test ? consequent : alternate
-		// Generate as inline func() float64 expression
 		condCode, err := g.generateConditionExpression(e.Test)
 		if err != nil {
 			return "", err
@@ -1033,36 +1135,27 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 			condCode, consequentCode, alternateCode), nil
 
 	case *ast.Identifier:
-		// Try builtin resolution first (e.g., strategy.equity)
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, false); resolved {
 			return code, nil
 		}
-		// Variable reference - use Series.Get(0)
 		return e.Name + "Series.Get(0)", nil
 
 	case *ast.MemberExpression:
-		// Try builtin member expression resolution (e.g., strategy.equity, close[0])
 		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
 			return code, nil
 		}
-		// Fallback: Member expression like userVar[0]
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Literal:
-		// Direct literal value
 		return g.generateNumericExpression(e)
 
 	case *ast.BinaryExpression, *ast.LogicalExpression:
-		// Mathematical or logical expression
 		return g.generateConditionExpression(expr)
 
 	case *ast.CallExpression:
-		// Inline TA/math functions: plot(sma(close, 20)), plot(math.max(high, low))
 		return g.plotExprHandler.Generate(expr)
 
 	case *ast.ObjectExpression:
-		// Named arguments like type=input.session in input() calls, or title=/overlay= in study()
-		// These are metadata, not values - return empty string
 		return "", nil
 
 	default:
@@ -1879,7 +1972,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		g.indent++
 		code += g.ind() + "barAligner := request.NewSecurityBarMapperAligner(securityBarMapper, secLookahead)\n"
 		code += g.ind() + "secCtx.SetParent(ctx, barAligner)\n"
-		code += g.ind() + "log.Printf(\"[CONTEXT-HIERARCHY] Linked secCtx %s → mainCtx\", secKey)\n"
 		g.indent--
 		code += g.ind() + "}\n"
 		code += g.ind() + "\n"
@@ -1894,7 +1986,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 		exprArg := call.Arguments[2]
 
-		// Use SecurityExpressionHandler for consistent evaluation with offset handling
 		secExprHandler := NewSecurityExpressionHandler(SecurityExpressionConfig{
 			IndentFunc:           g.ind,
 			IncrementIndent:      func() { g.indent++ },
@@ -2981,7 +3072,6 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 		seriesName := strings.TrimSuffix(sourceExpr, "Series.GetCurrent()")
 		prevExpr = fmt.Sprintf("%sSeries.Get(%d)", seriesName, offset)
 	} else {
-		// Fallback for complex expressions
 		prevExpr = fmt.Sprintf("(/* previous value of %s */0.0)", sourceExpr)
 	}
 
@@ -3000,9 +3090,6 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 func (g *generator) generateValuewhen(varName string, conditionExpr string, sourceExpr string, occurrence int) (string, error) {
 	code := g.ind() + fmt.Sprintf("/* Inline valuewhen(%s, %s, %d) */\n", conditionExpr, sourceExpr, occurrence)
 
-	// EVIDENCE GATHERING: Log valuewhen execution
-	code += g.ind() + "log.Printf(\"[VALUEWHEN] Evaluating valuewhen at bar i=%d\", i)\n"
-
 	code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 {\n", varName)
 	g.indent++
 
@@ -3011,31 +3098,21 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	g.indent++
 
 	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
-	// Detect if condition is series access (float) or comparison/logical (bool)
 	isDirectSeriesAccess := strings.Contains(conditionAccess, ".Get(") &&
 		!strings.ContainsAny(conditionAccess, "><!=&|")
 
 	if isDirectSeriesAccess {
-		// Direct series value: already float64, use value.IsTrue()
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(%s) {\n", conditionAccess)
 	} else {
-		// Comparison/logical expression: boolean, convert to float
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(func() float64 { if %s { return 1.0 } else { return 0.0 } }()) {\n", conditionAccess)
 	}
 	g.indent++
-
-	// CRITICAL ASSESSMENT: Log when condition is true
-	code += g.ind() + "log.Printf(\"[VALUEWHEN] ✅ Condition TRUE at lookbackOffset=%d (bar %d), occurrenceCount=%d\", lookbackOffset, i-lookbackOffset, occurrenceCount)\n"
 
 	code += g.ind() + fmt.Sprintf("if occurrenceCount == %d {\n", occurrence)
 	g.indent++
 
 	sourceAccess := g.convertSeriesAccessToOffset(sourceExpr, "lookbackOffset")
-
-	// EVIDENCE GATHERING: Log the retrieved value
-	code += g.ind() + fmt.Sprintf("retrievedValue := %s\n", sourceAccess)
-	code += g.ind() + "log.Printf(\"[VALUEWHEN] 🎯 MATCH: occurrence reached, returning value=%f from lookbackOffset=%d\", retrievedValue, lookbackOffset)\n"
-	code += g.ind() + "return retrievedValue\n"
+	code += g.ind() + fmt.Sprintf("return %s\n", sourceAccess)
 
 	g.indent--
 	code += g.ind() + "}\n"
@@ -3047,8 +3124,6 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	g.indent--
 	code += g.ind() + "}\n"
 
-	// CRITICAL ASSESSMENT: Log when no match found (potential bandaid indicator)
-	code += g.ind() + "log.Printf(\"[VALUEWHEN] ⚠️  NO MATCH: condition never met in history up to bar i=%d\", i)\n"
 	code += g.ind() + "return math.NaN()\n"
 
 	g.indent--

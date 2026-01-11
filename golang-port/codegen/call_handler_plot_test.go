@@ -196,3 +196,198 @@ func TestPlotFunctionHandler_ComplexExpressions(t *testing.T) {
 	// Should handle expression (delegated to plotCollector)
 	_ = code // No immediate code, added to plotCollector
 }
+
+// TestPlotFunctionHandler_UniqueTitleGeneration verifies unique titles for untitled plots
+func TestPlotFunctionHandler_UniqueTitleGeneration(t *testing.T) {
+	handler := &PlotFunctionHandler{}
+	g := newTestGenerator()
+
+	// Plots with variable names should use variable name as title
+	call1 := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "plot"},
+		Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+	}
+
+	_, err := handler.GenerateCode(g, call1)
+	if err != nil {
+		t.Fatalf("GenerateCode() error on first call: %v", err)
+	}
+
+	call2 := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "plot"},
+		Arguments: []ast.Expression{&ast.Identifier{Name: "open"}},
+	}
+
+	_, err = handler.GenerateCode(g, call2)
+	if err != nil {
+		t.Fatalf("GenerateCode() error on second call: %v", err)
+	}
+
+	plots := g.plotCollector.GetPlots()
+	if len(plots) != 2 {
+		t.Fatalf("Expected 2 plots, got %d", len(plots))
+	}
+
+	// Variable names used as titles
+	if !strings.Contains(plots[0].code, `"close"`) {
+		t.Errorf("Expected first plot code to contain 'close', got %q", plots[0].code)
+	}
+	if !strings.Contains(plots[1].code, `"open"`) {
+		t.Errorf("Expected second plot code to contain 'open', got %q", plots[1].code)
+	}
+}
+
+// TestPlotFunctionHandler_GeneratedTitleForComplexExpr verifies generated titles for complex expressions
+func TestPlotFunctionHandler_GeneratedTitleForComplexExpr(t *testing.T) {
+	handler := &PlotFunctionHandler{}
+	g := newTestGenerator()
+
+	// Complex expressions should generate "Plot N" since extractPlotVariable returns ""
+	call1 := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "plot"},
+		Arguments: []ast.Expression{
+			&ast.BinaryExpression{
+				Left:     &ast.Identifier{Name: "close"},
+				Operator: "+",
+				Right:    &ast.Literal{Value: 10.0},
+			},
+		},
+	}
+
+	_, err := handler.GenerateCode(g, call1)
+	if err != nil {
+		t.Fatalf("GenerateCode() error: %v", err)
+	}
+
+	call2 := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "plot"},
+		Arguments: []ast.Expression{
+			&ast.BinaryExpression{
+				Left:     &ast.Identifier{Name: "high"},
+				Operator: "-",
+				Right:    &ast.Identifier{Name: "low"},
+			},
+		},
+	}
+
+	_, err = handler.GenerateCode(g, call2)
+	if err != nil {
+		t.Fatalf("GenerateCode() error: %v", err)
+	}
+
+	plots := g.plotCollector.GetPlots()
+	if len(plots) != 2 {
+		t.Fatalf("Expected 2 plots, got %d", len(plots))
+	}
+
+	// Generated titles for complex expressions
+	if !strings.Contains(plots[0].code, `"Plot 1"`) {
+		t.Errorf("Expected first plot code to contain 'Plot 1', got %q", plots[0].code)
+	}
+	if !strings.Contains(plots[1].code, `"Plot 2"`) {
+		t.Errorf("Expected second plot code to contain 'Plot 2', got %q", plots[1].code)
+	}
+}
+
+// TestPlotFunctionHandler_ExplicitTitlePreserved verifies explicit titles not overwritten
+func TestPlotFunctionHandler_ExplicitTitlePreserved(t *testing.T) {
+	handler := &PlotFunctionHandler{}
+	g := newTestGenerator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "plot"},
+		Arguments: []ast.Expression{
+			&ast.Identifier{Name: "sma20"},
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{
+						Key:   &ast.Identifier{Name: "title"},
+						Value: &ast.Literal{Value: "SMA 20"},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := handler.GenerateCode(g, call)
+	if err != nil {
+		t.Fatalf("GenerateCode() error: %v", err)
+	}
+
+	plots := g.plotCollector.GetPlots()
+	if len(plots) != 1 {
+		t.Fatalf("Expected 1 plot, got %d", len(plots))
+	}
+
+	if !strings.Contains(plots[0].code, `"SMA 20"`) {
+		t.Errorf("Expected code to contain 'SMA 20', got %q", plots[0].code)
+	}
+}
+
+// TestPlotFunctionHandler_MixedTitles verifies mixed explicit and generated titles
+func TestPlotFunctionHandler_MixedTitles(t *testing.T) {
+	handler := &PlotFunctionHandler{}
+	g := newTestGenerator()
+
+	calls := []*ast.CallExpression{
+		// Explicit title
+		{
+			Callee: &ast.Identifier{Name: "plot"},
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "sma20"},
+				&ast.ObjectExpression{
+					Properties: []ast.Property{
+						{Key: &ast.Identifier{Name: "title"}, Value: &ast.Literal{Value: "SMA 20"}},
+					},
+				},
+			},
+		},
+		// No title, simple variable - should use variable name "close"
+		{
+			Callee:    &ast.Identifier{Name: "plot"},
+			Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+		},
+		// Explicit title
+		{
+			Callee: &ast.Identifier{Name: "plot"},
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "ema50"},
+				&ast.ObjectExpression{
+					Properties: []ast.Property{
+						{Key: &ast.Identifier{Name: "title"}, Value: &ast.Literal{Value: "EMA 50"}},
+					},
+				},
+			},
+		},
+		// No title, complex expression - should generate "Plot 4" (total plot count)
+		{
+			Callee: &ast.Identifier{Name: "plot"},
+			Arguments: []ast.Expression{
+				&ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "high"},
+					Operator: "-",
+					Right:    &ast.Identifier{Name: "low"},
+				},
+			},
+		},
+	}
+
+	for _, call := range calls {
+		_, err := handler.GenerateCode(g, call)
+		if err != nil {
+			t.Fatalf("GenerateCode() error: %v", err)
+		}
+	}
+
+	plots := g.plotCollector.GetPlots()
+	if len(plots) != 4 {
+		t.Fatalf("Expected 4 plots, got %d", len(plots))
+	}
+
+	expectedTitles := []string{`"SMA 20"`, `"close"`, `"EMA 50"`, `"Plot 4"`}
+	for i, expectedTitle := range expectedTitles {
+		if !strings.Contains(plots[i].code, expectedTitle) {
+			t.Errorf("Plot %d: expected code to contain %s, got %q", i+1, expectedTitle, plots[i].code)
+		}
+	}
+}

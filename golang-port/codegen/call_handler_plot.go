@@ -35,8 +35,16 @@ func (h *PlotFunctionHandler) GenerateCode(g *generator, call *ast.CallExpressio
 	}
 
 	if plotExpr != "" {
+		title := opts.Title
+		if title == "" {
+			plotNum := 1
+			if g.plotCollector != nil {
+				plotNum = len(g.plotCollector.GetPlots()) + 1
+			}
+			title = fmt.Sprintf("Plot %d", plotNum)
+		}
 		options := g.buildPlotOptions(opts)
-		plotCode := fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, options)
+		plotCode := fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", title, plotExpr, options)
 		if g.plotCollector != nil {
 			g.plotCollector.AddPlot(call, plotCode)
 		}

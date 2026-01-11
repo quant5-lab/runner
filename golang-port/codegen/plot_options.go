@@ -5,10 +5,14 @@ import (
 )
 
 type PlotOptions struct {
-	Variable   string
-	Title      string
-	ColorExpr  ast.Expression
-	OffsetExpr ast.Expression
+	Variable      string
+	Title         string
+	ColorExpr     ast.Expression
+	OffsetExpr    ast.Expression
+	StyleExpr     ast.Expression
+	LineWidthExpr ast.Expression
+	TranspExpr    ast.Expression
+	PaneExpr      ast.Expression
 }
 
 func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
@@ -46,6 +50,18 @@ func ParsePlotOptions(call *ast.CallExpression) PlotOptions {
 		// Store expression for later evaluation (handles literals and compile-time constants)
 		if offsetExpr, ok := parser.ParseExpression(optionsObj, "offset"); ok {
 			opts.OffsetExpr = offsetExpr
+		}
+		if styleExpr, ok := parser.ParseExpression(optionsObj, "style"); ok {
+			opts.StyleExpr = styleExpr
+		}
+		if linewidthExpr, ok := parser.ParseExpression(optionsObj, "linewidth"); ok {
+			opts.LineWidthExpr = linewidthExpr
+		}
+		if transpExpr, ok := parser.ParseExpression(optionsObj, "transp"); ok {
+			opts.TranspExpr = transpExpr
+		}
+		if paneExpr, ok := parser.ParseExpression(optionsObj, "pane"); ok {
+			opts.PaneExpr = paneExpr
 		}
 	}
 

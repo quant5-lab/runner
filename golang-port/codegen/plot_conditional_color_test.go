@@ -102,6 +102,210 @@ func TestBuildPlotOptions_ZeroOffset(t *testing.T) {
 	}
 }
 
+// TestBuildPlotOptions_WithStyle verifies style parameter inclusion
+func TestBuildPlotOptions_WithStyle(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	tests := []struct {
+		name      string
+		styleExpr ast.Expression
+		wantValue string
+	}{
+		{
+			name:      "circles style",
+			styleExpr: Lit("circles"),
+			wantValue: `"circles"`,
+		},
+		{
+			name:      "linebr style",
+			styleExpr: Lit("linebr"),
+			wantValue: `"linebr"`,
+		},
+		{
+			name:      "histogram style",
+			styleExpr: Lit("histogram"),
+			wantValue: `"histogram"`,
+		},
+		{
+			name:      "line style",
+			styleExpr: Lit("line"),
+			wantValue: `"line"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := PlotOptions{Title: "Test", StyleExpr: tt.styleExpr}
+			result := gen.buildPlotOptions(opts)
+
+			if !strings.Contains(result, `"style": `+tt.wantValue) {
+				t.Errorf("Expected result to contain 'style': %s, got %q", tt.wantValue, result)
+			}
+		})
+	}
+}
+
+// TestBuildPlotOptions_WithLineWidth verifies linewidth parameter inclusion
+func TestBuildPlotOptions_WithLineWidth(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	tests := []struct {
+		name          string
+		linewidthExpr ast.Expression
+		wantValue     string
+	}{
+		{name: "linewidth 1", linewidthExpr: Lit(float64(1)), wantValue: "1"},
+		{name: "linewidth 2", linewidthExpr: Lit(float64(2)), wantValue: "2"},
+		{name: "linewidth 5", linewidthExpr: Lit(float64(5)), wantValue: "5"},
+		{name: "linewidth 8", linewidthExpr: Lit(float64(8)), wantValue: "8"},
+		{name: "linewidth 10", linewidthExpr: Lit(float64(10)), wantValue: "10"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := PlotOptions{Title: "Test", LineWidthExpr: tt.linewidthExpr}
+			result := gen.buildPlotOptions(opts)
+
+			if !strings.Contains(result, `"linewidth": `+tt.wantValue) {
+				t.Errorf("Expected result to contain 'linewidth': %s, got %q", tt.wantValue, result)
+			}
+		})
+	}
+}
+
+// TestBuildPlotOptions_WithTransp verifies transp parameter inclusion
+func TestBuildPlotOptions_WithTransp(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	tests := []struct {
+		name       string
+		transpExpr ast.Expression
+		wantValue  string
+	}{
+		{name: "transp 0", transpExpr: Lit(float64(0)), wantValue: "0"},
+		{name: "transp 20", transpExpr: Lit(float64(20)), wantValue: "20"},
+		{name: "transp 30", transpExpr: Lit(float64(30)), wantValue: "30"},
+		{name: "transp 50", transpExpr: Lit(float64(50)), wantValue: "50"},
+		{name: "transp 100", transpExpr: Lit(float64(100)), wantValue: "100"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := PlotOptions{Title: "Test", TranspExpr: tt.transpExpr}
+			result := gen.buildPlotOptions(opts)
+
+			if !strings.Contains(result, `"transp": `+tt.wantValue) {
+				t.Errorf("Expected result to contain 'transp': %s, got %q", tt.wantValue, result)
+			}
+		})
+	}
+}
+
+// TestBuildPlotOptions_WithPane verifies pane parameter inclusion
+func TestBuildPlotOptions_WithPane(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	tests := []struct {
+		name      string
+		paneExpr  ast.Expression
+		wantValue string
+	}{
+		{name: "pane indicator", paneExpr: Lit("indicator"), wantValue: `"indicator"`},
+		{name: "pane main", paneExpr: Lit("main"), wantValue: `"main"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := PlotOptions{Title: "Test", PaneExpr: tt.paneExpr}
+			result := gen.buildPlotOptions(opts)
+
+			if !strings.Contains(result, `"pane": `+tt.wantValue) {
+				t.Errorf("Expected result to contain 'pane': %s, got %q", tt.wantValue, result)
+			}
+		})
+	}
+}
+
+// TestBuildPlotOptions_AllParameters verifies all parameters together
+func TestBuildPlotOptions_AllParameters(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	opts := PlotOptions{
+		Title:         "MACD",
+		ColorExpr:     MemberExpr("color", "blue"),
+		StyleExpr:     Lit("line"),
+		LineWidthExpr: Lit(float64(2)),
+		TranspExpr:    Lit(float64(20)),
+		OffsetExpr:    Lit(float64(-1)),
+		PaneExpr:      Lit("indicator"),
+	}
+	result := gen.buildPlotOptions(opts)
+
+	expectations := []string{
+		`"style": "line"`,
+		`"linewidth": 2`,
+		`"transp": 20`,
+		`"offset": -1`,
+		`"pane": "indicator"`,
+	}
+
+	for _, expected := range expectations {
+		if !strings.Contains(result, expected) {
+			t.Errorf("Expected result to contain %q, got %q", expected, result)
+		}
+	}
+}
+
+// TestBuildPlotOptions_ColorExtractionFromConstant verifies color extraction
+func TestBuildPlotOptions_ColorExtractionFromConstant(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	tests := []struct {
+		name      string
+		colorExpr ast.Expression
+		wantColor string
+	}{
+		{
+			name:      "color.red constant",
+			colorExpr: MemberExpr("color", "red"),
+			wantColor: "#FF0000",
+		},
+		{
+			name:      "color.lime constant",
+			colorExpr: MemberExpr("color", "lime"),
+			wantColor: "#00FF00",
+		},
+		{
+			name:      "color literal string",
+			colorExpr: Lit("#0000FF"),
+			wantColor: "#0000FF",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := PlotOptions{Title: "Test", ColorExpr: tt.colorExpr}
+			result := gen.buildPlotOptions(opts)
+
+			if !strings.Contains(result, `"color": "`+tt.wantColor+`"`) {
+				t.Errorf("Expected color %q in result, got %q", tt.wantColor, result)
+			}
+		})
+	}
+}
+
 // Tests for buildPlotOptionsWithNullColor method
 
 func TestBuildPlotOptionsWithNullColor_NoOffset(t *testing.T) {

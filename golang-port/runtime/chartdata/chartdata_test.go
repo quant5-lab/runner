@@ -73,6 +73,298 @@ func TestAddPlots(t *testing.T) {
 	}
 }
 
+// TestAddPlots_StyleExtraction verifies style parameter extraction from options
+func TestAddPlots_StyleExtraction(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	tests := []struct {
+		name      string
+		title     string
+		options   map[string]interface{}
+		wantStyle string
+	}{
+		{
+			name:      "circles style",
+			title:     "Signal",
+			options:   map[string]interface{}{"style": "circles"},
+			wantStyle: "circles",
+		},
+		{
+			name:      "linebr style",
+			title:     "Trend",
+			options:   map[string]interface{}{"style": "linebr"},
+			wantStyle: "linebr",
+		},
+		{
+			name:      "histogram style",
+			title:     "Volume",
+			options:   map[string]interface{}{"style": "histogram"},
+			wantStyle: "histogram",
+		},
+		{
+			name:      "line style",
+			title:     "MA",
+			options:   map[string]interface{}{"style": "line"},
+			wantStyle: "line",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector.Add(tt.title, now, 100.0, tt.options)
+		})
+	}
+
+	cd.AddPlots(collector)
+
+	for _, tt := range tests {
+		series, ok := cd.Indicators[tt.title]
+		if !ok {
+			t.Errorf("%s: series not found", tt.name)
+			continue
+		}
+		if series.Style.PlotStyle != tt.wantStyle {
+			t.Errorf("%s: expected style %q, got %q", tt.name, tt.wantStyle, series.Style.PlotStyle)
+		}
+	}
+}
+
+// TestAddPlots_LineWidthExtraction verifies linewidth extraction from options
+func TestAddPlots_LineWidthExtraction(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	tests := []struct {
+		name          string
+		title         string
+		linewidth     float64
+		wantLineWidth int
+	}{
+		{name: "linewidth 1", title: "L1", linewidth: 1, wantLineWidth: 1},
+		{name: "linewidth 2", title: "L2", linewidth: 2, wantLineWidth: 2},
+		{name: "linewidth 5", title: "L5", linewidth: 5, wantLineWidth: 5},
+		{name: "linewidth 8", title: "L8", linewidth: 8, wantLineWidth: 8},
+		{name: "linewidth 10", title: "L10", linewidth: 10, wantLineWidth: 10},
+	}
+
+	for _, tt := range tests {
+		collector.Add(tt.title, now, 100.0, map[string]interface{}{"linewidth": tt.linewidth})
+	}
+
+	cd.AddPlots(collector)
+
+	for _, tt := range tests {
+		series, ok := cd.Indicators[tt.title]
+		if !ok {
+			t.Errorf("%s: series not found", tt.name)
+			continue
+		}
+		if series.Style.LineWidth != tt.wantLineWidth {
+			t.Errorf("%s: expected linewidth %d, got %d", tt.name, tt.wantLineWidth, series.Style.LineWidth)
+		}
+	}
+}
+
+// TestAddPlots_TranspExtraction verifies transp extraction from options
+func TestAddPlots_TranspExtraction(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	tests := []struct {
+		name       string
+		title      string
+		transp     float64
+		wantTransp int
+	}{
+		{name: "transp 0", title: "T0", transp: 0, wantTransp: 0},
+		{name: "transp 20", title: "T20", transp: 20, wantTransp: 20},
+		{name: "transp 50", title: "T50", transp: 50, wantTransp: 50},
+		{name: "transp 100", title: "T100", transp: 100, wantTransp: 100},
+	}
+
+	for _, tt := range tests {
+		collector.Add(tt.title, now, 100.0, map[string]interface{}{"transp": tt.transp})
+	}
+
+	cd.AddPlots(collector)
+
+	for _, tt := range tests {
+		series, ok := cd.Indicators[tt.title]
+		if !ok {
+			t.Errorf("%s: series not found", tt.name)
+			continue
+		}
+		if series.Style.Transp != tt.wantTransp {
+			t.Errorf("%s: expected transp %d, got %d", tt.name, tt.wantTransp, series.Style.Transp)
+		}
+	}
+}
+
+// TestAddPlots_ColorExtraction verifies color extraction from options
+func TestAddPlots_ColorExtraction(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	tests := []struct {
+		name      string
+		title     string
+		color     string
+		wantColor string
+	}{
+		{name: "red color", title: "Red", color: "#FF0000", wantColor: "#FF0000"},
+		{name: "lime color", title: "Lime", color: "#00FF00", wantColor: "#00FF00"},
+		{name: "blue color", title: "Blue", color: "#0000FF", wantColor: "#0000FF"},
+		{name: "purple color", title: "Purple", color: "#800080", wantColor: "#800080"},
+	}
+
+	for _, tt := range tests {
+		collector.Add(tt.title, now, 100.0, map[string]interface{}{"color": tt.color})
+	}
+
+	cd.AddPlots(collector)
+
+	for _, tt := range tests {
+		series, ok := cd.Indicators[tt.title]
+		if !ok {
+			t.Errorf("%s: series not found", tt.name)
+			continue
+		}
+		if series.Style.Color != tt.wantColor {
+			t.Errorf("%s: expected color %q, got %q", tt.name, tt.wantColor, series.Style.Color)
+		}
+	}
+}
+
+// TestAddPlots_AllStyleParameters verifies all style parameters together
+func TestAddPlots_AllStyleParameters(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	options := map[string]interface{}{
+		"color":     "#FF0000",
+		"style":     "circles",
+		"linewidth": float64(8),
+		"transp":    float64(30),
+		"pane":      "indicator",
+	}
+
+	collector.Add("MACD Signal", now, 50.0, options)
+	collector.Add("MACD Signal", now+3600, 52.0, options)
+
+	cd.AddPlots(collector)
+
+	series, ok := cd.Indicators["MACD Signal"]
+	if !ok {
+		t.Fatal("MACD Signal series not found")
+	}
+
+	if series.Style.Color != "#FF0000" {
+		t.Errorf("Expected color #FF0000, got %s", series.Style.Color)
+	}
+	if series.Style.PlotStyle != "circles" {
+		t.Errorf("Expected style circles, got %s", series.Style.PlotStyle)
+	}
+	if series.Style.LineWidth != 8 {
+		t.Errorf("Expected linewidth 8, got %d", series.Style.LineWidth)
+	}
+	if series.Style.Transp != 30 {
+		t.Errorf("Expected transp 30, got %d", series.Style.Transp)
+	}
+}
+
+// TestAddPlots_DefaultValues verifies default values when options missing
+func TestAddPlots_DefaultValues(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	collector.Add("Simple", now, 100.0, nil)
+
+	cd.AddPlots(collector)
+
+	series, ok := cd.Indicators["Simple"]
+	if !ok {
+		t.Fatal("Simple series not found")
+	}
+
+	// Verify defaults are applied (color rotation, linewidth 2, etc.)
+	if series.Style.LineWidth == 0 {
+		t.Error("Expected default linewidth to be set")
+	}
+	if series.Style.Color == "" {
+		t.Error("Expected default color to be set")
+	}
+}
+
+// TestAddPlots_MultiplePlotsWithDifferentStyles verifies multiple plots
+func TestAddPlots_MultiplePlotsWithDifferentStyles(t *testing.T) {
+	ctx := context.New("TEST", "1h", 10)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+
+	plots := []struct {
+		title   string
+		options map[string]interface{}
+	}{
+		{"MA Fast", map[string]interface{}{"color": "#FF0000", "style": "line", "linewidth": float64(1)}},
+		{"MA Slow", map[string]interface{}{"color": "#0000FF", "style": "line", "linewidth": float64(2)}},
+		{"Buy Signal", map[string]interface{}{"color": "#00FF00", "style": "circles", "linewidth": float64(5)}},
+		{"Sell Signal", map[string]interface{}{"color": "#FF0000", "style": "circles", "linewidth": float64(5)}},
+		{"Volume", map[string]interface{}{"color": "#808080", "style": "histogram", "transp": float64(50)}},
+	}
+
+	for _, p := range plots {
+		collector.Add(p.title, now, 100.0, p.options)
+	}
+
+	cd.AddPlots(collector)
+
+	if len(cd.Indicators) != 5 {
+		t.Errorf("Expected 5 indicators, got %d", len(cd.Indicators))
+	}
+
+	// Verify each plot maintains its unique style
+	for _, p := range plots {
+		series, ok := cd.Indicators[p.title]
+		if !ok {
+			t.Errorf("Series %q not found", p.title)
+			continue
+		}
+
+		if expectedColor, ok := p.options["color"].(string); ok {
+			if series.Style.Color != expectedColor {
+				t.Errorf("%s: expected color %q, got %q", p.title, expectedColor, series.Style.Color)
+			}
+		}
+
+		if expectedStyle, ok := p.options["style"].(string); ok {
+			if series.Style.PlotStyle != expectedStyle {
+				t.Errorf("%s: expected style %q, got %q", p.title, expectedStyle, series.Style.PlotStyle)
+			}
+		}
+	}
+}
+
 func TestAddStrategy(t *testing.T) {
 	ctx := context.New("TEST", "1h", 10)
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")

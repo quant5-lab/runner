@@ -24,6 +24,8 @@ type Metadata struct {
 type StyleConfig struct {
 	Color     string `json:"color,omitempty"`
 	LineWidth int    `json:"lineWidth,omitempty"`
+	PlotStyle string `json:"plotStyle,omitempty"`
+	Transp    int    `json:"transp,omitempty"`
 }
 
 /* IndicatorSeries represents a plot indicator with metadata */
@@ -159,6 +161,11 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 	for i, s := range series {
 		plotPoints := make([]PlotPoint, len(s.Data))
 		offset := 0
+		color := ""
+		lineWidth := 0
+		style := ""
+		pane := ""
+		transp := 0
 
 		for j, p := range s.Data {
 			plotPoints[j] = PlotPoint{
@@ -167,24 +174,62 @@ func (cd *ChartData) AddPlots(collector *output.Collector) {
 				Options: p.Options,
 			}
 
-			if offset == 0 && p.Options != nil {
-				if offsetVal, ok := p.Options["offset"].(int); ok {
-					offset = offsetVal
+			if p.Options != nil {
+				if offset == 0 {
+					if offsetVal, ok := p.Options["offset"].(int); ok {
+						offset = offsetVal
+					} else if offsetValFloat, ok := p.Options["offset"].(float64); ok {
+						offset = int(offsetValFloat)
+					}
+				}
+				if color == "" {
+					if colorVal, ok := p.Options["color"].(string); ok {
+						color = colorVal
+					}
+				}
+				if lineWidth == 0 {
+					if lwVal, ok := p.Options["linewidth"].(int); ok {
+						lineWidth = lwVal
+					} else if lwValFloat, ok := p.Options["linewidth"].(float64); ok {
+						lineWidth = int(lwValFloat)
+					}
+				}
+				if style == "" {
+					if styleVal, ok := p.Options["style"].(string); ok {
+						style = styleVal
+					}
+				}
+				if pane == "" {
+					if paneVal, ok := p.Options["pane"].(string); ok {
+						pane = paneVal
+					}
+				}
+				if transp == 0 {
+					if transpVal, ok := p.Options["transp"].(int); ok {
+						transp = transpVal
+					} else if transpValFloat, ok := p.Options["transp"].(float64); ok {
+						transp = int(transpValFloat)
+					}
 				}
 			}
 		}
 
-		/* Use default color rotation */
-		color := colors[i%len(colors)]
-		lineWidth := 2
+		if color == "" {
+			color = colors[i%len(colors)]
+		}
+		if lineWidth == 0 {
+			lineWidth = 2
+		}
 
 		cd.Indicators[s.Title] = IndicatorSeries{
 			Title:  s.Title,
-			Pane:   "", /* Presentation layer assigns pane based on range analysis */
+			Pane:   pane,
 			Offset: offset,
 			Style: StyleConfig{
 				Color:     color,
 				LineWidth: lineWidth,
+				PlotStyle: style,
+				Transp:    transp,
 			},
 			Data: plotPoints,
 		}
