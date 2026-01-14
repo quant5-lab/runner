@@ -1,17 +1,13 @@
 package integration
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
-/* TestSecurityBBRealWorldPatterns tests actual security() patterns from production BB strategies
- * These are patterns that WORK with our current implementation (Python parser + Go codegen)
- *
- * From bb-strategy-7-rus.pine, bb-strategy-8-rus.pine, bb-strategy-9-rus.pine
- */
+/* TestSecurityBBRealWorldPatterns tests actual security() patterns from production BB strategies */
 func TestSecurityBBRealWorldPatterns(t *testing.T) {
 	patterns := []struct {
 		name        string
@@ -87,11 +83,12 @@ plot(ema_1d_10, "EMA10 1D")
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePineScript(t, tc.script)
-			if !success {
-				t.Fatalf("'%s' failed: %s", tc.name, tc.description)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("'%s' failed: %s - %v", tc.name, tc.description, err)
 			}
 			t.Logf("'%s' - %s", tc.name, tc.description)
 		})
@@ -100,10 +97,7 @@ plot(ema_1d_10, "EMA10 1D")
 	t.Logf("All %d BB strategy patterns compiled successfully", len(patterns))
 }
 
-/* TestSecurityStdevWorkaround tests BB strategy pattern with stdev
- * BB8 uses: bb_1d_dev = security(syminfo.tickerid, "1D", bb_1d_bbstdev * stdev(close, bb_1d_bblenght))
- * But multiplication inside security() doesn't parse - need workaround
- */
+/* TestSecurityStdevWorkaround tests BB strategy pattern with stdev */
 func TestSecurityStdevWorkaround(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -133,20 +127,19 @@ plot(bb_dev, "BB Dev")
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePineScript(t, tc.script)
-			if !success {
-				t.Fatalf("Test failed: %s", tc.status)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("Test failed: %s - %v", tc.status, err)
 			}
 			t.Logf("%s: %s", tc.name, tc.status)
 		})
 	}
 }
 
-/* TestSecurityLongTermStability tests patterns for regression safety
- * These patterns must continue working in all future versions
- */
+/* TestSecurityLongTermStability tests patterns for regression safety */
 func TestSecurityLongTermStability(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -186,20 +179,19 @@ plot(sma_1d, "SMA")
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			success := buildAndCompilePineScript(t, tc.script)
-			if !success {
-				t.Fatalf("REGRESSION: %s failed - critical for: %s", tc.name, tc.criticalFor)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("REGRESSION: %s failed - critical for: %s - %v", tc.name, tc.criticalFor, err)
 			}
 			t.Logf("Stability check passed: %s", tc.criticalFor)
 		})
 	}
 }
 
-/* TestSecurityInlineTA_Validation validates inline TA code generation
- * Ensures generated code contains inline algorithms, not runtime lookups
- */
+/* TestSecurityInlineTA_Validation validates inline TA code generation */
 func TestSecurityInlineTA_Validation(t *testing.T) {
 	pineScript := `//@version=5
 indicator("Inline TA Check", overlay=true)
@@ -209,111 +201,28 @@ plot(sma20_1d, "SMA")
 plot(ema10_1d, "EMA")
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "inline_ta_check", pineScript)
 
-	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	generatedStr := string(generatedCode)
-
-	if !containsSubstring(generatedStr, "ta.sma") {
+	if !strings.Contains(generatedCode, "ta.sma") {
 		t.Error("Expected inline SMA generation (not runtime lookup)")
 	}
 
-	if !containsSubstring(generatedStr, "ta.ema") {
+	if !strings.Contains(generatedCode, "ta.ema") {
 		t.Error("Expected inline EMA generation (not runtime lookup)")
 	}
 
-	/* Updated expectations for streaming evaluation (no context switching) */
-	if !containsSubstring(generatedStr, "secBarEvaluator") {
+	if !strings.Contains(generatedCode, "secBarEvaluator") {
 		t.Error("Expected StreamingBarEvaluator for security() expressions")
 	}
 
-	if !containsSubstring(generatedStr, "EvaluateAtBar") {
+	if !strings.Contains(generatedCode, "EvaluateAtBar") {
 		t.Error("Expected EvaluateAtBar() call for streaming evaluation")
 	}
 
-	if !containsSubstring(generatedStr, "math.NaN()") {
+	if !strings.Contains(generatedCode, "math.NaN()") {
 		t.Error("Expected NaN handling for insufficient warmup")
 	}
 
 	t.Log("Inline TA code generation validated")
-}
-
-/* Helper function to build and compile Pine script using pine-gen */
-func buildAndCompilePineScript(t *testing.T, pineScript string) bool {
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
-
-	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
-	if err != nil {
-		t.Errorf("Failed to write Pine file: %v", err)
-		return false
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("Build failed: %v\nOutput: %s", err, buildOutput)
-		return false
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("Compilation failed: %v\nOutput: %s", err, compileOutput)
-		return false
-	}
-
-	return true
-}
-
-func containsSubstring(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 &&
-		(s == substr || (len(s) >= len(substr) && containsSubstringHelper(s, substr)))
-}
-
-func containsSubstringHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

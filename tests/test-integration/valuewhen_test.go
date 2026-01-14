@@ -1,11 +1,10 @@
 package integration
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
 func TestValuewhen_BasicCodegen(t *testing.T) {
@@ -20,54 +19,23 @@ plot(lastBullishClose, "Last Bullish", color=color.green)
 plot(prevBullishClose, "Prev Bullish", color=color.blue)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "valuewhen-basic", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	codeStr := string(generatedCode)
-
-	if !strings.Contains(codeStr, "Inline valuewhen") {
+	if !strings.Contains(generatedCode, "Inline valuewhen") {
 		t.Error("Expected inline valuewhen generation")
 	}
 
-	if !strings.Contains(codeStr, "occurrenceCount") {
+	if !strings.Contains(generatedCode, "occurrenceCount") {
 		t.Error("Expected occurrenceCount variable in generated code")
 	}
 
-	if !strings.Contains(codeStr, "lookbackOffset") {
+	if !strings.Contains(generatedCode, "lookbackOffset") {
 		t.Error("Expected lookbackOffset loop variable")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("✓ Valuewhen basic codegen test passed")
@@ -84,50 +52,19 @@ crossLevel = ta.valuewhen(crossUp, close, 0)
 plot(crossLevel, "Cross Level", color=color.orange)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "valuewhen-series", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	codeStr := string(generatedCode)
-
-	if !strings.Contains(codeStr, "valuewhen") {
+	if !strings.Contains(generatedCode, "valuewhen") {
 		t.Error("Expected valuewhen in generated code")
 	}
 
-	if !strings.Contains(codeStr, "crossUpSeries.Get") {
+	if !strings.Contains(generatedCode, "crossUpSeries.Get") {
 		t.Error("Expected Series.Get() for condition access")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("✓ Valuewhen with series sources test passed")
@@ -147,57 +84,26 @@ plot(val1, "Occurrence 1", color=color.orange)
 plot(val2, "Occurrence 2", color=color.yellow)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "valuewhen-multiple", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	codeStr := string(generatedCode)
-
-	occurrenceCount := strings.Count(codeStr, "Inline valuewhen")
+	occurrenceCount := strings.Count(generatedCode, "Inline valuewhen")
 	if occurrenceCount != 3 {
 		t.Errorf("Expected 3 valuewhen calls, got %d", occurrenceCount)
 	}
 
-	if !strings.Contains(codeStr, "occurrenceCount == 0") {
+	if !strings.Contains(generatedCode, "occurrenceCount == 0") {
 		t.Error("Expected occurrence 0 check")
 	}
-	if !strings.Contains(codeStr, "occurrenceCount == 1") {
+	if !strings.Contains(generatedCode, "occurrenceCount == 1") {
 		t.Error("Expected occurrence 1 check")
 	}
-	if !strings.Contains(codeStr, "occurrenceCount == 2") {
+	if !strings.Contains(generatedCode, "occurrenceCount == 2") {
 		t.Error("Expected occurrence 2 check")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("✓ Valuewhen multiple occurrences test passed")
@@ -216,35 +122,11 @@ if buySignal
 plot(buyPrice, "Buy Price", color=color.green)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "valuewhen-strategy", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("✓ Valuewhen in strategy context test passed")
@@ -263,46 +145,15 @@ lastTriggerPrice = ta.valuewhen(trigger, low, 0)
 plot(lastTriggerPrice, "Trigger Price", color=color.purple)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "valuewhen-complex", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	codeStr := string(generatedCode)
-
-	if !strings.Contains(codeStr, "triggerSeries.Get(lookbackOffset)") {
+	if !strings.Contains(generatedCode, "triggerSeries.Get(lookbackOffset)") {
 		t.Error("Expected condition Series.Get() access with lookbackOffset")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("✓ Valuewhen complex conditions test passed")
@@ -348,35 +199,11 @@ plot(v1, "Chained")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			pineFile := filepath.Join(tmpDir, "test.pine")
-			outputBinary := filepath.Join(tmpDir, "test_binary")
+			exec := testutil.NewPineExecutor(t)
+			generatedCode, _ := exec.GenerateCode(t, "valuewhen-regression", tt.script)
 
-			if err := os.WriteFile(pineFile, []byte(tt.script), 0644); err != nil {
-				t.Fatalf("Failed to write Pine file: %v", err)
-			}
-
-			originalDir, _ := os.Getwd()
-			os.Chdir("../..")
-			defer os.Chdir(originalDir)
-
-			buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-				"-input", pineFile,
-				"-output", outputBinary)
-
-			buildOutput, err := buildCmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-			}
-
-			tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-			binaryPath := filepath.Join(tmpDir, "test_binary")
-			compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-			compileOutput, err := compileCmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("Compilation failed: %v", err)
 			}
 		})
 	}

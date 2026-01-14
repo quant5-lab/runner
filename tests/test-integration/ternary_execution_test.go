@@ -1,44 +1,21 @@
 package integration
 
 import (
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
 func TestTernaryExecution(t *testing.T) {
-	// Change to golang-port directory for correct template path
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	pineScript := `//@version=5
+indicator("Ternary Test", overlay=false)
 
-	tmpDir := t.TempDir()
-	tempBinary := filepath.Join(tmpDir, "test-ternary-exec")
+close_avg = ta.sma(close, 20)
+signal = close > close_avg ? 1 : 0
 
-	// Build strategy binary
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", "testdata/fixtures/ternary-test.pine",
-		"-output", tempBinary)
+plot(signal, "signal", color=color.blue)
+`
 
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	compileCmd := exec.Command("go", "build",
-		"-o", tempBinary,
-		tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
-	}
-
-	// Create test data - alternating close above/below SMA
 	testData := []map[string]interface{}{
 		{"time": 1700000000, "open": 100.0, "high": 105.0, "low": 95.0, "close": 110.0, "volume": 1000.0},
 		{"time": 1700003600, "open": 110.0, "high": 115.0, "low": 105.0, "close": 112.0, "volume": 1100.0},
@@ -66,70 +43,20 @@ func TestTernaryExecution(t *testing.T) {
 		{"time": 1700082800, "open": 104.0, "high": 109.0, "low": 99.0, "close": 106.0, "volume": 3300.0},
 	}
 
-	dataFile := filepath.Join(tmpDir, "ternary-test-bars.json")
-	dataJSON, _ := json.Marshal(testData)
-	err = os.WriteFile(dataFile, dataJSON, 0644)
-	if err != nil {
-		t.Fatalf("Write data failed: %v", err)
+	exec := testutil.NewPineExecutor(t)
+	result := exec.ExecuteScriptWithCustomData(t, "ternary-test", pineScript, testData)
+
+	signalValues := exec.ExtractPlotValues(t, result, "signal")
+
+	if len(signalValues) < 24 {
+		t.Fatalf("Expected at least 24 signal values, got %d", len(signalValues))
 	}
 
-	// Execute strategy
-	outputFile := filepath.Join(tmpDir, "ternary-exec-result.json")
-
-	execCmd := exec.Command(tempBinary,
-		"-symbol", "TEST",
-		"-data", dataFile,
-		"-output", outputFile)
-
-	execOutput, err := execCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Execution failed: %v\nOutput: %s", err, execOutput)
+	if signalValues[20] != 0.0 {
+		t.Errorf("Bar 20: expected signal=0 (close below SMA), got %v", signalValues[20])
 	}
 
-	// Verify output
-	resultData, err := os.ReadFile(outputFile)
-	if err != nil {
-		t.Fatalf("Read output failed: %v", err)
-	}
-
-	var result map[string]interface{}
-	err = json.Unmarshal(resultData, &result)
-	if err != nil {
-		t.Fatalf("Parse output failed: %v\nOutput: %s", err, resultData)
-	}
-
-	// Verify signal values from indicators
-	indicators, ok := result["indicators"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("Missing indicators in output")
-	}
-
-	signalPlotObj, ok := indicators["signal"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("Missing signal indicator object")
-	}
-
-	signalPlot, ok := signalPlotObj["data"].([]interface{})
-	if !ok {
-		t.Fatalf("Missing signal plot data")
-	}
-
-	// After first 20 bars (SMA period), check signals
-	// Bars 0-19: SMA warming up
-	// Bars 20-23: Close below SMA, signal should be 0
-	if len(signalPlot) < 24 {
-		t.Fatalf("Expected at least 24 signal values, got %d", len(signalPlot))
-	}
-
-	// Check bar 20 (first bar after warmup with close=100, below SMA of ~134)
-	bar20Signal := signalPlot[20].(map[string]interface{})
-	if bar20Signal["value"].(float64) != 0.0 {
-		t.Errorf("Bar 20: expected signal=0 (close below SMA), got %v", bar20Signal["value"])
-	}
-
-	// Check bar 19 (last bar with close above SMA)
-	bar19Signal := signalPlot[19].(map[string]interface{})
-	if bar19Signal["value"].(float64) != 1.0 {
-		t.Errorf("Bar 19: expected signal=1 (close above SMA), got %v", bar19Signal["value"])
+	if signalValues[19] != 1.0 {
+		t.Errorf("Bar 19: expected signal=1 (close above SMA), got %v", signalValues[19])
 	}
 }

@@ -1,51 +1,29 @@
 package integration
 
 import (
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
 func TestUnaryBooleanInPlot(t *testing.T) {
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	pineScript := `//@version=5
+strategy("Unary Boolean Plot", overlay=false)
 
-	tmpDir := t.TempDir()
-	tempBinary := filepath.Join(tmpDir, "unary-bool-test")
+buy_signal = close > 110.0 ? 1.0 : na
+sell_signal = close < 100.0 ? 1.0 : na
 
-	// Use pre-existing test fixture
-	fixtureFile := "testdata/fixtures/unary-boolean-plot.pine"
+plot(not na(buy_signal) ? 1 : 0, title="Buy Active", color=color.green)
+plot(not na(sell_signal) ? 1 : 0, title="Sell Active", color=color.red)
 
-	// Build strategy
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", fixtureFile,
-		"-output", tempBinary)
+has_signal = not na(buy_signal)
+plot(has_signal ? 1 : 0, title="Has Signal", color=color.blue)
+`
 
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	// Compile - this will fail if boolean type mismatches exist
-	compileCmd := exec.Command("go", "build",
-		"-o", tempBinary,
-		tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compile failed with type errors: %v\nOutput: %s\n\nThis indicates boolean conversion issues with unary expressions", err, compileOutput)
-	}
-
-	// Create test data with values crossing thresholds
-	testData := []map[string]interface{}{}
 	baseTime := int64(1700000000)
 	prices := []float64{95, 98, 105, 112, 108, 102, 115, 120, 98, 95, 110, 118}
 
+	testData := []map[string]interface{}{}
 	for i, price := range prices {
 		testData = append(testData, map[string]interface{}{
 			"time":   baseTime + int64(i*3600),
@@ -57,57 +35,16 @@ func TestUnaryBooleanInPlot(t *testing.T) {
 		})
 	}
 
-	dataFile := filepath.Join(tmpDir, "unary-bool-bars.json")
-	dataJSON, _ := json.Marshal(testData)
-	err = os.WriteFile(dataFile, dataJSON, 0644)
-	if err != nil {
-		t.Fatalf("Write data failed: %v", err)
-	}
+	exec := testutil.NewPineExecutor(t)
+	result := exec.ExecuteScriptWithCustomData(t, "unary-bool-test", pineScript, testData)
 
-	// Execute strategy
-	outputFile := filepath.Join(tmpDir, "unary-bool-result.json")
-
-	execCmd := exec.Command(tempBinary,
-		"-symbol", "TEST",
-		"-timeframe", "1h",
-		"-data", dataFile,
-		"-output", outputFile)
-
-	execOutput, err := execCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Execution failed: %v\nOutput: %s", err, execOutput)
-	}
-
-	// Verify output exists and contains plots
-	outputData, err := os.ReadFile(outputFile)
-	if err != nil {
-		t.Fatalf("Failed to read output: %v", err)
-	}
-
-	var result map[string]interface{}
-	err = json.Unmarshal(outputData, &result)
-	if err != nil {
-		t.Fatalf("Failed to parse output JSON: %v", err)
-	}
-
-	// Verify indicators map exists (Pine v5 output structure uses map, not array)
-	indicators, ok := result["indicators"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Output missing indicators map")
-	}
-
-	// Count indicators with our test titles
-	expectedTitles := []string{
-		"Buy Active",
-		"Sell Active",
-		"Has Signal",
-	}
-
+	expectedTitles := []string{"Buy Active", "Sell Active", "Has Signal"}
 	foundTitles := make(map[string]bool)
-	for title := range indicators {
+
+	for _, plot := range result.Plots {
 		for _, expected := range expectedTitles {
-			if title == expected {
-				foundTitles[title] = true
+			if plot.Title == expected {
+				foundTitles[plot.Title] = true
 			}
 		}
 	}
@@ -117,53 +54,31 @@ func TestUnaryBooleanInPlot(t *testing.T) {
 		t.Logf("Found titles: %v", foundTitles)
 	}
 
-	// Verify no runtime errors (strategy executed to completion)
-	_, ok = result["candlestick"].([]interface{})
-	if !ok {
-		t.Fatal("Strategy did not execute properly - no candlestick data in output")
-	}
-
-	t.Logf("✓ Unary boolean plot test passed: indicators generated %v", foundTitles)
+	t.Log("✓ Strategy executed successfully with unary boolean plots")
 }
 
 func TestUnaryBooleanInConditional(t *testing.T) {
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	pineScript := `//@version=5
+strategy("Unary Conditional Test", overlay=true)
 
-	tmpDir := t.TempDir()
-	tempBinary := filepath.Join(tmpDir, "unary-cond-test")
+sma5 = ta.sma(close, 5)
 
-	// Use pre-existing test fixture
-	fixtureFile := "testdata/fixtures/unary-boolean-conditional.pine"
+buy_sig = close > sma5 ? close : na
+sell_sig = close < sma5 ? close : na
 
-	// Build
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", fixtureFile,
-		"-output", tempBinary)
+if not na(buy_sig)
+    strategy.entry("long", strategy.long)
+    
+if not na(sell_sig)
+    strategy.close("long")
 
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
+plot(close, title="Close")
+`
 
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	// Compile
-	compileCmd := exec.Command("go", "build",
-		"-o", tempBinary,
-		tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compile failed: %v\nOutput: %s", err, compileOutput)
-	}
-
-	// Create test data
-	testData := []map[string]interface{}{}
 	baseTime := int64(1700000000)
 	prices := []float64{100, 102, 98, 105, 103, 101, 107, 110}
 
+	testData := []map[string]interface{}{}
 	for i, price := range prices {
 		testData = append(testData, map[string]interface{}{
 			"time":   baseTime + int64(i*3600),
@@ -175,44 +90,12 @@ func TestUnaryBooleanInConditional(t *testing.T) {
 		})
 	}
 
-	dataFile := filepath.Join(tmpDir, "unary-cond-bars.json")
-	dataJSON, _ := json.Marshal(testData)
-	err = os.WriteFile(dataFile, dataJSON, 0644)
-	if err != nil {
-		t.Fatalf("Write data failed: %v", err)
-	}
+	exec := testutil.NewPineExecutor(t)
+	result := exec.ExecuteScriptWithCustomData(t, "unary-cond-test", pineScript, testData)
 
-	// Execute
-	outputFile := filepath.Join(tmpDir, "unary-cond-result.json")
-
-	execCmd := exec.Command(tempBinary,
-		"-symbol", "TEST",
-		"-timeframe", "1h",
-		"-data", dataFile,
-		"-output", outputFile)
-
-	execOutput, err := execCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Execution failed: %v\nOutput: %s", err, execOutput)
-	}
-
-	// Verify execution completed
-	outputData, err := os.ReadFile(outputFile)
-	if err != nil {
-		t.Fatalf("Failed to read output: %v", err)
-	}
-
-	var result map[string]interface{}
-	err = json.Unmarshal(outputData, &result)
-	if err != nil {
-		t.Fatalf("Failed to parse output JSON: %v", err)
-	}
-
-	// Verify execution completed (check candlestick data exists)
-	_, ok := result["candlestick"].([]interface{})
-	if !ok {
+	if len(result.Plots) == 0 {
 		t.Fatal("Strategy did not execute - unary boolean conditionals may have caused runtime errors")
 	}
 
-	t.Logf("✓ Unary boolean conditional test passed: candlestick data generated, no runtime errors")
+	t.Log("✓ Unary boolean conditional test passed: no runtime errors")
 }

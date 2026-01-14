@@ -1,16 +1,13 @@
 package integration
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
-/* TestSecurityTACombination tests inline TA combination inside security()
- * Pattern: security(symbol, "1D", ta.sma(close, 20) + ta.ema(close, 10))
- * Critical for regression safety - ensures inline TA + binary operations work
- */
+/* TestSecurityTACombination tests inline TA combination inside security() */
 func TestSecurityTACombination(t *testing.T) {
 	pineScript := `//@version=5
 indicator("TA Combo Security", overlay=true)
@@ -18,62 +15,25 @@ combined = request.security(syminfo.tickerid, "1D", ta.sma(close, 20) + ta.ema(c
 plot(combined, "Combined", color=color.blue)
 `
 
-	/* Write Pine script to temp file */
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "ta_combo", pineScript)
 
-	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	/* Build using pine-gen */
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	generatedStr := string(generatedCode)
-
-	if !contains(generatedStr, "ta.sma") {
+	if !strings.Contains(generatedCode, "ta.sma") {
 		t.Error("Expected inline SMA generation in security context")
 	}
 
-	if !contains(generatedStr, "ta.ema") {
+	if !strings.Contains(generatedCode, "ta.ema") {
 		t.Error("Expected inline EMA generation in security context")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("TA combination security() compiled successfully")
 }
 
-/* TestSecurityArithmeticExpression tests arithmetic expressions inside security()
- * Pattern: security(symbol, "1D", (high - low) / close * 100)
- * Critical for regression safety - ensures binary operations work in security context
- */
+/* TestSecurityArithmeticExpression tests arithmetic expressions inside security() */
 func TestSecurityArithmeticExpression(t *testing.T) {
 	pineScript := `//@version=5
 indicator("Arithmetic Security", overlay=true)
@@ -81,65 +41,29 @@ volatility = request.security(syminfo.tickerid, "1D", (high - low) / close * 100
 plot(volatility, "Volatility %", color=color.red)
 `
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "arithmetic", pineScript)
 
-	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	generatedStr := string(generatedCode)
-
-	/* Verify expression evaluation using StreamingBarEvaluator */
-	if !contains(generatedStr, "secBarEvaluator") {
+	if !strings.Contains(generatedCode, "secBarEvaluator") {
 		t.Error("Expected StreamingBarEvaluator for complex arithmetic expression")
 	}
 
-	if !contains(generatedStr, "EvaluateAtBar") {
+	if !strings.Contains(generatedCode, "EvaluateAtBar") {
 		t.Error("Expected EvaluateAtBar() call for expression evaluation")
 	}
 
-	/* Verify AST expression serialization includes operators and identifiers */
-	if !contains(generatedStr, "BinaryExpression") {
+	if !strings.Contains(generatedCode, "BinaryExpression") {
 		t.Error("Expected BinaryExpression AST node in serialized expression")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("Arithmetic expression security() compiled successfully")
 }
 
-/* TestSecurityBBStrategy7Patterns tests real-world patterns from bb-strategy-7-rus.pine
- * Validates all security() patterns used in production strategy
- */
+/* TestSecurityBBStrategy7Patterns tests real-world patterns from bb-strategy-7-rus.pine */
 func TestSecurityBBStrategy7Patterns(t *testing.T) {
 	patterns := []struct {
 		name   string
@@ -168,21 +92,19 @@ plot(open_1d)`,
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
-			if !success {
-				t.Fatalf("Pattern '%s' failed", tc.name)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("Pattern '%s' failed: %v", tc.name, err)
 			}
 			t.Logf("BB7 pattern '%s' compiled successfully", tc.name)
 		})
 	}
 }
 
-/* TestSecurityBBStrategy8Patterns tests real-world patterns from bb-strategy-8-rus.pine
- * Includes complex expressions with stdev, comparisons, valuewhen
- */
+/* TestSecurityBBStrategy8Patterns tests real-world patterns from bb-strategy-8-rus.pine */
 func TestSecurityBBStrategy8Patterns(t *testing.T) {
 	patterns := []struct {
 		name   string
@@ -204,21 +126,19 @@ plot(bb_1d_dev)`,
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
-			if !success {
-				t.Fatalf("Pattern '%s' failed", tc.name)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("Pattern '%s' failed: %v", tc.name, err)
 			}
 			t.Logf("BB8 pattern '%s' compiled successfully", tc.name)
 		})
 	}
 }
 
-/* TestSecurityStability_RegressionSuite comprehensive regression test suite
- * Ensures all complex expression types continue to work
- */
+/* TestSecurityStability_RegressionSuite comprehensive regression test suite */
 func TestSecurityStability_RegressionSuite(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -275,12 +195,12 @@ plot(dev)`,
 		},
 	}
 
+	exec := testutil.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			success := buildAndCompilePineInDir(t, tc.script, tmpDir)
-			if !success {
-				t.Fatalf("'%s' failed: %s", tc.name, tc.description)
+			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
+			if err := exec.CompileCode(t, generatedCode); err != nil {
+				t.Fatalf("'%s' failed: %s - %v", tc.name, tc.description, err)
 			}
 			t.Logf("'%s' - %s", tc.name, tc.description)
 		})
@@ -289,107 +209,23 @@ plot(dev)`,
 	t.Logf("All %d regression test cases passed", len(testCases))
 }
 
-/* TestSecurityNaN_Handling ensures NaN values are handled correctly
- * Critical for long-term stability - avoid crashes with insufficient data
- */
+/* TestSecurityNaN_Handling ensures NaN values are handled correctly */
 func TestSecurityNaN_Handling(t *testing.T) {
 	pineScript := `//@version=5
 indicator("NaN Test", overlay=true)
 sma20 = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 plot(sma20, "SMA20")`
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
+	exec := testutil.NewPineExecutor(t)
+	generatedCode, _ := exec.GenerateCode(t, "nan_test", pineScript)
 
-	if err := os.WriteFile(pineFile, []byte(pineScript), 0644); err != nil {
-		t.Fatalf("Failed to write Pine file: %v", err)
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Build failed: %v\nOutput: %s", err, buildOutput)
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	generatedCode, err := os.ReadFile(tempGoFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated code: %v", err)
-	}
-
-	if !contains(string(generatedCode), "math.NaN()") {
+	if !strings.Contains(generatedCode, "math.NaN()") {
 		t.Error("Expected NaN handling in generated code for insufficient warmup")
 	}
 
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Compilation failed: %v\nOutput: %s", err, compileOutput)
+	if err := exec.CompileCode(t, generatedCode); err != nil {
+		t.Fatalf("Compilation failed: %v", err)
 	}
 
 	t.Log("NaN handling compiled successfully")
-}
-
-/* Helper function to build and compile Pine script using pine-gen */
-func buildAndCompilePineInDir(t *testing.T, pineScript, tmpDir string) bool {
-	pineFile := filepath.Join(tmpDir, "test.pine")
-	outputBinary := filepath.Join(tmpDir, "test_binary")
-
-	err := os.WriteFile(pineFile, []byte(pineScript), 0644)
-	if err != nil {
-		t.Errorf("Failed to write Pine file: %v", err)
-		return false
-	}
-
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
-
-	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
-		"-input", pineFile,
-		"-output", outputBinary)
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("Build failed: %v\nOutput: %s", err, buildOutput)
-		return false
-	}
-
-	tempGoFile := ParseGeneratedFilePath(t, buildOutput)
-
-	binaryPath := filepath.Join(tmpDir, "test_binary")
-	compileCmd := exec.Command("go", "build", "-o", binaryPath, tempGoFile)
-
-	compileOutput, err := compileCmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("Compilation failed: %v\nOutput: %s", err, compileOutput)
-		return false
-	}
-
-	return true
-}
-
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 &&
-		(s == substr || (len(s) >= len(substr) && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
