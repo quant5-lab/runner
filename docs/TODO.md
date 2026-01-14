@@ -1,23 +1,14 @@
-# Golang Port PoC
+# Go Runner PoC
 
-## Current Performance (Measured)
-- Total: 2792ms
-- Python parser: 2108ms (75%)
-- Runtime execution: 18ms (0.6%)
-- Data fetch: 662ms (23.7%)
-
-## Target Performance
+## Performance
 - Total: <50ms (excl. data fetch)
 - Go parser: 5-10ms
 - Go runtime: <10ms
 
 ## License Safety
-- Current: pynescript v0.2.0 (LGPL 3.0 - VIRAL)
-- Current: escodegen v2.1.0 (BSD-2-Clause)
-- Current: pinets local (unknown)
-- Target: Go stdlib (BSD-3-Clause)
-- Target: participle/v2 (MIT)
-- Target: Pure Go TA
+- Go stdlib (BSD-3-Clause)
+- participle/v2 (MIT)
+- Pure Go TA
 
 ## Phase 1: Go Parser + Transpiler
 - [x] Create golang-port structure
