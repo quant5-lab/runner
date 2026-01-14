@@ -327,7 +327,7 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 				Alternate:  &ast.Identifier{Name: "skip"},
 			},
 			expectCode: []string{
-				"((bar_indexSeries.GetCurrent() % 5) == 0)",
+				"(float64(i % 5) == 0)",
 			},
 		},
 		{

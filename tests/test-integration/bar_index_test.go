@@ -146,8 +146,6 @@ plot(secMod20 ? 1 : 0, "Security Mod 20")
 }
 
 func TestBarIndexConditional(t *testing.T) {
-	t.Skip("Requires bar_indexSeries variable generation - see e2e/fixtures/strategies/test-bar-index-conditional.pine.skip")
-
 	pineScript := `//@version=5
 indicator("bar_index Conditional", overlay=false)
 firstBar = bar_index == 0 ? 1 : 0
@@ -180,8 +178,6 @@ plot(every10th, "Every 10th")
 }
 
 func TestBarIndexComparisons(t *testing.T) {
-	t.Skip("Requires bar_indexSeries variable generation - see e2e/fixtures/strategies/test-bar-index-comparisons.pine.skip")
-
 	pineScript := `//@version=5
 indicator("bar_index Comparisons", overlay=false)
 gtTen = bar_index > 10 ? 1 : 0

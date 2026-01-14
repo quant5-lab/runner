@@ -68,6 +68,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
+	gen.hasBarIndexUsage = detectBarIndexUsage(program)
 
 	body, err := gen.generateProgram(program)
 	if err != nil {
@@ -99,6 +100,7 @@ type generator struct {
 	hasSecurityCalls         bool
 	hasSecurityExprEvals     bool // Track if security() calls with complex expressions exist
 	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
+	hasBarIndexUsage         bool // Track if bar_index is used
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
 	hoistedArrowContexts     []ArrowCallSite // Contexts pre-allocated before bar loop
@@ -584,6 +586,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			g.symbolTable.Register(varName, VariableTypeSeries)
 		}
 	}
+	if g.hasBarIndexUsage {
+		code += g.ind() + "var bar_indexSeries *series.Series\n"
+		if g.symbolTable != nil {
+			g.symbolTable.Register("bar_index", VariableTypeSeries)
+		}
+	}
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -641,6 +649,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
 		code += g.ind() + fmt.Sprintf("%s = series.NewSeries(len(ctx.Data))\n", seriesName)
 	}
+	if g.hasBarIndexUsage {
+		code += g.ind() + "bar_indexSeries = series.NewSeries(len(ctx.Data))\n"
+	}
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -664,6 +675,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		/* Register OHLCV bar fields */
 		for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
 			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", seriesName, seriesName)
+		}
+		if g.hasBarIndexUsage {
+			code += g.ind() + `ctx.RegisterSeries("bar_indexSeries", bar_indexSeries)` + "\n"
 		}
 
 		/* Register user variables */
@@ -727,6 +741,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code += g.ind() + "lowSeries.Set(bar.Low)\n"
 	code += g.ind() + "openSeries.Set(bar.Open)\n"
 	code += g.ind() + "volumeSeries.Set(bar.Volume)\n"
+	if g.hasBarIndexUsage {
+		code += g.ind() + fmt.Sprintf("bar_indexSeries.Set(float64(%s))\n", iterVar)
+	}
 	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
@@ -780,6 +797,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	for _, seriesName := range g.barFieldRegistry.AllSeriesNames() {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %s.Next() }\n", iterVar, seriesName)
+	}
+	if g.hasBarIndexUsage {
+		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { bar_indexSeries.Next() }\n", iterVar)
 	}
 
 	for varName, varType := range g.variables {
@@ -1224,6 +1244,18 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
 
 	case *ast.BinaryExpression:
+		// Special case: bar_index with modulo operator
+		if e.Operator == "%" {
+			leftIdent, leftIsBarIndex := e.Left.(*ast.Identifier)
+			if leftIsBarIndex && leftIdent.Name == "bar_index" {
+				right, err := g.generateConditionExpression(e.Right)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("float64(i %% %s)", right), nil
+			}
+		}
+
 		left, err := g.generateConditionExpression(e.Left)
 		if err != nil {
 			return "", err
@@ -1268,6 +1300,8 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return "bar.Low", nil
 		case "volume":
 			return "bar.Volume", nil
+		case "bar_index":
+			return "float64(i)", nil
 		}
 
 		// Check if it's an input constant
@@ -3525,6 +3559,11 @@ func hasSecurityInExpression(expr ast.Expression) bool {
 
 	switch e := expr.(type) {
 	case *ast.CallExpression:
+		if ident, ok := e.Callee.(*ast.Identifier); ok {
+			if ident.Name == "security" {
+				return true
+			}
+		}
 		if member, ok := e.Callee.(*ast.MemberExpression); ok {
 			if obj, ok := member.Object.(*ast.Identifier); ok {
 				if prop, ok := member.Property.(*ast.Identifier); ok {
@@ -3625,6 +3664,79 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
+	}
+	return false
+}
+
+func detectBarIndexUsage(program *ast.Program) bool {
+	if program == nil {
+		return false
+	}
+	for _, node := range program.Body {
+		if hasBarIndexInNode(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBarIndexInNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.VariableDeclaration:
+		for _, decl := range n.Declarations {
+			if hasBarIndexInExpression(decl.Init) {
+				return true
+			}
+		}
+	case *ast.ExpressionStatement:
+		return hasBarIndexInExpression(n.Expression)
+	case *ast.IfStatement:
+		if hasBarIndexInExpression(n.Test) {
+			return true
+		}
+		for _, consequent := range n.Consequent {
+			if hasBarIndexInNode(consequent) {
+				return true
+			}
+		}
+		for _, alternate := range n.Alternate {
+			if hasBarIndexInNode(alternate) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasBarIndexInExpression(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+	switch e := expr.(type) {
+	case *ast.Identifier:
+		return e.Name == "bar_index"
+	case *ast.MemberExpression:
+		if ident, ok := e.Object.(*ast.Identifier); ok && ident.Name == "bar_index" {
+			return true
+		}
+		return hasBarIndexInExpression(e.Property)
+	case *ast.CallExpression:
+		if hasBarIndexInExpression(e.Callee) {
+			return true
+		}
+		for _, arg := range e.Arguments {
+			if hasBarIndexInExpression(arg) {
+				return true
+			}
+		}
+	case *ast.BinaryExpression:
+		return hasBarIndexInExpression(e.Left) || hasBarIndexInExpression(e.Right)
+	case *ast.LogicalExpression:
+		return hasBarIndexInExpression(e.Left) || hasBarIndexInExpression(e.Right)
+	case *ast.ConditionalExpression:
+		return hasBarIndexInExpression(e.Test) || hasBarIndexInExpression(e.Consequent) || hasBarIndexInExpression(e.Alternate)
+	case *ast.UnaryExpression:
+		return hasBarIndexInExpression(e.Argument)
 	}
 	return false
 }
