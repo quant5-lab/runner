@@ -149,7 +149,7 @@ test-syminfo: ## Run syminfo.tickerid integration tests only
 	@echo "✓ syminfo.tickerid tests passed"
 
 regression-syminfo: ## Run syminfo.tickerid regression test suite
-	@./golang-port/scripts/test-syminfo-regression.sh
+	@./scripts/test-syminfo-regression.sh
 
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
@@ -208,7 +208,7 @@ run-strategy: ## Run strategy with pre-generated data file (usage: make run-stra
 	 $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
 	@SYMBOL=$$(basename $(DATA) | sed 's/_[^_]*\.json//'); \
 	TIMEFRAME=$$(basename $(DATA) .json | sed 's/.*_//'); \
-	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir golang-port/testdata/ohlcv -output out/chart-data.json
+	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir testdata/ohlcv -output out/chart-data.json
 	@echo "✓ Strategy executed: out/chart-data.json"
 	@ls -lh out/chart-data.json
 

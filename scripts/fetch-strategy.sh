@@ -52,8 +52,8 @@ echo "[1/4] 📡 Fetching market data..."
 BINANCE_FILE="$TEMP_DIR/binance.json"
 METADATA_FILE="$TEMP_DIR/metadata.json"
 node -e "
-import('./src/container.js').then(({ createContainer }) => {
-  import('./src/config.js').then(({ createProviderChain, DEFAULTS }) => {
+import('./fetchers/src/container.js').then(({ createContainer }) => {
+  import('./fetchers/src/config.js').then(({ createProviderChain, DEFAULTS }) => {
     const container = createContainer(createProviderChain, DEFAULTS);
     const providerManager = container.resolve('providerManager');
     
@@ -93,7 +93,7 @@ elif [ "$TIMEFRAME" = "M" ]; then
 fi
 
 # Save to test data directory for future use
-TESTDATA_DIR="golang-port/testdata/ohlcv"
+TESTDATA_DIR="testdata/ohlcv"
 mkdir -p "$TESTDATA_DIR"
 SAVED_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TIMEFRAME}.json"
 cp "$DATA_FILE" "$SAVED_FILE"
@@ -163,8 +163,8 @@ for SEC_TF in $SECURITY_TFS; do
         SEC_STD="$TEMP_DIR/security_${NORM_TF}_std.json"
         
         node -e "
-import('./src/container.js').then(({ createContainer }) => {
-  import('./src/config.js').then(({ createProviderChain, DEFAULTS }) => {
+import('./fetchers/src/container.js').then(({ createContainer }) => {
+  import('./fetchers/src/config.js').then(({ createProviderChain, DEFAULTS }) => {
     const container = createContainer(createProviderChain, DEFAULTS);
     const providerManager = container.resolve('providerManager');
     
@@ -198,19 +198,18 @@ echo "[2/4] 🔨 Building strategy binary..."
 STRATEGY_NAME=$(basename "$STRATEGY" .pine)
 OUTPUT_BINARY="/tmp/${STRATEGY_NAME}"
 
-# Generate Go code
-TEMP_GO=$(cd golang-port && go run cmd/pine-gen/main.go -input ../"$STRATEGY" -output "$OUTPUT_BINARY" 2>&1 | grep "Generated:" | awk '{print $2}')
+# Generate Go code from Pine Script
+TEMP_GO=$(go run cmd/pine-gen/main.go -input "$STRATEGY" -output "$OUTPUT_BINARY" 2>&1 | grep "Generated:" | awk '{print $2}')
 if [ -z "$TEMP_GO" ]; then
     echo "❌ Failed to generate Go code"
     exit 1
 fi
 
-# Compile binary from golang-port directory (needs go.mod)
-cd golang-port && go build -o "$OUTPUT_BINARY" "$TEMP_GO" > /dev/null 2>&1 || {
+# Compile binary (from root where go.mod exists)
+go build -o "$OUTPUT_BINARY" "$TEMP_GO" > /dev/null 2>&1 || {
     echo "❌ Failed to compile binary"
     exit 1
 }
-cd ..
 echo "✓ Binary: $OUTPUT_BINARY"
 
 # Step 3: Execute strategy
@@ -221,7 +220,7 @@ mkdir -p out
     -symbol "$SYMBOL" \
     -timeframe "$TIMEFRAME" \
     -data "$DATA_FILE" \
-    -datadir golang-port/testdata/ohlcv \
+    -datadir testdata/ohlcv \
     -output out/chart-data.json || {
     echo "❌ Failed to execute strategy"
     exit 1

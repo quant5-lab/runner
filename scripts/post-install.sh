@@ -17,19 +17,15 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo_info "Downloading Go modules..."
-cd golang-port
 go mod download
-cd ..
 echo_success "Modules downloaded"
 
 echo_info "Creating directories..."
-mkdir -p out golang-port/build golang-port/coverage
+mkdir -p out build coverage
 echo_success "Directories created"
 
 echo_info "Building pine-gen..."
-cd golang-port
 go build -o build/pine-gen ./cmd/pine-gen
-cd ..
 echo_success "pine-gen built"
 
 echo ""

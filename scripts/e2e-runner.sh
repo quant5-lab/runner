@@ -1,11 +1,11 @@
 #!/bin/bash
-# E2E Test Runner for golang-port Pine strategies
+# E2E Test Runner for Pine strategies
 # Centralized orchestrator for all Pine script validation
 
 set -e
 
 # Configuration
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TESTDATA_FIXTURES_DIR="$PROJECT_ROOT/testdata/fixtures"
 TESTDATA_E2E_DIR="$PROJECT_ROOT/testdata/e2e"
 STRATEGIES_DIR="$PROJECT_ROOT/strategies"
@@ -22,7 +22,7 @@ FAILED_TESTS=()
 SKIPPED_TESTS=()
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🧪 golang-port E2E Test Suite"
+echo "🧪 E2E Test Suite"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

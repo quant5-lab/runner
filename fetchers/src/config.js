@@ -1,0 +1,36 @@
+import { MoexProvider } from './providers/MoexProvider.js';
+import { BinanceProvider } from './providers/BinanceProvider.js';
+import { YahooFinanceProvider } from './providers/YahooFinanceProvider.js';
+
+/* Provider chain factory - requires logger injection */
+export function createProviderChain(logger, statsCollector) {
+  return [
+    { name: 'MOEX', instance: new MoexProvider(logger, statsCollector) },
+    { name: 'Binance', instance: new BinanceProvider(logger, statsCollector) },
+    { name: 'YahooFinance', instance: new YahooFinanceProvider(logger, statsCollector) },
+  ];
+}
+
+/* Default application configuration */
+export const DEFAULTS = {
+  symbol: process.env.SYMBOL || 'BTCUSDT',
+  timeframe: process.env.TIMEFRAME || 'D',
+  bars: parseInt(process.env.BARS) || 100,
+  strategy: 'EMA Crossover Strategy',
+};
+
+/* Chart color constants */
+export const CHART_COLORS = {
+  DEFAULT_PLOT: '#2962FF',
+  CANDLESTICK_UP: '#26a69a',
+  CANDLESTICK_DOWN: '#ef5350',
+};
+
+/* Plot color to name mapping for auto-generated plot names */
+export const PLOT_COLOR_NAMES = {
+  '#FF5252': 'Red',
+  '#363A45': 'Black',
+  '#00E676': 'Lime',
+  '#787B86': 'Gray',
+  '#FFFFFF': 'White',
+};
