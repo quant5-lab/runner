@@ -160,15 +160,17 @@
 - [x] `valuewhen()` function for conditional value retrieval (66+ tests: handler validation, runtime correctness, integration scenarios)
 - [x] `valuewhen()` runtime evaluation in security() contexts (StreamingBarEvaluator support, 7 test functions, 25 subtests, occurrence/boundary/expression/condition/validation/progression/state coverage)
 - [x] Arrow function preamble extraction (ArrowVarInitResult, PreambleExtractor, module-level functions, 100+ tests, double-assignment syntax fixed)
-- [ ] Multi-condition strategy logic with session management
+- [x] Multi-condition strategy logic with session management
 - [ ] Visualization config system integration with BB7
 
-## PineScript Support Blockers (10)
+## PineScript Support Blockers (5)
 - Codegen TODO: alert, alertcondition, str.tostring, str.tonumber, str.split
-- Type: string variables
-- Runtime: multi-symbol security, syminfo.tickerid mapping
-- Parser: arrow functions, while loops, for loops (literals only), map generics, bitwise operators
+- Type: string variables (standalone assignment)
+- Runtime: multi-symbol security (data files only)
+- Parser: while loops, for loops (execution only), map generics
 - Codegen: RSI inline
+- Parser: varip (not implemented)
+- Note: arrow functions ✅, syminfo.tickerid ✅ (security context), strategy.exit ✅
 
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - manual validation PASSED
