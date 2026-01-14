@@ -259,8 +259,8 @@ enough_potential = sma_bullish ?
    take_level <= open_1d + potential_buy * (1 + lack_of_potential_tolerance / 100) : 
    take_level >= open_1d - potential_sell * (1 + lack_of_potential_tolerance / 100)
 
-plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main')
-plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main')
+plot(has_active_trade and show_trades ? stop_level : na, color=color.red, style=plot.style_linebr, linewidth=2, pane='main')
+plot(has_active_trade and show_trades ? smart_take_level : na, color=color.green, style=plot.style_linebr, linewidth=2, pane='main')
 
 // // Closing all by RSI 1W
 // rsi_len = input(28, minval=1, title="Close RSI Length")

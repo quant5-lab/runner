@@ -1,0 +1,6 @@
+//@version=5
+strategy("Test Strategy Exit", overlay=true)
+
+if close > open
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit", "Long", stop=close*0.95, limit=close*1.05)

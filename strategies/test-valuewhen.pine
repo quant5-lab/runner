@@ -1,0 +1,10 @@
+//@version=5
+indicator("Test valuewhen", overlay=true)
+
+// Simple valuewhen test
+condition = close > open
+lastBullishClose = ta.valuewhen(condition, close, 0)
+prevBullishClose = ta.valuewhen(condition, close, 1)
+
+plot(lastBullishClose, "Last Bullish Close", color.green)
+plot(prevBullishClose, "Previous Bullish Close", color.blue)

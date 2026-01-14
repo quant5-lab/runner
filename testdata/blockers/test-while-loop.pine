@@ -1,0 +1,11 @@
+//@version=5
+indicator("Test While Loop", overlay=true)
+
+// Test while loop
+i = 0
+sum = 0.0
+while i < 10
+    sum := sum + i
+    i := i + 1
+
+plot(sum, "Sum While", color=color.red)

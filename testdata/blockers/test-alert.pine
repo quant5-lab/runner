@@ -1,0 +1,9 @@
+//@version=5
+indicator("Test Alert", overlay=true)
+
+// Test alert function
+if close > open
+    alert("Bullish bar detected", alert.freq_once_per_bar)
+
+// Test alertcondition
+alertcondition(close > open, title="Bull Alert", message="Price is bullish")

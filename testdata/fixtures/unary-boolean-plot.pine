@@ -1,0 +1,11 @@
+//@version=5
+strategy("Unary Boolean Plot", overlay=false)
+
+buy_signal = close > 110.0 ? 1.0 : na
+sell_signal = close < 100.0 ? 1.0 : na
+
+plot(not na(buy_signal) ? 1 : 0, title="Buy Active", color=color.green)
+plot(not na(sell_signal) ? 1 : 0, title="Sell Active", color=color.red)
+
+has_signal = not na(buy_signal)
+plot(has_signal ? 1 : 0, title="Has Signal", color=color.blue)

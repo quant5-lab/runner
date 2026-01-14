@@ -1,0 +1,8 @@
+//@version=5
+indicator("Test Label", overlay=true)
+
+// Test label.new
+if close > open
+    label.new(bar_index, high, "Bull", color=color.green)
+
+plot(close)

@@ -32,6 +32,22 @@ bower_components
 # Compiled binary addons
 build/Release
 
+# Go binaries
+build/
+dist/
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binaries
+*.test
+
+# Go coverage
+*.out
+
 # Dependency directories
 jspm_packages/
 
@@ -119,6 +135,7 @@ dist/
 # Generated files
 out/chart-data.json
 out/chart-config.json
+out/e2e-*-output.json
 
 # Keep the output directory structure and template
 !out/
@@ -154,4 +171,57 @@ __pycache__/
 *$py.class
 *.so
 .pyc
-.github
+
+# GitHub - track CI workflows only
+.github/*
+!.github/workflows/
+.github/workflows/local-*.yaml
+.github/workflows/draft-*.yaml# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+pine-gen
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Temporary files and build artifacts
+tmp/
+temp/
+output/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Generated test output (keep fixtures)
+testdata/output.json
+testdata/sma-output.json
+testdata/*-output.json

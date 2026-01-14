@@ -1,0 +1,11 @@
+//@version=5
+indicator("Test Color Functions", overlay=true)
+
+// Test color.rgb
+myColor = color.rgb(255, 0, 0, 50)
+
+// Test color.new
+newColor = color.new(color.blue, 80)
+
+plot(close, "Close", color=myColor)
+plot(open, "Open", color=newColor)

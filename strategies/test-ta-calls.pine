@@ -1,0 +1,6 @@
+//@version=5
+indicator("TA Test", overlay=true)
+
+// Test various TA functions
+sma20 = ta.sma(close, 20)
+plot(sma20, "SMA20")

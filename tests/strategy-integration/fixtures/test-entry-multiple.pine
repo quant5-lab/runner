@@ -1,0 +1,5 @@
+//@version=4
+strategy("Multiple Entry Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000, pyramiding=3)
+
+if close > 105.0 and strategy.position_size < 3
+    strategy.entry("Long", strategy.long)

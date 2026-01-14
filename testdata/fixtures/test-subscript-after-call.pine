@@ -1,0 +1,5 @@
+//@version=5
+indicator("Parser Test", overlay=true)
+pivot = pivothigh(5, 5)[1]
+filled = fixnan(pivot)
+plot(filled)

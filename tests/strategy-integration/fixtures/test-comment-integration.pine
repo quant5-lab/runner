@@ -1,0 +1,10 @@
+//@version=5
+strategy("Comment Integration Test", overlay=true, pyramiding=10)
+
+// Entry with literal comment
+if close > open
+    strategy.entry("long", strategy.long, 1, comment="Bullish candle entry")
+
+// Exit after 1 bar with comment
+if strategy.position_size > 0
+    strategy.close("long", comment="Position close")

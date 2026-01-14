@@ -1,0 +1,9 @@
+Runtime limitation: Requires security() function implementation
+Parse: ✅ Success (PineScript v5)
+Generate: ❌ Fails (Go - undefined: secBarEvaluator)
+Compile: ❌ Fails (Go)
+Execute: ❌ Fails (E2E - ReferenceError: security is not defined)
+Error: "security is not defined" in PineTS runtime
+Blocker: security() multi-timeframe function not implemented in PineTS/Go compiler
+Note: Commit eba403a fixed bar_index in security() context, but security() itself not in runtime
+Related: bb9 strategy uses security(syminfo.tickerid, "1D", (bar_index % 20) == 0) pattern

@@ -1,0 +1,8 @@
+Runtime limitation: Requires syminfo.tickerid data file mapping
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ✅ Success
+Execute: ❌ Fails
+Error: "Failed to fetch TEST_.json: file not found"
+Blocker: Requires proper syminfo.tickerid → filename mapping for TEST symbol
+Note: Code is correct, only missing data file mapping logic

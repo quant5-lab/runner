@@ -1,0 +1,8 @@
+Runtime limitation: Requires multi-symbol OHLCV data
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ✅ Success
+Execute: ❌ Fails
+Error: "Failed to fetch BINANCE:ETHUSDT:1D: file not found"
+Blocker: Requires BINANCE:ETHUSDT_1D.json and BINANCE:BTCUSDT_1D.json files
+Note: Code is correct, only missing test data files

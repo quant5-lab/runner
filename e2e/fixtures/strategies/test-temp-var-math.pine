@@ -1,0 +1,6 @@
+//@version=4
+study("Test Math Temp Var", overlay=true)
+
+// Test nested math with TA
+test_max = max(change(close), 0)
+plot(test_max, color=color.red)

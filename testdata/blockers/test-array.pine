@@ -1,0 +1,9 @@
+//@version=5
+indicator("Test Arrays", overlay=false)
+
+// Test array functions
+prices = array.new_float(10, 0.0)
+array.push(prices, close)
+lastPrice = array.get(prices, 0)
+
+plot(lastPrice, "Last Price")

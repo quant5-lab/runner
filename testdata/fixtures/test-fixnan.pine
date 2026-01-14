@@ -1,0 +1,11 @@
+//@version=5
+indicator("Fixnan Test", overlay=true)
+
+// Test fixnan with pivothigh (returns NaN when no pivot)
+leftBars = 5
+rightBars = 5
+pivot_high = pivothigh(leftBars, rightBars)
+filled_high = fixnan(pivot_high)
+
+plot(pivot_high, title="Raw Pivot", color=color.red)
+plot(filled_high, title="Fixnan Pivot", color=color.green, linewidth=2)

@@ -1,1 +1,0 @@
-pynescript>=0.2.0

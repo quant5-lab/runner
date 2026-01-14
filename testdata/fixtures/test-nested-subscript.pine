@@ -1,0 +1,6 @@
+//@version=5
+indicator("Nested Test", overlay=true)
+leftBars = 15
+rightBars = 15
+highUsePivot = fixnan(pivothigh(leftBars, rightBars)[1])
+plot(highUsePivot)

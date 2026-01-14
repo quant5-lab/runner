@@ -1,0 +1,840 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Financial Chart Visualization</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.development.js"></script>
+    <script type="module">
+      import { adaptLineSeriesData } from './lineSeriesAdapter.js';
+      window.adaptLineSeriesData = adaptLineSeriesData;
+    </script>
+    <style>
+      body {
+        background-color: #0f172a;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        color: #cbd5e1;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+
+      #container {
+        width: 100%;
+        max-width: 90vw;
+        margin: 0 auto;
+        padding: 1.5rem;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        min-height: auto;
+        transition: all 0.3s ease;
+      }
+
+      h1 {
+        color: #5eead4;
+        font-size: 2.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(45deg, #5eead4, #2dd4bf);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .info {
+        background-color: #1a2035;
+        border: 1px solid #2d3748;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        color: #cbd5e1;
+      }
+
+      .chart-container {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 2rem;
+      }
+
+      #main-chart {
+        position: relative;
+        z-index: 1;
+      }
+
+      #indicator-chart {
+        position: relative;
+        z-index: 1;
+      }
+
+      .refresh-btn {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-bottom: 1rem;
+        transition: background-color 0.2s;
+      }
+
+      .refresh-btn:hover {
+        background-color: #1d4ed8;
+      }
+
+      .timestamp {
+        color: #6b7280;
+        font-size: 0.875rem;
+        text-align: center;
+        margin-top: 1rem;
+      }
+
+      /* Trade table styles */
+      .trades-section {
+        margin-top: 2rem;
+        background-color: #1a2035;
+        border: 1px solid #2d3748;
+        border-radius: 6px;
+        padding: 1rem;
+      }
+
+      .trades-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #2d3748;
+      }
+
+      .trades-header h2 {
+        color: #5eead4;
+        font-size: 1.5rem;
+        margin: 0;
+      }
+
+      .trades-summary {
+        font-size: 0.875rem;
+        color: #94a3b8;
+      }
+
+      .trades-table-container {
+        overflow-x: auto;
+      }
+
+      .trades-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+
+      .trades-table th {
+        background-color: #0f172a;
+        color: #94a3b8;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #334155;
+      }
+
+      .trades-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #2d3748;
+      }
+
+      .trades-table tbody tr:hover {
+        background-color: #1e293b;
+      }
+
+      .trade-long {
+        color: #10b981;
+      }
+
+      .trade-short {
+        color: #ef4444;
+      }
+
+      .trade-profit-positive {
+        color: #10b981;
+        font-weight: 600;
+      }
+
+      .trade-profit-negative {
+        color: #ef4444;
+        font-weight: 600;
+      }
+
+      .trade-open {
+        color: #3b82f6;
+        font-weight: 600;
+        font-style: italic;
+      }
+
+      .no-trades {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+        font-style: italic;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="container">
+      <h1 id="chart-title">Financial Chart</h1>
+
+      <div class="info" id="strategy-info">
+        <strong>Symbol:</strong> <span id="symbol-display">Loading...</span><br />
+        <strong>Timeframe:</strong> <span id="timeframe-display">Loading...</span><br />
+        <strong>Strategy:</strong> <span id="strategy-display">Loading...</span>
+      </div>
+
+      <button class="refresh-btn" onclick="loadChartData()">Refresh Data</button>
+
+      <div class="chart-container">
+        <div id="main-chart"></div>
+      </div>
+
+      <div class="timestamp" id="timestamp"></div>
+
+      <div class="trades-section" id="trades-section">
+        <div class="trades-header">
+          <h2>Trade History</h2>
+          <div class="trades-summary" id="trades-summary">No trades</div>
+        </div>
+        <div class="trades-table-container">
+          <table class="trades-table" id="trades-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Direction</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Size</th>
+                <th>Profit/Loss</th>
+              </tr>
+            </thead>
+            <tbody id="trades-tbody">
+              <tr>
+                <td colspan="7" class="no-trades">No trades to display</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* PaneManager: Manages chart pane lifecycle */
+      class PaneManager {
+        constructor(chartOptions) {
+          this.chartOptions = chartOptions;
+          this.mainPane = null;
+          this.dynamicPanes = new Map();
+        }
+
+        createMainPane(container, config) {
+          this.mainPane = {
+            container,
+            chart: LightweightCharts.createChart(container, {
+              ...this.chartOptions,
+              height: config.height,
+              width: container.clientWidth,
+            }),
+          };
+          return this.mainPane;
+        }
+
+        createDynamicPane(paneName, config) {
+          const containerDiv = document.createElement('div');
+          containerDiv.id = `${paneName}-chart`;
+          containerDiv.style.position = 'relative';
+          containerDiv.style.zIndex = '1';
+
+          const chartContainerDiv = document.querySelector('.chart-container');
+          chartContainerDiv.appendChild(containerDiv);
+
+          const chart = LightweightCharts.createChart(containerDiv, {
+            ...this.chartOptions,
+            height: config.height,
+            width: containerDiv.clientWidth,
+          });
+
+          this.dynamicPanes.set(paneName, { container: containerDiv, chart });
+          return { container: containerDiv, chart };
+        }
+
+        getPane(paneName) {
+          return paneName === 'main' ? this.mainPane : this.dynamicPanes.get(paneName);
+        }
+
+        getAllCharts() {
+          const charts = [this.mainPane.chart];
+          this.dynamicPanes.forEach(({ chart }) => charts.push(chart));
+          return charts;
+        }
+
+        getAllContainers() {
+          const containers = [this.mainPane.container];
+          this.dynamicPanes.forEach(({ container }) => containers.push(container));
+          return containers;
+        }
+
+        synchronizeTimeScales() {
+          const charts = this.getAllCharts();
+          let isUpdating = false;
+
+          charts.forEach((sourceChart, sourceIndex) => {
+            sourceChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+              if (isUpdating || !logicalRange) return;
+
+              isUpdating = true;
+              requestAnimationFrame(() => {
+                charts.forEach((targetChart, targetIndex) => {
+                  if (sourceIndex !== targetIndex) {
+                    try {
+                      targetChart.timeScale().setVisibleLogicalRange(logicalRange);
+                    } catch (error) {
+                      console.warn('Failed to sync logical range:', error);
+                    }
+                  }
+                });
+                isUpdating = false;
+              });
+            });
+          });
+        }
+      }
+
+      /* Global chart variables */
+      let mainChart,
+        indicatorChart,
+        seriesMap = {};
+      let CONFIG = null;
+      let paneManager = null;
+
+      /* SeriesRouter: Routes series to correct pane */
+      class SeriesRouter {
+        constructor(paneManager, seriesMap) {
+          this.paneManager = paneManager;
+          this.seriesMap = seriesMap;
+        }
+
+        routeSeries(seriesKey, seriesConfig, chartManager) {
+          const paneName = seriesConfig.chart || 'indicator';
+          const pane = this.paneManager.getPane(paneName);
+
+          if (!pane) {
+            console.warn(`Pane '${paneName}' not found for series '${seriesKey}'`);
+            return null;
+          }
+
+          const seriesType = seriesConfig.style || 'line';
+          let series;
+
+          if (seriesType === 'histogram') {
+            series = chartManager.addHistogramSeries(pane.chart, seriesConfig);
+          } else {
+            series = chartManager.addLineSeries(pane.chart, seriesConfig);
+          }
+
+          this.seriesMap[seriesKey] = series;
+          return series;
+        }
+
+        rerouteSeries(seriesKey, newPaneName, seriesConfig, chartManager) {
+          const oldSeries = this.seriesMap[seriesKey];
+          if (!oldSeries) return null;
+
+          const oldPaneName = seriesConfig.chart;
+          const oldPane = this.paneManager.getPane(oldPaneName);
+
+          if (oldPane && oldPane.chart) {
+            oldPane.chart.removeSeries(oldSeries);
+          }
+
+          seriesConfig.chart = newPaneName;
+          return this.routeSeries(seriesKey, seriesConfig, chartManager);
+        }
+      }
+
+      /* Unified data loader - no separate config file needed */
+      const ConfigLoader = {
+        async loadConfig(url = 'chart-data.json') {
+          const response = await fetch(url + '?' + Date.now());
+          const data = await response.json();
+          
+          /* Extract UI config from unified format */
+          return {
+            ui: {
+              title: data.metadata?.title || 'Financial Chart',
+              symbol: data.metadata?.symbol || 'Unknown',
+              timeframe: data.metadata?.timeframe || 'Unknown',
+              strategy: data.metadata?.strategy || 'None',
+            },
+            dataSource: {
+              url: url,
+              candlestickPath: 'candlestick',
+              indicatorsPath: 'indicators',
+              strategyPath: 'strategy',
+            },
+            chartLayout: data.ui?.panes || {
+              main: { height: 400, fixed: true },
+              indicator: { height: 200, fixed: false },
+            },
+            /* Generate series config from indicators */
+            seriesConfig: {
+              candlestick: {
+                upColor: '#26a69a',
+                downColor: '#ef5350',
+                borderVisible: false,
+                wickUpColor: '#26a69a',
+                wickDownColor: '#ef5350',
+              },
+              series: this.generateSeriesConfig(data.indicators || {}),
+            },
+          };
+        },
+        
+        generateSeriesConfig(indicators) {
+          const seriesConfig = {};
+          Object.entries(indicators).forEach(([key, indicator]) => {
+            seriesConfig[key] = {
+              color: indicator.style?.color || '#2196F3',
+              lineWidth: indicator.style?.lineWidth || 2,
+              title: indicator.title || key,
+              chart: indicator.pane || 'main',
+              style: 'line',
+            };
+          });
+          return seriesConfig;
+        },
+      };
+
+      /* Chart configuration */
+      const chartOptions = {
+        layout: {
+          background: { color: '#1e1e3c' },
+          textColor: '#DDD',
+        },
+        grid: {
+          vertLines: { color: '#2B2B43' },
+          horzLines: { color: '#2B2B43' },
+        },
+        rightPriceScale: {
+          borderColor: '#2B2B43',
+        },
+        timeScale: {
+          borderColor: '#2B2B43',
+        },
+        crosshair: {
+          mode: LightweightCharts.CrosshairMode.Normal,
+          vertLine: {
+            visible: true,
+          },
+          horzLine: {
+            visible: true,
+            labelVisible: true,
+          },
+        },
+      };
+
+      /* UI utilities */
+      const UIManager = {
+        updateDisplay(config) {
+          if (config.ui) {
+            document.getElementById('chart-title').textContent =
+              config.ui.title || 'Financial Chart';
+            document.getElementById('symbol-display').textContent = config.ui.symbol || 'Unknown';
+            document.getElementById('timeframe-display').textContent =
+              config.ui.timeframe || 'Unknown';
+            document.getElementById('strategy-display').textContent =
+              config.ui.strategy || 'Unknown';
+          }
+        },
+
+        updateTradeTable(trades, candlestickData, strategyMetrics) {
+          const tbody = document.getElementById('trades-tbody');
+          const summary = document.getElementById('trades-summary');
+
+          if (!trades || trades.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="7" class="no-trades">No trades to display</td></tr>';
+            summary.textContent = 'No trades';
+            return;
+          }
+
+          const formatter = new TradeDataFormatter(candlestickData);
+          const renderer = new TradeTableRenderer(formatter);
+          tbody.innerHTML = renderer.renderRows(trades);
+
+          const netProfit = strategyMetrics?.netProfit || 0;
+          const profitClass = netProfit >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
+          summary.innerHTML = `${trades.length} trades | Net P/L: <span class="${profitClass}">$${netProfit.toFixed(2)}</span>`;
+        },
+      };
+
+      /* TradeDataFormatter: Formats trade data for display (SRP, DRY) */
+      class TradeDataFormatter {
+        constructor(candlestickData) {
+          this.candlestickData = candlestickData || [];
+        }
+
+        formatDate(timestamp) {
+          const date = new Date(timestamp);
+          return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        }
+
+        formatPrice(price) {
+          return `$${price.toFixed(2)}`;
+        }
+
+        formatProfit(profit) {
+          const formatted = `$${Math.abs(profit).toFixed(2)}`;
+          return profit >= 0 ? `+${formatted}` : `-${formatted}`;
+        }
+
+        getTradeDate(trade) {
+          if (trade.entryTime) {
+            return this.formatDate(trade.entryTime);
+          }
+          if (trade.entryBar < this.candlestickData.length) {
+            const timestamp = this.candlestickData[trade.entryBar].time * 1000;
+            return this.formatDate(timestamp);
+          }
+          return 'N/A';
+        }
+
+        formatTrade(trade, index) {
+          const isOpen = trade.status === 'open';
+          return {
+            number: index + 1,
+            date: this.getTradeDate(trade),
+            direction: trade.direction,
+            entryPrice: this.formatPrice(trade.entryPrice),
+            exitPrice: isOpen ? 'OPEN' : this.formatPrice(trade.exitPrice),
+            size: trade.size.toFixed(2),
+            profit: isOpen ? 'OPEN' : this.formatProfit(trade.profit),
+            profitRaw: isOpen ? 0 : trade.profit,
+            isOpen: isOpen,
+          };
+        }
+      }
+
+      /* TradeTableRenderer: Renders trade table HTML (SRP, KISS) */
+      class TradeTableRenderer {
+        constructor(formatter) {
+          this.formatter = formatter;
+        }
+
+        renderRows(trades) {
+          return trades
+            .map((trade, index) => {
+              const formatted = this.formatter.formatTrade(trade, index);
+              const directionClass =
+                formatted.direction === 'long' ? 'trade-long' : 'trade-short';
+              const profitClass = formatted.isOpen ? 'trade-open' : 
+                (formatted.profitRaw >= 0 ? 'trade-profit-positive' : 'trade-profit-negative');
+
+              return `
+              <tr>
+                <td>${formatted.number}</td>
+                <td>${formatted.date}</td>
+                <td class="${directionClass}">${formatted.direction.toUpperCase()}</td>
+                <td>${formatted.entryPrice}</td>
+                <td>${formatted.exitPrice}</td>
+                <td>${formatted.size}</td>
+                <td class="${profitClass}">${formatted.profit}</td>
+              </tr>
+            `;
+            })
+            .join('');
+        }
+      }
+
+      async function initializeCharts() {
+        CONFIG = await ConfigLoader.loadConfig();
+
+        /* Initialize PaneManager */
+        paneManager = new PaneManager(chartOptions);
+
+        /* Create main pane (fixed) */
+        const mainContainer = document.getElementById('main-chart');
+        paneManager.createMainPane(mainContainer, CONFIG.chartLayout.main);
+        mainChart = paneManager.mainPane.chart;
+
+        /* Create dynamic panes from chartLayout config */
+        Object.entries(CONFIG.chartLayout).forEach(([paneName, paneConfig]) => {
+          if (paneName !== 'main') {
+            const pane = paneManager.createDynamicPane(paneName, paneConfig);
+            if (paneName === 'indicator') {
+              indicatorChart = pane.chart;
+            }
+          }
+        });
+
+        /* Initialize SeriesRouter */
+        const seriesRouter = new SeriesRouter(paneManager, seriesMap);
+
+        /* Add candlestick series to main pane */
+        seriesMap.candlestick = ChartManager.addCandlestickSeries(
+          mainChart,
+          CONFIG.seriesConfig.candlestick,
+        );
+
+        /* Route all series to correct panes */
+        Object.entries(CONFIG.seriesConfig.series).forEach(([key, seriesConfig]) => {
+          seriesRouter.routeSeries(key, seriesConfig, ChartManager);
+        });
+
+        /* Window resize handler */
+        window.addEventListener('resize', () => {
+          const containers = paneManager.getAllContainers();
+          const charts = paneManager.getAllCharts();
+          const width = containers[0].clientWidth;
+          charts.forEach((chart) => chart.applyOptions({ width }));
+        });
+
+        /* Initialize time scale sync */
+        setTimeout(() => {
+          paneManager.synchronizeTimeScales();
+        }, 50);
+      }
+
+      /* Data transformation utilities */
+      const DataTransformer = {
+        validateCandlestick(candle) {
+          return (
+            candle &&
+            typeof candle.time === 'number' &&
+            typeof candle.open === 'number' &&
+            !isNaN(candle.open) &&
+            typeof candle.high === 'number' &&
+            !isNaN(candle.high) &&
+            typeof candle.low === 'number' &&
+            !isNaN(candle.low) &&
+            typeof candle.close === 'number' &&
+            !isNaN(candle.close) &&
+            candle.open > 0 &&
+            candle.high > 0 &&
+            candle.low > 0 &&
+            candle.close > 0 &&
+            candle.high >= candle.low &&
+            candle.high >= candle.open &&
+            candle.high >= candle.close &&
+            candle.low <= candle.open &&
+            candle.low <= candle.close
+          );
+        },
+
+        extractCandlestickData(candle) {
+          return {
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          };
+        },
+
+        processPlotData(plotData, plotTitle) {
+          /* Uses LineSeries Adapter (Adapter Pattern) */
+          return window.adaptLineSeriesData(plotData);
+        },
+
+        processCandlestickArray(candlestickArray) {
+          return candlestickArray
+            .sort((a, b) => a.time - b.time)
+            .filter(this.validateCandlestick)
+            .map(this.extractCandlestickData);
+        },
+      };
+
+      /* Chart management utilities */
+      const ChartManager = {
+        createChart(container, config) {
+          return LightweightCharts.createChart(container, {
+            ...chartOptions,
+            height: config.height,
+            width: container.clientWidth,
+          });
+        },
+
+        addCandlestickSeries(chart, config) {
+          return chart.addCandlestickSeries(config);
+        },
+
+        addLineSeries(chart, config) {
+          return chart.addLineSeries(config);
+        },
+
+        addHistogramSeries(chart, config) {
+          return chart.addHistogramSeries(config);
+        },
+
+        fitContent(charts) {
+          charts.forEach((chart) => chart.timeScale().fitContent());
+        },
+
+        handleResize(charts, containers) {
+          const width = containers[0].clientWidth;
+          charts.forEach((chart) => chart.applyOptions({ width }));
+        },
+
+        synchronizeTimeScales(charts) {
+          let isUpdating = false;
+
+          charts.forEach((sourceChart, sourceIndex) => {
+            sourceChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+              if (isUpdating || !logicalRange) return;
+
+              isUpdating = true;
+              requestAnimationFrame(() => {
+                charts.forEach((targetChart, targetIndex) => {
+                  if (sourceIndex !== targetIndex) {
+                    try {
+                      targetChart.timeScale().setVisibleLogicalRange(logicalRange);
+                    } catch (error) {
+                      console.warn('Failed to sync logical range:', error);
+                    }
+                  }
+                });
+                isUpdating = false;
+              });
+            });
+          });
+        },
+      };
+
+      /* Data loading and processing */
+      const DataLoader = {
+        async fetchChartData(config) {
+          const response = await fetch(config.dataSource.url + '?' + Date.now());
+          return await response.json();
+        },
+
+        loadCandlestickData(data, series, config) {
+          const rawData = this.getNestedProperty(data, config.dataSource.candlestickPath);
+          if (!rawData || !Array.isArray(rawData)) return;
+
+          const processedData = DataTransformer.processCandlestickArray(rawData);
+          if (processedData.length > 0) {
+            series.setData(processedData);
+          }
+        },
+
+        loadPlotData(data, config, seriesRouter) {
+          const indicators = this.getNestedProperty(data, config.dataSource.indicatorsPath);
+          if (!indicators) return;
+
+          Object.entries(config.seriesConfig.series).forEach(([key, seriesConfig]) => {
+            const indicator = indicators[key];
+            const series = seriesMap[key];
+
+            if (indicator?.data && series) {
+              /* For unified format, points don't have individual color/options */
+              /* Add color to each point for adapter compatibility */
+              const color = indicator.style?.color || seriesConfig.color;
+              const dataWithColor = indicator.data.map(point => ({
+                ...point,
+                options: { color: color }
+              }));
+              
+              const processedData = DataTransformer.processPlotData(dataWithColor);
+              if (processedData.length > 0) {
+                seriesMap[key].setData(processedData);
+              }
+            }
+          });
+        },
+
+        loadStrategyData(data, candlestickData) {
+          const strategy = data.strategy;
+          if (!strategy) return null;
+
+          return {
+            trades: strategy.trades || [],
+            openTrades: strategy.openTrades || [],
+            metrics: {
+              equity: strategy.equity,
+              netProfit: strategy.netProfit,
+            },
+            candlestickData,
+          };
+        },
+
+        updateTimestamp(data, config, elementId = 'timestamp') {
+          const timestamp = data.metadata?.timestamp;
+          if (timestamp) {
+            document.getElementById(elementId).textContent =
+              'Last updated: ' + new Date(timestamp).toLocaleString();
+          }
+        },
+
+        getNestedProperty(obj, path) {
+          return path.split('.').reduce((current, key) => current?.[key], obj);
+        },
+      };
+
+      async function loadChartData() {
+        try {
+          const data = await DataLoader.fetchChartData(CONFIG);
+          const seriesRouter = new SeriesRouter(paneManager, seriesMap);
+
+          const rawCandlestickData = DataLoader.getNestedProperty(
+            data,
+            CONFIG.dataSource.candlestickPath,
+          );
+
+          DataLoader.loadCandlestickData(data, seriesMap.candlestick, CONFIG);
+          DataLoader.loadPlotData(data, CONFIG, seriesRouter);
+
+          const strategyData = DataLoader.loadStrategyData(data, rawCandlestickData);
+          if (strategyData) {
+            /* Combine closed trades and open trades for display */
+            const allTrades = [
+              ...(strategyData.trades || []),
+              ...(strategyData.openTrades || []).map(t => ({...t, status: 'open'}))
+            ];
+            UIManager.updateTradeTable(
+              allTrades,
+              strategyData.candlestickData,
+              strategyData.metrics,
+            );
+          }
+
+          const charts = paneManager.getAllCharts();
+          ChartManager.fitContent(charts);
+          DataLoader.updateTimestamp(data, CONFIG);
+          UIManager.updateDisplay(CONFIG);
+
+          /* Ensure sync is active after data load */
+          setTimeout(() => {
+            paneManager.synchronizeTimeScales();
+          }, 50);
+        } catch (error) {
+          console.error('Error loading chart data:', error);
+        }
+      }
+
+      // Initialize everything when DOM is loaded
+      document.addEventListener('DOMContentLoaded', async () => {
+        await initializeCharts();
+        await loadChartData();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+//@version=4
+strategy(title="Test Builtin Identifier Bug", overlay=true)
+
+// Test 1: close in assignment
+test_var = close
+
+// Test 2: strategy.position_avg_price
+has_trade = not na(strategy.position_avg_price)
+avg_or_close = has_trade ? strategy.position_avg_price : close
+
+plot(test_var, color=color.red)
+plot(avg_or_close, color=color.blue)

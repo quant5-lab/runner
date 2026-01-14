@@ -1,0 +1,6 @@
+//@version=4
+strategy("Entry Basic Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Enter long when close rises
+if close > open
+    strategy.entry("Long", strategy.long)

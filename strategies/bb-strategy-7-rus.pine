@@ -272,5 +272,5 @@ if has_active_trade and not hold_overnight and not session_open
     strategy.close_all()
     // TODO: call API or notify manual trader
 
-plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='SL')
-plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main', title='TP')
+plot(has_active_trade and show_trades ? stop_level : na, color=color.red, style=plot.style_linebr, linewidth=2, pane='main', title='SL')
+plot(has_active_trade and show_trades ? smart_take_level : na, color=color.green, style=plot.style_linebr, linewidth=2, pane='main', title='TP')

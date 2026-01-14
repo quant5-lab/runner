@@ -1,0 +1,13 @@
+//@version=5
+indicator("Test Visual Functions", overlay=true)
+
+// Test fill
+plot1 = plot(high, color=color.green)
+plot2 = plot(low, color=color.red)
+fill(plot1, plot2, color=color.new(color.blue, 90))
+
+// Test bgcolor
+bgcolor(close > open ? color.new(color.green, 90) : na)
+
+// Test hline
+hline(0, "Zero Line", color=color.gray)

@@ -1,0 +1,8 @@
+//@version=5
+strategy("Crossover Test", overlay=true)
+
+sma20 = ta.sma(close, 20)
+longCrossover = ta.crossover(close, sma20)
+
+if longCrossover
+    strategy.entry("long", strategy.long)

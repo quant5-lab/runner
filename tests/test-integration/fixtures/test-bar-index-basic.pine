@@ -1,0 +1,18 @@
+//@version=5
+indicator("bar_index Basic Test", overlay=false)
+
+// Test 1: Basic bar_index value
+// Expected: Sequential integers 0, 1, 2, 3...
+barIdx = bar_index
+
+// Test 2: bar_index in arithmetic
+doubled = bar_index * 2
+incremented = bar_index + 10
+
+// Test 3: bar_index as float
+asFloat = bar_index / 1.0
+
+plot(barIdx, "Bar Index", color=color.blue)
+plot(doubled, "Doubled", color=color.green)
+plot(incremented, "Plus 10", color=color.orange)
+plot(asFloat, "As Float", color=color.purple)

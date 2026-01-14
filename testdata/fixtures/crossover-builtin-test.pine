@@ -1,0 +1,8 @@
+//@version=5
+strategy("Simple Crossover", overlay=true)
+
+// Test crossover with two built-in series (close crosses above open)
+openCrossover = ta.crossover(close, open)
+
+if openCrossover
+    strategy.entry("long", strategy.long)

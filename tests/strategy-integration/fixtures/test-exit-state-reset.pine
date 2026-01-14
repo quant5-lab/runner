@@ -1,0 +1,42 @@
+//@version=5
+strategy("Exit State Reset Test", overlay=true, pyramiding=3)
+
+// Pattern: Exit state must reset properly for next entry/exit cycle
+// Exit trigger: Alternating entry/exit signals
+// Expected: Multiple complete entry/exit cycles
+
+sma20 = ta.sma(close, 20)
+atr_val = ta.atr(14)
+
+// Entry: Price crosses above SMA
+entry_long = ta.crossover(close, sma20)
+
+// Exit: Price drops by ATR from entry
+exit_trigger = close < sma20 - atr_val
+
+// Track if we have an active position
+has_trade = false
+has_trade := strategy.position_size != 0
+
+// Track exit state
+exit_active = false
+exit_active := exit_active[1]
+
+// Entry resets exit state
+if entry_long and not has_trade
+    strategy.entry("Long", strategy.long)
+    exit_active := false
+
+// Exit condition
+if exit_trigger and has_trade and not exit_active
+    strategy.close_all()
+    exit_active := true
+
+// Reset exit state when position closes
+if not has_trade
+    exit_active := false
+
+plot(strategy.position_size, "Position Size")
+plot(entry_long ? 1 : 0, "Entry Signal")
+plot(exit_trigger ? 1 : 0, "Exit Trigger")
+plot(exit_active ? 1 : 0, "Exit Active")

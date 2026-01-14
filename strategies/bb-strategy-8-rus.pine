@@ -339,5 +339,5 @@ if close_all_avg
     strategy.close_all()
     has_active_trade := false
 
-plot(stop_level, color=has_active_trade and show_trades ? color.red : color.white, style=plot.style_linebr, linewidth=2, pane='main')
-plot(smart_take_level, color=has_active_trade and show_trades ? color.green : color.white, style=plot.style_linebr, linewidth=2, pane='main')
+plot(has_active_trade and show_trades ? stop_level : na, color=color.red, style=plot.style_linebr, linewidth=2, pane='main')
+plot(has_active_trade and show_trades ? smart_take_level : na, color=color.green, style=plot.style_linebr, linewidth=2, pane='main')

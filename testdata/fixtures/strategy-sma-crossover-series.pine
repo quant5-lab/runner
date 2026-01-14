@@ -1,0 +1,35 @@
+//@version=5
+strategy("SMA Crossover with Series", overlay=true)
+
+// Calculate moving averages
+sma20 = ta.sma(close, 20)
+sma50 = ta.sma(close, 50)
+
+// Access historical values using subscript
+prev_sma20 = sma20[1]
+prev_sma50 = sma50[1]
+
+// Detect crossover: current above, previous below
+crossover_signal = sma20 > sma50 and prev_sma20 <= prev_sma50
+crossunder_signal = sma20 < sma50 and prev_sma20 >= prev_sma50
+
+// Compare with ta.crossover for verification
+ta_crossover = ta.crossover(sma20, sma50)
+ta_crossunder = ta.crossunder(sma20, sma50)
+
+// Verify manual crossover matches ta.crossover
+manual_signal = crossover_signal ? 1 : 0
+ta_signal = ta_crossover ? 1 : 0
+
+// Entry conditions
+if (crossover_signal)
+    strategy.entry("Long", strategy.long)
+
+if (crossunder_signal)
+    strategy.entry("Short", strategy.short)
+
+// Plot for visual verification
+plot(sma20, "SMA 20", color=color.blue)
+plot(sma50, "SMA 50", color=color.red)
+plot(manual_signal, "Manual Crossover", color=color.green)
+plot(ta_signal, "TA Crossover", color=color.lime)

@@ -1,0 +1,39 @@
+name: PR Time Report
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  time-report:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate time report
+        id: report
+        run: |
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          bash scripts/estimate-hours.sh ${BASE_SHA} ${HEAD_SHA} > report.md
+          cat report.md
+          echo "has_data=true" >> $GITHUB_OUTPUT
+      
+      - name: Comment PR
+        if: steps.report.outputs.has_data == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⏱️ Time Estimation\n\n${report}`
+            });

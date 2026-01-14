@@ -1,0 +1,9 @@
+Runtime limitation: Requires bar_index historical access and nz() function
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ❌ Fails
+Execute: ❌ Not reached
+Error: "syntax error: unexpected comma, expected expression"
+Blocker: Historical access bar_index[1] and nz(bar_index[1]) generate invalid Go syntax
+Note: ForwardSeriesBuffer paradigm requires proper historical offset codegen
+Related: Patterns like "nz(bar_index[1])" for safety checks fail
