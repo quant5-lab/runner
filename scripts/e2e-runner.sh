@@ -6,11 +6,11 @@ set -e
 
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-TESTDATA_FIXTURES_DIR="$PROJECT_ROOT/golang-port/testdata/fixtures"
-TESTDATA_E2E_DIR="$PROJECT_ROOT/golang-port/testdata/e2e"
+TESTDATA_FIXTURES_DIR="$PROJECT_ROOT/testdata/fixtures"
+TESTDATA_E2E_DIR="$PROJECT_ROOT/testdata/e2e"
 STRATEGIES_DIR="$PROJECT_ROOT/strategies"
-BUILD_DIR="$PROJECT_ROOT/golang-port/build"
-DATA_DIR="$PROJECT_ROOT/golang-port/testdata/ohlcv"
+BUILD_DIR="$PROJECT_ROOT/build"
+DATA_DIR="$PROJECT_ROOT/testdata/ohlcv"
 OUTPUT_DIR="$PROJECT_ROOT/out"
 
 # Test tracking

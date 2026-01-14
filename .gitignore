@@ -176,4 +176,52 @@ __pycache__/
 .github/*
 !.github/workflows/
 .github/workflows/local-*.yaml
-.github/workflows/draft-*.yaml
+.github/workflows/draft-*.yaml# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+pine-gen
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Temporary files and build artifacts
+tmp/
+temp/
+output/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Generated test output (keep fixtures)
+testdata/output.json
+testdata/sma-output.json
+testdata/*-output.json

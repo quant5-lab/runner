@@ -13,7 +13,7 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 	// Verifies timeframe.ismonthly detection produces non-zero CAGR values
 
 	// Test runs from golang-port/tests/integration
-	strategy := "../../../strategies/rolling-cagr.pine"
+	strategy := "../../strategies/rolling-cagr.pine"
 	dataFile := "../../testdata/ohlcv/SPY_1M.json"
 
 	// Check if files exist

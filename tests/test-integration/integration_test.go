@@ -15,7 +15,7 @@ import (
 
 /* Test parsing simple Pine strategy */
 func TestParseSimplePine(t *testing.T) {
-	strategyPath := "../../../strategies/test-simple.pine"
+	strategyPath := "../../strategies/test-simple.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
 		t.Fatalf("test-simple.pine not found (required test fixture): %v", err)
@@ -63,7 +63,7 @@ func TestParseSimplePine(t *testing.T) {
 
 /* Test parsing e2e fixture strategy - validates parser handles known limitations */
 func TestParseFixtureStrategy(t *testing.T) {
-	strategyPath := "../../../e2e/fixtures/strategies/test-strategy.pine"
+	strategyPath := "../../e2e/fixtures/strategies/test-strategy.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
 		t.Fatalf("test-strategy.pine not found: %v", err)
@@ -183,7 +183,7 @@ func TestChartDataGeneration(t *testing.T) {
 
 /* Test parsing all fixture strategies */
 func TestParseAllFixtures(t *testing.T) {
-	fixturesDir := "../../../e2e/fixtures/strategies"
+	fixturesDir := "../../e2e/fixtures/strategies"
 
 	entries, err := os.ReadDir(fixturesDir)
 	if err != nil {

@@ -11,11 +11,10 @@ BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Directories
-GOLANG_PORT := golang-port
-CMD_DIR := $(GOLANG_PORT)/cmd/pine-gen
-BUILD_DIR := $(GOLANG_PORT)/build
-DIST_DIR := $(GOLANG_PORT)/dist
-COVERAGE_DIR := $(GOLANG_PORT)/coverage
+CMD_DIR := cmd/pine-gen
+BUILD_DIR := build
+DIST_DIR := dist
+COVERAGE_DIR := coverage
 
 # Go configuration
 GO := go
@@ -41,17 +40,17 @@ help: ## Display this help
 
 fmt: ## Format Go code
 	@echo "Formatting code..."
-	@cd $(GOLANG_PORT) && gofmt -s -w .
+	@gofmt -s -w .
 	@echo "✓ Code formatted"
 
 vet: ## Run go vet
 	@echo "Running go vet..."
-	@cd $(GOLANG_PORT) && $(GO) vet ./...
+	@$(GO) vet ./...
 	@echo "✓ Vet passed"
 
 lint: ## Run linter
 	@echo "Running linter..."
-	@cd $(GOLANG_PORT) && $(GO) vet ./...
+	@$(GO) vet ./...
 	@echo "✓ Lint passed"
 
 ##@ Build
@@ -59,7 +58,7 @@ lint: ## Run linter
 build: ## Build pine-gen for current platform
 	@echo "Building $(BINARY_NAME) v$(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(GOLANG_PORT) && $(GOBUILD) -o ../$(BUILD_DIR)/$(BINARY_NAME) ./cmd/pine-gen
+	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/pine-gen
 	@echo "✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)"
 
 build-strategy: ## Build standalone strategy binary (usage: make build-strategy STRATEGY=path/to/strategy.pine OUTPUT=runner-name)
@@ -72,13 +71,13 @@ _build_strategy_internal:
 	@mkdir -p $(BUILD_DIR)
 	@echo "[1/3] Generating Go code from Pine Script..."
 	@OUTPUT_PATH="$(OUTPUT)"; \
-	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="../$(BUILD_DIR)/$(OUTPUT)";; esac; \
+	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="$(BUILD_DIR)/$(OUTPUT)";; esac; \
 	STRATEGY_PATH="$(STRATEGY)"; \
-	case "$$STRATEGY_PATH" in /*) ;; *) STRATEGY_PATH="../$$STRATEGY_PATH";; esac; \
-	TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run ./cmd/pine-gen -input $$STRATEGY_PATH -output $$OUTPUT_PATH 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	case "$$STRATEGY_PATH" in /*) ;; *) STRATEGY_PATH="$$STRATEGY_PATH";; esac; \
+	TEMP_FILE=$$($(GO) run ./cmd/pine-gen -input $$STRATEGY_PATH -output $$OUTPUT_PATH 2>&1 | grep "Generated:" | awk '{print $$2}'); \
 	if [ -z "$$TEMP_FILE" ]; then echo "Failed to generate Go code"; exit 1; fi; \
 	echo "[2/3] Compiling binary..."; \
-	cd $(GOLANG_PORT) && $(GO) build -o $$OUTPUT_PATH $$TEMP_FILE
+	$(GO) build -o $$OUTPUT_PATH $$TEMP_FILE
 	@OUTPUT_PATH="$(OUTPUT)"; \
 	case "$$OUTPUT_PATH" in /*) ;; *) OUTPUT_PATH="$(BUILD_DIR)/$(OUTPUT)";; esac; \
 	echo "[3/3] Cleanup..."; \
@@ -100,7 +99,7 @@ cross-compile: ## Build pine-gen for all platforms (strategy code generator)
 _cross_compile_platform:
 	@BINARY=$(DIST_DIR)/pine-gen-$(PLATFORM_OS)-$(PLATFORM_ARCH)$(if $(findstring windows,$(PLATFORM_OS)),.exe,); \
 	echo "  Building $$BINARY..."; \
-	cd $(GOLANG_PORT) && GOOS=$(PLATFORM_OS) GOARCH=$(PLATFORM_ARCH) \
+	 GOOS=$(PLATFORM_OS) GOARCH=$(PLATFORM_ARCH) \
 	$(GOBUILD) -o ../$$BINARY ./cmd/pine-gen
 
 ##@ Testing
@@ -111,42 +110,42 @@ test: test-unit test-integration test-e2e ## Run all tests (unit + integration +
 
 test-unit: ## Run unit tests (excludes integration)
 	@echo "Running unit tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -short ./...
+	@ $(GOTEST) $(TEST_FLAGS) -short ./...
 	@echo "✓ Unit tests passed"
 
 test-integration: ## Run integration tests
 	@echo "Running integration tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
+	@ $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
 	@echo "✓ Integration tests passed"
 
 test-e2e: ## Run E2E tests (compile + execute all Pine fixtures/strategies)
 	@echo "Running E2E tests..."
-	@./golang-port/scripts/e2e-runner.sh
+	@./scripts/e2e-runner.sh
 	@echo "✓ E2E tests passed"
 
 test-parser: ## Run parser tests only
 	@echo "Running parser tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) ./parser/...
+	@ $(GOTEST) $(TEST_FLAGS) ./parser/...
 	@echo "✓ Parser tests passed"
 
 test-codegen: ## Run codegen tests only
 	@echo "Running codegen tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) ./codegen/...
+	@ $(GOTEST) $(TEST_FLAGS) ./codegen/...
 	@echo "✓ Codegen tests passed"
 
 test-runtime: ## Run runtime tests only
 	@echo "Running runtime tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) ./runtime/...
+	@ $(GOTEST) $(TEST_FLAGS) ./runtime/...
 	@echo "✓ Runtime tests passed"
 
 test-series: ## Run Series tests only
 	@echo "Running Series tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./runtime/series/...
+	@ $(GOTEST) $(TEST_FLAGS) -v ./runtime/series/...
 	@echo "✓ Series tests passed"
 
 test-syminfo: ## Run syminfo.tickerid integration tests only
 	@echo "Running syminfo.tickerid tests..."
-	@cd $(GOLANG_PORT) && $(GOTEST) $(TEST_FLAGS) -v ./tests/test-integration -run Syminfo
+	@ $(GOTEST) $(TEST_FLAGS) -v ./tests/test-integration -run Syminfo
 	@echo "✓ syminfo.tickerid tests passed"
 
 regression-syminfo: ## Run syminfo.tickerid regression test suite
@@ -154,11 +153,11 @@ regression-syminfo: ## Run syminfo.tickerid regression test suite
 
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
-	@cd $(GOLANG_PORT) && $(GO) test $(BENCH_FLAGS) -bench=. ./...
+	@ $(GO) test $(BENCH_FLAGS) -bench=. ./...
 
 bench-series: ## Benchmark Series performance
 	@echo "Benchmarking Series..."
-	@cd $(GOLANG_PORT) && $(GO) test $(BENCH_FLAGS) -bench=. ./runtime/series/
+	@ $(GO) test $(BENCH_FLAGS) -bench=. ./runtime/series/
 	@echo ""
 	@echo "Performance targets:"
 	@echo "  Series.Get():    < 10ns/op"
@@ -168,9 +167,9 @@ bench-series: ## Benchmark Series performance
 coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
-	@cd $(GOLANG_PORT) && $(GO) test -coverprofile=../$(COVERAGE_DIR)/coverage.out ./...
-	@cd $(GOLANG_PORT) && $(GO) tool cover -html=../$(COVERAGE_DIR)/coverage.out -o ../$(COVERAGE_DIR)/coverage.html
-	@cd $(GOLANG_PORT) && $(GO) tool cover -func=../$(COVERAGE_DIR)/coverage.out | tail -1
+	@ $(GO) test -coverprofile=$(COVERAGE_DIR)/coverage.out ./...
+	@ $(GO) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/coverage.html
+	@ $(GO) tool cover -func=$(COVERAGE_DIR)/coverage.out | tail -1
 	@echo "✓ Coverage report: $(COVERAGE_DIR)/coverage.html"
 
 coverage-show: coverage ## Generate and open coverage report
@@ -186,14 +185,14 @@ ci: fmt vet lint build test ## CI pipeline (format, vet, lint, build, all tests)
 clean: ## Remove build artifacts
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(BUILD_DIR) $(DIST_DIR) $(COVERAGE_DIR)
-	@cd $(GOLANG_PORT) && $(GO) clean -cache -testcache
+	@ $(GO) clean -cache -testcache
 	@find . -name "*.test" -type f -delete
 	@find . -name "*.out" -type f -delete
 	@echo "✓ Cleaned"
 
 clean-all: clean ## Remove all generated files including dependencies
 	@echo "Removing all generated files..."
-	@cd $(GOLANG_PORT) && $(GO) clean -modcache
+	@ $(GO) clean -modcache
 	@echo "✓ Deep cleaned"
 
 ##@ Development Workflow
@@ -203,10 +202,10 @@ run-strategy: ## Run strategy with pre-generated data file (usage: make run-stra
 	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@echo "Running strategy: $(STRATEGY)"
 	@mkdir -p out
-	@TEMP_FILE=$$(cd $(GOLANG_PORT) && $(GO) run cmd/pine-gen/main.go \
+	@TEMP_FILE=$$( $(GO) run cmd/pine-gen/main.go \
 		-input ../$(STRATEGY) \
 		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
-	cd $(GOLANG_PORT) && $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
+	 $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
 	@SYMBOL=$$(basename $(DATA) | sed 's/_[^_]*\.json//'); \
 	TIMEFRAME=$$(basename $(DATA) .json | sed 's/.*_//'); \
 	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir golang-port/testdata/ohlcv -output out/chart-data.json
@@ -327,17 +326,17 @@ version: ## Show version information
 
 deps: ## Show Go module dependencies
 	@echo "Go modules:"
-	@cd $(GOLANG_PORT) && $(GO) list -m all
+	@ $(GO) list -m all
 
 mod-tidy: ## Tidy go.mod
 	@echo "Tidying go.mod..."
-	@cd $(GOLANG_PORT) && $(GO) mod tidy
-	@cd $(GOLANG_PORT) && $(GO) mod verify
+	@ $(GO) mod tidy
+	@ $(GO) mod verify
 	@echo "✓ Dependencies tidied"
 
 mod-update: ## Update all dependencies
 	@echo "Updating dependencies..."
-	@cd $(GOLANG_PORT) && $(GO) get -u ./...
+	@ $(GO) get -u ./...
 	@$(MAKE) mod-tidy
 	@echo "✓ Dependencies updated"
 

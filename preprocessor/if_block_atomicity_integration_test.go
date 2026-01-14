@@ -14,7 +14,7 @@ import (
 func parseAndNormalize(t *testing.T, filename string) *parser.Script {
 	t.Helper()
 
-	filePath := filepath.Join("..", "..", "e2e", "fixtures", "strategies", filename)
+	filePath := filepath.Join("..", "e2e", "fixtures", "strategies", filename)
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		t.Fatalf("Failed to read %s: %v", filename, err)
