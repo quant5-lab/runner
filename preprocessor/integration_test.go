@@ -11,7 +11,7 @@ import (
 // TestIntegration_DailyLinesSimple tests the full v4→v5 pipeline with the actual file
 func TestIntegration_DailyLinesSimple(t *testing.T) {
 	// Find the strategies directory
-	strategyPath := filepath.Join("..", "..", "strategies", "daily-lines-simple.pine")
+	strategyPath := filepath.Join("..", "strategies", "daily-lines-simple.pine")
 
 	// Read the actual file
 	content, err := os.ReadFile(strategyPath)

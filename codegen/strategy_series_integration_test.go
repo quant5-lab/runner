@@ -119,7 +119,7 @@ func TestSeriesCodegenPerformanceCheck(t *testing.T) {
 
 	content, err := os.ReadFile("../testdata/fixtures/strategy-sma-crossover-series.pine")
 	if err != nil {
-		t.Skip("Strategy file not available")
+		t.Fatalf("Failed to read strategy file: %v", err)
 	}
 
 	p, err := parser.NewParser()

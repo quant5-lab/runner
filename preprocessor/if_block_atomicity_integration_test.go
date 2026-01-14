@@ -251,7 +251,7 @@ func TestIfBlockAtomicity_NoRegressionOnExistingStrategies(t *testing.T) {
 
 	for _, tc := range strategies {
 		t.Run(tc.filename, func(t *testing.T) {
-			filePath := filepath.Join("..", "..", "strategies", tc.filename)
+			filePath := filepath.Join("..", "strategies", tc.filename)
 			content, err := os.ReadFile(filePath)
 			if err != nil {
 				t.Skipf("Cannot read %s: %v", tc.filename, err)

@@ -533,29 +533,6 @@ func TestSecurityBarMapper_DateBoundaries(t *testing.T) {
 	}
 }
 
-func TestBarRange_Contains(t *testing.T) {
-	t.Skip("replaced by TestBarRange_Predicates for comprehensive predicate testing")
-	r := NewBarRange(0, 10, 20)
-
-	tests := []struct {
-		hourlyIndex int
-		expected    bool
-	}{
-		{5, false},
-		{10, true},
-		{15, true},
-		{20, true},
-		{25, false},
-	}
-
-	for _, tt := range tests {
-		result := r.Contains(tt.hourlyIndex)
-		if result != tt.expected {
-			t.Errorf("Contains(%d) = %v, expected %v", tt.hourlyIndex, result, tt.expected)
-		}
-	}
-}
-
 func parseTime(layout string) int64 {
 	t, _ := timeFromString(layout)
 	return t
