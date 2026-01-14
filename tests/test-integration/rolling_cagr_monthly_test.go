@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
 func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
@@ -21,7 +23,7 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 	}
 
 	// Fetch test data (auto-downloads if not cached)
-	dataFile := FetchTestData(t, "SPY", "M", 120) // 10 years of monthly data
+	dataFile := testutil.FetchTestData(t, "SPY", "M", 120) // 10 years of monthly data
 
 	// Read data to check bar count
 	data, err := os.ReadFile(dataFile)
@@ -29,17 +31,25 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 		t.Fatalf("Failed to read data file: %v", err)
 	}
 
-	// Parse standard OHLCV format (with timezone wrapper)
+	// Parse standard OHLCV format (support both wrapped and raw array)
 	var dataWrapper struct {
 		Timezone string                   `json:"timezone"`
 		Bars     []map[string]interface{} `json:"bars"`
 	}
-	if err := json.Unmarshal(data, &dataWrapper); err != nil {
+	var bars []map[string]interface{}
+
+	if err := json.Unmarshal(data, &dataWrapper); err == nil && len(dataWrapper.Bars) > 0 {
+		bars = dataWrapper.Bars
+	} else if err := json.Unmarshal(data, &bars); err != nil {
 		t.Fatalf("Failed to parse data: %v", err)
 	}
 
-	barCount := len(dataWrapper.Bars)
-	t.Logf("Testing with %d monthly bars (timezone: %s)", barCount, dataWrapper.Timezone)
+	barCount := len(bars)
+	timezone := dataWrapper.Timezone
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	t.Logf("Testing with %d monthly bars (timezone: %s)", barCount, timezone)
 
 	// Generate strategy code (must run from golang-port to find templates)
 	tempBinary := filepath.Join(t.TempDir(), "rolling-cagr-test")

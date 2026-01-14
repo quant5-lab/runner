@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/quant5-lab/runner/tests/testutil"
 )
 
 /* setupGoMod creates go.mod in generated code directory for standalone compilation */
@@ -245,11 +247,11 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
 
-	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1h.json")
-	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
+	dataPath := testutil.FetchTestData(t, "ACN", "1h", 500)
+	dataDir := filepath.Dir(dataPath)
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "ACN", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}
@@ -367,11 +369,11 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
 
-	dataPath := filepath.Join(projectRoot, "testdata", "ohlcv", "BTCUSDT_1D.json")
-	dataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
+	dataPath := testutil.FetchTestData(t, "ACN", "1D", 500)
+	dataDir := filepath.Dir(dataPath)
 	resultPath := filepath.Join(testDir, "result.json")
 
-	runCmd := exec.Command(binPath, "-symbol", "BTCUSDT", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
+	runCmd := exec.Command(binPath, "-symbol", "ACN", "-data", dataPath, "-datadir", dataDir, "-output", resultPath)
 	if output, err := runCmd.CombinedOutput(); err != nil {
 		t.Fatalf("Execution failed: %v\nOutput: %s", err, output)
 	}

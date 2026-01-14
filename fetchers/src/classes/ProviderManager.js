@@ -64,7 +64,38 @@ class ProviderManager {
     }
   }
 
-  async fetchMarketData(symbol, timeframe, bars) {
+  checkDiskCache(symbol, timeframe, outputFile) {
+    const fs = require('fs');
+    const path = require('path');
+    
+    const maxAge = parseInt(process.env.TEST_DATA_MAX_AGE_SECONDS || '300');
+    const cacheFile = outputFile;
+    
+    if (!fs.existsSync(cacheFile)) {
+      return null;
+    }
+    
+    const stats = fs.statSync(cacheFile);
+    const ageSeconds = (Date.now() - stats.mtimeMs) / 1000;
+    
+    if (ageSeconds < maxAge) {
+      this.logger.log(`✓ Using cached data (age: ${Math.floor(ageSeconds)}s)`);
+      const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      return { provider: 'disk-cache', data, timezone: 'UTC', message: `Using cached ${symbol} ${timeframe}` };
+    }
+    
+    this.logger.log(`⚠ Cache expired (age: ${Math.floor(ageSeconds)}s > ${maxAge}s)`);
+    return null;
+  }
+
+  async fetchMarketData(symbol, timeframe, bars, outputFile) {
+    if (outputFile) {
+      const cached = this.checkDiskCache(symbol, timeframe, outputFile);
+      if (cached) {
+        return cached;
+      }
+    }
+
     for (let i = 0; i < this.providerChain.length; i++) {
       const { name, instance } = this.providerChain[i];
 
@@ -81,12 +112,27 @@ class ProviderManager {
           this.logger.log(
             `Found data:\t${name} (${marketData.length} candles, took ${providerDuration}ms)`,
           );
-          return {
+          
+          const result = {
             provider: name,
             data: marketData,
             instance,
-            timezone: instance.timezone || 'UTC', // Include timezone from provider
+            timezone: instance.timezone || 'UTC',
+            message: `Fetched ${marketData.length} bars from ${name}`,
           };
+          
+          if (outputFile) {
+            const fs = require('fs');
+            const path = require('path');
+            const dir = path.dirname(outputFile);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(outputFile, JSON.stringify(marketData, null, 2));
+            this.logger.log(`✓ Saved: ${outputFile}`);
+          }
+          
+          return result;
         }
 
         this.logger.log(`No data:\t${name} > ${symbol}`);
