@@ -148,7 +148,7 @@ test-syminfo: ## Run syminfo.tickerid integration tests only
 	@ $(GOTEST) $(TEST_FLAGS) -v ./tests/test-integration -run Syminfo
 	@echo "✓ syminfo.tickerid tests passed"
 
-regression-syminfo: ## Run syminfo.tickerid regression test suite
+test-syminfo-regression: ## Run syminfo.tickerid regression test suite
 	@./scripts/test-syminfo-regression.sh
 
 bench: ## Run benchmarks

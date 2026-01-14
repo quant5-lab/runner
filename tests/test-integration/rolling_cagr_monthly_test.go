@@ -14,15 +14,14 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 
 	// Test runs from golang-port/tests/integration
 	strategy := "../../strategies/rolling-cagr.pine"
-	dataFile := "../../testdata/ohlcv/SPY_1M.json"
 
-	// Check if files exist
+	// Check if strategy exists
 	if _, err := os.Stat(strategy); os.IsNotExist(err) {
 		t.Fatalf("rolling-cagr.pine not found (required test fixture): %v", err)
 	}
-	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
-		t.Fatalf("SPY_1M.json not found (required test data): %v", err)
-	}
+
+	// Fetch test data (auto-downloads if not cached)
+	dataFile := FetchTestData(t, "SPY", "M", 120) // 10 years of monthly data
 
 	// Read data to check bar count
 	data, err := os.ReadFile(dataFile)
@@ -30,13 +29,17 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 		t.Fatalf("Failed to read data file: %v", err)
 	}
 
-	var bars []map[string]interface{}
-	if err := json.Unmarshal(data, &bars); err != nil {
+	// Parse standard OHLCV format (with timezone wrapper)
+	var dataWrapper struct {
+		Timezone string                   `json:"timezone"`
+		Bars     []map[string]interface{} `json:"bars"`
+	}
+	if err := json.Unmarshal(data, &dataWrapper); err != nil {
 		t.Fatalf("Failed to parse data: %v", err)
 	}
 
-	barCount := len(bars)
-	t.Logf("Testing with %d monthly bars", barCount)
+	barCount := len(dataWrapper.Bars)
+	t.Logf("Testing with %d monthly bars (timezone: %s)", barCount, dataWrapper.Timezone)
 
 	// Generate strategy code (must run from golang-port to find templates)
 	tempBinary := filepath.Join(t.TempDir(), "rolling-cagr-test")

@@ -39,16 +39,31 @@ if [ ! -f "$BUILD_DIR/pine-gen" ]; then
 fi
 
 # Discover testdata/fixtures/*.pine files
-FIXTURES_FILES=$(find "$TESTDATA_FIXTURES_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
-FIXTURES_COUNT=$(echo "$FIXTURES_FILES" | grep -c . || echo 0)
+if [ -d "$TESTDATA_FIXTURES_DIR" ]; then
+    FIXTURES_FILES=$(find "$TESTDATA_FIXTURES_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
+    FIXTURES_COUNT=$(echo "$FIXTURES_FILES" | grep -c . || echo 0)
+else
+    FIXTURES_FILES=""
+    FIXTURES_COUNT=0
+fi
 
 # Discover testdata/e2e/*.pine files
-E2E_FILES=$(find "$TESTDATA_E2E_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
-E2E_COUNT=$(echo "$E2E_FILES" | grep -c . || echo 0)
+if [ -d "$TESTDATA_E2E_DIR" ]; then
+    E2E_FILES=$(find "$TESTDATA_E2E_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
+    E2E_COUNT=$(echo "$E2E_FILES" | grep -c . || echo 0)
+else
+    E2E_FILES=""
+    E2E_COUNT=0
+fi
 
 # Discover strategies/*.pine files
-STRATEGY_FILES=$(find "$STRATEGIES_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
-STRATEGY_COUNT=$(echo "$STRATEGY_FILES" | grep -c . || echo 0)
+if [ -d "$STRATEGIES_DIR" ]; then
+    STRATEGY_FILES=$(find "$STRATEGIES_DIR" -maxdepth 1 -name "*.pine" -type f 2>/dev/null | sort)
+    STRATEGY_COUNT=$(echo "$STRATEGY_FILES" | grep -c . || echo 0)
+else
+    STRATEGY_FILES=""
+    STRATEGY_COUNT=0
+fi
 
 TOTAL=$((FIXTURES_COUNT + E2E_COUNT + STRATEGY_COUNT))
 
@@ -90,7 +105,7 @@ run_test() {
         return 1
     fi
     
-    # Find suitable data file
+    # Find suitable data file, fetch if none exists
     DATA_FILE=""
     if [ -f "$DATA_DIR/BTCUSDT_1h.json" ]; then
         DATA_FILE="$DATA_DIR/BTCUSDT_1h.json"
@@ -102,14 +117,115 @@ run_test() {
     fi
     
     if [ -z "$DATA_FILE" ]; then
-        echo "⚠️  SKIP: No data files in $DATA_DIR"
-        echo ""
-        return 0
+        # No data files exist - fetch default test data
+        echo "📡 No cached data found, fetching BTCUSDT 1h (500 bars)..."
+        mkdir -p "$DATA_DIR"
+        
+        # Fetch data using Node.js providers
+        TEMP_DIR=$(mktemp -d)
+        trap "rm -rf $TEMP_DIR" RETURN
+        
+        BINANCE_FILE="$TEMP_DIR/binance.json"
+        METADATA_FILE="$TEMP_DIR/metadata.json"
+        STANDARD_FILE="$DATA_DIR/BTCUSDT_1h.json"
+        
+        # Node.js fetch command
+        if ! node -e "
+import('./fetchers/src/container.js').then(({ createContainer }) => {
+  import('./fetchers/src/config.js').then(({ createProviderChain, DEFAULTS }) => {
+    const container = createContainer(createProviderChain, DEFAULTS);
+    const providerManager = container.resolve('providerManager');
+    
+    providerManager.fetchMarketData('BTCUSDT', '1h', 500)
+      .then(result => {
+        const fs = require('fs');
+        fs.writeFileSync('$BINANCE_FILE', JSON.stringify(result.data, null, 2));
+        fs.writeFileSync('$METADATA_FILE', JSON.stringify({ timezone: result.timezone, provider: result.provider }, null, 2));
+        console.log('✓ Fetched ' + result.data.length + ' bars from ' + result.provider);
+      })
+      .catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+      });
+  });
+});" > /tmp/e2e-fetch-$TEST_NAME.log 2>&1; then
+            # If fetch fails, skip test with explanation
+            echo "⚠️  SKIP: Failed to fetch test data (network issue or provider unavailable)"
+            echo ""
+            SKIPPED=$((SKIPPED + 1))
+            SKIPPED_TESTS+=("$TEST_NAME: Network data fetch failed")
+            return 0
+        fi
+        
+        # Convert to standard format
+        if ! node scripts/convert-binance-to-standard.cjs "$BINANCE_FILE" "$STANDARD_FILE" "$METADATA_FILE" > /dev/null 2>&1; then
+            echo "⚠️  SKIP: Failed to convert data format"
+            echo ""
+            SKIPPED=$((SKIPPED + 1))
+            SKIPPED_TESTS+=("$TEST_NAME: Data conversion failed")
+            return 0
+        fi
+        
+        DATA_FILE="$STANDARD_FILE"
+        echo "✓ Data fetched and cached: $DATA_FILE"
     fi
     
-    # Execute strategy
+    # Determine symbol and timeframe from data file
     SYMBOL=$(basename "$DATA_FILE" | sed 's/_[^_]*\.json//')
     TIMEFRAME=$(basename "$DATA_FILE" .json | sed 's/.*_//')
+    
+    # Detect security() calls and fetch additional timeframes for the SAME symbol
+    SECURITY_TFS=$(grep -o "security([^)]*)" "$PINE_FILE" | grep -oE "\"[^\"]+\"|'[^']+'" | tr -d "\"'" | grep -E "^(1h|1D|1W|1M|D|W|M)$" | sort -u || true)
+    for SEC_TF in $SECURITY_TFS; do
+        # Normalize timeframe
+        NORM_TF="$SEC_TF"
+        [ "$SEC_TF" = "D" ] && NORM_TF="1D"
+        [ "$SEC_TF" = "W" ] && NORM_TF="1W"
+        [ "$SEC_TF" = "M" ] && NORM_TF="1M"
+        
+        SEC_FILE="$DATA_DIR/${SYMBOL}_${NORM_TF}.json"
+        
+        # Skip if already exists (avoid re-downloading)
+        if [ -f "$SEC_FILE" ]; then
+            echo "  ✓ Using cached: $SEC_FILE"
+            continue
+        fi
+        
+        # Fetch additional timeframe for the same symbol
+        echo "  📡 Fetching security() timeframe: $SYMBOL $SEC_TF..."
+        
+        TEMP_DIR=$(mktemp -d)
+        trap "rm -rf $TEMP_DIR" RETURN
+        
+        BINANCE_FILE="$TEMP_DIR/binance.json"
+        METADATA_FILE="$TEMP_DIR/metadata.json"
+        
+        if node -e "
+import('./fetchers/src/container.js').then(({ createContainer }) => {
+  import('./fetchers/src/config.js').then(({ createProviderChain, DEFAULTS }) => {
+    const container = createContainer(createProviderChain, DEFAULTS);
+    const providerManager = container.resolve('providerManager');
+    
+    providerManager.fetchMarketData('$SYMBOL', '$SEC_TF', 500)
+      .then(result => {
+        const fs = require('fs');
+        fs.writeFileSync('$BINANCE_FILE', JSON.stringify(result.data, null, 2));
+        fs.writeFileSync('$METADATA_FILE', JSON.stringify({ timezone: result.timezone, provider: result.provider }, null, 2));
+      })
+      .catch(err => {
+        console.error('Error:', err.message);
+        process.exit(1);
+      });
+  });
+});" > /dev/null 2>&1; then
+            node scripts/convert-binance-to-standard.cjs "$BINANCE_FILE" "$SEC_FILE" "$METADATA_FILE" > /dev/null 2>&1
+            echo "  ✓ Fetched and cached: $SEC_FILE"
+        else
+            echo "  ⚠️  Failed to fetch $SYMBOL $SEC_TF (will skip if strategy errors)"
+        fi
+    done
+    
+    # Execute strategy
     
     if ! "$OUTPUT_BINARY" \
         -symbol "$SYMBOL" \
