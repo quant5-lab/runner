@@ -242,6 +242,182 @@ func TestStrategy(t *testing.T) {
 	}
 }
 
+/* TestEquityCurrentPriceTracking verifies price tracking across bar updates */
+func TestEquityCurrentPriceTracking(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialCap    float64
+		barUpdates    []float64
+		expectedPrice float64
+		desc          string
+	}{
+		{"single_bar", 10000, []float64{100}, 100, "first bar sets price"},
+		{"multiple_bars", 10000, []float64{100, 105, 110}, 110, "last bar price retained"},
+		{"price_decline", 10000, []float64{100, 95, 90}, 90, "declining price tracked"},
+		{"price_volatility", 10000, []float64{100, 110, 95, 105}, 105, "volatile price tracked"},
+		{"zero_price", 10000, []float64{0}, 0, "zero price handled"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCap)
+
+			for i, price := range tt.barUpdates {
+				s.OnBarUpdate(i, price, int64(1000+i))
+			}
+
+			/* Verify Equity() uses the last updated price */
+			expectedEquity := s.GetEquity(tt.expectedPrice)
+			if s.Equity() != expectedEquity {
+				t.Errorf("%s: Equity() should use price %.2f, got equity %.2f vs expected %.2f",
+					tt.desc, tt.expectedPrice, s.Equity(), expectedEquity)
+			}
+		})
+	}
+}
+
+/* TestEquityUnrealizedProfitCalculation verifies unrealized P&L in equity */
+func TestEquityUnrealizedProfitCalculation(t *testing.T) {
+	tests := []struct {
+		name         string
+		initialCap   float64
+		direction    string
+		entryPrice   float64
+		currentPrice float64
+		qty          float64
+		wantEquity   float64
+		desc         string
+	}{
+		{"long_profit", 10000, Long, 100, 110, 10, 10100, "long with 100 profit"},
+		{"long_loss", 10000, Long, 100, 90, 10, 9900, "long with 100 loss"},
+		{"short_profit", 10000, Short, 100, 90, 10, 10100, "short with 100 profit"},
+		{"short_loss", 10000, Short, 100, 110, 10, 9900, "short with 100 loss"},
+		{"long_breakeven", 10000, Long, 100, 100, 10, 10000, "long at entry price"},
+		{"short_breakeven", 10000, Short, 100, 100, 10, 10000, "short at entry price"},
+		{"large_position", 10000, Long, 50, 60, 100, 11000, "large qty position"},
+		{"small_position", 10000, Long, 100, 101, 1, 10001, "fractional profit"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCap)
+
+			err := s.Entry("trade1", tt.direction, tt.qty, "")
+			if err != nil {
+				t.Fatal("Entry failed:", err)
+			}
+
+			s.OnBarUpdate(1, tt.entryPrice, 1001)
+			s.OnBarUpdate(2, tt.currentPrice, 1002)
+
+			equity := s.Equity()
+			if equity != tt.wantEquity {
+				t.Errorf("%s: expected equity=%.2f, got %.2f",
+					tt.desc, tt.wantEquity, equity)
+			}
+		})
+	}
+}
+
+/* TestEquityMultiplePositions verifies equity with multiple open trades */
+func TestEquityMultiplePositions(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	/* Open first long position */
+	s.Entry("long1", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1001)
+
+	/* Open second long position */
+	s.Entry("long2", Long, 5, "")
+	s.OnBarUpdate(2, 105, 1002)
+
+	/* Update price: long1 +150 profit, long2 +25 profit */
+	s.OnBarUpdate(3, 120, 1003)
+
+	expectedEquity := 10000.0 + (120-100)*10 + (120-105)*5
+	if s.Equity() != expectedEquity {
+		t.Errorf("Expected equity %.2f with multiple positions, got %.2f",
+			expectedEquity, s.Equity())
+	}
+}
+
+/* TestEquityAfterClosedTrade verifies realized profit in equity */
+func TestEquityAfterClosedTrade(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	/* Open and close first trade with profit */
+	s.Entry("long1", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1001)
+	s.Close("long1", 110, 1002, "")
+
+	/* Equity should reflect realized profit */
+	s.OnBarUpdate(2, 110, 1002)
+	expectedEquity := 10000.0 + 100.0 /* (110-100)*10 */
+
+	if s.Equity() != expectedEquity {
+		t.Errorf("Expected equity %.2f after closed trade, got %.2f",
+			expectedEquity, s.Equity())
+	}
+
+	/* Open new trade - equity should include both realized + unrealized */
+	s.Entry("long2", Long, 5, "")
+	s.OnBarUpdate(3, 110, 1003)
+	s.OnBarUpdate(4, 120, 1004)
+
+	expectedEquity = 10000.0 + 100.0 + (120-110)*5
+	if s.Equity() != expectedEquity {
+		t.Errorf("Expected equity %.2f with realized+unrealized, got %.2f",
+			expectedEquity, s.Equity())
+	}
+}
+
+/* TestEquityConsistencyWithGetEquity verifies wrapper delegates correctly */
+func TestEquityConsistencyWithGetEquity(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	priceSequence := []float64{100, 105, 110, 95, 100, 120}
+
+	for i, price := range priceSequence {
+		s.OnBarUpdate(i, price, int64(1000+i))
+
+		equityWrapper := s.Equity()
+		equityDirect := s.GetEquity(price)
+
+		if equityWrapper != equityDirect {
+			t.Errorf("Bar %d (price=%.2f): Equity()=%.2f != GetEquity()=%.2f",
+				i, price, equityWrapper, equityDirect)
+		}
+	}
+}
+
+/* TestEquityBeforeInitialization verifies behavior before Call() */
+func TestEquityBeforeInitialization(t *testing.T) {
+	s := NewStrategy()
+
+	/* Equity before Call() uses default capital from NewEquityCalculator */
+	equity := s.Equity()
+	if equity != 10000 {
+		t.Errorf("Expected equity=10000 (default capital), got %.2f", equity)
+	}
+}
+
+/* TestEquityWithNoBarUpdates verifies behavior without price updates */
+func TestEquityWithNoBarUpdates(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	/* Without OnBarUpdate, currentPrice is 0 */
+	equity := s.Equity()
+	if equity != 10000 {
+		t.Errorf("Expected equity=10000 (initial capital, no positions), got %.2f", equity)
+	}
+}
+
 /* TestStrategyEntryComment verifies entry comment propagation through full cycle */
 func TestStrategyEntryComment(t *testing.T) {
 	s := NewStrategy()

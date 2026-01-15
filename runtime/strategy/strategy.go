@@ -238,6 +238,7 @@ type Strategy struct {
 	equityCalculator *EquityCalculator
 	initialized      bool
 	currentBar       int
+	currentPrice     float64
 }
 
 /* NewStrategy creates a new strategy */
@@ -371,6 +372,7 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	}
 
 	s.currentBar = currentBar
+	s.currentPrice = openPrice
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
 
 	for _, order := range pendingOrders {
@@ -422,6 +424,11 @@ func (s *Strategy) GetEquity(currentPrice float64) float64 {
 	}
 
 	return s.equityCalculator.GetEquity(unrealizedPL)
+}
+
+/* Equity returns current equity */
+func (s *Strategy) Equity() float64 {
+	return s.GetEquity(s.currentPrice)
 }
 
 /* GetNetProfit returns realized profit */
