@@ -1,0 +1,41 @@
+Codegen limitation: ta.crossover/crossunder requires inline expression arguments
+
+Parse: ✅ (AST generation successful)
+Generate: ❌ (Error: ta.crossover requires CallExpression arguments for inline generation)
+Compile: ❌ (Cannot proceed due to codegen failure)
+Execute: ❌ (Cannot proceed due to compilation failure)
+
+Error message: "Codegen error: ta.crossover requires CallExpression arguments for inline generation"
+
+Root cause:
+  The ta.crossover() function in codegen requires direct CallExpression arguments,
+  but when variable references (ema_fast, ema_slow) are passed, inline generation fails.
+
+Problem code:
+  ema_fast = ta.ema(close, 10)
+  ema_slow = ta.ema(close, 20)
+  long_condition = ta.crossover(ema_fast, ema_slow)  ← FAILS: variable references
+
+Working workaround:
+  long_condition = ta.crossover(ta.ema(close, 10), ta.ema(close, 20))  ← Inline expressions
+
+Solution options:
+  1. Enhance codegen to handle variable references in ta.crossover/crossunder
+  2. Use inline expressions (workaround, but less readable)
+  3. Manual crossover logic: curr > ref and curr[1] <= ref[1]
+
+Note: 
+  - Strategy logic is valid (HTF trend + LTF crossover = classic MTF confirmation)
+  - request.security() for HTF data works correctly
+  - Same limitation affects Ichimoku Cloud strategy
+  - This is a known codegen constraint, not a Pine Script issue
+
+Related strategies with same issue:
+  - ichimoku-cloud-strategy.pine.skip (tenkanSen/kijunSen crossover)
+  - Any strategy using ta.crossover() with pre-computed variables
+
+Strategy concept (Multi-Timeframe Confirmation):
+  - HTF filter: Daily SMA50 determines trend bias
+  - LTF signal: EMA 10/20 crossover on chart timeframe
+  - Trade direction: Only long when above HTF SMA, only short when below
+  - Classic institutional approach: higher timeframe context, lower timeframe execution

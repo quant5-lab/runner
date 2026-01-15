@@ -1,0 +1,26 @@
+//@version=5
+strategy("Multi-Timeframe Confirmation", overlay=true, 
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === HTF Trend Filter (Daily SMA50) ===
+htf_sma = request.security(syminfo.tickerid, "D", ta.sma(close, 50))
+
+// === LTF Entry Signal (EMA Crossover) ===
+ema_fast = ta.ema(close, 10)
+ema_slow = ta.ema(close, 20)
+
+// Entry conditions: HTF uptrend + LTF bullish cross
+long_condition = close > htf_sma and ta.crossover(ema_fast, ema_slow)
+short_condition = close < htf_sma and ta.crossunder(ema_fast, ema_slow)
+
+// Execute trades
+if (long_condition)
+    strategy.entry("Long", strategy.long)
+
+if (short_condition)
+    strategy.entry("Short", strategy.short)
+
+// Visual plots
+plot(htf_sma, "HTF SMA50", color=color.blue, linewidth=2)
+plot(ema_fast, "EMA Fast", color=color.green)
+plot(ema_slow, "EMA Slow", color=color.red)
