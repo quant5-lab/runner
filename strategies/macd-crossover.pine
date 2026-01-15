@@ -1,0 +1,34 @@
+//@version=4
+strategy("MACD Crossover Strategy", shorttitle="MACD", overlay=true,
+         default_qty_type=strategy.percent_of_equity, default_qty_value=100,
+         initial_capital=100000, commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// MACD Crossover Strategy from golden-strategies.md
+// Entry: MACD line crosses signal line
+// Exit: Opposite crossover
+
+// Inputs
+fast_length = input(12, "Fast Length", minval=1)
+slow_length = input(26, "Slow Length", minval=1)
+signal_length = input(9, "Signal Smoothing", minval=1)
+
+// MACD calculation
+[macd_line, signal_line, hist] = macd(close, fast_length, slow_length, signal_length)
+
+// Entry conditions
+bullish_cross = crossover(macd_line, signal_line)
+bearish_cross = crossunder(macd_line, signal_line)
+
+// Strategy execution
+if bullish_cross
+    strategy.entry("Long", strategy.long)
+
+if bearish_cross
+    strategy.entry("Short", strategy.short)
+
+// Plot MACD for visual reference (optional)
+plot(macd_line, "MACD", color=color.blue, linewidth=2)
+plot(signal_line, "Signal", color=color.orange, linewidth=2)
+plot(hist, "Histogram", color=color.gray, style=plot.style_histogram)
+hline(0, "Zero Line", color=color.gray, linestyle=hline.style_dashed)
