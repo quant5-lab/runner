@@ -1,0 +1,12 @@
+Parser limitation: PineScript v4 tooltip parameter with newlines causes parse error
+Parse: ❌ Fails at line 5:54
+Generate: ❌ Not reached
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+Error: "unexpected token ',' (expected ')') at adx-di-strategy.pine:5:54"
+Blocker: Multi-line tooltip string in input() causes parser to fail
+Line: version = input(title="Version", type=input.string, defval=txtVer, options=[txtVer], tooltip="This is informational only, nothing will change.\n\nEntry conditions:\n")
+Solution: Remove tooltip parameter OR escape newlines properly OR upgrade parser to handle v4 multi-line strings
+Note: Strategy logic is valid (MA Cross + DMI/ADX), DMI provides +DI, -DI, ADX indicators
+Related: Other strategies with tooltip parameters may fail similarly
+Source: https://github.com/Alorse/pinescript-strategies/blob/master/strategies/MA%20Cross%20%2B%20DMI.pine
