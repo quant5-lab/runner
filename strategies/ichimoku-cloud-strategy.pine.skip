@@ -1,0 +1,14 @@
+Codegen limitation: ta.crossover/crossunder requires inline expression arguments
+
+Parse: ✅ (AST generation successful)
+Generate: ❌ (Error: ta.crossover requires CallExpression arguments for inline generation)
+Compile: ❌ (Cannot proceed due to codegen failure)
+Execute: ❌ (Cannot proceed due to compilation failure)
+
+The ta.crossover() and ta.crossunder() functions in the codegen require their arguments
+to be simple expressions, but when variables (tenkanSen, kijunSen) are passed, the inline
+generation fails. This needs codegen enhancement to handle variable references in cross
+functions.
+
+Temporary workaround: Store previous values and manually implement crossover logic:
+  longCross = tenkanSen > kijunSen and tenkanSen[1] <= kijunSen[1]
