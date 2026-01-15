@@ -1,7 +1,7 @@
 # Makefile for Runner - PineScript Go Port
 # Centralized build automation following Go project conventions
 
-.PHONY: help build test test-unit test-integration test-e2e test-parser test-codegen test-runtime test-series test-syminfo regression-syminfo bench bench-series coverage coverage-show check ci clean clean-all cross-compile fmt vet lint build-strategy
+.PHONY: help build test test-unit test-integration test-e2e test-golden test-golden-update test-parser test-codegen test-runtime test-series test-syminfo regression-syminfo bench bench-series coverage coverage-show check ci clean clean-all cross-compile fmt vet lint build-strategy
 
 # Project configuration
 PROJECT_NAME := runner
@@ -104,8 +104,8 @@ _cross_compile_platform:
 
 ##@ Testing
 
-# Main test target: runs all tests (unit + integration + e2e)
-test: test-unit test-integration test-e2e ## Run all tests (unit + integration + e2e)
+# Main test target: runs all tests (unit + integration + e2e + golden)
+test: test-unit test-integration test-e2e test-golden ## Run all tests (unit + integration + e2e + golden)
 	@echo "✓ All tests passed"
 
 test-unit: ## Run unit tests (excludes integration)
@@ -122,6 +122,16 @@ test-e2e: ## Run E2E tests (compile + execute all Pine fixtures/strategies)
 	@echo "Running E2E tests..."
 	@./scripts/e2e-runner.sh
 	@echo "✓ E2E tests passed"
+
+test-golden: ## Run golden file regression tests
+	@echo "Running golden file regression tests..."
+	@ $(GOTEST) $(TEST_FLAGS) ./tests/golden/...
+	@echo "✓ Golden tests passed"
+
+test-golden-update: ## Update golden baseline files
+	@echo "Updating golden baseline files..."
+	@ $(GOTEST) -v ./tests/golden/... -update-golden
+	@echo "✓ Golden baselines updated"
 
 test-parser: ## Run parser tests only
 	@echo "Running parser tests..."
