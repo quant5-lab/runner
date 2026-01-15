@@ -1,12 +1,6 @@
-Codegen missing: ta.macd() function not implemented, generates TODO comment
-Parse: ✅ Success (PineScript v4)
-Generate: ⚠️  Partial (Go code generated with TODO placeholder)
-Compile: ❌ Fails (syntax error: unexpected keyword if)
+Codegen limitation: syntax error in generated crossover code
+
+Parse: ✅ Success
+Generate: ✅ Success
+Compile: ❌ Fails (syntax error: unexpected keyword if, expected expression)
 Execute: ❌ Not reached
-Error: "syntax error: unexpected keyword if, expected expression at line 115-116"
-Blocker: ta.macd() generates "// macd() - TODO: implement" instead of actual implementation
-Solution: Implement ta.macd() in codegen/ta_function_generator.go or equivalent
-Note: Strategy logic is valid MACD crossover, limitation is missing ta.macd() in transpiler
-Related: Need to implement MACD calculation (fast_ema - slow_ema, then signal_ema of result)
-Priority: Low complexity - standard MACD(12,26,9) from golden-strategies.md catalog
-Source: Golden strategy #3 from docs/golden-strategies.md

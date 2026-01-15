@@ -1,12 +1,6 @@
-Codegen limitation: Nested TA function calls not supported in arrow functions
-Parse: ✅ Success (PineScript v5)
-Generate: ❌ Fails (Arrow function extraction error)
+Codegen limitation: unsupported member expression in TA call
+
+Parse: ✅ Success
+Generate: ❌ Fails (unsupported member expression in TA call)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
-Error: "failed to generate arrow function keltner: failed to extract TA arguments: failed to create accessor: unsupported member expression in TA call"
-Blocker: keltner() function uses ta.ema(ta.tr, length) - nested TA function call ta.tr inside ta.ema() not supported
-Solution: Flatten nested TA calls by extracting ta.tr to intermediate variable OR use ta.atr() built-in function
-Note: Strategy logic is valid TTM Squeeze (Bollinger Bands inside Keltner Channels volatility compression), limitation is codegen nested function handling
-Related: Arrow function codegen requires simple series references, not inline TA calculations
-Source: https://github.com/Alorse/pinescript-strategies/blob/master/strategies/TTM%20Squeeze.pine
-Workaround: Replace "ta.ema(ta.tr, length)" with "ta.atr(length)" (ATR is EMA of true range)

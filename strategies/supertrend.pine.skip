@@ -1,11 +1,6 @@
-Compiler limitation: ta.atr() requires literal period, strategy uses input() parameter
+Codegen limitation: ta.atr period must be literal integer
+
 Parse: ✅ Success
-Generate: ❌ Fails
+Generate: ❌ Fails (ta.atr period must be literal)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
-Error: "Codegen error: ta.atr period must be literal"
-Blocker: ta.atr(Periods) where Periods=input(...) not supported by codegen
-Solution: Either hardcode period value OR enhance compiler to support input() in ta.* functions
-Note: Strategy code is valid Pine v4, limitation is in our transpiler
-Related: Other ta.* functions (sma, ema, rsi, etc.) may have same constraint
-Source: https://github.com/Alorse/pinescript-strategies/blob/master/strategies/Supertrend.pine

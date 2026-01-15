@@ -11,3 +11,8 @@
 | **9** | **Codegen** | `alertcondition()` function | ✅ **VALID** | Generates TODO comment only. Not implemented |
 | **10** | **Codegen** | String functions (`str.*`) | ✅ **VALID** | `str.tostring()`, `str.tonumber()`, `str.split()` generate TODO comments |
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
+| **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
+| **13** | **Codegen** | `ta.atr()` literal period requirement | ✅ **VALID** | Parse✅ Generate❌: "ta.atr period must be literal". Blocks supertrend.pine |
+| **14** | **Codegen** | TA member expression arguments | ✅ **VALID** | Parse✅ Generate❌: "unsupported member expression in TA call". Blocks keltner-squeeze.pine |
+| **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **VALID** | Parse✅ Generate❌: "ta.crossover requires CallExpression arguments". Blocks mtf-confirmation-strategy.pine |
+| **16** | **Codegen** | `ta.crossover()` syntax error in generated code | ✅ **VALID** | Parse✅ Generate✅ Compile❌: "syntax error: unexpected keyword if". Blocks macd-crossover.pine |
