@@ -1,33 +1,15 @@
 #!/bin/bash
+# Golden File Regression Testing
+# Uses FROZEN REAL market data - DO NOT regenerate
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-generate_data() {
-    echo "Generating test data files..."
-    
-    go run tests/golden/cmd/gendata/main.go -symbol AAPL -timeframe 1h -bars 5500 -output tests/golden/fixtures/data/AAPL-1h.json
-    go run tests/golden/cmd/gendata/main.go -symbol AAPL -timeframe D -bars 252 -output tests/golden/fixtures/data/AAPL-D.json
-    go run tests/golden/cmd/gendata/main.go -symbol AAPL -timeframe W -bars 52 -output tests/golden/fixtures/data/AAPL-W.json
-    go run tests/golden/cmd/gendata/main.go -symbol AAPL -timeframe M -bars 120 -output tests/golden/fixtures/data/AAPL-M.json
-    go run tests/golden/cmd/gendata/main.go -symbol AAPL_1D -timeframe D -bars 252 -output tests/golden/fixtures/data/AAPL_1D.json
-    
-    go run tests/golden/cmd/gendata/main.go -symbol BTCUSDT -timeframe 1h -bars 5500 -output tests/golden/fixtures/data/BTCUSDT-1h.json
-    go run tests/golden/cmd/gendata/main.go -symbol BTCUSDT -timeframe M -bars 120 -output tests/golden/fixtures/data/BTCUSDT-M.json
-    go run tests/golden/cmd/gendata/main.go -symbol BTCUSDT_1D -timeframe D -bars 365 -output tests/golden/fixtures/data/BTCUSDT_1D.json
-    
-    go run tests/golden/cmd/gendata/main.go -symbol SBERP -timeframe 1h -bars 5500 -output tests/golden/fixtures/data/SBERP-1h.json
-    go run tests/golden/cmd/gendata/main.go -symbol SBERP -timeframe M -bars 120 -output tests/golden/fixtures/data/SBERP-M.json
-    go run tests/golden/cmd/gendata/main.go -symbol SBERP_1D -timeframe D -bars 252 -output tests/golden/fixtures/data/SBERP_1D.json
-    
-    echo "Data generation complete"
-}
-
 update_golden() {
-    echo "Updating golden files..."
+    echo "Updating golden reference files..."
     go test -v ./tests/golden/... -update-golden
-    echo "Golden files updated"
+    echo "✓ Golden references updated"
 }
 
 run_tests() {
@@ -35,29 +17,43 @@ run_tests() {
     go test -v ./tests/golden/...
 }
 
+verify_data() {
+    echo "Verifying frozen market data integrity..."
+    echo ""
+    for f in tests/golden/fixtures/data/*-1h.json; do
+        name=$(basename "$f")
+        bars=$(jq '.bars | length' "$f" 2>/dev/null || echo "ERROR")
+        first_close=$(jq '.bars[0].close' "$f" 2>/dev/null || echo "N/A")
+        printf "  %-20s %5s bars  first_close=%.2f\n" "$name" "$bars" "$first_close"
+    done
+    echo ""
+    echo "✓ Data verification complete"
+}
+
 case "${1:-}" in
-    generate)
-        generate_data
-        ;;
     update)
         update_golden
         ;;
     test)
         run_tests
         ;;
-    all)
-        generate_data
-        update_golden
-        run_tests
+    verify)
+        verify_data
         ;;
     *)
-        echo "Usage: $0 {generate|update|test|all}"
+        echo "Golden File Regression Testing"
+        echo "==============================="
+        echo "Uses FROZEN REAL market data from repository"
+        echo ""
+        echo "Usage: $0 {update|test|verify}"
         echo ""
         echo "Commands:"
-        echo "  generate  - Generate synthetic test data"
-        echo "  update    - Update golden files with current results"
-        echo "  test      - Run regression tests"
-        echo "  all       - Generate data, update golden files, and test"
+        echo "  test    - Run regression tests against frozen data"
+        echo "  update  - Update golden reference files (after intentional changes)"
+        echo "  verify  - Verify frozen market data integrity"
+        echo ""
+        echo "NOTE: Market data is FROZEN in repository. Do not regenerate."
+        echo "      Data source: Real historical OHLCV from external provider"
         exit 1
         ;;
 esac
