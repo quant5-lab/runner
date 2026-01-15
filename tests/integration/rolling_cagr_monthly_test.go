@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
@@ -23,7 +23,7 @@ func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
 	}
 
 	// Fetch test data (auto-downloads if not cached)
-	dataFile := testutil.FetchTestData(t, "SPY", "M", 120) // 10 years of monthly data
+	dataFile := util.FetchTestData(t, "SPY", "M", 120) // 10 years of monthly data
 
 	// Read data to check bar count
 	data, err := os.ReadFile(dataFile)

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 /* TestSecurityTACombination tests inline TA combination inside security() */
@@ -15,7 +15,7 @@ combined = request.security(syminfo.tickerid, "1D", ta.sma(close, 20) + ta.ema(c
 plot(combined, "Combined", color=color.blue)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "ta_combo", pineScript)
 
 	if !strings.Contains(generatedCode, "ta.sma") {
@@ -41,7 +41,7 @@ volatility = request.security(syminfo.tickerid, "1D", (high - low) / close * 100
 plot(volatility, "Volatility %", color=color.red)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "arithmetic", pineScript)
 
 	if !strings.Contains(generatedCode, "secBarEvaluator") {
@@ -92,7 +92,7 @@ plot(open_1d)`,
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -126,7 +126,7 @@ plot(bb_1d_dev)`,
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -195,7 +195,7 @@ plot(dev)`,
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -216,7 +216,7 @@ indicator("NaN Test", overlay=true)
 sma20 = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 plot(sma20, "SMA20")`
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "nan_test", pineScript)
 
 	if !strings.Contains(generatedCode, "math.NaN()") {

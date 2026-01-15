@@ -1,4 +1,4 @@
-package tests
+package regression
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 /* setupGoMod creates go.mod in generated code directory for standalone compilation */
@@ -97,7 +97,7 @@ plot(dailyClose, title="Daily Close", color=color.blue)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
@@ -214,7 +214,7 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
@@ -247,7 +247,7 @@ plot(sameTFClose, title="Same-TF Close", color=color.green)
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
 
-	dataPath := testutil.FetchTestData(t, "ACN", "1h", 500)
+	dataPath := util.FetchTestData(t, "ACN", "1h", 500)
 	dataDir := filepath.Dir(dataPath)
 	resultPath := filepath.Join(testDir, "result.json")
 
@@ -335,7 +335,7 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
 	outputGoPath := filepath.Join(testDir, "output.go")
@@ -369,7 +369,7 @@ plot(dailyClose, title="Daily Close (hourly)", color=color.red)
 		t.Fatalf("Compile failed: %v\nOutput: %s", err, output)
 	}
 
-	dataPath := testutil.FetchTestData(t, "ACN", "1D", 500)
+	dataPath := util.FetchTestData(t, "ACN", "1D", 500)
 	dataDir := filepath.Dir(dataPath)
 	resultPath := filepath.Join(testDir, "result.json")
 

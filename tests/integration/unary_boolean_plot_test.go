@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestUnaryBooleanInPlot(t *testing.T) {
@@ -35,7 +35,7 @@ plot(has_signal ? 1 : 0, title="Has Signal", color=color.blue)
 		})
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	result := exec.ExecuteScriptWithCustomData(t, "unary-bool-test", pineScript, testData)
 
 	expectedTitles := []string{"Buy Active", "Sell Active", "Has Signal"}
@@ -90,7 +90,7 @@ plot(close, title="Close")
 		})
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	result := exec.ExecuteScriptWithCustomData(t, "unary-cond-test", pineScript, testData)
 
 	if len(result.Plots) == 0 {

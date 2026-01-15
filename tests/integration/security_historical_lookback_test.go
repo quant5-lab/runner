@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 /*
@@ -35,7 +35,7 @@ plot(sma_1d, "current")
 plot(prev_sma_1d, "previous")
 `
 
-	executor := testutil.NewPineExecutor(t)
+	executor := util.NewPineExecutor(t)
 	output := executor.ExecuteScript(t, "simple-prev", pineScript)
 
 	current := executor.ExtractPlotValues(t, output, "current")
@@ -72,7 +72,7 @@ plot(daily_close, "value")
 plot(changed ? 1 : 0, "changed")
 `
 
-	executor := testutil.NewPineExecutor(t)
+	executor := util.NewPineExecutor(t)
 	output := executor.ExecuteScript(t, "comparison", pineScript)
 
 	values := executor.ExtractPlotValues(t, output, "value")
@@ -113,7 +113,7 @@ plot(condition ? 1 : 0, "condition")
 plot(captured, "captured")
 `
 
-	executor := testutil.NewPineExecutor(t)
+	executor := util.NewPineExecutor(t)
 	output := executor.ExecuteScript(t, "valuewhen-chain", pineScript)
 
 	high := executor.ExtractPlotValues(t, output, "high")
@@ -153,7 +153,7 @@ plot(prev2, "prev2")
 plot(prev3, "prev3")
 `
 
-	executor := testutil.NewPineExecutor(t)
+	executor := util.NewPineExecutor(t)
 	output := executor.ExecuteScript(t, "multiple-offsets", pineScript)
 
 	current := executor.ExtractPlotValues(t, output, "current")
@@ -214,7 +214,7 @@ plot(daily_trend, "trend")
 plot(trend_changed ? 1 : 0, "changed")
 `
 
-	executor := testutil.NewPineExecutor(t)
+	executor := util.NewPineExecutor(t)
 	output := executor.ExecuteScript(t, "strategy-security", pineScript)
 
 	trend := executor.ExtractPlotValues(t, output, "trend")

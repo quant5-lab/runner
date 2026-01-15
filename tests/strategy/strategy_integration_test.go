@@ -55,7 +55,7 @@ func runStrategyTest(t *testing.T, tc StrategyTestCase) *StrategyTestResult {
 
 	golangPortDir := filepath.Join(baseDir, "../..")
 	pineGenPath := filepath.Join(golangPortDir, "pine-gen")
-	pineFile := filepath.Join(baseDir, "fixtures", tc.PineFile)
+	pineFile := filepath.Join(golangPortDir, "tests", "fixtures", "strategy", tc.PineFile)
 	dataFile := filepath.Join(baseDir, "testdata", tc.DataFile)
 
 	binaryPath := filepath.Join(os.TempDir(), "strategy-test-"+tc.Name)

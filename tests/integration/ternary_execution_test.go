@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestTernaryExecution(t *testing.T) {
@@ -43,7 +43,7 @@ plot(signal, "signal", color=color.blue)
 		{"time": 1700082800, "open": 104.0, "high": 109.0, "low": 99.0, "close": 106.0, "volume": 3300.0},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	result := exec.ExecuteScriptWithCustomData(t, "ternary-test", pineScript, testData)
 
 	signalValues := exec.ExtractPlotValues(t, result, "signal")

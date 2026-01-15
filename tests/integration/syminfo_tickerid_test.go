@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 /* TestSyminfoTickeridInSecurity validates syminfo.tickerid resolves to ctx.Symbol in security() context */
@@ -17,7 +17,7 @@ indicator("Syminfo Security", overlay=true)
 daily_close = request.security(syminfo.tickerid, "1D", close)
 plot(daily_close, "Daily Close", color=color.blue)
 `
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "syminfo-security", pineScript)
 
 	if !strings.Contains(generatedCode, "var syminfo_tickerid string") {
@@ -46,7 +46,7 @@ indicator("Syminfo TA Security", overlay=true)
 daily_sma = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 plot(daily_sma, "Daily SMA", color=color.green)
 `
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "syminfo-ta", pineScript)
 
 	if !strings.Contains(generatedCode, "var syminfo_tickerid string") {
@@ -120,7 +120,7 @@ weekly_close = request.security(syminfo.tickerid, "1W", close)
 plot(daily_close, "Daily", color=color.blue)
 plot(weekly_close, "Weekly", color=color.red)
 `
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "syminfo-multiple", pineScript)
 
 	declarationCount := strings.Count(generatedCode, "var syminfo_tickerid string")
@@ -147,7 +147,7 @@ indicator("Syminfo Complex Expression", overlay=true)
 daily_change_pct = request.security(syminfo.tickerid, "1D", (close - open) / open * 100)
 plot(daily_change_pct, "Daily % Change", color=color.orange)
 `
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "syminfo-expression", pineScript)
 
 	if !strings.Contains(generatedCode, "var syminfo_tickerid string") {
@@ -176,7 +176,7 @@ indicator("Regression Test", overlay=true)
 btc_close = request.security("BTCUSDT", "1D", close)
 plot(btc_close, "BTC Close", color=color.yellow)
 `
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "syminfo-regression", pineScript)
 
 	if !strings.Contains(generatedCode, "var syminfo_tickerid string") {

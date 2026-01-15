@@ -1,4 +1,4 @@
-package testutil
+package util
 
 import (
 	"fmt"
@@ -9,22 +9,22 @@ import (
 )
 
 /* FetchTestData fetches market data for testing using Node.js data fetchers.
- * Automatically downloads data if not cached in testdata/ohlcv/.
+ * Automatically downloads data if not cached in tests/fixtures/ohlcv/.
  *
  * This ensures tests are self-contained and can fetch required data on-demand.
  * Data is cached to avoid repeated network calls in local development.
  *
  * Example:
- *   dataFile := testutil.FetchTestData(t, "SPY", "M", 120) // 10 years monthly
- *   dataFile := testutil.FetchTestData(t, "BTCUSDT", "1h", 500) // 500 hours
+ *   dataFile := util.FetchTestData(t, "SPY", "M", 120) // 10 years monthly
+ *   dataFile := util.FetchTestData(t, "BTCUSDT", "1h", 500) // 500 hours
  */
 func FetchTestData(t *testing.T, symbol, timeframe string, bars int) string {
 	t.Helper()
 
 	projectRoot := findProjectRoot(t)
-	testdataDir := filepath.Join(projectRoot, "testdata", "ohlcv")
+	testdataDir := filepath.Join(projectRoot, "tests", "fixtures", "ohlcv")
 	if err := os.MkdirAll(testdataDir, 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
+		t.Fatalf("Failed to create fixtures directory: %v", err)
 	}
 
 	normTimeframe := timeframe

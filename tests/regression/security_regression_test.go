@@ -1,4 +1,4 @@
-package tests
+package regression
 
 import (
 	"encoding/json"
@@ -37,7 +37,7 @@ plot(dailyOpen, "Daily Open", color=color.blue)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 
 	result := compileAndRun(t, strategyPath, hourlyPath, testDir, projectRoot, "AAPL", testDir)
 
@@ -82,7 +82,7 @@ plot(dailyOpen, "Daily Open", color=color.green)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 
 	result := compileAndRun(t, strategyPath, hourlyPath, testDir, projectRoot, "FIRSTBAR", testDir)
 
@@ -131,7 +131,7 @@ plot(weeklyHigh, "Weekly High", color=color.orange)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 
 	result := compileAndRun(t, strategyPath, dailyPath, testDir, projectRoot, "UPTEST", testDir)
 
@@ -170,7 +170,7 @@ plot(sameClose, "Same TF Close", color=color.purple)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 
 	result := compileAndRun(t, strategyPath, dailyPath, testDir, projectRoot, "SAMETEST", testDir)
 
@@ -226,7 +226,7 @@ plot(dailyOpen, "Daily Open", color=color.green)
 	}
 
 	cwd, _ := os.Getwd()
-	projectRoot := filepath.Dir(cwd)
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
 
 	result := compileAndRun(t, strategyPath, hourlyPath, testDir, projectRoot, "DOWNTEST", testDir)
 

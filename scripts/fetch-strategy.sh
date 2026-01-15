@@ -93,7 +93,7 @@ elif [ "$TIMEFRAME" = "M" ]; then
 fi
 
 # Save to test data directory for future use
-TESTDATA_DIR="testdata/ohlcv"
+TESTDATA_DIR="tests/fixtures/ohlcv"
 mkdir -p "$TESTDATA_DIR"
 SAVED_FILE="${TESTDATA_DIR}/${SYMBOL}_${NORM_TIMEFRAME}.json"
 cp "$DATA_FILE" "$SAVED_FILE"
@@ -220,7 +220,7 @@ mkdir -p out
     -symbol "$SYMBOL" \
     -timeframe "$TIMEFRAME" \
     -data "$DATA_FILE" \
-    -datadir testdata/ohlcv \
+    -datadir tests/fixtures/ohlcv \
     -output out/chart-data.json || {
     echo "❌ Failed to execute strategy"
     exit 1

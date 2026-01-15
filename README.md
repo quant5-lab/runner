@@ -20,7 +20,7 @@ make fetch-strategy SYMBOL=BTCUSDT TIMEFRAME=1h BARS=500 STRATEGY=strategies/dai
 make serve-strategy SYMBOL=AAPL TIMEFRAME=1D BARS=200 STRATEGY=strategies/test-simple.pine
 
 # Run with pre-generated data file (deterministic, CI-friendly)
-make run-strategy STRATEGY=strategies/daily-lines.pine DATA=golang-port/testdata/ohlcv/BTCUSDT_1h.json
+make run-strategy STRATEGY=strategies/daily-lines.pine DATA=tests/fixtures/ohlcv/BTCUSDT_1h.json
 ```
 
 ### Build Commands
@@ -58,7 +58,7 @@ make fetch-strategy SYMBOL=SBER TIMEFRAME=1h BARS=500 STRATEGY=strategies/ema-st
 # Reproducible test (no network)
 make run-strategy \
   STRATEGY=strategies/test-simple.pine \
-  DATA=testdata/ohlcv/BTCUSDT_1h.json
+  DATA=tests/fixtures/ohlcv/BTCUSDT_1h.json
 ```
 
 ### Building Standalone Binaries
@@ -134,7 +134,7 @@ make coverage-show   # Opens in browser
 # Run strategy with existing data
 make run-strategy \
   STRATEGY=strategies/daily-lines.pine \
-  DATA=golang-port/testdata/ohlcv/BTCUSDT_1h.json
+  DATA=tests/fixtures/ohlcv/BTCUSDT_1h.json
 
 # Fetch live data and run strategy
 make fetch-strategy \
@@ -196,7 +196,7 @@ make build-strategy STRATEGY=strategies/test-simple.pine OUTPUT=test-runner
 ./golang-port/build/test-runner \
   -symbol BTCUSDT \
   -timeframe 1h \
-  -data golang-port/testdata/ohlcv/BTCUSDT_1h.json \
+  -data golang-port/tests/fixtures/ohlcv/BTCUSDT_1h.json \
   -output out/test-result.json
 
 # 6. View results

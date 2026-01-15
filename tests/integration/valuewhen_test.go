@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestValuewhen_BasicCodegen(t *testing.T) {
@@ -19,7 +19,7 @@ plot(lastBullishClose, "Last Bullish", color=color.green)
 plot(prevBullishClose, "Prev Bullish", color=color.blue)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "valuewhen-basic", pineScript)
 
 	if !strings.Contains(generatedCode, "Inline valuewhen") {
@@ -52,7 +52,7 @@ crossLevel = ta.valuewhen(crossUp, close, 0)
 plot(crossLevel, "Cross Level", color=color.orange)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "valuewhen-series", pineScript)
 
 	if !strings.Contains(generatedCode, "valuewhen") {
@@ -84,7 +84,7 @@ plot(val1, "Occurrence 1", color=color.orange)
 plot(val2, "Occurrence 2", color=color.yellow)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "valuewhen-multiple", pineScript)
 
 	occurrenceCount := strings.Count(generatedCode, "Inline valuewhen")
@@ -122,7 +122,7 @@ if buySignal
 plot(buyPrice, "Buy Price", color=color.green)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "valuewhen-strategy", pineScript)
 
 	if err := exec.CompileCode(t, generatedCode); err != nil {
@@ -145,7 +145,7 @@ lastTriggerPrice = ta.valuewhen(trigger, low, 0)
 plot(lastTriggerPrice, "Trigger Price", color=color.purple)
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "valuewhen-complex", pineScript)
 
 	if !strings.Contains(generatedCode, "triggerSeries.Get(lookbackOffset)") {
@@ -199,7 +199,7 @@ plot(v1, "Chained")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exec := testutil.NewPineExecutor(t)
+			exec := util.NewPineExecutor(t)
 			generatedCode, _ := exec.GenerateCode(t, "valuewhen-regression", tt.script)
 
 			if err := exec.CompileCode(t, generatedCode); err != nil {

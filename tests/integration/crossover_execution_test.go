@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestCrossoverExecution(t *testing.T) {
@@ -39,7 +39,7 @@ if openCrossover
 		{"time": 1704135600, "open": 100.0, "high": 114.0, "low": 108.0, "close": 110.0, "volume": 1400.0},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	rawOutput := exec.ExecuteScriptWithCustomDataRaw(t, "crossover-test", pineScript, testData)
 
 	var result struct {

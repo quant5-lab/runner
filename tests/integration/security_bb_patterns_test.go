@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 /* TestSecurityBBRealWorldPatterns tests actual security() patterns from production BB strategies */
@@ -83,7 +83,7 @@ plot(ema_1d_10, "EMA10 1D")
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -127,7 +127,7 @@ plot(bb_dev, "BB Dev")
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -179,7 +179,7 @@ plot(sma_1d, "SMA")
 		},
 	}
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
@@ -201,7 +201,7 @@ plot(sma20_1d, "SMA")
 plot(ema10_1d, "EMA")
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "inline_ta_check", pineScript)
 
 	if !strings.Contains(generatedCode, "ta.sma") {

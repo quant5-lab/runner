@@ -115,7 +115,7 @@ test-unit: ## Run unit tests (excludes integration)
 
 test-integration: ## Run integration tests
 	@echo "Running integration tests..."
-	@ $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/test-integration/...
+	@ $(GOTEST) $(TEST_FLAGS) -tags=integration ./tests/integration/...
 	@echo "✓ Integration tests passed"
 
 test-e2e: ## Run E2E tests (compile + execute all Pine fixtures/strategies)

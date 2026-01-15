@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestSeriesStrategyExecution(t *testing.T) {
@@ -28,7 +28,7 @@ if (crossunder_signal)
 
 	testData := createSMACrossoverTestData()
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	result := exec.ExecuteScriptWithCustomData(t, "series-strategy", pineScript, testData)
 
 	totalTrades := len(result.Strategy.ClosedTrades)

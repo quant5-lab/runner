@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/quant5-lab/runner/tests/testutil"
+	"github.com/quant5-lab/runner/tests/util"
 )
 
 func TestBarIndexBasic(t *testing.T) {
@@ -13,7 +13,7 @@ barIdx = bar_index
 plot(barIdx, "Bar Index")
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "bar-index-basic", pineScript)
 
 	barIndexVals := exec.ExtractPlotValues(t, output, "Bar Index")
@@ -48,7 +48,7 @@ plot(mod5, "Mod 5")
 plot(mod20, "Mod 20")
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "bar-index-modulo", pineScript)
 
 	mod5 := exec.ExtractPlotValues(t, output, "Mod 5")
@@ -106,7 +106,7 @@ plot(firstBar, "First Bar")
 plot(every10th, "Every 10th")
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "bar-index-conditional", pineScript)
 
 	firstBar := exec.ExtractPlotValues(t, output, "First Bar")
@@ -137,7 +137,7 @@ plot(gtTen, "Greater Than 10")
 plot(eqTwenty, "Equals 20")
 `
 
-	exec := testutil.NewPineExecutor(t)
+	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "bar-index-comparisons", pineScript)
 
 	gtTen := exec.ExtractPlotValues(t, output, "Greater Than 10")
