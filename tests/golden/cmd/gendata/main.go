@@ -22,6 +22,7 @@ type MarketData struct {
 	Symbol    string `json:"symbol"`
 	Timeframe string `json:"timeframe"`
 	Period    string `json:"period"`
+	Timezone  string `json:"timezone"`
 	Bars      []Bar  `json:"bars"`
 }
 
@@ -49,30 +50,33 @@ func generateSyntheticData(symbol, timeframe string, barCount int) *MarketData {
 	bars := make([]Bar, barCount)
 
 	basePrice := 100.0
-	baseTime := int64(1609459200)
+	baseTime := int64(1609772400)
 	timeInterval := getTimeInterval(timeframe)
 
+	currentPrice := basePrice
+	trendStrength := 0.0
+	volatilityRegime := 1.0
+
 	for i := 0; i < barCount; i++ {
-		trend := float64(i) * 0.05
-		volatility := 2.0
+		if i%200 == 0 {
+			trendStrength = float64((i/200)%3-1) * 0.15
+			volatilityRegime = []float64{0.5, 1.0, 2.0, 1.5}[(i/200)%4]
+		}
 
-		open := basePrice + trend + randomWalk(volatility)
-		high := open + randomPositive(volatility)
-		low := open - randomPositive(volatility)
-		close := open + randomWalk(volatility)
+		drift := trendStrength * pseudoRandom(i, 0)
+		noise := pseudoRandom(i, 1) * 0.8 * volatilityRegime
+		priceChange := drift + noise
 
-		if high < open {
-			high = open
+		if i%137 == 0 {
+			priceChange *= 2.5
 		}
-		if high < close {
-			high = close
-		}
-		if low > open {
-			low = open
-		}
-		if low > close {
-			low = close
-		}
+
+		open := currentPrice
+		close := currentPrice * (1 + priceChange/100.0)
+
+		barVolatility := volatilityRegime * (0.3 + pseudoRandom(i, 2)*0.7)
+		high := max(open, close) * (1 + barVolatility/100.0)
+		low := min(open, close) * (1 - barVolatility/100.0)
 
 		bars[i] = Bar{
 			Time:   baseTime + int64(i)*timeInterval,
@@ -80,14 +84,17 @@ func generateSyntheticData(symbol, timeframe string, barCount int) *MarketData {
 			High:   high,
 			Low:    low,
 			Close:  close,
-			Volume: 1000000 + float64(i%100)*10000,
+			Volume: 1000000 * (1 + volatilityRegime*0.5) * (0.8 + pseudoRandom(i, 3)*0.4),
 		}
+
+		currentPrice = close
 	}
 
 	return &MarketData{
 		Symbol:    symbol,
 		Timeframe: timeframe,
 		Period:    fmt.Sprintf("synthetic-%d-bars", barCount),
+		Timezone:  "America/New_York",
 		Bars:      bars,
 	}
 }
@@ -107,12 +114,24 @@ func getTimeInterval(timeframe string) int64 {
 	}
 }
 
-func randomWalk(magnitude float64) float64 {
-	return (float64(len(os.Args)%10) - 5) * magnitude / 10
+// pseudoRandom generates deterministic pseudo-random values using simple hashing
+func pseudoRandom(seed int, salt int) float64 {
+	x := (seed*2654435761 + salt*1103515245) & 0x7FFFFFFF
+	return (float64(x)/float64(0x7FFFFFFF))*2 - 1
 }
 
-func randomPositive(magnitude float64) float64 {
-	return float64(len(os.Args)%5+1) * magnitude / 5
+func max(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func saveJSON(path string, data interface{}) error {

@@ -2,12 +2,27 @@
   "version": "1.0",
   "strategy": "BB8",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-01-15T16:21:21Z",
+  "generatedAt": "2026-01-15T17:20:15Z",
   "result": {
-    "trades": [],
+    "trades": [
+      {
+        "entryId": "BB entry",
+        "entryBar": 286,
+        "entryTime": 1764613800,
+        "entryPrice": 280.590087890625,
+        "entryComment": "",
+        "exitBar": 447,
+        "exitTime": 1767709800,
+        "exitPrice": 264.0299987792969,
+        "exitComment": "",
+        "size": 2138.3650808532316,
+        "profit": -35411.51629148189,
+        "direction": "long"
+      }
+    ],
     "openTrades": [],
-    "equity": 2000000,
-    "netProfit": 0,
+    "equity": 1964588.483708518,
+    "netProfit": -35411.51629148189,
     "totalTrades": 0,
     "plots": {}
   }

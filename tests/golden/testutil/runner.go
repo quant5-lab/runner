@@ -78,10 +78,14 @@ func (r *StrategyRunner) compileStrategy(t *testing.T, goSourcePath, binaryPath 
 func (r *StrategyRunner) runStrategy(t *testing.T, binaryPath, dataPath, outputPath, symbol, timeframe string) {
 	t.Helper()
 
+	/* Security() data directory: same directory as main data file */
+	dataDir := filepath.Dir(dataPath)
+
 	cmd := exec.Command(binaryPath,
 		"-symbol", symbol,
 		"-timeframe", timeframe,
 		"-data", dataPath,
+		"-datadir", dataDir,
 		"-output", outputPath,
 	)
 

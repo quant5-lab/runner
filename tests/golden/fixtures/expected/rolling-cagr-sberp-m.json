@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "RollingCAGR",
   "dataSource": "SBERP-M.json",
-  "generatedAt": "2026-01-15T16:21:25Z",
+  "generatedAt": "2026-01-15T17:20:21Z",
   "result": {
     "trades": [],
     "openTrades": [],
