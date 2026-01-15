@@ -1,0 +1,2 @@
+Strategy fails compilation: strat.Equity undefined (type *strategy.Strategy has no field or method Equity)
+Requires Security.Equity field implementation before enabling
