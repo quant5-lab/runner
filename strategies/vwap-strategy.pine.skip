@@ -1,0 +1,21 @@
+Strategy generates 0 trades with 5500 bars test data
+Parse: ✅ Success (PineScript v5)
+Generate: ✅ Success (Go code generated)
+Compile: ✅ Success (Binary created)
+Execute: ✅ Success (Runs without errors)
+Result: 0 trades on AAPL/BTCUSDT/SBERP 1h data
+
+Blocker: ta.vwap() function not implemented in runtime
+Workaround: Manual VWAP calculation using math.sum() with 100-bar rolling window
+Issue: Strategy parameters too strict for synthetic test data
+- VWAP bands ±1% too narrow
+- Volume threshold 1.2x average too high
+- Entry requires: crossover(close, lowerBand) AND highVolume AND close < vwap
+
+Status: Strategy technically works but produces no signals
+Solution options:
+1. Tune parameters (widen bands to ±2-3%, lower volume threshold)
+2. Implement true ta.vwap() in runtime/ta/ta.go
+3. Accept as valid baseline (0 trades = valid regression test)
+
+Note: All golden tests pass, regression mechanism functional

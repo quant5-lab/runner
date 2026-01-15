@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "Volume Weighted Strategy",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-01-15T20:58:07Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 1000000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

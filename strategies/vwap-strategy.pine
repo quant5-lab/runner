@@ -1,0 +1,40 @@
+//@version=5
+strategy("Volume Weighted Strategy", shorttitle="VWAP", overlay=true, default_qty_type=strategy.cash, default_qty_value=1000000, initial_capital=1000000, commission_type=strategy.commission.percent, commission_value=0.1)
+
+// Manual VWAP calculation (since ta.vwap() not implemented)
+// VWAP = Cumulative(Typical Price × Volume) / Cumulative(Volume)
+typicalPrice = (high + low + close) / 3
+cumulativeTPV = math.sum(typicalPrice * volume, 100)
+cumulativeVol = math.sum(volume, 100)
+vwap = cumulativeTPV / cumulativeVol
+
+// Deviation bands (±1% from VWAP)
+upperBand = vwap * 1.01
+lowerBand = vwap * 0.99
+
+// Volume confirmation (above 20-period average)
+avgVolume = ta.sma(volume, 20)
+highVolume = volume > avgVolume * 1.2
+
+plot(vwap, "VWAP", color=color.blue, linewidth=2)
+plot(upperBand, "Upper Band", color=color.gray, linewidth=1)
+plot(lowerBand, "Lower Band", color=color.gray, linewidth=1)
+
+// Long: Price crosses above lower band with high volume
+crossAboveLower = ta.crossover(close, lowerBand)
+longCondition = crossAboveLower and highVolume and close < vwap
+
+// Exit: Price reaches VWAP or crosses above upper band
+crossAboveUpper = ta.crossover(close, upperBand)
+exitCondition = close >= vwap or crossAboveUpper
+
+if longCondition
+    strategy.entry("Long", strategy.long, comment="VWAP Long")
+
+if exitCondition and strategy.position_size > 0
+    strategy.close("Long", comment="VWAP Exit")
+
+// Visual signals
+plotshape(longCondition, "Buy", shape.triangleup, location.belowbar, color=color.green, size=size.small)
+plotshape(exitCondition and strategy.position_size > 0, "Sell", shape.triangledown, location.abovebar, color=color.red, size=size.small)
+
