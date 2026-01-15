@@ -1,0 +1,10 @@
+Codegen limitation: Generated code references strat.Equity field which doesn't exist in runtime
+Parse: ✅ Success (PineScript v4)
+Generate: ✅ Success (Go code generated)
+Compile: ❌ Fails (Go compilation error)
+Execute: ❌ Not reached
+Error: "strat.Equity undefined (type *strategy.Strategy has no field or method Equity)"
+Blocker: Codegen uses strategy.percent_of_equity but generates .Equity field access, runtime has different field name
+Solution: Either fix codegen to use correct field name OR add Equity field to runtime Strategy struct
+Note: Strategy logic is valid (BB bands + RSI oversold/overbought), limitation is codegen/runtime mismatch
+Related: default_qty_type=strategy.percent_of_equity parameter triggers this codegen path

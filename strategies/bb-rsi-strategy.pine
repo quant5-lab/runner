@@ -1,0 +1,55 @@
+//@version=4
+strategy("BB + RSI Strategy", shorttitle="BB+RSI", overlay=true, 
+         default_qty_type=strategy.percent_of_equity, default_qty_value=100,
+         initial_capital=100000, commission_type=strategy.commission.percent, 
+         commission_value=0.1)
+
+// Bollinger Bands + RSI Strategy from golden-strategies.md
+// Entry: BB breakout + RSI confirmation
+// Exit: Opposite BB band or RSI reversal
+
+// Inputs
+bb_length = input(20, "BB Length", minval=1)
+bb_mult = input(2.0, "BB StdDev", minval=0.1, step=0.1, type=input.float)
+rsi_length = input(14, "RSI Length", minval=1)
+rsi_oversold = input(30, "RSI Oversold", minval=1, maxval=50)
+rsi_overbought = input(70, "RSI Overbought", minval=50, maxval=99)
+
+// Bollinger Bands calculation
+bb_basis = sma(close, bb_length)
+bb_dev = bb_mult * stdev(close, bb_length)
+bb_upper = bb_basis + bb_dev
+bb_lower = bb_basis - bb_dev
+
+// RSI calculation (manual implementation)
+rsi_src = close
+rsi_up = rma(max(change(rsi_src), 0), rsi_length)
+rsi_down = rma(-min(change(rsi_src), 0), rsi_length)
+rsi_value = rsi_down == 0 ? 100 : rsi_up == 0 ? 0 : 100 - 100 / (1 + rsi_up / rsi_down)
+
+// Entry conditions
+long_condition = close < bb_lower and rsi_value < rsi_oversold
+short_condition = close > bb_upper and rsi_value > rsi_overbought
+
+// Exit conditions
+long_exit = close > bb_upper or rsi_value > rsi_overbought
+short_exit = close < bb_lower or rsi_value < rsi_oversold
+
+// Strategy execution
+if long_condition
+    strategy.entry("Long", strategy.long)
+
+if short_condition
+    strategy.entry("Short", strategy.short)
+
+if long_exit
+    strategy.close("Long")
+
+if short_exit
+    strategy.close("Short")
+
+// Plot Bollinger Bands
+plot(bb_basis, "BB Basis", color=color.blue)
+plot(bb_upper, "BB Upper", color=color.red)
+plot(bb_lower, "BB Lower", color=color.green)
+
