@@ -4,7 +4,6 @@ High-performance PineScript v5 parser, transpiler, and runtime written in Go for
 
 ## Tooling
 
-- **pine-inspect**: AST parser/debugger (outputs JSON AST for inspection)
 - **pine-gen**: Code generator (transpiles .pine → Go source)
 - **Strategy binaries**: Standalone executables (compiled per-strategy)
 
@@ -193,10 +192,10 @@ make bench-series
 
 # 5. Build a strategy and test it
 make build-strategy STRATEGY=strategies/test-simple.pine OUTPUT=test-runner
-./golang-port/build/test-runner \
+./build/test-runner \
   -symbol BTCUSDT \
   -timeframe 1h \
-  -data golang-port/tests/fixtures/ohlcv/BTCUSDT_1h.json \
+  -data tests/fixtures/ohlcv/BTCUSDT_1h.json \
   -output out/test-result.json
 
 # 6. View results
@@ -216,23 +215,18 @@ make ci
 
 ```bash
 # Verbose test output
-cd golang-port
 go test -v ./tests/integration/
 
 # Test specific function
-cd golang-port
 go test -v ./tests/integration -run TestSecurity
 
 # Check for race conditions
-cd golang-port
 go test -race -count=10 ./...
 
 # Benchmark specific package
-cd golang-port
 go test -bench=. -benchmem -benchtime=5s ./runtime/series/
 
 # Memory profiling
-cd golang-port
 go test -memprofile=mem.prof -bench=. ./runtime/series/
 go tool pprof mem.prof
 ```
