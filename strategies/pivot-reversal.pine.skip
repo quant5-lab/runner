@@ -1,0 +1,61 @@
+Runtime limitation: Drawing objects (line.*, label.*) and array.* operations not implemented
+
+Parse: ✅ Success (PineScript v5 syntax valid)
+Generate: ❌ Fails (Missing runtime support)
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Error: "Codegen error: line.new() not supported - drawing objects not implemented"
+       "Codegen error: label.new() not supported - drawing objects not implemented"
+       "Codegen error: array.new_line() not supported - array operations not implemented"
+
+Blocker: Strategy requires three unimplemented runtime features:
+  1. array.* package (array.new_line, array.new_label, array.new_float, array.push, array.remove, array.get, array.size, array.includes)
+  2. line.* drawing objects (line.new, line.set_x2, line.get_y1, line.delete, line.style_*)
+  3. label.* drawing objects (label.new, label.set_x, label.get_text, label.set_text, label.delete, label.style_*)
+
+Solution: Implement runtime packages for:
+  - /runtime/array/array.go (dynamic array operations)
+  - /runtime/visual/line.go (line drawing objects with lifecycle management)
+  - /runtime/visual/label.go (label drawing objects with lifecycle management)
+  
+  Codegen must support:
+  - Object-oriented method calls (line.set_x2, label.delete)
+  - Generic array operations with type safety
+  - Visual object serialization to output format
+
+Note: Original strategy tracks pivot levels using persistent arrays and draws horizontal
+      lines/labels that dynamically update or remove when price breaks through levels.
+      This is a sophisticated institutional-style support/resistance tracking system.
+
+Related: Other strategies requiring drawing objects:
+  - Supply & Demand Zones (box.*, line.*)
+  - Fibonacci levels (line.*)
+  - Trendline detection (line.*)
+
+Source: https://github.com/800cherries/Tradingview-Indicators/blob/main/indicators/Reversal%20Pivot%20Points
+TradingView: https://www.tradingview.com/script/OGeG7pyt-Reversal-Pivot-Points/
+
+Workaround: Create simplified version without drawing objects:
+  - Use ta.pivothigh/ta.pivotlow directly (✅ implemented)
+  - Store single float values instead of arrays
+  - Use plot() instead of line.new() for visualization
+  - Generate strategy.entry() signals on pivot detection
+  - Skip dynamic level tracking (trade immediately on pivot)
+
+Simplified Alternative: /strategies/pivot-reversal-simple.pine
+  - Tests pivot detection logic without visual objects
+  - Validates ta.pivothigh/ta.pivotlow correctness
+  - Provides immediate strategy entry signals
+  - Can be used for golden reference testing NOW
+
+Estimated Implementation Effort:
+  - array.* package: 2-3 weeks (generic types, GC, performance)
+  - line.* objects: 2-3 weeks (object lifecycle, visual output format)
+  - label.* objects: 1-2 weeks (similar to line.* but simpler)
+  - Integration testing: 1 week
+  Total: 6-9 weeks for full feature parity
+
+File Purpose: Documentation of blocker for future reference when implementing
+              drawing object support. Strategy code preserved for validation
+              once runtime features are implemented.
