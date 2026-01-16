@@ -223,6 +223,12 @@ func (ih *InputHandler) GetInputConstantsMap() map[string]float64 {
 	return result
 }
 
+/* IsInputConstant returns true if varName is tracked as input constant */
+func (ih *InputHandler) IsInputConstant(varName string) bool {
+	_, exists := ih.inputConstants[varName]
+	return exists
+}
+
 /* Helper function to extract function name from CallExpression */
 func extractFunctionNameFromCall(call *ast.CallExpression) string {
 	if member, ok := call.Callee.(*ast.MemberExpression); ok {

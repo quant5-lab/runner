@@ -14,5 +14,6 @@
 | **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
 | **13** | **Codegen** | `ta.atr()` literal period requirement | ✅ **VALID** | Parse✅ Generate❌: "ta.atr period must be literal". Blocks supertrend.pine |
 | **14** | **Codegen** | TA member expression arguments | ✅ **VALID** | Parse✅ Generate❌: "unsupported member expression in TA call". Blocks keltner-squeeze.pine |
-| **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **VALID** | Parse✅ Generate❌: "ta.crossover requires CallExpression arguments". Blocks mtf-confirmation-strategy.pine |
-| **16** | **Codegen** | `ta.crossover()` syntax error in generated code | ✅ **VALID** | Parse✅ Generate✅ Compile❌: "syntax error: unexpected keyword if". Blocks macd-crossover.pine |
+| **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
+| **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
+| **17** | **Codegen** | Tuple destructuring syntax | ✅ **FIXED** | Universal tuple indicator architecture implemented. MACD, BB, Stoch supported via data-driven registry. |

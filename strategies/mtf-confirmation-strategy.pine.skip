@@ -1,6 +1,0 @@
-Codegen limitation: ta.crossover requires CallExpression arguments for inline generation
-
-Parse: ✅ Success
-Generate: ❌ Fails (ta.crossover requires CallExpression arguments)
-Compile: ❌ Not reached
-Execute: ❌ Not reached

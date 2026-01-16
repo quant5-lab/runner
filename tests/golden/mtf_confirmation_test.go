@@ -5,7 +5,7 @@ import (
 )
 
 func TestMTF_AAPL_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover requires inline expression arguments - see mtf-confirmation-strategy.pine.skip")
+	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +19,7 @@ func TestMTF_AAPL_Hourly(t *testing.T) {
 }
 
 func TestMTF_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover requires inline expression arguments - see mtf-confirmation-strategy.pine.skip")
+	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +33,7 @@ func TestMTF_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestMTF_SBERP_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover requires inline expression arguments - see mtf-confirmation-strategy.pine.skip")
+	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

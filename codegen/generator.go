@@ -65,6 +65,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 	gen.symbolTable = NewSymbolTable()
 	gen.literalFormatter = NewLiteralFormatter()
+	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
@@ -98,12 +99,12 @@ type generator struct {
 	inSecurityContext        bool
 	inArrowFunctionBody      bool
 	hasSecurityCalls         bool
-	hasSecurityExprEvals     bool // Track if security() calls with complex expressions exist
-	hasStrategyRuntimeAccess bool // Track if strategy.* runtime values are accessed
-	hasBarIndexUsage         bool // Track if bar_index is used
+	hasSecurityExprEvals     bool
+	hasStrategyRuntimeAccess bool
+	hasBarIndexUsage         bool
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
-	hoistedArrowContexts     []ArrowCallSite // Contexts pre-allocated before bar loop
+	hoistedArrowContexts     []ArrowCallSite
 
 	constantRegistry *ConstantRegistry
 	typeSystem       *TypeInferenceEngine
@@ -130,8 +131,9 @@ type generator struct {
 	signatureRegistrar      *SignatureRegistrar
 	arrowContextLifecycle   *ArrowContextLifecycleManager
 	returnValueStorage      *ReturnValueSeriesStorageHandler
-	symbolTable             SymbolTable // Tracks variable types for type-aware code generation
+	symbolTable             SymbolTable
 	literalFormatter        *LiteralFormatter
+	tupleIndicatorHandler   *TupleIndicatorHandler
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -546,6 +548,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
+				if _, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					continue
+				}
+
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 					funcName := g.extractFunctionName(callExpr.Callee)
 					if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
@@ -789,6 +795,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
 			continue
 		}
+		/* Skip input constants - they don't have Series versions */
+		if g.inputHandler != nil && g.inputHandler.IsInputConstant(varName) {
+			continue
+		}
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
 
@@ -804,6 +814,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {
+			continue
+		}
+		if g.inputHandler != nil && g.inputHandler.IsInputConstant(varName) {
 			continue
 		}
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, varName)
@@ -2467,6 +2480,11 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 		return g.generateUserDefinedFunctionTupleCall(varNames, funcName, callExpr)
 	}
 
+	/* Delegate tuple-returning TA functions to specialized handlers */
+	if g.tupleIndicatorHandler.CanHandle(funcName) {
+		return g.tupleIndicatorHandler.GenerateTupleCode(g, varNames, callExpr)
+	}
+
 	initCode, err := g.generateCallExpression(callExpr)
 	if err != nil {
 		return "", err
@@ -2786,6 +2804,11 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	// Handle Series.Get(0) → Series.Get(1)
 	if strings.HasSuffix(seriesCode, "Series.Get(0)") {
 		return strings.Replace(seriesCode, "Series.Get(0)", "Series.Get(1)", 1)
+	}
+
+	// Handle Series.GetCurrent() → Series.Get(1)
+	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
+		return strings.Replace(seriesCode, "Series.GetCurrent()", "Series.Get(1)", 1)
 	}
 
 	// For non-Series user variables, return 0.0 (shouldn't happen in crossover with Series)

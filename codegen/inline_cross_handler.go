@@ -6,7 +6,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* CrossInlineHandler generates inline expressions for ta.crossover and ta.crossunder */
 type CrossInlineHandler struct {
 	isUnder bool
 }
@@ -27,56 +26,57 @@ func (h *CrossInlineHandler) CanHandle(funcName string) bool {
 }
 
 func (h *CrossInlineHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
+	funcName := h.functionName()
+
 	if len(expr.Arguments) < 2 {
-		funcName := "ta.crossover"
-		if h.isUnder {
-			funcName = "ta.crossunder"
-		}
 		return "", fmt.Errorf("%s requires 2 arguments", funcName)
 	}
 
-	arg1Call, isCall1 := expr.Arguments[0].(*ast.CallExpression)
-	arg2Call, isCall2 := expr.Arguments[1].(*ast.CallExpression)
-
-	if !isCall1 || !isCall2 {
-		funcName := "ta.crossover"
-		if h.isUnder {
-			funcName = "ta.crossunder"
-		}
-		return "", fmt.Errorf("%s requires CallExpression arguments for inline generation", funcName)
-	}
-
-	inline1, err := g.plotExprHandler.Generate(arg1Call)
+	inline1, err := g.plotExprHandler.Generate(expr.Arguments[0])
 	if err != nil {
-		funcName := "ta.crossover"
-		if h.isUnder {
-			funcName = "ta.crossunder"
-		}
 		return "", fmt.Errorf("%s arg1 inline generation failed: %w", funcName, err)
 	}
 
-	inline2, err := g.plotExprHandler.Generate(arg2Call)
+	inline2, err := g.plotExprHandler.Generate(expr.Arguments[1])
 	if err != nil {
-		funcName := "ta.crossover"
-		if h.isUnder {
-			funcName = "ta.crossunder"
-		}
 		return "", fmt.Errorf("%s arg2 inline generation failed: %w", funcName, err)
 	}
 
-	/* Generate IIFE that:
-	 * 1. Evaluates both expressions at current bar
-	 * 2. Temporarily decrements ctx.BarIndex to evaluate at previous bar
-	 * 3. Compares current vs previous to detect crossover/crossunder
-	 * 4. Restores ctx.BarIndex
-	 */
-	if h.isUnder {
-		/* crossunder: curr1 < curr2 && prev1 >= prev2 (series1 crosses BELOW series2) */
-		return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 < curr2 && prev1 >= prev2 }())",
-			inline1, inline2, inline1, inline2), nil
-	}
+	return h.buildCrossDetectionIIFE(inline1, inline2), nil
+}
 
-	/* crossover: curr1 > curr2 && prev1 <= prev2 (series1 crosses ABOVE series2) */
-	return fmt.Sprintf("(func() bool { if ctx.BarIndex == 0 { return false }; curr1 := (%s); curr2 := (%s); prevBarIdx := ctx.BarIndex; ctx.BarIndex--; prev1 := (%s); prev2 := (%s); ctx.BarIndex = prevBarIdx; return curr1 > curr2 && prev1 <= prev2 }())",
-		inline1, inline2, inline1, inline2), nil
+func (h *CrossInlineHandler) functionName() string {
+	if h.isUnder {
+		return "ta.crossunder"
+	}
+	return "ta.crossover"
+}
+
+func (h *CrossInlineHandler) buildCrossDetectionIIFE(expr1, expr2 string) string {
+	operator := h.crossOperator()
+	reverseOp := h.reverseCrossOperator()
+
+	return fmt.Sprintf(
+		"(func() bool { if ctx.BarIndex == 0 { return false }; "+
+			"curr1 := (%s); curr2 := (%s); "+
+			"prevBarIdx := ctx.BarIndex; ctx.BarIndex--; "+
+			"prev1 := (%s); prev2 := (%s); "+
+			"ctx.BarIndex = prevBarIdx; "+
+			"return curr1 %s curr2 && prev1 %s prev2 }())",
+		expr1, expr2, expr1, expr2, operator, reverseOp,
+	)
+}
+
+func (h *CrossInlineHandler) crossOperator() string {
+	if h.isUnder {
+		return "<"
+	}
+	return ">"
+}
+
+func (h *CrossInlineHandler) reverseCrossOperator() string {
+	if h.isUnder {
+		return ">="
+	}
+	return "<="
 }

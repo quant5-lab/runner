@@ -1,6 +1,0 @@
-Codegen limitation: syntax error in generated crossover code
-
-Parse: ✅ Success
-Generate: ✅ Success
-Compile: ❌ Fails (syntax error: unexpected keyword if, expected expression)
-Execute: ❌ Not reached

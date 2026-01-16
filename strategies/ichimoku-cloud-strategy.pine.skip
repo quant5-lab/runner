@@ -1,7 +1,7 @@
-Codegen limitation: ta.crossover/crossunder requires inline expression arguments
+Codegen limitation: ta.ichimoku() function not implemented
 
 Parse: ✅ (AST generation successful)
-Generate: ❌ (Error: ta.crossover requires CallExpression arguments for inline generation)
+Generate: ❌ (ta.ichimoku() not implemented)
 Compile: ❌ (Cannot proceed due to codegen failure)
 Execute: ❌ (Cannot proceed due to compilation failure)
 

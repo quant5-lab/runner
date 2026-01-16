@@ -5,7 +5,7 @@ import (
 )
 
 func TestIchimokuCloud_AAPL_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover/crossunder requires inline expression arguments - see ichimoku-cloud-strategy.pine.skip")
+	t.Skip("Codegen limitation: ta.ichimoku() not implemented - see ichimoku-cloud-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +19,7 @@ func TestIchimokuCloud_AAPL_Hourly(t *testing.T) {
 }
 
 func TestIchimokuCloud_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover/crossunder requires inline expression arguments - see ichimoku-cloud-strategy.pine.skip")
+	t.Skip("Codegen limitation: ta.ichimoku() not implemented - see ichimoku-cloud-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +33,7 @@ func TestIchimokuCloud_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestIchimokuCloud_SBERP_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: ta.crossover/crossunder requires inline expression arguments - see ichimoku-cloud-strategy.pine.skip")
+	t.Skip("Codegen limitation: ta.ichimoku() not implemented - see ichimoku-cloud-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
