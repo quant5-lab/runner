@@ -12,7 +12,7 @@
 | **10** | **Codegen** | String functions (`str.*`) | ✅ **VALID** | `str.tostring()`, `str.tonumber()`, `str.split()` generate TODO comments |
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
 | **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
-| **13** | **Codegen** | `ta.atr()` literal period requirement | ✅ **FIXED** | Now supports input() variables via constEvaluator. supertrend.pine now fails on different blocker (lowest in condition) |
+| **13** | **Codegen** | `lowest()`/`highest()` in conditions | ✅ **FIXED** | Added inline handlers. supertrend.pine: Parse✅ Generate✅ Compile✅. Remaining: strategy.exit() not triggered |
 | **14** | **Codegen** | TA member expression arguments | ✅ **VALID** | Parse✅ Generate❌: "unsupported member expression in TA call". Blocks keltner-squeeze.pine |
 | **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
 | **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |

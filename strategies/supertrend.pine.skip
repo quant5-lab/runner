@@ -1,7 +1,6 @@
-Codegen limitation: lowest() inline function not supported in condition contextCodegen limitation: ta.atr period must be literal integer
-
+Runtime limitation: strategy.exit() not triggered
 
 Parse: ✅ Success
-Generate: ❌ Fails (ta.atr period must be literal)
-Compile: ❌ Not reached
-Execute: ❌ Not reached
+Generate: ✅ Success
+Compile: ✅ Success
+Execute: ⚠️ Partial (entries work, exits don't trigger)
