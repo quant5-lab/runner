@@ -1,4 +1,5 @@
-Codegen limitation: ta.atr period must be literal integer
+Codegen limitation: lowest() inline function not supported in condition contextCodegen limitation: ta.atr period must be literal integer
+
 
 Parse: ✅ Success
 Generate: ❌ Fails (ta.atr period must be literal)

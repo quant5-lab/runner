@@ -381,42 +381,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 					funcName := g.extractFunctionName(callExpr.Callee)
 
-					// Generate input constants immediately (if handler exists)
+					/* Generate input constants immediately (if handler exists) */
 					if g.inputHandler != nil {
-						// Handle Pine v4 generic input() - infer type from arguments
+						/* Handle Pine v4 generic input() - infer type from arguments */
 						if funcName == "input" && len(callExpr.Arguments) > 0 {
-							// Check for type=input.session ObjectExpression
-							for _, arg := range callExpr.Arguments {
-								if objExpr, ok := arg.(*ast.ObjectExpression); ok {
-									for _, prop := range objExpr.Properties {
-										if keyId, ok := prop.Key.(*ast.Identifier); ok && keyId.Name == "type" {
-											if memExpr, ok := prop.Value.(*ast.MemberExpression); ok {
-												if objId, ok := memExpr.Object.(*ast.Identifier); ok {
-													if propId, ok := memExpr.Property.(*ast.Identifier); ok {
-														if objId.Name == "input" && propId.Name == "session" {
-															funcName = "input.session"
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-							// Infer from first literal arg if not already determined
-							if funcName == "input" {
-								if lit, ok := callExpr.Arguments[0].(*ast.Literal); ok {
-									switch v := lit.Value.(type) {
-									case float64:
-										if v == float64(int(v)) {
-											funcName = "input.int"
-										} else {
-											funcName = "input.float"
-										}
-									case int:
-										funcName = "input.int"
-									}
-								}
+							/* Check for type=input.* ObjectExpression (v4 syntax) */
+							if detectedType := detectV4InputType(callExpr); detectedType != "" {
+								funcName = detectedType
+							} else if inferredType := inferInputTypeFromLiteral(callExpr); inferredType != "" {
+								/* Infer from first literal arg if not already determined */
+								funcName = inferredType
 							}
 						}
 
@@ -2161,22 +2135,9 @@ func (g *generator) generateInlineTA(varName string, funcName string, call *ast.
 
 	/* ATR special case: requires 1 argument (period only) */
 	if normalizedFunc == "ta.atr" {
-		if len(call.Arguments) < 1 {
-			return "", fmt.Errorf("ta.atr requires 1 argument (period)")
-		}
-		periodArg, ok := call.Arguments[0].(*ast.Literal)
-		if !ok {
-			return "", fmt.Errorf("ta.atr period must be literal")
-		}
-		// Handle both int and float64 literals
-		var period int
-		switch v := periodArg.Value.(type) {
-		case float64:
-			period = int(v)
-		case int:
-			period = v
-		default:
-			return "", fmt.Errorf("ta.atr period must be numeric")
+		period, err := extractSinglePeriodArgument(g, call, "ta.atr")
+		if err != nil {
+			return "", err
 		}
 		return g.generateInlineATR(varName, period)
 	}

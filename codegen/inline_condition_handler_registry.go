@@ -24,6 +24,8 @@ func NewInlineConditionHandlerRegistry() *InlineConditionHandlerRegistry {
 			NewCrossunderInlineHandler(),
 			NewChangeInlineHandler(),
 			NewSecurityInlineHandler(),
+			NewLowestInlineHandler(),
+			NewHighestInlineHandler(),
 		},
 	}
 }
