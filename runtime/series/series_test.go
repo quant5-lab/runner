@@ -1,6 +1,7 @@
 package series
 
 import (
+	"math"
 	"testing"
 )
 
@@ -61,14 +62,14 @@ func TestSeriesSetGet(t *testing.T) {
 func TestSeriesWarmupPeriod(t *testing.T) {
 	s := NewSeries(10)
 
-	// Bar 0: no history, Get(1) should return 0.0
+	// Bar 0: no history, Get(1) should return NaN (PineScript semantics)
 	s.Set(100.0)
-	if got := s.Get(1); got != 0.0 {
-		t.Errorf("Warmup: expected 0.0 for Get(1) on first bar, got %f", got)
+	if got := s.Get(1); !math.IsNaN(got) {
+		t.Errorf("Warmup: expected NaN for Get(1) on first bar, got %f", got)
 	}
 
-	if got := s.Get(5); got != 0.0 {
-		t.Errorf("Warmup: expected 0.0 for Get(5) on first bar, got %f", got)
+	if got := s.Get(5); !math.IsNaN(got) {
+		t.Errorf("Warmup: expected NaN for Get(5) on first bar, got %f", got)
 	}
 }
 

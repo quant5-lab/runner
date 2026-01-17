@@ -1,6 +1,9 @@
 package series
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Series is a forward-only buffer for Pine Script series variables
 // Enforces immutability of historical values and prevents future writes
@@ -50,8 +53,7 @@ func (s *Series) Get(offset int) float64 {
 	targetIndex := s.cursor - offset
 
 	if targetIndex < 0 {
-		// Warmup period - return 0.0 (Pine Script uses na, we use 0.0)
-		return 0.0
+		return math.NaN()
 	}
 
 	return s.buffer[targetIndex]

@@ -3,7 +3,6 @@ package codegen
 import (
 	"fmt"
 	"math"
-	"os"
 	"regexp"
 	"strings"
 
@@ -434,9 +433,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 						}
 					}
 					if funcName == "input.source" {
-						// input.source is an alias to an existing series
-						// Don't add to variables - handle specially in codegen
 						g.constants[varName] = funcName
+						g.variables[varName] = "float"
+						g.typeSystem.RegisterVariable(varName, "float")
 						continue
 					}
 
@@ -977,8 +976,10 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			}
 		}
 
-		// Check if it's a constant
-		if _, isConstant := g.constants[e.Name]; isConstant {
+		if constVal, isConstant := g.constants[e.Name]; isConstant {
+			if constVal == "input.source" {
+				return e.Name + "Series.GetCurrent()", nil
+			}
 			return e.Name, nil
 		}
 
@@ -1291,8 +1292,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return "float64(i)", nil
 		}
 
-		// Check if it's an input constant
-		if _, isConstant := g.constants[varName]; isConstant {
+		if constVal, isConstant := g.constants[varName]; isConstant {
+			if constVal == "input.source" {
+				return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
+			}
 			return varName, nil
 		}
 
@@ -1348,18 +1351,26 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 		varName := id.Name
 
-		// CODEGEN DEBUG - log all variables reaching this point
-		fmt.Fprintf(os.Stderr, "⚡ VARDECL: varName=%s Kind=%s reassigned=%v\n", varName, decl.Kind, g.reassignedVars[varName])
-		os.Stderr.Sync()
-
-		// Skip initial assignment (Kind="let") if variable has reassignment (Kind="var")
-		// This prevents double Set() calls that overwrite reassignment logic
-		// Example: sr_xup = 0.0 (skip) + sr_xup := ternary (generate)
+		/* Skip zero-literal placeholders for reassigned variables */
 		if decl.Kind == "let" && g.reassignedVars[varName] {
-			continue
+			if lit, isLiteral := declarator.Init.(*ast.Literal); isLiteral {
+				isZero := false
+				switch v := lit.Value.(type) {
+				case float64:
+					isZero = v == 0
+				case int:
+					isZero = v == 0
+				case int64:
+					isZero = v == 0
+				case string:
+					isZero = v == "" || v == "0" || v == "0.0"
+				}
+				if isZero {
+					continue
+				}
+			}
 		}
 
-		// Handle arrow function declarations (user-defined functions)
 		if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
 			// Already generated before bar loop - skip here
 			continue
@@ -1368,6 +1379,10 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		// Check if this is an input.* function call
 		if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 			funcName := g.extractFunctionName(callExpr.Callee)
+
+			if constVal, isConst := g.constants[varName]; isConst && constVal == "input.source" {
+				funcName = "input.source"
+			}
 
 			// Handle input functions
 			if funcName == "input.float" || funcName == "input.int" ||
@@ -1378,16 +1393,28 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			}
 
 			if funcName == "input.source" {
-				// input.source(defval=close) means varName is an alias to close
-				// Generate comment only - actual usage will reference source directly
-				code += g.ind() + fmt.Sprintf("// %s = input.source() - using source directly\n", varName)
+				sourceSeries := "close"
+				if len(callExpr.Arguments) > 0 {
+					if id, ok := callExpr.Arguments[0].(*ast.Identifier); ok {
+						sourceSeries = id.Name
+					}
+				}
+				if seriesCode, resolved := g.builtinHandler.TryResolveIdentifier(&ast.Identifier{Name: sourceSeries}, false); resolved {
+					code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, seriesCode)
+				} else {
+					code += g.ind() + fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", varName, sourceSeries)
+				}
 				continue
 			}
 		}
 
-		// Skip if already registered as constant (handled in first pass)
+		/* Skip constants EXCEPT input.source */
 		if g.constantRegistry.IsConstant(varName) {
-			continue
+			if constValue, exists := g.constants[varName]; exists && constValue == "input.source" {
+				/* input.source needs initialization */
+			} else {
+				continue
+			}
 		}
 
 		varType := g.inferVariableType(declarator.Init)
@@ -2113,6 +2140,14 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		handler := NewTimeHandler(g.ind())
 		return handler.HandleVariableInit(varName, call), nil
 
+	case "nz":
+		/* nz(x, replacement) - replaces NaN with replacement value (default 0) */
+		nzCode, err := g.valueHandler.generateNz(call.Arguments, g)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, nzCode), nil
+
 	default:
 		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
 			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
@@ -2668,12 +2703,13 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 
 		return g.extractMemberName(e)
 	case *ast.Identifier:
-		// Check if it's an input constant
-		if _, isConstant := g.constants[e.Name]; isConstant {
+		if constVal, isConstant := g.constants[e.Name]; isConstant {
+			if constVal == "input.source" {
+				return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
+			}
 			return e.Name
 		}
 
-		// Try builtin identifier resolution first
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
 			return code
 		}

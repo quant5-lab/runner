@@ -1,0 +1,27 @@
+//@version=5
+strategy("Test Exit Orders", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Simple moving average crossover
+fastMA = ta.sma(close, 10)
+slowMA = ta.sma(close, 20)
+
+// Entry signals with 'when' condition
+buySignal = ta.crossover(fastMA, slowMA)
+sellSignal = ta.crossunder(fastMA, slowMA)
+
+// Enter long when buySignal is true
+if (buySignal)
+    strategy.entry("Long", strategy.long, when=buySignal)
+
+// Enter short when sellSignal is true  
+if (sellSignal)
+    strategy.entry("Short", strategy.short, when=sellSignal)
+
+// Exit orders with stop loss and take profit
+// These should persist across bars until triggered
+strategy.exit("Exit Long", from_entry="Long", stop=close * 0.98, limit=close * 1.02)
+strategy.exit("Exit Short", from_entry="Short", stop=close * 1.02, limit=close * 0.98)
+
+// Plot MAs
+plot(fastMA, color=color.blue, title="Fast MA")
+plot(slowMA, color=color.red, title="Slow MA")

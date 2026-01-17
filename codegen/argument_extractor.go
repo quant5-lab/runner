@@ -126,6 +126,37 @@ func (e *ArgumentExtractor) ExtractCommentArgument(args []ast.Expression, argNam
 }
 
 /*
+ExtractConditionArgument extracts boolean condition parameter (when=buySignal).
+Returns generated code expression and success boolean.
+*/
+func (e *ArgumentExtractor) ExtractConditionArgument(args []ast.Expression, argName string) (string, bool) {
+	if len(args) == 0 {
+		return "", false
+	}
+
+	lastArg := args[len(args)-1]
+	objExpr, isObject := lastArg.(*ast.ObjectExpression)
+	if !isObject {
+		return "", false
+	}
+
+	for _, prop := range objExpr.Properties {
+		if prop.Key == nil {
+			continue
+		}
+		keyIdent, isIdent := prop.Key.(*ast.Identifier)
+		if !isIdent || keyIdent.Name != argName {
+			continue
+		}
+
+		// Extract condition expression
+		code := e.generator.extractSeriesExpression(prop.Value)
+		return strings.TrimRight(code, "\n"), true
+	}
+	return "", false
+}
+
+/*
 extractCommentValue converts AST expression to Go string literal or identifier.
 */
 func (e *ArgumentExtractor) extractCommentValue(expr ast.Expression) string {

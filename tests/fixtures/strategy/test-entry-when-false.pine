@@ -1,0 +1,5 @@
+//@version=5
+strategy("Entry When False", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Entry with always-false condition should produce zero trades
+strategy.entry("Long", strategy.long, when=false)

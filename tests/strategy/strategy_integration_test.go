@@ -395,3 +395,160 @@ func TestCommentIntegration(t *testing.T) {
 	result := runStrategyTest(t, tc)
 	tc.ValidateTrades(t, result)
 }
+
+/* TestEntryWhenTrue validates conditional entry execution with when parameter */
+func TestEntryWhenTrue(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "entry-when-true",
+		PineFile: "test-entry-when-true.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			totalTrades := len(result.Trades) + len(result.OpenTrades)
+			if totalTrades < 1 {
+				t.Errorf("Expected at least 1 trade (when condition met), got %d", totalTrades)
+				return
+			}
+
+			/* Entry should happen when buySignal becomes true (close > 105) */
+			var trade Trade
+			if len(result.Trades) > 0 {
+				trade = result.Trades[0]
+			} else {
+				trade = result.OpenTrades[0]
+			}
+
+			if trade.EntryBar < 1 {
+				t.Errorf("Entry bar %d too early (expected >= 1 when condition becomes true)", trade.EntryBar)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestEntryWhenFalse validates entry suppression with always-false when condition */
+func TestEntryWhenFalse(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "entry-when-false",
+		PineFile: "test-entry-when-false.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			/* Entry with when=false should never execute */
+			totalTrades := len(result.Trades) + len(result.OpenTrades)
+			if totalTrades != 0 {
+				t.Errorf("Expected 0 trades with when=false, got %d", totalTrades)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestEntryWhenMultiple validates different entries with different when conditions */
+func TestEntryWhenMultiple(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "entry-when-multiple",
+		PineFile: "test-entry-when-multiple.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			/* Should have both long and short entries based on different conditions */
+			if len(result.Trades) < 2 {
+				t.Errorf("Expected at least 2 trades (long and short with different when), got %d", len(result.Trades))
+			}
+
+			/* Verify both directions present */
+			hasLong := false
+			hasShort := false
+			for _, trade := range result.Trades {
+				if trade.Direction == "long" {
+					hasLong = true
+				}
+				if trade.Direction == "short" {
+					hasShort = true
+				}
+			}
+
+			if !hasLong {
+				t.Error("Expected at least 1 long trade from longCondition")
+			}
+			if !hasShort {
+				t.Error("Expected at least 1 short trade from shortCondition")
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestExitDynamicLevels validates exit level updates each bar (trailing stop pattern) */
+func TestExitDynamicLevels(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "exit-dynamic-levels",
+		PineFile: "test-exit-dynamic-levels.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			/* Exit levels update each bar - should use latest level when triggered */
+			if len(result.Trades) < 1 {
+				t.Error("Expected at least 1 closed trade from dynamic stop level")
+			}
+
+			/* Verify exit triggered (not still open) */
+			for _, trade := range result.Trades {
+				if trade.ExitBar == 0 {
+					t.Error("Trade has exitBar=0, exit did not trigger properly")
+				}
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestExitPersistenceMultibar validates exit orders persist across multiple bars until triggered */
+func TestExitPersistenceMultibar(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "exit-persistence-multibar",
+		PineFile: "test-exit-persistence-multibar.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 1 {
+				t.Error("Expected at least 1 closed trade from persistent exit order")
+				return
+			}
+
+			/* Verify exit happened (not same bar as entry) */
+			for _, trade := range result.Trades {
+				if trade.ExitBar == trade.EntryBar {
+					t.Errorf("Exit bar %d same as entry bar %d (expected persistence across bars)",
+						trade.ExitBar, trade.EntryBar)
+				}
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestEntryWhenComplex validates when parameter with complex boolean expressions */
+func TestEntryWhenComplex(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "entry-when-complex",
+		PineFile: "test-entry-when-complex.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			/* Complex when expression should gate entry correctly */
+			if len(result.Trades)+len(result.OpenTrades) < 1 {
+				t.Errorf("Expected at least 1 trade (complex when condition met), got %d trades + %d open",
+					len(result.Trades), len(result.OpenTrades))
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}

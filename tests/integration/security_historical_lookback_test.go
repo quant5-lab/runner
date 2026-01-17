@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"math"
 	"testing"
 
 	"github.com/quant5-lab/runner/tests/util"
@@ -105,7 +106,8 @@ indicator("Valuewhen Chain", overlay=false)
 
 // Daily high with valuewhen on [1] condition
 daily_high = security(syminfo.tickerid, "1D", high)
-condition = daily_high > daily_high[1]
+// Use bar_index > 0 to skip warmup bar where high[1] is na
+condition = bar_index > 0 and daily_high > daily_high[1]
 captured = valuewhen(condition, daily_high, 0)
 
 plot(daily_high, "high")
@@ -123,17 +125,30 @@ plot(captured, "captured")
 		t.Fatalf("Insufficient data: high=%d, captured=%d bars", len(high), len(captured))
 	}
 
-	/* Valuewhen should capture values when condition is true */
-	hasNonZeroCaptured := false
+	/* Valuewhen captures values when condition (high > high[1]) is true
+	 * In 500 bars of SPY data, there should be at least one increasing high
+	 * If no captures found, market was in constant decline (rare but possible)
+	 */
+	hasValidCaptured := false
 	for _, v := range captured {
-		if v > 0 {
-			hasNonZeroCaptured = true
+		if !math.IsNaN(v) && v > 0 {
+			hasValidCaptured = true
 			break
 		}
 	}
 
-	if !hasNonZeroCaptured {
-		t.Error("Valuewhen failed to capture values")
+	/* Skip test if market data has no increasing highs (unusual but valid) */
+	if !hasValidCaptured {
+		conditionCount := 0
+		for i := 1; i < len(high); i++ {
+			if high[i] > high[i-1] {
+				conditionCount++
+			}
+		}
+		if conditionCount == 0 {
+			t.Skip("Skipping: SPY data has no increasing daily highs in test period")
+		}
+		t.Error("Valuewhen failed to capture values despite increasing highs in data")
 	}
 }
 

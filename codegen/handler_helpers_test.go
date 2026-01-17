@@ -428,6 +428,77 @@ func TestInferInputTypeFromLiteral_AllTypes(t *testing.T) {
 	}
 }
 
+/* Input type inference for input.source from builtin identifiers */
+func TestInferInputTypeFromLiteral_SourceIdentifiers(t *testing.T) {
+	tests := []struct {
+		name         string
+		identifier   string
+		wantFuncName string
+	}{
+		{
+			name:         "hl2 builtin",
+			identifier:   "hl2",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "hlc3 builtin",
+			identifier:   "hlc3",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "ohlc4 builtin",
+			identifier:   "ohlc4",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "hlcc4 builtin",
+			identifier:   "hlcc4",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "open builtin",
+			identifier:   "open",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "high builtin",
+			identifier:   "high",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "low builtin",
+			identifier:   "low",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "close builtin",
+			identifier:   "close",
+			wantFuncName: "input.source",
+		},
+		{
+			name:         "volume builtin",
+			identifier:   "volume",
+			wantFuncName: "input.source",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: tt.identifier},
+				},
+			}
+
+			funcName := inferInputTypeFromLiteral(call)
+
+			if funcName != tt.wantFuncName {
+				t.Errorf("inferInputTypeFromLiteral() = %q, want %q", funcName, tt.wantFuncName)
+			}
+		})
+	}
+}
+
 /* Input type inference when not possible from arguments */
 func TestInferInputTypeFromLiteral_NotFound(t *testing.T) {
 	tests := []struct {
@@ -441,10 +512,10 @@ func TestInferInputTypeFromLiteral_NotFound(t *testing.T) {
 			},
 		},
 		{
-			name: "identifier not literal",
+			name: "identifier not builtin source",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
-					&ast.Identifier{Name: "value"},
+					&ast.Identifier{Name: "customValue"},
 				},
 			},
 		},

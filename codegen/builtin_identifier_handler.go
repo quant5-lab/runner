@@ -16,7 +16,8 @@ func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 // IsBuiltinSeriesIdentifier checks if identifier is a Pine built-in series variable.
 func (h *BuiltinIdentifierHandler) IsBuiltinSeriesIdentifier(name string) bool {
 	switch name {
-	case "close", "open", "high", "low", "volume", "tr", "bar_index":
+	case "close", "open", "high", "low", "volume", "tr", "bar_index",
+		"hl2", "hlc3", "ohlc4", "hlcc4":
 		return true
 	default:
 		return false
@@ -54,6 +55,14 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return h.generateTrueRangeCalculation("bar")
 	case "bar_index":
 		return "float64(i)"
+	case "hl2":
+		return "((bar.High + bar.Low) / 2)"
+	case "hlc3":
+		return "((bar.High + bar.Low + bar.Close) / 3)"
+	case "ohlc4":
+		return "((bar.Open + bar.High + bar.Low + bar.Close) / 4)"
+	case "hlcc4":
+		return "((bar.High + bar.Low + bar.Close + bar.Close) / 4)"
 	default:
 		return ""
 	}
@@ -76,6 +85,14 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return h.generateTrueRangeCalculation("ctx.Data[ctx.BarIndex]")
 	case "bar_index":
 		return "float64(ctx.BarIndex)"
+	case "hl2":
+		return "((ctx.Data[ctx.BarIndex].High + ctx.Data[ctx.BarIndex].Low) / 2)"
+	case "hlc3":
+		return "((ctx.Data[ctx.BarIndex].High + ctx.Data[ctx.BarIndex].Low + ctx.Data[ctx.BarIndex].Close) / 3)"
+	case "ohlc4":
+		return "((ctx.Data[ctx.BarIndex].Open + ctx.Data[ctx.BarIndex].High + ctx.Data[ctx.BarIndex].Low + ctx.Data[ctx.BarIndex].Close) / 4)"
+	case "hlcc4":
+		return "((ctx.Data[ctx.BarIndex].High + ctx.Data[ctx.BarIndex].Low + ctx.Data[ctx.BarIndex].Close + ctx.Data[ctx.BarIndex].Close) / 4)"
 	default:
 		return ""
 	}

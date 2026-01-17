@@ -19,6 +19,7 @@ type VersionDirective struct {
 type Statement struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
+	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
 	If              *IfStatement     `parser:"| @@"`

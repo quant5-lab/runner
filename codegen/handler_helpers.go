@@ -172,6 +172,13 @@ func inferInputTypeFromLiteral(call *ast.CallExpression) string {
 		return ""
 	}
 
+	if ident, ok := call.Arguments[0].(*ast.Identifier); ok {
+		switch ident.Name {
+		case "hl2", "hlc3", "ohlc4", "hlcc4", "open", "high", "low", "close", "volume":
+			return "input.source"
+		}
+	}
+
 	lit, ok := call.Arguments[0].(*ast.Literal)
 	if !ok {
 		return ""
