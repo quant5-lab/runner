@@ -376,6 +376,26 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
 
 	for _, order := range pendingOrders {
+		// Close opposite direction trades before opening new position (PineScript behavior)
+		openTrades := s.tradeHistory.GetOpenTrades()
+		for _, trade := range openTrades {
+			isOpposite := (order.Direction == Long && trade.Direction == Short) || (order.Direction == Short && trade.Direction == Long)
+			if isOpposite {
+				closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, openPrice, currentBar, openTime, "Opposite entry")
+				if closedTrade != nil {
+					// Update position tracker
+					oppositeDir := Long
+					if trade.Direction == Long {
+						oppositeDir = Short
+					}
+					s.positionTracker.UpdatePosition(trade.Size, openPrice, oppositeDir)
+
+					// Update equity
+					s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
+				}
+			}
+		}
+
 		// Update position
 		s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
 
