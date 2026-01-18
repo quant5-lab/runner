@@ -17,3 +17,4 @@
 | **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
 | **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
 | **17** | **Codegen** | Tuple destructuring syntax | ✅ **FIXED** | Universal tuple indicator architecture implemented. MACD, BB, Stoch supported via data-driven registry. |
+| **18** | **Codegen** | `ta.crossover()` in if-condition series variable | ✅ **VALID** | Parse✅ Generate✅ Compile❌: `undefined: ta_crossover_XXXSeries`. Generates series variable references without declarations. Blocks test-comment-strategy.pine |
