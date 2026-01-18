@@ -21,6 +21,10 @@ type AccessGenerator interface {
 	// GenerateInitialValueAccess generates code to access the initial value
 	// Parameter: period is the lookback period
 	GenerateInitialValueAccess(period int) string
+
+	// GenerateCurrentValueAccess generates code to access the current bar's value
+	// Used for stateful indicators that need the current value for incremental calculation
+	GenerateCurrentValueAccess() string
 }
 
 // LoopGenerator creates for-loop structures for iterating over lookback periods.

@@ -222,8 +222,7 @@ func (m *SecurityBarMapper) findDownscalingIndex(sourceBarIndex int, lookahead b
 			if i > 0 {
 				return m.ranges[i-1].DailyBarIndex
 			}
-			// For first range with lookahead=false, return current Daily bar
-			// since there is no previous Daily bar to reference
+			/* First range with lookahead=false returns current daily bar (no previous available) */
 			return r.DailyBarIndex
 		}
 	}

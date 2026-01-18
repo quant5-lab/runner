@@ -13,11 +13,11 @@ ema_slow = ta.ema(close, 20)
 long_condition = close > htf_sma and ta.crossover(ema_fast, ema_slow)
 short_condition = close < htf_sma and ta.crossunder(ema_fast, ema_slow)
 
-// Execute trades
-if (long_condition)
+// Only enter if no position or opposite direction
+if (long_condition and strategy.position_size <= 0)
     strategy.entry("Long", strategy.long)
 
-if (short_condition)
+if (short_condition and strategy.position_size >= 0)
     strategy.entry("Short", strategy.short)
 
 // Visual plots

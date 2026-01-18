@@ -1,0 +1,86 @@
+{
+  "version": "1.0",
+  "strategy": "MTF Confirmation",
+  "dataSource": "NVDA-1h.json",
+  "generatedAt": "2026-01-18T19:31:38Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 37,
+        "entryTime": 1753371000,
+        "entryPrice": 172.69189453125,
+        "entryComment": "",
+        "exitBar": 628,
+        "exitTime": 1763667000,
+        "exitPrice": 182.7100067138672,
+        "exitComment": "Position reversal",
+        "size": 5.791109000554758,
+        "profit": 58.01597962932166,
+        "direction": "long"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 628,
+        "entryTime": 1763667000,
+        "entryPrice": 182.7100067138672,
+        "entryComment": "",
+        "exitBar": 814,
+        "exitTime": 1767367800,
+        "exitPrice": 190.57000732421875,
+        "exitComment": "Position reversal",
+        "size": 5.510279092926571,
+        "profit": -43.3107970336103,
+        "direction": "short"
+      },
+      {
+        "entryId": "Long",
+        "entryBar": 814,
+        "entryTime": 1767367800,
+        "entryPrice": 190.57000732421875,
+        "entryComment": "",
+        "exitBar": 842,
+        "exitTime": 1767886200,
+        "exitPrice": 186.0800018310547,
+        "exitComment": "Position reversal",
+        "size": 5.25625605078626,
+        "profit": -23.60061854150715,
+        "direction": "long"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 842,
+        "entryTime": 1767886200,
+        "entryPrice": 186.0800018310547,
+        "entryComment": "",
+        "exitBar": 879,
+        "exitTime": 1768498200,
+        "exitPrice": 188.6199951171875,
+        "exitComment": "Position reversal",
+        "size": 5.37692235030452,
+        "profit": -13.657346669830943,
+        "direction": "short"
+      }
+    ],
+    "openTrades": [
+      {
+        "entryId": "Long",
+        "entryBar": 879,
+        "entryTime": 1768498200,
+        "entryPrice": 188.6199951171875,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 5.293054779136945,
+        "profit": 0,
+        "direction": "long"
+      }
+    ],
+    "equity": 9964.79681969286,
+    "netProfit": -22.55278261562673,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

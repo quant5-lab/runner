@@ -5,7 +5,6 @@ import (
 )
 
 func TestMTF_AAPL_Hourly(t *testing.T) {
-	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +18,6 @@ func TestMTF_AAPL_Hourly(t *testing.T) {
 }
 
 func TestMTF_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +31,6 @@ func TestMTF_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestMTF_SBERP_Hourly(t *testing.T) {
-	t.Skip("Runtime bug: ta.crossover IIFE incorrect previous bar access - see mtf-confirmation-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -43,5 +40,18 @@ func TestMTF_SBERP_Hourly(t *testing.T) {
 		Timeframe:    "1h",
 		DataFile:     "SBERP-1h.json",
 		GoldenFile:   "mtf-confirmation-sberp-1h.json",
+	})
+}
+
+func TestMTF_NVDA_Hourly(t *testing.T) {
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "MTF Confirmation",
+		StrategyFile: "mtf-confirmation-strategy.pine",
+		Symbol:       "NVDA",
+		Timeframe:    "1h",
+		DataFile:     "NVDA-1h.json",
+		GoldenFile:   "mtf-confirmation-nvda-1h.json",
 	})
 }

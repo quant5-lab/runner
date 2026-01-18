@@ -639,11 +639,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			}
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
 		}
+	}
 
-		tempVarInits := g.tempVarMgr.GenerateInitializations()
-		if tempVarInits != "" {
-			code += tempVarInits
-		}
+	tempVarInits := g.tempVarMgr.GenerateInitializations()
+	if tempVarInits != "" {
+		code += tempVarInits
 	}
 	code += "\n"
 
@@ -2486,7 +2486,23 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 		return "", err
 	}
 
-	return g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), initCode), nil
+	/* Function implemented: use normal assignment */
+	if !isTODOComment(initCode) {
+		return g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), initCode), nil
+	}
+
+	/* Function unimplemented: AST-driven graceful degradation.
+	 * len(varNames) from ArrayPattern tells us return count - no hardcoded registry.
+	 */
+	code := g.ind() + fmt.Sprintf("/* %s() - TODO: implement */\n", funcName)
+	for _, varName := range varNames {
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
+	}
+	return code, nil
+}
+
+func isTODOComment(code string) bool {
+	return strings.Contains(code, "// ") && strings.Contains(code, "TODO: implement")
 }
 
 func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, funcName string, callExpr *ast.CallExpression) (string, error) {
@@ -2781,6 +2797,7 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	// Convert current bar access to previous bar access
 	// bar.Close → ctx.Data[i-1].Close
 	// sma20Series.Get(0) → sma20Series.Get(1)
+	// sma20Series.GetCurrent() → sma20Series.Get(1)
 
 	if seriesCode == "bar.Close" {
 		return "ctx.Data[i-1].Close"
@@ -2804,8 +2821,8 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 	}
 
 	// Handle Series.GetCurrent() → Series.Get(1)
-	if strings.HasSuffix(seriesCode, "Series.GetCurrent()") {
-		return strings.Replace(seriesCode, "Series.GetCurrent()", "Series.Get(1)", 1)
+	if strings.Contains(seriesCode, "Series.GetCurrent()") {
+		return strings.ReplaceAll(seriesCode, "Series.GetCurrent()", "Series.Get(1)")
 	}
 
 	// For non-Series user variables, return 0.0 (shouldn't happen in crossover with Series)

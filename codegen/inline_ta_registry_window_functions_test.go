@@ -276,6 +276,10 @@ func (m *mockWindowAccessor) GenerateLoopValueAccess(loopVar string) string {
 	return m.loopAccess
 }
 
+func (m *mockWindowAccessor) GenerateCurrentValueAccess() string {
+	return "ctx.Data[ctx.BarIndex].Close"
+}
+
 func intToString(n int) string {
 	if n == 0 {
 		return "0"

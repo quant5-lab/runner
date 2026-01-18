@@ -135,6 +135,16 @@ func TestConvertSeriesAccessToPrev(t *testing.T) {
 			expected: "ctx.Data[i-1].Volume",
 		},
 		{
+			name:     "Series.Get(0) to Get(1)",
+			series:   "sma20Series.Get(0)",
+			expected: "sma20Series.Get(1)",
+		},
+		{
+			name:     "Series.GetCurrent() to Get(1)",
+			series:   "sma20Series.GetCurrent()",
+			expected: "sma20Series.Get(1)",
+		},
+		{
 			name:     "user variable (placeholder)",
 			series:   "sma20",
 			expected: "0.0",

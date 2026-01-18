@@ -38,6 +38,13 @@ func (g *SeriesVariableAccessGenerator) GenerateLoopValueAccess(loopVar string) 
 	return fmt.Sprintf("%sSeries.Get(%s+%d)", g.variableName, loopVar, g.baseOffset)
 }
 
+func (g *SeriesVariableAccessGenerator) GenerateCurrentValueAccess() string {
+	if g.baseOffset == 0 {
+		return fmt.Sprintf("%sSeries.GetCurrent()", g.variableName)
+	}
+	return fmt.Sprintf("%sSeries.Get(%d)", g.variableName, g.baseOffset)
+}
+
 // OHLCVFieldAccessGenerator generates access code for built-in OHLCV fields.
 type OHLCVFieldAccessGenerator struct {
 	fieldName  string
@@ -70,6 +77,13 @@ func (g *OHLCVFieldAccessGenerator) GenerateLoopValueAccess(loopVar string) stri
 		return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", loopVar, g.fieldName)
 	}
 	return fmt.Sprintf("ctx.Data[ctx.BarIndex-(%s+%d)].%s", loopVar, g.baseOffset, g.fieldName)
+}
+
+func (g *OHLCVFieldAccessGenerator) GenerateCurrentValueAccess() string {
+	if g.baseOffset == 0 {
+		return fmt.Sprintf("ctx.Data[ctx.BarIndex].%s", g.fieldName)
+	}
+	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", g.baseOffset, g.fieldName)
 }
 
 // CreateAccessGenerator creates the appropriate access generator based on source info.

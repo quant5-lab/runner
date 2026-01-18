@@ -1,0 +1,17 @@
+//@version=5
+strategy("When Parameter E2E Test", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1)
+
+// Simple buy/sell signals
+buy_signal = close > open
+sell_signal = close < open
+
+// Entry with when condition - should only execute when condition is true
+if buy_signal
+    strategy.entry("Long", strategy.long, when=buy_signal)
+
+if sell_signal
+    strategy.entry("Short", strategy.short, when=sell_signal)
+
+// Plot signals for verification
+plot(buy_signal ? 1 : 0, "Buy Signal", color=#00FF00)
+plot(sell_signal ? 1 : 0, "Sell Signal", color=#FF0000)

@@ -181,3 +181,29 @@ func (e *ArgumentExtractor) extractCommentValue(expr ast.Expression) string {
 	}
 	return `""`
 }
+
+/*
+ExtractWhenCondition extracts when= parameter for conditional strategy execution.
+Returns (conditionExpr, hasWhen) where conditionExpr is Go boolean expression.
+*/
+func (e *ArgumentExtractor) ExtractWhenCondition(args []ast.Expression) (string, bool) {
+	if len(args) == 0 {
+		return "", false
+	}
+
+	lastArg := args[len(args)-1]
+	objExpr, isObject := lastArg.(*ast.ObjectExpression)
+	if !isObject {
+		return "", false
+	}
+
+	for _, prop := range objExpr.Properties {
+		if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "when" {
+			conditionExpr := e.generator.extractSeriesExpression(prop.Value)
+			conditionExpr = strings.TrimRight(conditionExpr, "\n")
+			return conditionExpr, true
+		}
+	}
+
+	return "", false
+}

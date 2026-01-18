@@ -6,6 +6,7 @@ import "fmt"
 type DataAccessStrategy interface {
 	GenerateInitialValueAccess(period int) string
 	GenerateLoopValueAccess(loopVar string) string
+	GenerateCurrentValueAccess() string
 }
 
 // SeriesDataAccessor generates code for accessing user-defined Series variables.
@@ -32,6 +33,13 @@ func (a *SeriesDataAccessor) GenerateLoopValueAccess(loopVar string) string {
 	return fmt.Sprintf("%sSeries.Get(%s)", a.variableName, accessExpr)
 }
 
+func (a *SeriesDataAccessor) GenerateCurrentValueAccess() string {
+	if a.offset.IsZero() {
+		return fmt.Sprintf("%sSeries.GetCurrent()", a.variableName)
+	}
+	return fmt.Sprintf("%sSeries.Get(%d)", a.variableName, a.offset.Value())
+}
+
 // OHLCVDataAccessor generates code for accessing built-in OHLCV fields.
 type OHLCVDataAccessor struct {
 	fieldName string
@@ -56,6 +64,13 @@ func (a *OHLCVDataAccessor) GenerateLoopValueAccess(loopVar string) string {
 		return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", loopVar, a.fieldName)
 	}
 	return fmt.Sprintf("ctx.Data[ctx.BarIndex-(%s+%d)].%s", loopVar, a.offset.Value(), a.fieldName)
+}
+
+func (a *OHLCVDataAccessor) GenerateCurrentValueAccess() string {
+	if a.offset.IsZero() {
+		return fmt.Sprintf("ctx.Data[ctx.BarIndex].%s", a.fieldName)
+	}
+	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", a.offset.Value(), a.fieldName)
 }
 
 // DataAccessFactory creates appropriate accessor based on source classification.

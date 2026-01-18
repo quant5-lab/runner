@@ -64,12 +64,7 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
-
-	// Extract when condition
-	conditionExpr := ""
-	if cond, found := extractor.ExtractConditionArgument(call.Arguments, "when"); found {
-		conditionExpr = cond
-	}
+	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
 	/* Runtime qty calculation per PineScript spec: https://www.tradingview.com/pine-script-reference/v5/#fun_strategy */
 	var entryCode string
@@ -87,10 +82,9 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 		entryCode += g.ind() + fmt.Sprintf("strat.Entry(%q, %s, %.0f, %s)\n", entryID, direction, qty, comment)
 	}
 
-	// Wrap with conditional if when parameter present
-	if conditionExpr != "" {
-		h.conditionalWrapper.indentation = g.ind()
-		return h.conditionalWrapper.WrapWithCondition(entryCode, conditionExpr), nil
+	if hasWhen {
+		wrapper := &ConditionalWrapperGenerator{}
+		return wrapper.WrapIfNeeded(whenCondition, entryCode, g.ind()), nil
 	}
 
 	return entryCode, nil

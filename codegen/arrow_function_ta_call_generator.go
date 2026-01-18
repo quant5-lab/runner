@@ -272,3 +272,7 @@ func (a *ArrowFunctionParameterAccessor) GenerateLoopValueAccess(loopVar string)
 func (a *ArrowFunctionParameterAccessor) GenerateInitialValueAccess(period int) string {
 	return fmt.Sprintf("%sSeries.Get(%d-1)", a.parameterName, period)
 }
+
+func (a *ArrowFunctionParameterAccessor) GenerateCurrentValueAccess() string {
+	return fmt.Sprintf("%sSeries.GetCurrent()", a.parameterName)
+}

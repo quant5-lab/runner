@@ -71,3 +71,18 @@ func (a *SeriesExpressionAccessor) GenerateInitialValueAccess(period int) string
 
 	return code
 }
+
+/* GenerateCurrentValueAccess converts expression for current bar access */
+func (a *SeriesExpressionAccessor) GenerateCurrentValueAccess() string {
+	if a.symbolTable == nil {
+		return "math.NaN()"
+	}
+
+	converter := NewSeriesAccessConverter(a.symbolTable, "0", a.lookupCallVar)
+	code, err := converter.ConvertExpression(a.expr)
+	if err != nil {
+		return "math.NaN()"
+	}
+
+	return code
+}

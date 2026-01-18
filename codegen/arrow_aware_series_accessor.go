@@ -33,6 +33,10 @@ func (a *ArrowAwareSeriesAccessor) GenerateInitialValueAccess(period int) string
 	return fmt.Sprintf("%sSeries.Get(%d-1)", a.seriesName, period)
 }
 
+func (a *ArrowAwareSeriesAccessor) GenerateCurrentValueAccess() string {
+	return fmt.Sprintf("%sSeries.GetCurrent()", a.seriesName)
+}
+
 /*
 GetPreamble returns any setup code needed before the accessor is used.
 */

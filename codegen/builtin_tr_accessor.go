@@ -37,6 +37,16 @@ func (a *BuiltinTrueRangeAccessor) GenerateInitialValueAccess(period int) string
 	)
 }
 
+/* GenerateCurrentValueAccess generates tr calculation for the current bar */
+func (a *BuiltinTrueRangeAccessor) GenerateCurrentValueAccess() string {
+	return "func() float64 { " +
+		"if ctx.BarIndex < 1 { return ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low }; " +
+		"prevClose := ctx.Data[ctx.BarIndex-1].Close; " +
+		"currentBar := ctx.Data[ctx.BarIndex]; " +
+		"return math.Max(currentBar.High - currentBar.Low, math.Max(math.Abs(currentBar.High - prevClose), math.Abs(currentBar.Low - prevClose))) " +
+		"}()"
+}
+
 /*
 GetPreamble returns empty string - tr calculation is self-contained.
 */

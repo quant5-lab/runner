@@ -6,6 +6,9 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+/* CrossInlineHandler generates inline access for crossover/crossunder in conditions.
+ * Delegates to temp variable system - crossover is just another TA function.
+ */
 type CrossInlineHandler struct {
 	isUnder bool
 }
@@ -32,17 +35,17 @@ func (h *CrossInlineHandler) GenerateInline(expr *ast.CallExpression, g *generat
 		return "", fmt.Errorf("%s requires 2 arguments", funcName)
 	}
 
-	inline1, err := g.plotExprHandler.Generate(expr.Arguments[0])
-	if err != nil {
-		return "", fmt.Errorf("%s arg1 inline generation failed: %w", funcName, err)
+	// Register as temp var (standard TA function flow)
+	argHash := g.exprAnalyzer.ComputeArgHash(expr)
+	callInfo := CallInfo{
+		Call:     expr,
+		FuncName: funcName,
+		ArgHash:  argHash,
 	}
+	varName := g.tempVarMgr.GetOrCreate(callInfo)
 
-	inline2, err := g.plotExprHandler.Generate(expr.Arguments[1])
-	if err != nil {
-		return "", fmt.Errorf("%s arg2 inline generation failed: %w", funcName, err)
-	}
-
-	return h.buildCrossDetectionIIFE(inline1, inline2), nil
+	// Return Series access wrapped in value.IsTrue() for boolean context
+	return fmt.Sprintf("value.IsTrue(%sSeries.GetCurrent())", varName), nil
 }
 
 func (h *CrossInlineHandler) functionName() string {
@@ -50,33 +53,4 @@ func (h *CrossInlineHandler) functionName() string {
 		return "ta.crossunder"
 	}
 	return "ta.crossover"
-}
-
-func (h *CrossInlineHandler) buildCrossDetectionIIFE(expr1, expr2 string) string {
-	operator := h.crossOperator()
-	reverseOp := h.reverseCrossOperator()
-
-	return fmt.Sprintf(
-		"(func() bool { if ctx.BarIndex == 0 { return false }; "+
-			"curr1 := (%s); curr2 := (%s); "+
-			"prevBarIdx := ctx.BarIndex; ctx.BarIndex--; "+
-			"prev1 := (%s); prev2 := (%s); "+
-			"ctx.BarIndex = prevBarIdx; "+
-			"return curr1 %s curr2 && prev1 %s prev2 }())",
-		expr1, expr2, expr1, expr2, operator, reverseOp,
-	)
-}
-
-func (h *CrossInlineHandler) crossOperator() string {
-	if h.isUnder {
-		return "<"
-	}
-	return ">"
-}
-
-func (h *CrossInlineHandler) reverseCrossOperator() string {
-	if h.isUnder {
-		return ">="
-	}
-	return "<="
 }

@@ -43,6 +43,13 @@ func (a *BuiltinIdentifierAccessor) GenerateInitialValueAccess(period int) strin
 }
 
 /*
+GenerateCurrentValueAccess generates access for the current bar's value.
+*/
+func (a *BuiltinIdentifierAccessor) GenerateCurrentValueAccess() string {
+	return fmt.Sprintf("ctx.Data[ctx.BarIndex].%s", a.fieldName)
+}
+
+/*
 GetPreamble returns any setup code needed before the accessor is used.
 */
 func (a *BuiltinIdentifierAccessor) GetPreamble() string {

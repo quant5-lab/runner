@@ -236,6 +236,7 @@ type Strategy struct {
 	positionTracker  *PositionTracker
 	tradeHistory     *TradeHistory
 	equityCalculator *EquityCalculator
+	reversalHandler  *PositionReversalHandler
 	initialized      bool
 	currentBar       int
 	currentPrice     float64
@@ -243,11 +244,18 @@ type Strategy struct {
 
 /* NewStrategy creates a new strategy */
 func NewStrategy() *Strategy {
+	om := NewOrderManager()
+	pt := NewPositionTracker()
+	th := NewTradeHistory()
+	ec := NewEquityCalculator(10000)
+	rh := NewPositionReversalHandler(th, pt, ec)
+
 	return &Strategy{
-		orderManager:     NewOrderManager(),
-		positionTracker:  NewPositionTracker(),
-		tradeHistory:     NewTradeHistory(),
-		equityCalculator: NewEquityCalculator(10000),
+		orderManager:     om,
+		positionTracker:  pt,
+		tradeHistory:     th,
+		equityCalculator: ec,
+		reversalHandler:  rh,
 		initialized:      false,
 	}
 }
@@ -256,6 +264,7 @@ func NewStrategy() *Strategy {
 func (s *Strategy) Call(strategyName string, initialCapital float64) {
 	s.initialized = true
 	s.equityCalculator = NewEquityCalculator(initialCapital)
+	s.reversalHandler.equityCalculator = s.equityCalculator
 }
 
 /* Entry places an entry order */
@@ -376,30 +385,10 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
 
 	for _, order := range pendingOrders {
-		// Close opposite direction trades before opening new position (PineScript behavior)
-		openTrades := s.tradeHistory.GetOpenTrades()
-		for _, trade := range openTrades {
-			isOpposite := (order.Direction == Long && trade.Direction == Short) || (order.Direction == Short && trade.Direction == Long)
-			if isOpposite {
-				closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, openPrice, currentBar, openTime, "Opposite entry")
-				if closedTrade != nil {
-					// Update position tracker
-					oppositeDir := Long
-					if trade.Direction == Long {
-						oppositeDir = Short
-					}
-					s.positionTracker.UpdatePosition(trade.Size, openPrice, oppositeDir)
+		s.reversalHandler.HandleReversal(order.Direction, openPrice, currentBar, openTime)
 
-					// Update equity
-					s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
-				}
-			}
-		}
-
-		// Update position
 		s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
 
-		// Add to open trades
 		s.tradeHistory.AddOpenTrade(Trade{
 			EntryID:      order.ID,
 			Direction:    order.Direction,
@@ -410,7 +399,6 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 			EntryComment: order.EntryComment,
 		})
 
-		// Remove order
 		s.orderManager.RemoveOrder(order.ID)
 	}
 }

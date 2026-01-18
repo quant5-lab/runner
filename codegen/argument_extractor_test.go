@@ -140,3 +140,98 @@ func TestExtractNamedOrPositional_UseDefault(t *testing.T) {
 		t.Errorf("Expected default value, got %q", code)
 	}
 }
+
+func TestExtractWhenCondition_Found(t *testing.T) {
+	g := &generator{}
+	extractor := &ArgumentExtractor{generator: g}
+
+	args := []ast.Expression{
+		&ast.Literal{Value: "entry_id"},
+		&ast.Identifier{Name: "strategy.long"},
+		&ast.ObjectExpression{
+			NodeType: ast.TypeObjectExpression,
+			Properties: []ast.Property{
+				{
+					NodeType: ast.TypeProperty,
+					Key:      &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "when"},
+					Value: &ast.BinaryExpression{
+						NodeType: ast.TypeBinaryExpression,
+						Left:     &ast.Identifier{Name: "close"},
+						Operator: ">",
+						Right:    &ast.Identifier{Name: "open"},
+					},
+				},
+			},
+		},
+	}
+
+	condition, found := extractor.ExtractWhenCondition(args)
+	if !found {
+		t.Fatal("Expected when condition to be found")
+	}
+	if condition == "" {
+		t.Error("Expected non-empty condition expression")
+	}
+	if !containsSubstring(condition, "Close") || !containsSubstring(condition, "Open") {
+		t.Errorf("Expected condition with Close/Open, got: %s", condition)
+	}
+}
+
+func TestExtractWhenCondition_NotFound(t *testing.T) {
+	g := &generator{}
+	extractor := &ArgumentExtractor{generator: g}
+
+	args := []ast.Expression{
+		&ast.Literal{Value: "entry_id"},
+		&ast.Identifier{Name: "strategy.long"},
+		&ast.ObjectExpression{
+			NodeType: ast.TypeObjectExpression,
+			Properties: []ast.Property{
+				{
+					NodeType: ast.TypeProperty,
+					Key:      &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "qty"},
+					Value:    &ast.Literal{Value: 1.5},
+				},
+			},
+		},
+	}
+
+	condition, found := extractor.ExtractWhenCondition(args)
+	if found {
+		t.Error("Expected when condition not to be found")
+	}
+	if condition != "" {
+		t.Errorf("Expected empty condition, got: %s", condition)
+	}
+}
+
+func TestExtractWhenCondition_NoObjectExpression(t *testing.T) {
+	g := &generator{}
+	extractor := &ArgumentExtractor{generator: g}
+
+	args := []ast.Expression{
+		&ast.Literal{Value: "entry_id"},
+		&ast.Identifier{Name: "strategy.long"},
+	}
+
+	condition, found := extractor.ExtractWhenCondition(args)
+	if found {
+		t.Error("Expected when condition not to be found")
+	}
+	if condition != "" {
+		t.Errorf("Expected empty condition, got: %s", condition)
+	}
+}
+
+func TestExtractWhenCondition_EmptyArgs(t *testing.T) {
+	g := &generator{}
+	extractor := &ArgumentExtractor{generator: g}
+
+	condition, found := extractor.ExtractWhenCondition([]ast.Expression{})
+	if found {
+		t.Error("Expected when condition not to be found for empty args")
+	}
+	if condition != "" {
+		t.Errorf("Expected empty condition, got: %s", condition)
+	}
+}

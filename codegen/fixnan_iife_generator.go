@@ -54,6 +54,16 @@ func (a *FixnanCallExpressionAccessor) GenerateInitialValueAccess(period int) st
 	return a.tempVarName
 }
 
+func (a *FixnanCallExpressionAccessor) GenerateCurrentValueAccess() string {
+	// If exprCode is empty, fall back to temp variable
+	if a.exprCode == "" {
+		return a.tempVarName
+	}
+
+	// For current bar access, return the expression as-is (no transformation needed)
+	return a.exprCode
+}
+
 func (a *FixnanCallExpressionAccessor) GetPreamble() string {
 	// If expression contains Series access, don't generate preamble
 	// The expression will be generated inline at each access point
