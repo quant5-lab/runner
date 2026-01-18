@@ -52,7 +52,8 @@ func NormalizeIfBlocks(script string) string {
 			}
 
 			// Collect body statements (next indented lines)
-			var bodyStatements []string
+			var bodyLines []string
+			baseBodyIndent := -1
 			for i < len(lines) {
 				nextLine := lines[i]
 				nextIndent := getIndentation(nextLine)
@@ -72,7 +73,14 @@ func NormalizeIfBlocks(script string) string {
 
 				// Body statement (more indented than if)
 				if nextIndent > indent {
-					bodyStatements = append(bodyStatements, nextTrimmed)
+					if baseBodyIndent < 0 {
+						baseBodyIndent = nextIndent
+					}
+					relativeIndent := nextIndent - baseBodyIndent
+					if relativeIndent < 0 {
+						relativeIndent = 0
+					}
+					bodyLines = append(bodyLines, strings.Repeat(" ", relativeIndent)+nextTrimmed)
 					i++
 					continue
 				}
@@ -82,10 +90,10 @@ func NormalizeIfBlocks(script string) string {
 			}
 
 			// Generate single if block with all body statements
-			if len(bodyStatements) > 0 {
+			if len(bodyLines) > 0 {
 				result = append(result, indentStr+"if "+condition)
-				for _, stmt := range bodyStatements {
-					result = append(result, indentStr+"    "+stmt)
+				for _, bodyLine := range bodyLines {
+					result = append(result, indentStr+"    "+bodyLine)
 				}
 			}
 			continue

@@ -536,10 +536,10 @@ func TestIfStatement_EdgeCases(t *testing.T) {
 		shouldErr bool
 	}{
 		{
-			name: "IF without indent - parser lenient",
+			name: "IF without indent - parser strict",
 			source: `if condition
 a = 1`,
-			shouldErr: false, // Lexer/parser handle this gracefully
+			shouldErr: true, // Proper INDENT/DEDENT required for if body
 		},
 		{
 			name: "IF with inconsistent indent - lexer lenient",
