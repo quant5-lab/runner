@@ -1,0 +1,9 @@
+//@version=5
+indicator("For Loop Counter Mutation Test", overlay=false)
+
+// Validates loop counter immutability - fixed iterations regardless of body
+count = 0.0
+for i = 1 to 5
+	count := count + 1
+
+plot(count, "Iteration Count", color=color.blue)

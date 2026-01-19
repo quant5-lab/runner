@@ -18,11 +18,12 @@ type VersionDirective struct {
 
 type Statement struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
+	If              *IfStatement     `parser:"| @@"`
+	For             *ForStatement    `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
 	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
-	If              *IfStatement     `parser:"| @@"`
 	Expression      *ExpressionStmt  `parser:"| @@"`
 }
 
@@ -31,6 +32,16 @@ type IfStatement struct {
 	Indent    *string      `parser:"@Indent"`
 	Body      []*Statement `parser:"@@+"`
 	Dedent    *string      `parser:"@Dedent"`
+}
+
+type ForStatement struct {
+	Counter string       `parser:"'for' @Ident '='"`
+	From    *ArithExpr   `parser:"@@"`
+	To      *ArithExpr   `parser:"'to' @@"`
+	Step    *ArithExpr   `parser:"( 'by' @@ )?"`
+	Indent  *string      `parser:"@Indent"`
+	Body    []*Statement `parser:"@@+"`
+	Dedent  *string      `parser:"@Dedent"`
 }
 
 type FunctionDecl struct {
@@ -196,7 +207,9 @@ type Value struct {
 
 var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
-	{Name: "Whitespace", Pattern: `[ \t\r\n]+`},
+	{Name: "Newline", Pattern: `\r?\n`},
+	{Name: "Whitespace", Pattern: `[ \t]+`},
+	{Name: "Keyword", Pattern: `\b(if|for|to|by|while|and|or|not|true|false)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
 	{Name: "Float", Pattern: `\d+\.\d+`},
@@ -210,7 +223,7 @@ var indentAwareLexer = indentlexer.NewIndentationDefinition(pineLexer)
 func NewParser() (*participle.Parser[Script], error) {
 	return participle.Build[Script](
 		participle.Lexer(indentAwareLexer),
-		participle.Elide("Comment", "Whitespace"),
+		participle.Elide("Comment", "Whitespace", "Newline"),
 		participle.UseLookahead(8),
 	)
 }

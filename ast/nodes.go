@@ -15,6 +15,7 @@ const (
 	TypeProperty                NodeType = "Property"
 	TypeBinaryExpression        NodeType = "BinaryExpression"
 	TypeIfStatement             NodeType = "IfStatement"
+	TypeForStatement            NodeType = "ForStatement"
 	TypeConditionalExpression   NodeType = "ConditionalExpression"
 	TypeLogicalExpression       NodeType = "LogicalExpression"
 	TypeUnaryExpression         NodeType = "UnaryExpression"
@@ -150,6 +151,17 @@ type IfStatement struct {
 }
 
 func (i *IfStatement) Type() NodeType { return TypeIfStatement }
+
+type ForStatement struct {
+	NodeType NodeType   `json:"type"`
+	Counter  string     `json:"counter"`
+	From     Expression `json:"from"`
+	To       Expression `json:"to"`
+	Step     Expression `json:"step,omitempty"`
+	Body     []Node     `json:"body"`
+}
+
+func (f *ForStatement) Type() NodeType { return TypeForStatement }
 
 type ConditionalExpression struct {
 	NodeType   NodeType   `json:"type"`

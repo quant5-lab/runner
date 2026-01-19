@@ -39,6 +39,7 @@ func NewConverter() *Converter {
 	c.factory = NewStatementConverterFactory(
 		c.convertExpression,
 		c.convertOrExpr,
+		c.convertArithExpr,
 		c.convertStatement,
 	)
 	return c

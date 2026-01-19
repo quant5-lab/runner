@@ -13,6 +13,7 @@ type StatementConverterFactory struct {
 func NewStatementConverterFactory(
 	expressionConverter func(*Expression) (ast.Expression, error),
 	orExprConverter func(*OrExpr) (ast.Expression, error),
+	arithExprConverter func(*ArithExpr) (ast.Expression, error),
 	statementConverter func(*Statement) (ast.Node, error),
 ) *StatementConverterFactory {
 	return &StatementConverterFactory{
@@ -23,6 +24,7 @@ func NewStatementConverterFactory(
 			NewAssignmentConverter(expressionConverter),
 			NewReassignmentConverter(expressionConverter),
 			NewIfStatementConverter(orExprConverter, statementConverter),
+			NewForStatementConverter(arithExprConverter, statementConverter),
 			NewExpressionStatementConverter(expressionConverter),
 		},
 	}

@@ -66,9 +66,11 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 		if len(l.pending) > 0 {
 			token := l.pending[0]
 			l.pending = l.pending[1:]
-			// Update lastTokenValue even for pending tokens
 			if token.Type != l.symbols["Indent"] && token.Type != l.symbols["Dedent"] {
 				l.lastTokenValue = token.Value
+				if l.isControlFlowKeyword(token.Value) {
+					l.expectingIndent = true
+				}
 			}
 			return token, nil
 		}
@@ -95,15 +97,16 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 			continue
 		}
 
-		// Track if we just saw => keyword or if keyword
+		if newlineType, exists := l.symbols["Newline"]; exists && token.Type == newlineType {
+			continue
+		}
+
 		tokenValue := token.Value
 
-		// Set expectingIndent flag when we see => or if
-		if tokenValue == "=>" || tokenValue == "if" {
+		if l.isControlFlowKeyword(tokenValue) {
 			l.expectingIndent = true
 		}
 
-		// Update last token value for next iteration
 		l.lastTokenValue = tokenValue
 
 		if token.Pos.Line > l.previousLine {
@@ -138,4 +141,8 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 
 		return token, nil
 	}
+}
+
+func (l *IndentationLexer) isControlFlowKeyword(value string) bool {
+	return value == "=>" || value == "if" || value == "for" || value == "while"
 }

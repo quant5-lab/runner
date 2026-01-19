@@ -31,7 +31,16 @@ func (sr *SubscriptResolver) ResolveSubscript(seriesName string, indexExpr ast.E
 		seriesName = "close"
 	}
 
-	// Check if index is a literal (fast path)
+	if ident, ok := indexExpr.(*ast.Identifier); ok {
+		isLoopCounter := g.loopContextStack != nil && g.loopContextStack.IsLoopCounter(ident.Name)
+		if isLoopCounter {
+			if seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" {
+				return fmt.Sprintf("%sSeries.Get(%s)", seriesName, ident.Name)
+			}
+			return fmt.Sprintf("%sSeries.Get(%s)", seriesName, ident.Name)
+		}
+	}
+
 	if lit, ok := indexExpr.(*ast.Literal); ok {
 		if floatVal, ok := lit.Value.(float64); ok {
 			intVal := int(floatVal)

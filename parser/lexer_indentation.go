@@ -32,7 +32,9 @@ func (d *IndentationDefinition) Symbols() map[string]lexer.TokenType {
 	nextType := lexer.TokenType(len(symbols) + 1)
 	symbols["Indent"] = nextType
 	symbols["Dedent"] = nextType + 1
-	symbols["Newline"] = nextType + 2
+	if _, exists := symbols["Newline"]; !exists {
+		symbols["Newline"] = nextType + 2
+	}
 	return symbols
 }
 
@@ -88,7 +90,6 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 
 	if l.isNewlineToken(token) {
 		l.atLineStart = true
-		// expectingIndent is set when we see keywords like 'if', not here
 		l.lastToken = token
 		return l.emitNewline(token.Pos), nil
 	}
@@ -216,11 +217,11 @@ func (l *IndentationLexer) isWhitespaceToken(token lexer.Token) bool {
 }
 
 func (l *IndentationLexer) isNewlineToken(token lexer.Token) bool {
-	return token.Value == "\n" || token.Value == "\r\n"
+	return token.Type == l.newlineType || token.Value == "\n" || token.Value == "\r\n"
 }
 
 func (l *IndentationLexer) shouldExpectIndent(token lexer.Token) bool {
-	return token.Value == "if" || token.Value == "for" || token.Value == "while" ||
+	return token.Value == "if" || token.Value == "for" || token.Value == "to" || token.Value == "while" ||
 		token.Value == "=>" || token.Value == ":"
 }
 

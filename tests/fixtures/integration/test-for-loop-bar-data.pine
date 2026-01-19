@@ -1,0 +1,10 @@
+//@version=5
+indicator("For Loop Bar Data Test", overlay=false)
+
+// Validates conditional bar data access within loop iteration
+highCount = 0.0
+for i = 1 to 5
+	if close > open
+		highCount := highCount + 1
+
+plot(highCount, "High Count", color=color.teal)

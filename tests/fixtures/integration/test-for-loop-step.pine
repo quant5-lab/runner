@@ -1,0 +1,14 @@
+//@version=5
+indicator("For Loop Step Test", overlay=false)
+
+// Expected: evenSum=110.0, oddSum=100.0 (custom step validation)
+evenSum = 0.0
+for i = 0 to 20 by 2
+	evenSum := evenSum + i
+
+oddSum = 0.0
+for j = 1 to 19 by 2
+	oddSum := oddSum + j
+
+plot(evenSum, "Even Sum", color=color.green)
+plot(oddSum, "Odd Sum", color=color.orange)

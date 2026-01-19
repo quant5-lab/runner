@@ -36,6 +36,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		strategyConfig:   NewStrategyConfig(),
 		limits:           NewCodeGenerationLimits(),
 		safetyGuard:      NewRuntimeSafetyGuard(),
+		loopContextStack: NewLoopContextStack(),
 		constantRegistry: constantRegistry,
 		typeSystem:       typeSystem,
 		boolConverter:    boolConverter,
@@ -106,6 +107,7 @@ type generator struct {
 	taFunctions              []taFunctionCall
 	inSecurityContext        bool
 	inArrowFunctionBody      bool
+	loopContextStack         *LoopContextStack
 	hasSecurityCalls         bool
 	hasSecurityExprEvals     bool
 	hasStrategyRuntimeAccess bool
@@ -864,6 +866,8 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateVariableDeclaration(n)
 	case *ast.IfStatement:
 		return g.generateIfStatement(n)
+	case *ast.ForStatement:
+		return g.generateForStatement(n)
 	default:
 		return "", fmt.Errorf("unsupported statement type: %T", node)
 	}
@@ -971,9 +975,74 @@ func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error)
 	return code, nil
 }
 
+func (g *generator) generateForStatement(forStmt *ast.ForStatement) (string, error) {
+	counterVar := forStmt.Counter
+
+	g.loopContextStack.Push(counterVar)
+
+	fromCode, err := g.generateArrowFunctionExpression(forStmt.From)
+	if err != nil {
+		g.loopContextStack.Pop()
+		return "", err
+	}
+
+	toCode, err := g.generateArrowFunctionExpression(forStmt.To)
+	if err != nil {
+		g.loopContextStack.Pop()
+		return "", err
+	}
+
+	stepCode := "1"
+	if forStmt.Step != nil {
+		stepCode, err = g.generateArrowFunctionExpression(forStmt.Step)
+		if err != nil {
+			g.loopContextStack.Pop()
+			return "", err
+		}
+	}
+
+	code := g.ind() + fmt.Sprintf("{\n")
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%s := int(%s)\n", counterVar, fromCode)
+	code += g.ind() + fmt.Sprintf("_to := int(%s)\n", toCode)
+	code += g.ind() + fmt.Sprintf("_step := int(%s)\n", stepCode)
+
+	code += g.ind() + fmt.Sprintf("if _step == 0 {\n")
+	g.indent++
+	code += g.ind() + fmt.Sprintf("panic(\"for loop step cannot be zero\")\n")
+	g.indent--
+	code += g.ind() + fmt.Sprintf("}\n")
+
+	code += g.ind() + fmt.Sprintf("_ascending := _step > 0\n")
+	code += g.ind() + fmt.Sprintf("for (_ascending && %s <= _to) || (!_ascending && %s >= _to) {\n", counterVar, counterVar)
+	g.indent++
+
+	for _, stmt := range forStmt.Body {
+		stmtCode, err := g.generateStatement(stmt)
+		if err != nil {
+			g.loopContextStack.Pop()
+			return "", err
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
+	code += g.ind() + fmt.Sprintf("%s += _step\n", counterVar)
+
+	g.indent--
+	code += g.ind() + "}\n"
+	g.indent--
+	code += g.ind() + "}\n"
+
+	g.loopContextStack.Pop()
+
+	return code, nil
+}
+
 func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
-	// Arrow function context: Generate arithmetic expression
-	if g.inArrowFunctionBody {
+	isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
+	if g.inArrowFunctionBody || isInLoop {
 		left, err := g.generateArrowFunctionExpression(binExpr.Left)
 		if err != nil {
 			return "", err
@@ -998,6 +1067,16 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.Identifier:
+		isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
+
+		if isInLoop && g.loopContextStack.IsLoopCounter(e.Name) {
+			return fmt.Sprintf("float64(%s)", e.Name), nil
+		}
+
+		if e.Name == "bar_index" && isInLoop {
+			return "bar_indexSeries.GetCurrent()", nil
+		}
+
 		// Check if it's a builtin identifier
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
 			return code, nil
@@ -1005,8 +1084,7 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 
 		// Check if it's a local variable (needs Series access)
 		if varType, exists := g.variables[e.Name]; exists {
-			// Local variable in arrow function uses Series storage
-			if varType == "float" || varType == "bool" {
+			if varType == "float" || varType == "float64" || varType == "bool" {
 				return e.Name + "Series.GetCurrent()", nil
 			}
 			// Function type stays as-is (user-defined function call)
@@ -1035,6 +1113,11 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 		return g.generateBinaryExpression(e)
 
 	case *ast.MemberExpression:
+		if e.Computed && g.subscriptResolver != nil {
+			if obj, ok := e.Object.(*ast.Identifier); ok {
+				return g.subscriptResolver.ResolveSubscript(obj.Name, e.Property, g), nil
+			}
+		}
 		return g.generateMemberExpression(e)
 
 	case *ast.ConditionalExpression:
@@ -1458,13 +1541,16 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 
 		varType := g.inferVariableType(declarator.Init)
 
-		if g.registryGuard != nil {
-			if g.registryGuard.SafeRegister(varName, varType) {
+		isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
+		if !isInLoop {
+			if g.registryGuard != nil {
+				if g.registryGuard.SafeRegister(varName, varType) {
+					g.varInits[varName] = declarator.Init
+				}
+			} else {
+				g.variables[varName] = varType
 				g.varInits[varName] = declarator.Init
 			}
-		} else {
-			g.variables[varName] = varType
-			g.varInits[varName] = declarator.Init
 		}
 
 		if varType == "string" {
@@ -1477,10 +1563,22 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			continue
 		}
 
-		// Generate initialization from init expression
 		if declarator.Init != nil {
-			// Arrow function context: ALL variables use Series (ForwardSeriesBuffer paradigm)
-			if g.inArrowFunctionBody {
+			if isInLoop {
+				if _, existsOuter := g.variables[varName]; existsOuter {
+					seriesCode, err := g.generateLoopSeriesReassignment(varName, declarator.Init)
+					if err != nil {
+						return "", err
+					}
+					code += seriesCode
+				} else {
+					localCode, err := g.generateLoopLocalVariable(varName, declarator.Init)
+					if err != nil {
+						return "", err
+					}
+					code += localCode
+				}
+			} else if g.inArrowFunctionBody {
 				seriesCode, err := g.generateArrowFunctionSeriesInit(varName, declarator.Init)
 				if err != nil {
 					return "", err
@@ -1497,6 +1595,24 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 	}
 	return code, nil
+}
+
+/* generateLoopLocalVariable generates local Go variable assignment inside for loops */
+func (g *generator) generateLoopLocalVariable(varName string, initExpr ast.Expression) (string, error) {
+	exprCode, err := g.generateArrowFunctionExpression(initExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate loop local variable %s: %w", varName, err)
+	}
+	return g.ind() + fmt.Sprintf("%s := %s\n", varName, exprCode), nil
+}
+
+/* generateLoopSeriesReassignment generates Series.Set() for reassigning outer Series variables in loops */
+func (g *generator) generateLoopSeriesReassignment(varName string, initExpr ast.Expression) (string, error) {
+	exprCode, err := g.generateArrowFunctionExpression(initExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate loop series reassignment %s: %w", varName, err)
+	}
+	return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, exprCode), nil
 }
 
 /*
@@ -3786,6 +3902,16 @@ func hasBarIndexInNode(node ast.Node) bool {
 		}
 		for _, alternate := range n.Alternate {
 			if hasBarIndexInNode(alternate) {
+				return true
+			}
+		}
+	case *ast.ForStatement:
+		/* Check for loop bounds and body for bar_index usage */
+		if hasBarIndexInExpression(n.From) || hasBarIndexInExpression(n.To) || hasBarIndexInExpression(n.Step) {
+			return true
+		}
+		for _, stmt := range n.Body {
+			if hasBarIndexInNode(stmt) {
 				return true
 			}
 		}
