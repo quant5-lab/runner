@@ -202,7 +202,7 @@ func TestEquityCalculator(t *testing.T) {
 
 func TestStrategy(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	// Place entry order
 	err := s.Entry("long1", Long, 10, "")
@@ -261,7 +261,7 @@ func TestEquityCurrentPriceTracking(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewStrategy()
-			s.Call("Test", tt.initialCap)
+			s.CallWithPyramiding("Test", tt.initialCap, 0)
 
 			for i, price := range tt.barUpdates {
 				s.OnBarUpdate(i, price, int64(1000+i))
@@ -302,7 +302,7 @@ func TestEquityUnrealizedProfitCalculation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewStrategy()
-			s.Call("Test", tt.initialCap)
+			s.CallWithPyramiding("Test", tt.initialCap, 0)
 
 			err := s.Entry("trade1", tt.direction, tt.qty, "")
 			if err != nil {
@@ -324,7 +324,7 @@ func TestEquityUnrealizedProfitCalculation(t *testing.T) {
 /* TestEquityMultiplePositions verifies equity with multiple open trades */
 func TestEquityMultiplePositions(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test", 10000)
+	s.CallWithPyramiding("Test", 10000, 1) // pyramiding=1 allows 2 positions
 
 	/* Open first long position */
 	s.Entry("long1", Long, 10, "")
@@ -347,7 +347,7 @@ func TestEquityMultiplePositions(t *testing.T) {
 /* TestEquityAfterClosedTrade verifies realized profit in equity */
 func TestEquityAfterClosedTrade(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test", 10000)
+	s.CallWithPyramiding("Test", 10000, 0)
 
 	/* Open and close first trade with profit */
 	s.Entry("long1", Long, 10, "")
@@ -378,7 +378,7 @@ func TestEquityAfterClosedTrade(t *testing.T) {
 /* TestEquityConsistencyWithGetEquity verifies wrapper delegates correctly */
 func TestEquityConsistencyWithGetEquity(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test", 10000)
+	s.CallWithPyramiding("Test", 10000, 0)
 
 	priceSequence := []float64{100, 105, 110, 95, 100, 120}
 
@@ -409,7 +409,7 @@ func TestEquityBeforeInitialization(t *testing.T) {
 /* TestEquityWithNoBarUpdates verifies behavior without price updates */
 func TestEquityWithNoBarUpdates(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test", 10000)
+	s.CallWithPyramiding("Test", 10000, 0)
 
 	/* Without OnBarUpdate, currentPrice is 0 */
 	equity := s.Equity()
@@ -421,7 +421,7 @@ func TestEquityWithNoBarUpdates(t *testing.T) {
 /* TestStrategyEntryComment verifies entry comment propagation through full cycle */
 func TestStrategyEntryComment(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	/* Place entry with comment */
 	err := s.Entry("long1", Long, 10, "Buy on MA cross")
@@ -455,12 +455,10 @@ func TestStrategyEntryComment(t *testing.T) {
 	}
 }
 
-/* TestStrategyExitComment verifies different exit methods preserve comments */
 func TestStrategyExitComment(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 2)
 
-	/* Test Close with comment */
 	s.Entry("long1", Long, 10, "Entry 1")
 	s.OnBarUpdate(1, 100, 1000)
 	s.Close("long1", 105, 2000, "Manual close")
@@ -509,7 +507,7 @@ func TestStrategyExitComment(t *testing.T) {
 /* TestStrategyMixedComments verifies behavior with mixed comment/no-comment trades */
 func TestStrategyMixedComments(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 1) // pyramiding=1 allows 2 positions
 
 	/* Entry with comment */
 	s.Entry("long1", Long, 10, "Signal A")
@@ -549,7 +547,7 @@ func TestStrategyMixedComments(t *testing.T) {
 
 func TestStrategyShort(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	// Place short entry
 	s.Entry("short1", Short, 5, "")
@@ -571,9 +569,8 @@ func TestStrategyShort(t *testing.T) {
 
 func TestStrategyCloseAll(t *testing.T) {
 	s := NewStrategy()
-	s.Call("Test Strategy", 10000)
+	s.CallWithPyramiding("Test Strategy", 10000, 1)
 
-	// Open multiple positions
 	s.Entry("long1", Long, 10, "")
 	s.Entry("long2", Long, 5, "")
 	s.OnBarUpdate(1, 100, 1000)

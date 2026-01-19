@@ -28,7 +28,7 @@ func TestStateManagerInitialization(t *testing.T) {
 func TestStateManagerSamplesAllFields(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	sm.SampleCurrentBar(strat, 100.0)
 
@@ -52,7 +52,7 @@ func TestStateManagerSamplesAllFields(t *testing.T) {
 func TestStateManagerLongPosition(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
@@ -69,7 +69,7 @@ func TestStateManagerLongPosition(t *testing.T) {
 func TestStateManagerShortPosition(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Short", Short, 5, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
@@ -86,7 +86,7 @@ func TestStateManagerShortPosition(t *testing.T) {
 func TestStateManagerHistoricalAccess(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.OnBarUpdate(0, 100.0, 1000)
 	sm.SampleCurrentBar(strat, 100.0)
@@ -107,7 +107,7 @@ func TestStateManagerHistoricalAccess(t *testing.T) {
 func TestStateManagerPositionLifecycle(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.OnBarUpdate(0, 100.0, 1000)
 	sm.SampleCurrentBar(strat, 100.0)
@@ -138,7 +138,7 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 func TestStateManagerPositionReversal(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
@@ -161,7 +161,7 @@ func TestStateManagerPositionReversal(t *testing.T) {
 func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
@@ -184,7 +184,7 @@ func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 func TestStateManagerMultipleClosedTrades(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	barIndex := 0
 	for i := 0; i < 3; i++ {
@@ -213,7 +213,7 @@ func TestStateManagerMultipleClosedTrades(t *testing.T) {
 func TestStateManagerNaNPropagation(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	for i := 0; i < 5; i++ {
 		sm.SampleCurrentBar(strat, 100.0)
@@ -227,7 +227,7 @@ func TestStateManagerNaNPropagation(t *testing.T) {
 func TestStateManagerCursorAdvancement(t *testing.T) {
 	sm := NewStateManager(10)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	values := []float64{100, 105, 110, 115, 120}
 

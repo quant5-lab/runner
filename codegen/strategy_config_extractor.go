@@ -56,4 +56,8 @@ func (e *StrategyConfigExtractor) extractFromObject(obj *ast.ObjectExpression, c
 	if val, ok := e.propertyParser.ParseIdentifier(obj, "default_qty_type"); ok {
 		config.DefaultQtyType = val
 	}
+
+	if val, ok := e.propertyParser.ParseInt(obj, "pyramiding"); ok {
+		config.Pyramiding = val
+	}
 }

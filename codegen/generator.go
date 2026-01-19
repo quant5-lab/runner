@@ -546,7 +546,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	code := ""
 
-	code += g.ind() + fmt.Sprintf("strat.Call(%q, %.0f)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital)
+	code += g.ind() + fmt.Sprintf("strat.CallWithPyramiding(%q, %.0f, %d)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital, g.strategyConfig.Pyramiding)
 
 	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
 		code += g.ind() + "// Input constants\n"
@@ -2989,7 +2989,7 @@ func (g *generator) analyzeSeriesRequirements(node ast.Node) {
 
 func (g *generator) generatePlaceholder() string {
 	code := g.ind() + "// Strategy code will be generated here\n"
-	code += g.ind() + fmt.Sprintf("strat.Call(%q, %.0f)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital)
+	code += g.ind() + fmt.Sprintf("strat.CallWithPyramiding(%q, %.0f, %d)\n\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital, g.strategyConfig.Pyramiding)
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"

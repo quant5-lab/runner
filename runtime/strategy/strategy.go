@@ -240,9 +240,9 @@ type Strategy struct {
 	initialized      bool
 	currentBar       int
 	currentPrice     float64
+	pyramiding       int
 }
 
-/* NewStrategy creates a new strategy */
 func NewStrategy() *Strategy {
 	om := NewOrderManager()
 	pt := NewPositionTracker()
@@ -257,21 +257,50 @@ func NewStrategy() *Strategy {
 		equityCalculator: ec,
 		reversalHandler:  rh,
 		initialized:      false,
+		pyramiding:       -1,
 	}
 }
 
-/* Call initializes strategy with name and options */
 func (s *Strategy) Call(strategyName string, initialCapital float64) {
 	s.initialized = true
 	s.equityCalculator = NewEquityCalculator(initialCapital)
 	s.reversalHandler.equityCalculator = s.equityCalculator
+	s.pyramiding = -1
 }
 
-/* Entry places an entry order */
+func (s *Strategy) CallWithPyramiding(strategyName string, initialCapital float64, pyramiding int) {
+	s.initialized = true
+	s.equityCalculator = NewEquityCalculator(initialCapital)
+	s.reversalHandler.equityCalculator = s.equityCalculator
+	s.pyramiding = pyramiding
+}
+
 func (s *Strategy) Entry(id, direction string, qty float64, comment string) error {
 	if !s.initialized {
 		return fmt.Errorf("strategy not initialized")
 	}
+
+	if s.pyramiding >= 0 {
+		openTrades := s.tradeHistory.GetOpenTrades()
+		sameDirectionCount := 0
+		for _, trade := range openTrades {
+			if trade.Direction == direction {
+				sameDirectionCount++
+			}
+		}
+
+		pendingOrders := s.orderManager.GetPendingOrders(s.currentBar + 1)
+		for _, order := range pendingOrders {
+			if order.Direction == direction {
+				sameDirectionCount++
+			}
+		}
+
+		if sameDirectionCount > s.pyramiding {
+			return nil
+		}
+	}
+
 	s.orderManager.CreateOrder(id, direction, qty, s.currentBar, comment)
 	return nil
 }

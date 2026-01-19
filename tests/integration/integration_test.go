@@ -142,7 +142,7 @@ func TestChartDataGeneration(t *testing.T) {
 
 	// Add mock strategy
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 0)
 	strat.Entry("long1", strategy.Long, 10, "")
 	strat.OnBarUpdate(1, 100, 1700000000)
 	strat.Close("long1", 110, 1700003600, "")
@@ -268,7 +268,7 @@ func TestRuntimeIntegration(t *testing.T) {
 
 	// Create strategy
 	strat := strategy.NewStrategy()
-	strat.Call("Test Runtime Strategy", 10000)
+	strat.CallWithPyramiding("Test Runtime Strategy", 10000, 0)
 
 	// Simulate strategy execution
 	for i := 0; i < len(ctx.Data); i++ {

@@ -9,7 +9,7 @@ import (
 
 func TestCrossoverExecution(t *testing.T) {
 	pineScript := `//@version=5
-strategy("Simple Crossover", overlay=true)
+strategy("Simple Crossover", overlay=true, pyramiding=1)
 
 openCrossover = ta.crossover(close, open)
 if openCrossover

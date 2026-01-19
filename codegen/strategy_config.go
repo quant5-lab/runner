@@ -3,26 +3,26 @@ package codegen
 const (
 	defaultInitialCapital = 10000.0
 	defaultQtyValue       = 1.0
+	defaultPyramiding     = 0
 )
 
-// StrategyConfig holds strategy declaration parameters.
 type StrategyConfig struct {
 	Name            string
 	InitialCapital  float64
 	DefaultQtyValue float64
 	DefaultQtyType  string
+	Pyramiding      int
 }
 
-// NewStrategyConfig creates config with Pine Script defaults.
 func NewStrategyConfig() *StrategyConfig {
 	return &StrategyConfig{
 		Name:            "Generated Strategy",
 		InitialCapital:  defaultInitialCapital,
 		DefaultQtyValue: defaultQtyValue,
+		Pyramiding:      defaultPyramiding,
 	}
 }
 
-// MergeFrom updates config with non-zero values from another config.
 func (c *StrategyConfig) MergeFrom(other *StrategyConfig) {
 	if other == nil {
 		return
@@ -38,5 +38,8 @@ func (c *StrategyConfig) MergeFrom(other *StrategyConfig) {
 	}
 	if other.DefaultQtyType != "" {
 		c.DefaultQtyType = other.DefaultQtyType
+	}
+	if other.Pyramiding >= 0 {
+		c.Pyramiding = other.Pyramiding
 	}
 }
