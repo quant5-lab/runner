@@ -60,8 +60,6 @@ func (r *InlineTAIIFERegistry) Generate(funcName string, accessor AccessGenerato
 	return gen.Generate(accessor, period, sourceHash), true
 }
 
-// Generators
-
 type SMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type EMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
@@ -82,7 +80,9 @@ func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += fmt.Sprintf("return sum / %s", period.AsFloat64Cast())
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
+	/* Previous bar access requires additional warmup bar */
+	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -111,7 +111,8 @@ func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := float64(%s - j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsGoExpr(), accessor.GenerateLoopValueAccess("j"))
 	body += "return sum / weightSum"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
+	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 
 func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -120,7 +121,8 @@ func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExp
 	body += fmt.Sprintf("variance := 0.0; for j := 0; j < %s; j++ { diff := %s - mean; variance += diff * diff }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += fmt.Sprintf("return math.Sqrt(variance / %s)", period.AsFloat64Cast())
 
-	return NewIIFECodeBuilder().WithWarmupCheck(period.AsInt()).WithBody(body).Build()
+	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 
 func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -129,7 +131,8 @@ func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodE
 	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return highest"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
+	warmupPeriod := periodInt + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 
 func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -138,7 +141,8 @@ func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodEx
 	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
 	body += "return lowest"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(periodInt).WithBody(body).Build()
+	warmupPeriod := periodInt + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 
 func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset PeriodExpression, sourceHash string) string {
@@ -151,5 +155,6 @@ func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset PeriodEx
 	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offsetInt)))
 	body += "return current - previous"
 
-	return NewIIFECodeBuilder().WithWarmupCheck(offsetInt + 1).WithBody(body).Build()
+	warmupPeriod := offsetInt + 1 + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }

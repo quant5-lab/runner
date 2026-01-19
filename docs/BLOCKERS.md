@@ -13,3 +13,7 @@
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
 | **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
 | **14** | **Codegen** | TA member expression arguments | ✅ **VALID** | Parse✅ Generate❌: "unsupported member expression in TA call". Blocks keltner-squeeze.pine |
+| **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
+| **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
+| **17** | **Codegen** | Tuple destructuring syntax | ✅ **FIXED** | Universal tuple indicator architecture implemented. MACD, BB, Stoch supported via data-driven registry. |
+| **18** | **Codegen** | `ta.crossover()/crossunder()` arbitrary expression support | ✅ **FIXED** | Inline IIFE pattern enables crossover/crossunder with arbitrary PineScript expressions in any context. Recursive stateful indicator detection. Comprehensive test coverage: 35+ behavioral tests (ArgumentTypes, StatefulDetection, WindowFunctionInlining, EdgeCases, LiteralTypes, LogicConditions). |

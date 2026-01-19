@@ -836,24 +836,22 @@ func TestPlotConditionalColor_PositiveOffset(t *testing.T) {
 // createPlotTestGenerator creates a fully initialized generator for plot testing
 func createPlotTestGenerator() *generator {
 	gen := &generator{
-		variables:               make(map[string]string),
-		varInits:                make(map[string]ast.Expression),
-		constants:               make(map[string]interface{}),
-		taRegistry:              NewTAFunctionRegistry(),
-		mathHandler:             NewMathHandler(),
-		runtimeOnlyFilter:       NewRuntimeOnlyFunctionFilter(),
-		barFieldRegistry:        NewBarFieldSeriesRegistry(),
-		constEvaluator:          validation.NewWarmupAnalyzer(),
-		inlineConditionRegistry: NewInlineConditionHandlerRegistry(),
-		indent:                  1,
+		variables:         make(map[string]string),
+		varInits:          make(map[string]ast.Expression),
+		constants:         make(map[string]interface{}),
+		taRegistry:        NewTAFunctionRegistry(),
+		mathHandler:       NewMathHandler(),
+		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
+		barFieldRegistry:  NewBarFieldSeriesRegistry(),
+		constEvaluator:    validation.NewWarmupAnalyzer(),
+		indent:            1,
 	}
 	gen.typeSystem = NewTypeInferenceEngine()
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry(gen.tempVarMgr)
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
-	gen.boolConverter = NewBooleanConverter(gen.typeSystem)
-
-	// Setup built-in variables
+	gen.boolConverter = NewBooleanConverter(gen.typeSystem) // Setup built-in variables
 	gen.variables["close"] = "float64"
 	gen.variables["open"] = "float64"
 	gen.variables["high"] = "float64"

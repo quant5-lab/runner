@@ -276,3 +276,8 @@ func (a *ArrowFunctionParameterAccessor) GenerateInitialValueAccess(period int) 
 func (a *ArrowFunctionParameterAccessor) GenerateCurrentValueAccess() string {
 	return fmt.Sprintf("%sSeries.GetCurrent()", a.parameterName)
 }
+
+/* GetBaseOffset returns 0 - arrow function parameter access is current bar relative */
+func (a *ArrowFunctionParameterAccessor) GetBaseOffset() int {
+	return 0
+}

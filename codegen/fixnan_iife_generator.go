@@ -73,6 +73,11 @@ func (a *FixnanCallExpressionAccessor) GetPreamble() string {
 	return a.tempVarCode
 }
 
+/* GetBaseOffset returns 0 - fixnan expression access is current bar relative */
+func (a *FixnanCallExpressionAccessor) GetBaseOffset() int {
+	return 0
+}
+
 /* transformSeriesAccess replaces .GetCurrent() with .Get(offset) for historical Series access */
 func transformSeriesAccess(exprCode, loopVar string) string {
 	// Replace all occurrences of .GetCurrent() with .Get(loopVar)

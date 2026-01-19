@@ -56,6 +56,11 @@ func (a *BuiltinIdentifierAccessor) GetPreamble() string {
 	return ""
 }
 
+/* GetBaseOffset returns 0 - builtin identifier access is current bar relative */
+func (a *BuiltinIdentifierAccessor) GetBaseOffset() int {
+	return 0
+}
+
 func extractFieldName(resolvedCode string) string {
 	// Extract field name from "ctx.Data[ctx.BarIndex].High" → "High"
 	// This is a simple heuristic - assumes last dotted component is the field name

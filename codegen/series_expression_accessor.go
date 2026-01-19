@@ -86,3 +86,8 @@ func (a *SeriesExpressionAccessor) GenerateCurrentValueAccess() string {
 
 	return code
 }
+
+/* GetBaseOffset returns 0 - series expression access is current bar relative */
+func (a *SeriesExpressionAccessor) GetBaseOffset() int {
+	return 0
+}

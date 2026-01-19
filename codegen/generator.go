@@ -55,7 +55,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
 	gen.inlineRegistry = NewInlineFunctionRegistry()
 	gen.runtimeOnlyFilter = NewRuntimeOnlyFunctionFilter()
-	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry()
+	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry(gen.tempVarMgr)
 	gen.plotCollector = NewPlotCollector()
 	gen.callRouter = NewCallExpressionRouter()
 	gen.funcSigRegistry = NewFunctionSignatureRegistry()

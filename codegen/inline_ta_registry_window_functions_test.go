@@ -280,6 +280,10 @@ func (m *mockWindowAccessor) GenerateCurrentValueAccess() string {
 	return "ctx.Data[ctx.BarIndex].Close"
 }
 
+func (m *mockWindowAccessor) GetBaseOffset() int {
+	return 0
+}
+
 func intToString(n int) string {
 	if n == 0 {
 		return "0"

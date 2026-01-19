@@ -13,7 +13,7 @@ type InlineConditionHandlerRegistry struct {
 	handlers []InlineConditionHandler
 }
 
-func NewInlineConditionHandlerRegistry() *InlineConditionHandlerRegistry {
+func NewInlineConditionHandlerRegistry(tempVarMgr *TempVariableManager) *InlineConditionHandlerRegistry {
 	return &InlineConditionHandlerRegistry{
 		handlers: []InlineConditionHandler{
 			NewValueHandler(),

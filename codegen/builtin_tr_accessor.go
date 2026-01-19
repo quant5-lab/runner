@@ -53,3 +53,8 @@ GetPreamble returns empty string - tr calculation is self-contained.
 func (a *BuiltinTrueRangeAccessor) GetPreamble() string {
 	return ""
 }
+
+/* GetBaseOffset returns 0 - tr access is always current bar relative */
+func (a *BuiltinTrueRangeAccessor) GetBaseOffset() int {
+	return 0
+}

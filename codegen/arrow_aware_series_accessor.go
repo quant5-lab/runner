@@ -43,3 +43,8 @@ GetPreamble returns any setup code needed before the accessor is used.
 func (a *ArrowAwareSeriesAccessor) GetPreamble() string {
 	return ""
 }
+
+/* GetBaseOffset returns 0 - arrow-aware series access is current bar relative */
+func (a *ArrowAwareSeriesAccessor) GetBaseOffset() int {
+	return 0
+}

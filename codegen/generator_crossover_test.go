@@ -8,6 +8,20 @@ import (
 	"github.com/quant5-lab/runner/runtime/validation"
 )
 
+/*
+Integration tests for crossover codegen with AST construction.
+
+These tests validate internal helper functions and codegen structure using programmatically constructed ASTs.
+Test hierarchy:
+- crossover_inline_handler_test.go: Unit tests for handler behavior (preferred for new tests)
+- generator_crossover_test.go: Integration tests for helper functions and codegen structure
+- crossover_arbitrary_pinescript_test.go: E2E compilation tests for full pipeline
+
+Note: Some tests validate internal APIs (extractSeriesExpression, convertSeriesAccessToPrev).
+While these provide granular validation, they couple to implementation details.
+Consider unit tests in crossover_inline_handler_test.go for behavioral validation.
+*/
+
 func TestExtractSeriesExpression(t *testing.T) {
 	gen := &generator{
 		imports:        make(map[string]bool),
