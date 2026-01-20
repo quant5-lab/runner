@@ -1624,7 +1624,7 @@ func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerato
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			if obj.Name == "ctx" {
 				if prop, ok := e.Property.(*ast.Identifier); ok {
-					fieldName := capitalizeFirst(prop.Name)
+					fieldName := capitalize(prop.Name)
 					return NewOHLCVFieldAccessGenerator(fieldName), nil
 				}
 			}
@@ -1666,7 +1666,7 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 			if obj.Name == "strategy" {
 				if prop, ok := expr.Property.(*ast.Identifier); ok {
 					if prop.Name == "long" || prop.Name == "short" {
-						return g.ind() + fmt.Sprintf("%s = strategy.%s\n", varName, capitalizeFirst(prop.Name)), nil
+						return g.ind() + fmt.Sprintf("%s = strategy.%s\n", varName, capitalize(prop.Name)), nil
 					}
 				}
 			}

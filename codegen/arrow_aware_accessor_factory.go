@@ -21,18 +21,21 @@ Design Rationale:
 */
 type ArrowAwareAccessorFactory struct {
 	identifierResolver *ArrowIdentifierResolver
-	exprGenerator      *ArrowExpressionGeneratorImpl
+	exprGenerator      ArrowExpressionGenerator
+	gen                *generator
 	symbolTable        SymbolTable
 }
 
 func NewArrowAwareAccessorFactory(
 	resolver *ArrowIdentifierResolver,
-	exprGen *ArrowExpressionGeneratorImpl,
+	exprGen ArrowExpressionGenerator,
+	gen *generator,
 	symbolTable SymbolTable,
 ) *ArrowAwareAccessorFactory {
 	return &ArrowAwareAccessorFactory{
 		identifierResolver: resolver,
 		exprGenerator:      exprGen,
+		gen:                gen,
 		symbolTable:        symbolTable,
 	}
 }
@@ -46,6 +49,9 @@ func (f *ArrowAwareAccessorFactory) CreateAccessorForExpression(expr ast.Express
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return f.createIdentifierAccessor(e)
+
+	case *ast.MemberExpression:
+		return f.createMemberAccessor(e)
 
 	case *ast.BinaryExpression:
 		return f.createBinaryAccessor(e)
@@ -69,7 +75,7 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 	}
 
 	// Try other builtin resolution (high, low, close, etc.)
-	code, resolved := f.exprGenerator.gen.builtinHandler.TryResolveIdentifier(id, false)
+	code, resolved := f.gen.builtinHandler.TryResolveIdentifier(id, false)
 	if resolved {
 		return NewBuiltinIdentifierAccessor(code), nil
 	}
@@ -83,7 +89,54 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 		return NewArrowFunctionParameterAccessor(id.Name), nil
 	}
 
-	return nil, fmt.Errorf("identifier '%s' not registered in arrow context", id.Name)
+	// Fallback: treat as series variable
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.ClassifyAST(id)
+	return CreateAccessGenerator(sourceInfo), nil
+}
+
+func (f *ArrowAwareAccessorFactory) createMemberAccessor(member *ast.MemberExpression) (AccessGenerator, error) {
+	obj, okObj := member.Object.(*ast.Identifier)
+	if !okObj {
+		return f.createFallbackMemberAccessor(member)
+	}
+
+	prop, okProp := member.Property.(*ast.Identifier)
+
+	if okProp && obj.Name == "ta" && prop.Name == "tr" {
+		return NewBuiltinTrueRangeAccessor(), nil
+	}
+
+	if okProp && obj.Name == "ctx" {
+		fieldName := capitalizeFirstLetter(prop.Name)
+		return NewOHLCVFieldAccessGenerator(fieldName), nil
+	}
+
+	code, resolved := f.gen.builtinHandler.TryResolveMemberExpression(member, false)
+	if resolved {
+		return NewBuiltinIdentifierAccessor(code), nil
+	}
+
+	return f.createFallbackMemberAccessor(member)
+}
+
+func (f *ArrowAwareAccessorFactory) createFallbackMemberAccessor(member *ast.MemberExpression) (AccessGenerator, error) {
+	if f.symbolTable != nil {
+		return NewSeriesExpressionAccessor(member, f.symbolTable, nil), nil
+	}
+
+	// Without symbolTable, we can't safely handle arbitrary member expressions
+	return nil, fmt.Errorf("unsupported member expression in TA call: %T", member)
+}
+
+func capitalizeFirstLetter(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	if s[0] >= 'a' && s[0] <= 'z' {
+		return string(s[0]-32) + s[1:]
+	}
+	return s
 }
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {

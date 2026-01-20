@@ -1,0 +1,30 @@
+//@version=5
+indicator("TR Member Expression Test", overlay=false)
+
+// Test: ta.tr MemberExpression in various contexts
+
+// Test 1: ta.tr in inline ta.ema() - primary use case for arrow function MemberExpression
+atr14 = ta.ema(ta.tr, 14)
+
+// Test 2: ta.tr[1] nested MemberExpression in ta.ema()
+atr_prev = ta.ema(ta.tr[1], 14)
+
+// Test 3: ta.tr in ta.rma() (different TA function)
+atr_rma = ta.rma(ta.tr, 14)
+
+// Test 4: Direct assignment - all variations
+tr_simple = tr
+tr_member = ta.tr
+tr_subscript = ta.tr[0]
+tr_historical = ta.tr[1]
+tr_historical2 = ta.tr[2]
+
+// Plot results to verify all work correctly
+plot(atr14, "ATR14 EMA", color=color.blue)
+plot(atr_prev, "ATR Prev", color=color.green)
+plot(atr_rma, "ATR14 RMA", color=color.orange)
+plot(tr_simple, "TR Simple", color=color.red)
+plot(tr_member, "TR Member", color=color.purple)
+plot(tr_historical, "TR[1]", color=color.yellow)
+plot(tr_historical2, "TR[2]", color=color.maroon)
+

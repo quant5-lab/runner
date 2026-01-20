@@ -50,6 +50,18 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 		return nil, err
 	}
 
+	// Check for tr builtin (identifier "tr" or member "ta.tr")
+	if e.isTrBuiltin(sourceExpr) {
+		return &TAArgumentComponents{
+			SourceExpr:    sourceExpr,
+			Period:        period,
+			SourceInfo:    SourceInfo{},
+			AccessGen:     NewBuiltinTrueRangeAccessor(),
+			NeedsNaNCheck: false,
+			Preamble:      "",
+		}, nil
+	}
+
 	sourceInfo := e.classifier.ClassifyAST(sourceExpr)
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()
@@ -73,6 +85,20 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 		NeedsNaNCheck: needsNaN,
 		Preamble:      preamble,
 	}, nil
+}
+
+func (e *TAArgumentExtractor) isTrBuiltin(expr ast.Expression) bool {
+	if id, ok := expr.(*ast.Identifier); ok && id.Name == "tr" {
+		return true
+	}
+	if mem, ok := expr.(*ast.MemberExpression); ok {
+		if obj, ok := mem.Object.(*ast.Identifier); ok {
+			if prop, ok := mem.Property.(*ast.Identifier); ok {
+				return obj.Name == "ta" && prop.Name == "tr"
+			}
+		}
+	}
+	return false
 }
 
 // requiresExpressionAccessor returns true when the source expression is not a simple OHLCV field/series

@@ -28,7 +28,7 @@ func NewArrowExpressionGeneratorImpl(gen *generator, resolver *ArrowSeriesAccess
 		identifierResolver: identifierResolver,
 	}
 
-	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen.symbolTable)
+	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
 	iifeRegistry := NewInlineTAIIFERegistry()
 	inlineTAGenerator := NewArrowInlineTACallGenerator(accessorFactory, iifeRegistry)
 

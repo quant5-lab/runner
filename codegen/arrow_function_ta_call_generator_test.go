@@ -385,7 +385,7 @@ func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 			}
 			gen := newTestArrowTAGenerator(g)
 
-			accessor, err := gen.createAccessorFromExpression(tt.expr)
+			accessor, err := gen.accessorFactory.CreateAccessorForExpression(tt.expr)
 
 			if tt.expectError {
 				if err == nil {

@@ -136,19 +136,19 @@ func TestArrowFunctionTACallGenerator_CreateAccessorForTr(t *testing.T) {
 	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
+	accessor, err := taGen.accessorFactory.CreateAccessorForExpression(trIdentifier)
 
 	if err != nil {
-		t.Errorf("createAccessorFromExpression(tr) returned error: %v", err)
+		t.Errorf("CreateAccessorForExpression(tr) returned error: %v", err)
 	}
 
 	if accessor == nil {
-		t.Fatal("createAccessorFromExpression(tr) returned nil accessor")
+		t.Fatal("CreateAccessorForExpression(tr) returned nil accessor")
 	}
 
 	/* Verify correct accessor type */
 	if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
-		t.Errorf("createAccessorFromExpression(tr) returned wrong type: %T, want *BuiltinTrueRangeAccessor", accessor)
+		t.Errorf("CreateAccessorForExpression(tr) returned wrong type: %T, want *BuiltinTrueRangeAccessor", accessor)
 	}
 }
 
@@ -159,10 +159,10 @@ func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
 
 	t.Run("tr builtin returns BuiltinTrueRangeAccessor", func(t *testing.T) {
 		trIdentifier := &ast.Identifier{Name: "tr"}
-		accessor, err := taGen.createAccessorFromExpression(trIdentifier)
+		accessor, err := taGen.accessorFactory.CreateAccessorForExpression(trIdentifier)
 
 		if err != nil {
-			t.Fatalf("createAccessorFromExpression(tr) error: %v", err)
+			t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
 		}
 
 		if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
@@ -172,10 +172,10 @@ func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
 
 	t.Run("my_tr parameter returns ArrowFunctionParameterAccessor", func(t *testing.T) {
 		myTrIdentifier := &ast.Identifier{Name: "my_tr"}
-		accessor, err := taGen.createAccessorFromExpression(myTrIdentifier)
+		accessor, err := taGen.accessorFactory.CreateAccessorForExpression(myTrIdentifier)
 
 		if err != nil {
-			t.Fatalf("createAccessorFromExpression(my_tr) error: %v", err)
+			t.Fatalf("CreateAccessorForExpression(my_tr) error: %v", err)
 		}
 
 		if _, ok := accessor.(*ArrowFunctionParameterAccessor); !ok {
@@ -190,10 +190,10 @@ func TestBuiltinTrueRange_IntegrationWithTAFunctions(t *testing.T) {
 	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
+	accessor, err := taGen.accessorFactory.CreateAccessorForExpression(trIdentifier)
 
 	if err != nil {
-		t.Fatalf("createAccessorFromExpression(tr) error: %v", err)
+		t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
 	}
 
 	t.Run("tr with RMA loop iteration", func(t *testing.T) {
@@ -239,10 +239,10 @@ func TestBuiltinTrueRange_InArrowFunctionContext(t *testing.T) {
 	taGen := newTestArrowTAGenerator(gen)
 
 	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
+	accessor, err := taGen.accessorFactory.CreateAccessorForExpression(trIdentifier)
 
 	if err != nil {
-		t.Fatalf("Arrow function createAccessorFromExpression(tr) error: %v", err)
+		t.Fatalf("Arrow function CreateAccessorForExpression(tr) error: %v", err)
 	}
 
 	/* Verify accessor is BuiltinTrueRangeAccessor */

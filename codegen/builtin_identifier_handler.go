@@ -165,12 +165,29 @@ func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, in
 func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberExpression, inSecurityContext bool) (string, bool) {
 	obj, okObj := expr.Object.(*ast.Identifier)
 	if !okObj {
+		// Check for nested MemberExpression like ta.tr[1]
+		if objMember, ok := expr.Object.(*ast.MemberExpression); ok && expr.Computed {
+			// Extract the base builtin from nested structure
+			baseObj, baseOk := objMember.Object.(*ast.Identifier)
+			baseProp, basePropOk := objMember.Property.(*ast.Identifier)
+
+			if baseOk && basePropOk && baseObj.Name == "ta" && baseProp.Name == "tr" {
+				// This is ta.tr[offset]
+				offset := h.extractOffset(expr.Property)
+				return h.generateHistoricalTrueRange(offset), true
+			}
+		}
 		return "", false
 	}
 
 	prop, okProp := expr.Property.(*ast.Identifier)
 	if !okProp && !expr.Computed {
 		return "", false
+	}
+
+	// Check for ta.tr (non-subscript member expression)
+	if okProp && obj.Name == "ta" && prop.Name == "tr" {
+		return h.GenerateCurrentBarAccess("tr"), true
 	}
 
 	// Strategy runtime values (non-computed member access)

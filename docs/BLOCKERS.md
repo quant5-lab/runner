@@ -12,7 +12,9 @@
 | **10** | **Codegen** | String functions (`str.*`) | ✅ **VALID** | `str.tostring()`, `str.tonumber()`, `str.split()` generate TODO comments |
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
 | **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
-| **14** | **Codegen** | TA member expression arguments | ✅ **VALID** | Parse✅ Generate❌: "unsupported member expression in TA call". Blocks keltner-squeeze.pine |
+| **19** | **Codegen** | MemberExpression namespace support | ✅ **VALID** | Only `ta.tr` supported. Remaining: `syminfo.*`, `strategy.*`, `timeframe.*`, `chart.*` namespaces. Extension point exists in ArrowAwareAccessorFactory.createMemberAccessor() |
+| **20** | **Codegen** | Array/map member access | ✅ **VALID** | `array.get()`, `array.set()`, `map.get()`, `map.put()` generate TODO comments or fail |
+| **14** | **Codegen** | TA member expression arguments | ✅ **FIXED** | MemberExpression `ta.tr` now supported via ArrowAwareAccessorFactory and TAArgumentExtractor. Both arrow and non-arrow contexts handle `ta.tr` builtin correctly. |
 | **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
 | **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
 | **17** | **Codegen** | Tuple destructuring syntax | ✅ **FIXED** | Universal tuple indicator architecture implemented. MACD, BB, Stoch supported via data-driven registry. |
