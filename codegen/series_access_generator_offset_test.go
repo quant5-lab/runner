@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -303,6 +304,73 @@ func TestAccessGenerator_OffsetCalculation(t *testing.T) {
 				// For small values, do exact string matching
 				t.Logf("OHLCV: %s, Series: %s (period=%d, offset=%d, sum=%d)",
 					ohlcvInitial, seriesInitial, tt.period, tt.baseOffset, tt.wantSum)
+			}
+		})
+	}
+}
+
+// TestDerivedPriceAccessor_WithOffset validates historical offset handling for derived prices
+func TestDerivedPriceAccessor_WithOffset(t *testing.T) {
+	tests := []struct {
+		name       string
+		priceName  string
+		baseOffset int
+		period     int
+		wantLoop   string
+		wantInit   string
+	}{
+		{
+			name:       "hl2 no offset, period 14",
+			priceName:  "hl2",
+			baseOffset: 0,
+			period:     14,
+			wantLoop:   "ctx.BarIndex-j",
+			wantInit:   "ctx.BarIndex-13",
+		},
+		{
+			name:       "hlc3 offset 1, period 20",
+			priceName:  "hlc3",
+			baseOffset: 1,
+			period:     20,
+			wantLoop:   "ctx.BarIndex-(j+1)",
+			wantInit:   "ctx.BarIndex-20",
+		},
+		{
+			name:       "ohlc4 offset 2, period 10",
+			priceName:  "ohlc4",
+			baseOffset: 2,
+			period:     10,
+			wantLoop:   "ctx.BarIndex-(j+2)",
+			wantInit:   "ctx.BarIndex-11",
+		},
+		{
+			name:       "hlcc4 offset 5, period 50",
+			priceName:  "hlcc4",
+			baseOffset: 5,
+			period:     50,
+			wantLoop:   "ctx.BarIndex-(j+5)",
+			wantInit:   "ctx.BarIndex-54",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := NewDerivedPriceAccessor(tt.priceName, tt.baseOffset)
+
+			gotLoop := gen.GenerateLoopValueAccess("j")
+			if !strings.Contains(gotLoop, tt.wantLoop) {
+				t.Errorf("GenerateLoopValueAccess(\"j\") should contain %q, got: %s",
+					tt.wantLoop, gotLoop)
+			}
+
+			gotInit := gen.GenerateInitialValueAccess(tt.period)
+			if !strings.Contains(gotInit, tt.wantInit) {
+				t.Errorf("GenerateInitialValueAccess(%d) should contain %q, got: %s",
+					tt.period, tt.wantInit, gotInit)
+			}
+
+			if gen.GetBaseOffset() != tt.baseOffset {
+				t.Errorf("GetBaseOffset() = %d, want %d", gen.GetBaseOffset(), tt.baseOffset)
 			}
 		})
 	}

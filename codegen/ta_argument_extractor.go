@@ -104,17 +104,27 @@ func (e *TAArgumentExtractor) isTrBuiltin(expr ast.Expression) bool {
 // requiresExpressionAccessor returns true when the source expression is not a simple OHLCV field/series
 // and therefore needs expression-aware offset rewriting instead of the default classifier fallback.
 func (e *TAArgumentExtractor) requiresExpressionAccessor(sourceExpr ast.Expression, info SourceInfo) bool {
-	// Simple series identifier: use default accessor
+	// Simple series identifier or builtin: use default accessor
 	if id, ok := sourceExpr.(*ast.Identifier); ok {
 		if info.IsSeriesVariable() {
 			return false
 		}
-		return !e.classifier.isBuiltinOHLCVField(id.Name)
+		if e.classifier.isBuiltinOHLCVField(id.Name) {
+			return false
+		}
+		if e.classifier.isDerivedPrice(id.Name) {
+			return false
+		}
+		return true
 	}
 
 	if mem, ok := sourceExpr.(*ast.MemberExpression); ok {
 		if obj, ok := mem.Object.(*ast.Identifier); ok && mem.Computed {
 			if e.classifier.isBuiltinOHLCVField(obj.Name) {
+				_, isLiteral := mem.Property.(*ast.Literal)
+				return !isLiteral
+			}
+			if e.classifier.isDerivedPrice(obj.Name) {
 				_, isLiteral := mem.Property.(*ast.Literal)
 				return !isLiteral
 			}

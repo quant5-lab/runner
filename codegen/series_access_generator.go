@@ -102,6 +102,9 @@ func CreateAccessGenerator(source SourceInfo) SeriesAccessCodeGenerator {
 		}
 		return NewSeriesVariableAccessGenerator(source.VariableName)
 	}
+	if source.IsDerivedPrice() {
+		return NewDerivedPriceAccessor(source.PriceName, source.BaseOffset)
+	}
 	return NewOHLCVFieldAccessGeneratorWithOffset(source.FieldName, source.BaseOffset)
 }
 
@@ -109,6 +112,9 @@ func CreateAccessGenerator(source SourceInfo) SeriesAccessCodeGenerator {
 func CreatePreviousBarAccessGenerator(source SourceInfo) SeriesAccessCodeGenerator {
 	if source.IsSeriesVariable() {
 		return NewSeriesVariableAccessGeneratorWithOffset(source.VariableName, source.BaseOffset+1)
+	}
+	if source.IsDerivedPrice() {
+		return NewDerivedPriceAccessor(source.PriceName, source.BaseOffset+1)
 	}
 	return NewOHLCVFieldAccessGeneratorWithOffset(source.FieldName, source.BaseOffset+1)
 }

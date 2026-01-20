@@ -254,7 +254,7 @@ func (c *SeriesAccessConverter) convertLiteral(lit *ast.Literal) (string, error)
 func (c *SeriesAccessConverter) isBuiltinField(name string) bool {
 	builtins := map[string]bool{
 		"open": true, "high": true, "low": true, "close": true,
-		"volume": true, "hl2": true, "hlc3": true, "ohlc4": true,
+		"volume": true, "hl2": true, "hlc3": true, "ohlc4": true, "hlcc4": true,
 	}
 	return builtins[name]
 }
@@ -281,6 +281,8 @@ func (c *SeriesAccessConverter) convertBuiltinField(field string) string {
 		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 3", c.offset, c.offset, c.offset)
 	case "ohlc4":
 		return fmt.Sprintf("(ctx.Data[i-%s].Open + ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 4", c.offset, c.offset, c.offset, c.offset)
+	case "hlcc4":
+		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close + ctx.Data[i-%s].Close) / 4", c.offset, c.offset, c.offset, c.offset)
 	}
 
 	return field

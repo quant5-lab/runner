@@ -1,0 +1,20 @@
+//@version=5
+indicator("Derived Price TA Sources", overlay=false)
+
+// Test derived price variables as TA function sources
+ema_hl2 = ta.ema(hl2, 10)
+ema_hlc3 = ta.ema(hlc3, 10)
+ema_ohlc4 = ta.ema(ohlc4, 10)
+ema_hlcc4 = ta.ema(hlcc4, 10)
+
+// Test with historical subscript
+ema_hl2_prev = ta.ema(hl2[1], 10)
+
+// Test with other TA functions
+sma_hl2 = ta.sma(hl2, 10)
+rma_hlc3 = ta.rma(hlc3, 10)
+
+plot(ema_hl2, "EMA HL2", color=color.blue)
+plot(ema_hlc3, "EMA HLC3", color=color.green)
+plot(ema_ohlc4, "EMA OHLC4", color=color.orange)
+plot(sma_hl2, "SMA HL2", color=color.purple)
