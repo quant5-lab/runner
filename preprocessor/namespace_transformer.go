@@ -91,7 +91,7 @@ func (t *NamespaceTransformer) visitCallExpr(call *parser.CallExpr) {
 
 	for _, arg := range call.Args {
 		if arg.Value != nil {
-			t.visitTernaryExpr(arg.Value)
+			t.visitExpression(arg.Value)
 		}
 	}
 }
@@ -189,6 +189,12 @@ func (t *NamespaceTransformer) visitFactor(factor *parser.Factor) {
 		return
 	}
 
+	if factor.Array != nil {
+		for _, elem := range factor.Array.Elements {
+			t.visitTernaryExpr(elem)
+		}
+	}
+
 	if factor.Postfix != nil {
 		t.visitPostfixExpr(factor.Postfix)
 	}
@@ -199,8 +205,13 @@ func (t *NamespaceTransformer) visitPostfixExpr(postfix *parser.PostfixExpr) {
 		return
 	}
 
-	if postfix.Primary != nil && postfix.Primary.Call != nil {
-		t.visitCallExpr(postfix.Primary.Call)
+	if postfix.Primary != nil {
+		if postfix.Primary.Paren != nil {
+			t.visitExpression(postfix.Primary.Paren)
+		}
+		if postfix.Primary.Call != nil {
+			t.visitCallExpr(postfix.Primary.Call)
+		}
 	}
 
 	if postfix.Subscript != nil {

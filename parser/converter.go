@@ -229,7 +229,7 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	namedArgs := make(map[string]ast.Expression)
 
 	for _, arg := range call.Args {
-		converted, err := c.convertTernaryExpr(arg.Value)
+		converted, err := c.convertExpression(arg.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +274,12 @@ func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, er
 	var baseExpr ast.Expression
 	var err error
 
-	if postfix.Primary.Call != nil {
+	if postfix.Primary.Paren != nil {
+		baseExpr, err = c.convertExpression(postfix.Primary.Paren)
+		if err != nil {
+			return nil, err
+		}
+	} else if postfix.Primary.Call != nil {
 		baseExpr, err = c.convertCallExpr(postfix.Primary.Call)
 		if err != nil {
 			return nil, err
@@ -287,7 +292,7 @@ func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, er
 			Name:     *postfix.Primary.Ident,
 		}
 	} else {
-		return nil, fmt.Errorf("postfix primary must have call, member access, or ident")
+		return nil, fmt.Errorf("postfix primary must have paren, call, member access, or ident")
 	}
 
 	if postfix.Subscript != nil {
@@ -530,8 +535,20 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 }
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
-	if factor.Paren != nil {
-		return c.convertTernaryExpr(factor.Paren)
+	if factor.Array != nil {
+		elements := []ast.Expression{}
+		for _, elem := range factor.Array.Elements {
+			astExpr, err := c.convertTernaryExpr(elem)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, astExpr)
+		}
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    elements,
+			Raw:      "[...]",
+		}, nil
 	}
 
 	if factor.Unary != nil {

@@ -68,8 +68,8 @@ type ArrayLiteral struct {
 }
 
 type Expression struct {
-	Array        *ArrayLiteral `parser:"@@"`
-	Ternary      *TernaryExpr  `parser:"| @@"`
+	Ternary      *TernaryExpr  `parser:"@@"`
+	Array        *ArrayLiteral `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
@@ -113,7 +113,7 @@ type Term struct {
 }
 
 type Factor struct {
-	Paren        *TernaryExpr  `parser:"( '(' @@ ')' )"`
+	Array        *ArrayLiteral `parser:"@@"`
 	Unary        *UnaryExpr    `parser:"| @@"`
 	True         *string       `parser:"| @'true'"`
 	False        *string       `parser:"| @'false'"`
@@ -131,7 +131,8 @@ type PostfixExpr struct {
 }
 
 type PrimaryExpr struct {
-	Call         *CallExpr     `parser:"@@"`
+	Paren        *Expression   `parser:"'(' @@ ')'"`
+	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
 }
@@ -178,8 +179,8 @@ type CallCallee struct {
 }
 
 type Argument struct {
-	Name  *string      `parser:"( @Ident '=' )?"`
-	Value *TernaryExpr `parser:"@@"`
+	Name  *string     `parser:"( @Ident '=' )?"`
+	Value *Expression `parser:"@@"`
 }
 
 type Value struct {

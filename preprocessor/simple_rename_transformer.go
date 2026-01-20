@@ -72,7 +72,7 @@ func (t *SimpleRenameTransformer) visitCallExpr(call *parser.CallExpr) {
 	/* Visit arguments */
 	for _, arg := range call.Args {
 		if arg.Value != nil {
-			t.visitTernaryExpr(arg.Value)
+			t.visitExpression(arg.Value)
 		}
 	}
 }
@@ -170,6 +170,12 @@ func (t *SimpleRenameTransformer) visitFactor(factor *parser.Factor) {
 		return
 	}
 
+	if factor.Array != nil {
+		for _, elem := range factor.Array.Elements {
+			t.visitTernaryExpr(elem)
+		}
+	}
+
 	if factor.Postfix != nil {
 		t.visitPostfixExpr(factor.Postfix)
 	}
@@ -180,8 +186,13 @@ func (t *SimpleRenameTransformer) visitPostfixExpr(postfix *parser.PostfixExpr) 
 		return
 	}
 
-	if postfix.Primary != nil && postfix.Primary.Call != nil {
-		t.visitCallExpr(postfix.Primary.Call)
+	if postfix.Primary != nil {
+		if postfix.Primary.Paren != nil {
+			t.visitExpression(postfix.Primary.Paren)
+		}
+		if postfix.Primary.Call != nil {
+			t.visitCallExpr(postfix.Primary.Call)
+		}
 	}
 
 	if postfix.Subscript != nil {
