@@ -1,21 +1,21 @@
 | # | Category | Blocker | Verdict | Evidence |
 |---|----------|---------|---------|----------|
 | **1** | **Codegen** | `ta.rsi()` inline generation | ✅ **VALID** | Error: "ta.rsi inline generation not yet implemented" in codegen/generator.go:2933 |
-| **2** | **Codegen** | `bar_index` Series generation | ✅ **VALID** | Compilation error: `undefined: bar_indexSeries`. Codegen doesn't create Series var for bar_index |
+| **2** | **Codegen** | `bar_index` Series generation | ✅ **FIXED** | Commit 72f73aa "improve `bar_index`". Tested: codegen + compile ✅ |
 | **3** | **Parser** | `while` loops | ✅ **VALID** | Parse error: "binary expression should be used in condition context" |
 | **4** | **Parser** | `for` loops execution | ✅ **VALID** | Parses but generates literals only: `sumVal = 50.0` instead of loop logic |
 | **5** | **Parser** | `varip` declarations | ✅ **VALID** | Not implemented. No matches in codegen/*.go or grammar.go |
 | **6** | **Parser** | `map.new<K,V>()` generics | ✅ **VALID** | Parse error: "unexpected token ," on generic syntax |
-| **7** | **Type System** | String variable assignment | ✅ **VALID** | Fails on `ticker = syminfo.tickerid` pattern. Series storage doesn't support strings |
+| **7** | **Type System** | String variable assignment | ✅ **FIXED** | Commit bbf317f "Add syminfo.tickerid string variable support". Tested: `ticker = syminfo.tickerid` compiles ✅ |
 | **8** | **Codegen** | `alert()` function | ✅ **VALID** | Generates TODO comment only. Not implemented |
 | **9** | **Codegen** | `alertcondition()` function | ✅ **VALID** | Generates TODO comment only. Not implemented |
 | **10** | **Codegen** | String functions (`str.*`) | ✅ **VALID** | `str.tostring()`, `str.tonumber()`, `str.split()` generate TODO comments |
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
 | **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
-| **19** | **Codegen** | MemberExpression namespace support | ✅ **VALID** | Only `ta.tr` supported. Remaining: `syminfo.*`, `strategy.*`, `timeframe.*`, `chart.*` namespaces. Extension point exists in ArrowAwareAccessorFactory.createMemberAccessor() |
-| **20** | **Codegen** | Array/map member access | ✅ **VALID** | `array.get()`, `array.set()`, `map.get()`, `map.put()` generate TODO comments or fail |
 | **14** | **Codegen** | TA member expression arguments | ✅ **FIXED** | MemberExpression `ta.tr` now supported via ArrowAwareAccessorFactory and TAArgumentExtractor. Both arrow and non-arrow contexts handle `ta.tr` builtin correctly. |
 | **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
 | **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
 | **17** | **Codegen** | Tuple destructuring syntax | ✅ **FIXED** | Universal tuple indicator architecture implemented. MACD, BB, Stoch supported via data-driven registry. |
 | **18** | **Codegen** | `ta.crossover()/crossunder()` arbitrary expression support | ✅ **FIXED** | Inline IIFE pattern enables crossover/crossunder with arbitrary PineScript expressions in any context. Recursive stateful indicator detection. Comprehensive test coverage: 35+ behavioral tests (ArgumentTypes, StatefulDetection, WindowFunctionInlining, EdgeCases, LiteralTypes, LogicConditions). |
+| **19** | **Codegen** | MemberExpression namespace support | ✅ **FIXED** | Commits 41fed2f, bbf317f. Tested: `syminfo.*`, `strategy.*` compile ✅ |
+| **20** | **Codegen** | Array/map functions | ✅ **VALID** | `array.new_float()`, `array.push()`, `array.get()`, `map.*` generate TODO comments |
