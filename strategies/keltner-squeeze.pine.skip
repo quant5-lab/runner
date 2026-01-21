@@ -1,6 +1,6 @@
-Codegen limitation: unsupported member expression in TA call
+Codegen limitation: arrow function return value Series declaration
 
 Parse: ✅ Success
-Generate: ❌ Fails (unsupported member expression in TA call)
-Compile: ❌ Not reached
+Generate: ✅ Success
+Compile: ❌ Fails (undefined: bbandSeries, keltnerSeries, colorSeries, input_floatSeries; type mismatches in crossover)
 Execute: ❌ Not reached

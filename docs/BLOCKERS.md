@@ -20,4 +20,5 @@
 | **19** | **Codegen** | MemberExpression namespace support | ✅ **FIXED** | Commits 41fed2f, bbf317f. Tested: `syminfo.*`, `strategy.*` compile ✅ |
 | **20** | **Codegen** | Array/map functions | ✅ **VALID** | `array.new_float()`, `array.push()`, `array.get()`, `map.*` generate TODO comments |
 | **21** | **Codegen** | Go reserved word collision | ✅ **FIXED** | AST transformation preprocessor `IdentifierSanitizer` renames Pine identifiers conflicting with Go reserved words (e.g., `len` → `len_`, `type` → `type_`, `map` → `map_`). Preserves Pine built-ins (`close`, `open`, `high`, `low`, `volume`). Integrated in cmd/pine-gen/main.go before warmup analysis. Tested: `len = input.int(14)` generates `const len_ = 14` and compiles successfully. |
+| **22** | **Codegen** | Arrow function return value Series declaration | ✅ **VALID** | Parse✅ Generate✅ Compile❌. Errors: `undefined: bbandSeries`, `undefined: keltnerSeries`, `undefined: colorSeries`, `undefined: input_floatSeries`. Type mismatches in crossover comparisons. Blocks keltner-squeeze.pine |
 
