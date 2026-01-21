@@ -49,6 +49,13 @@ func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, err
 }
 
 func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
+	if constVal, isConstant := g.generator.constants[id.Name]; isConstant {
+		if constVal == "input.source" {
+			return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
+		}
+		return id.Name, nil
+	}
+
 	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.inSecurityContext); resolved {
 		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
 
@@ -57,7 +64,8 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 		}
 		return g.resolveBuiltinToValue(id.Name, code)
 	}
-	return id.Name, nil
+
+	return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback string) (string, error) {
