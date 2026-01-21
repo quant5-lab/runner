@@ -90,7 +90,7 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateCurrentBarAccess(t *test
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code := handler.GenerateCurrentBarAccess(tt.priceName)
-			
+
 			if code == "" {
 				t.Fatal("GenerateCurrentBarAccess returned empty string")
 			}
@@ -161,7 +161,7 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateSecurityContextAccess(t 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code := handler.GenerateSecurityContextAccess(tt.priceName)
-			
+
 			if code == "" {
 				t.Fatal("GenerateSecurityContextAccess returned empty string")
 			}
@@ -257,7 +257,7 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code := handler.GenerateHistoricalAccess(tt.priceName, tt.offset)
-			
+
 			if code == "" {
 				t.Fatal("GenerateHistoricalAccess returned empty string")
 			}
@@ -324,7 +324,7 @@ func TestBuiltinIdentifierHandler_DerivedPrices_FormulaStructure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code := handler.GenerateCurrentBarAccess(tt.priceName)
-			
+
 			if !strings.Contains(code, tt.divisor) {
 				t.Errorf("Formula for %s should contain divisor %s, got: %s", tt.priceName, tt.divisor, code)
 			}

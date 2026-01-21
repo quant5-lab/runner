@@ -7,14 +7,14 @@ import (
 )
 
 type BuiltinIdentifierHandler struct {
-	registry        *BuiltinIdentifierRegistry
-	formulaGen      *DerivedPriceFormulaGenerator
+	registry   *BuiltinIdentifierRegistry
+	formulaGen *DerivedPriceFormulaGenerator
 }
 
 func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 	return &BuiltinIdentifierHandler{
-		registry:        NewBuiltinIdentifierRegistry(),
-		formulaGen:      NewDerivedPriceFormulaGenerator(),
+		registry:   NewBuiltinIdentifierRegistry(),
+		formulaGen: NewDerivedPriceFormulaGenerator(),
 	}
 }
 
