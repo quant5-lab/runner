@@ -1,13 +1,23 @@
 //@version=5
 indicator("Built-in Variables - Calculations", overlay=false)
 
-// Variables in SMA calculations
+// Derived prices in TA calculations
 close_sma = ta.sma(close, 10)
 volume_sma = ta.sma(volume, 10)
 hl2_sma = ta.sma(hl2, 10)
+hlc3_ema = ta.ema(hlc3, 10)
+ohlc4_rma = ta.rma(ohlc4, 10)
+hlcc4_sma = ta.sma(hlcc4, 10)
 tr_sma = ta.sma(tr, 10)
 
+// Historical subscript access
+hl2_prev_sma = ta.sma(hl2[1], 10)
+
+// Arithmetic with derived prices
+hl2_hlc3_avg = ta.sma((hl2 + hlc3) / 2, 10)
+
 plot(close_sma, "close_sma", color=color.blue)
-plot(volume_sma, "volume_sma", color=color.green)
-plot(hl2_sma, "hl2_sma", color=color.orange)
+plot(hl2_sma, "hl2_sma", color=color.green)
+plot(hlc3_ema, "hlc3_ema", color=color.orange)
+plot(hlcc4_sma, "hlcc4_sma", color=color.purple)
 plot(tr_sma, "tr_sma", color=color.red)

@@ -63,6 +63,8 @@ func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGene
 		baseOffset = ohlcvAccessor.baseOffset
 	} else if seriesAccessor, ok := accessor.(*SeriesVariableAccessGenerator); ok {
 		baseOffset = seriesAccessor.baseOffset
+	} else if derivedPriceAccessor, ok := accessor.(*DerivedPriceAccessor); ok {
+		baseOffset = derivedPriceAccessor.GetBaseOffset()
 	}
 
 	return &TAIndicatorBuilder{

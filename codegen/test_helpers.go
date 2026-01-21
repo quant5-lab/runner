@@ -21,6 +21,7 @@ func newTestGenerator() *generator {
 		constants:         make(map[string]interface{}),
 		strategyConfig:    NewStrategyConfig(),
 		taRegistry:        NewTAFunctionRegistry(),
+		builtinHandler:    NewBuiltinIdentifierHandler(),
 		typeSystem:        typeSystem,
 		boolConverter:     boolConverter,
 		constantRegistry:  constantRegistry,

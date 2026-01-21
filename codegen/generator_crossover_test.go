@@ -201,6 +201,7 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 		variables:      make(map[string]string),
 		strategyConfig: NewStrategyConfig(),
 		taRegistry:     NewTAFunctionRegistry(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	code, err := gen.generateVariableFromCall("longCross", call)
@@ -256,6 +257,7 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 		variables:      make(map[string]string),
 		strategyConfig: NewStrategyConfig(),
 		taRegistry:     NewTAFunctionRegistry(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	code, err := gen.generateVariableFromCall("shortCross", call)
@@ -310,6 +312,7 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 		variables:      make(map[string]string),
 		strategyConfig: NewStrategyConfig(),
 		taRegistry:     NewTAFunctionRegistry(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	code, err := gen.generateVariableFromCall("crossAboveThreshold", call)

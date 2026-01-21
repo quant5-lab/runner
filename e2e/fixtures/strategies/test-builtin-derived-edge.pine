@@ -1,0 +1,23 @@
+//@version=5
+indicator("Built-in Variables - Derived Edge Cases", overlay=false)
+
+// Edge: derived prices in conditionals
+ema_cond = ta.ema(hl2 > close ? hl2 : close, 10)
+
+// Edge: derived prices with other builtins
+hl2_tr_sum = ta.sma(hl2 + tr, 10)
+
+// Edge: nested TA calls with derived prices
+nested = ta.ema(ta.sma(hlc3, 5), 10)
+
+// Edge: multiple subscripts
+hl2_lag2 = hl2[2]
+ohlc4_lag1 = ohlc4[1]
+
+// Edge: derived price arithmetic
+price_spread = (hlcc4 - hl2) / hl2 * 100
+
+plot(ema_cond, "ema_cond", color=color.blue)
+plot(hl2_tr_sum, "hl2_tr_sum", color=color.green)
+plot(nested, "nested", color=color.orange)
+plot(price_spread, "price_spread", color=color.purple)

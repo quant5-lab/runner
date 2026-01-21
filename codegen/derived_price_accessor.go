@@ -2,7 +2,6 @@ package codegen
 
 import "fmt"
 
-/* DerivedPriceAccessor generates offset-aware inline calculations for derived price builtins (hl2, hlc3, ohlc4, hlcc4) */
 type DerivedPriceAccessor struct {
 	priceName  string
 	baseOffset int
@@ -17,21 +16,21 @@ func NewDerivedPriceAccessor(priceName string, baseOffset int) *DerivedPriceAcce
 
 func (a *DerivedPriceAccessor) GenerateLoopValueAccess(loopVar string) string {
 	if a.baseOffset == 0 {
-		return a.generateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%s", loopVar))
+		return a.GenerateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%s", loopVar))
 	}
-	return a.generateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-(%s+%d)", loopVar, a.baseOffset))
+	return a.GenerateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-(%s+%d)", loopVar, a.baseOffset))
 }
 
 func (a *DerivedPriceAccessor) GenerateInitialValueAccess(period int) string {
 	totalOffset := period - 1 + a.baseOffset
-	return a.generateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%d", totalOffset))
+	return a.GenerateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%d", totalOffset))
 }
 
 func (a *DerivedPriceAccessor) GenerateCurrentValueAccess() string {
 	if a.baseOffset == 0 {
-		return a.generateFormulaAtOffset("ctx.BarIndex")
+		return a.GenerateFormulaAtOffset("ctx.BarIndex")
 	}
-	return a.generateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%d", a.baseOffset))
+	return a.GenerateFormulaAtOffset(fmt.Sprintf("ctx.BarIndex-%d", a.baseOffset))
 }
 
 func (a *DerivedPriceAccessor) GetPreamble() string {
@@ -42,7 +41,7 @@ func (a *DerivedPriceAccessor) GetBaseOffset() int {
 	return a.baseOffset
 }
 
-func (a *DerivedPriceAccessor) generateFormulaAtOffset(indexExpr string) string {
+func (a *DerivedPriceAccessor) GenerateFormulaAtOffset(indexExpr string) string {
 	switch a.priceName {
 	case "hl2":
 		return fmt.Sprintf("((ctx.Data[%s].High + ctx.Data[%s].Low) / 2)", indexExpr, indexExpr)
