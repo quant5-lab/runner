@@ -24,19 +24,21 @@ import (
 //   - Unique naming: funcName + period + argHash
 //   - Series lifecycle: Declaration, initialization, .Next() calls
 type TempVariableManager struct {
-	gen           *generator                     // Generator context
-	callToVar     map[*ast.CallExpression]string // Deduplication map
-	varToCallInfo map[string]CallInfo            // Reverse mapping for code generation
-	declaredVars  map[string]bool                // Track which vars need declaration
+	gen             *generator                            // Generator context
+	callToVar       map[*ast.CallExpression]string        // Deduplication map
+	varToCallInfo   map[string]CallInfo                   // Reverse mapping for code generation
+	declaredVars    map[string]bool                       // Track which vars need declaration
+	conditionalVars map[string]*ast.ConditionalExpression // Hash -> Conditional mapping
 }
 
 // NewTempVariableManager creates manager with generator context
 func NewTempVariableManager(g *generator) *TempVariableManager {
 	return &TempVariableManager{
-		gen:           g,
-		callToVar:     make(map[*ast.CallExpression]string),
-		varToCallInfo: make(map[string]CallInfo),
-		declaredVars:  make(map[string]bool),
+		gen:             g,
+		callToVar:       make(map[*ast.CallExpression]string),
+		varToCallInfo:   make(map[string]CallInfo),
+		declaredVars:    make(map[string]bool),
+		conditionalVars: make(map[string]*ast.ConditionalExpression),
 	}
 }
 
@@ -234,4 +236,37 @@ func (m *TempVariableManager) Reset() {
 	m.callToVar = make(map[*ast.CallExpression]string)
 	m.varToCallInfo = make(map[string]CallInfo)
 	m.declaredVars = make(map[string]bool)
+	m.conditionalVars = make(map[string]*ast.ConditionalExpression)
+}
+
+func (m *TempVariableManager) RegisterConditional(hash string, cond *ast.ConditionalExpression) string {
+	if existingVar, exists := m.conditionalVars[hash]; exists {
+		for varName, storedCond := range m.conditionalVars {
+			if storedCond == existingVar {
+				return varName
+			}
+		}
+	}
+
+	varName := fmt.Sprintf("conditional_%s", hash)
+	m.conditionalVars[varName] = cond
+	m.declaredVars[varName] = true
+	return varName
+}
+
+func (m *TempVariableManager) GetConditionalByHash(hash string) *ast.ConditionalExpression {
+	varName := fmt.Sprintf("conditional_%s", hash)
+	return m.conditionalVars[varName]
+}
+
+func (m *TempVariableManager) GetConditionalVarName(hash string) string {
+	varName := fmt.Sprintf("conditional_%s", hash)
+	if _, exists := m.conditionalVars[varName]; exists {
+		return varName
+	}
+	return ""
+}
+
+func (m *TempVariableManager) GetAllConditionals() map[string]*ast.ConditionalExpression {
+	return m.conditionalVars
 }

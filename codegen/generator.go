@@ -69,6 +69,12 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.literalFormatter = NewLiteralFormatter()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
 
+	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
+	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)
+	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
+	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
+	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
+
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
 	gen.hasBarIndexUsage = detectBarIndexUsage(program)
@@ -137,6 +143,12 @@ type generator struct {
 	symbolTable                SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
+
+	conditionalArgAnalyzer *ConditionalArgumentAnalyzer
+	conditionalCodeGen     *ConditionalCodeGenerator
+	securityAnalyzer       *SecurityCallAnalyzer
+	udfAnalyzer            *UDFTempVarAnalyzer
+	statementAnalyzer      *StatementConditionalAnalyzer
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
