@@ -6,12 +6,7 @@ import (
 	"github.com/quant5-lab/runner/tests/util"
 )
 
-/* TestForLoopCounterImmutability validates loop counter mutation behavior
- *
- * Pine loop counters should be immutable or mutations ignored
- * Tests that reassigning loop counter inside body doesn't affect iteration
- * Expected: Loop executes fixed number of iterations regardless of counter mutation
- */
+/* Loop counter mutations don't affect iteration count */
 func TestForLoopCounterImmutability(t *testing.T) {
 	pineScript := `//@version=5
 indicator("For Loop Counter Mutation", overlay=false)

@@ -12,7 +12,6 @@ type Converter struct {
 	factory *StatementConverterFactory
 }
 
-/* Builds nested MemberExpression from object and property chain (strategy.commission.percent) */
 func buildNestedMemberExpression(object string, properties []string) ast.Expression {
 	var current ast.Expression = &ast.Identifier{
 		NodeType: ast.TypeIdentifier,
@@ -489,6 +488,72 @@ func (c *Converter) convertCompExpr(comp *CompExpr) (ast.Expression, error) {
 	}, nil
 }
 
+func (c *Converter) buildLeftAssociativeArithExpr(leftOperand ast.Expression, op string, rightGrammar *ArithExpr) (ast.Expression, error) {
+	operands := []ast.Expression{leftOperand}
+	operators := []string{op}
+
+	current := rightGrammar
+	for current != nil {
+		operand, err := c.convertTerm(current.Left)
+		if err != nil {
+			return nil, err
+		}
+		operands = append(operands, operand)
+
+		if current.Op != nil && current.Right != nil {
+			operators = append(operators, *current.Op)
+			current = current.Right
+		} else {
+			current = nil
+		}
+	}
+
+	result := operands[0]
+	for i := 0; i < len(operators); i++ {
+		result = &ast.BinaryExpression{
+			NodeType: ast.TypeBinaryExpression,
+			Operator: operators[i],
+			Left:     result,
+			Right:    operands[i+1],
+		}
+	}
+
+	return result, nil
+}
+
+func (c *Converter) buildLeftAssociativeTerm(leftOperand ast.Expression, op string, rightGrammar *Term) (ast.Expression, error) {
+	operands := []ast.Expression{leftOperand}
+	operators := []string{op}
+
+	current := rightGrammar
+	for current != nil {
+		operand, err := c.convertFactor(current.Left)
+		if err != nil {
+			return nil, err
+		}
+		operands = append(operands, operand)
+
+		if current.Op != nil && current.Right != nil {
+			operators = append(operators, *current.Op)
+			current = current.Right
+		} else {
+			current = nil
+		}
+	}
+
+	result := operands[0]
+	for i := 0; i < len(operators); i++ {
+		result = &ast.BinaryExpression{
+			NodeType: ast.TypeBinaryExpression,
+			Operator: operators[i],
+			Left:     result,
+			Right:    operands[i+1],
+		}
+	}
+
+	return result, nil
+}
+
 func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
 	left, err := c.convertTerm(arith.Left)
 	if err != nil {
@@ -499,17 +564,7 @@ func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
 		return left, nil
 	}
 
-	right, err := c.convertArithExpr(arith.Right)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ast.BinaryExpression{
-		NodeType: ast.TypeBinaryExpression,
-		Operator: *arith.Op,
-		Left:     left,
-		Right:    right,
-	}, nil
+	return c.buildLeftAssociativeArithExpr(left, *arith.Op, arith.Right)
 }
 
 func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
@@ -522,17 +577,7 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 		return left, nil
 	}
 
-	right, err := c.convertTerm(term.Right)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ast.BinaryExpression{
-		NodeType: ast.TypeBinaryExpression,
-		Operator: *term.Op,
-		Left:     left,
-		Right:    right,
-	}, nil
+	return c.buildLeftAssociativeTerm(left, *term.Op, term.Right)
 }
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {

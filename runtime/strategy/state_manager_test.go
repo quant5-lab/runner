@@ -196,6 +196,8 @@ func TestStateManagerMultipleClosedTrades(t *testing.T) {
 
 		barIndex++
 		strat.Close(tradeID, 105.0, int64(1000+barIndex), "")
+		barIndex++
+		strat.OnBarUpdate(barIndex, 105.0, int64(1000+barIndex))
 	}
 
 	sm.SampleCurrentBar(strat, 105.0)

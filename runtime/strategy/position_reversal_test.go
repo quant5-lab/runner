@@ -413,6 +413,7 @@ func TestPositionReversal_ExplicitClose(t *testing.T) {
 	s.OnBarUpdate(1, 100.0, 1001)
 
 	s.Close("Long", 110.0, 1002, "Manual exit")
+	s.OnBarUpdate(2, 110.0, 1002)
 
 	if s.GetPositionSize() != 0.0 {
 		t.Errorf("Position after close: expected 0.0, got %.1f", s.GetPositionSize())
@@ -421,7 +422,7 @@ func TestPositionReversal_ExplicitClose(t *testing.T) {
 	closedBefore := len(s.tradeHistory.GetClosedTrades())
 
 	s.Entry("Short", Short, 1.0, "")
-	s.OnBarUpdate(2, 110.0, 1002)
+	s.OnBarUpdate(3, 110.0, 1003)
 
 	if s.GetPositionSize() != -1.0 {
 		t.Errorf("Position after short entry: expected -1.0, got %.1f", s.GetPositionSize())

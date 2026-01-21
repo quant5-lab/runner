@@ -96,7 +96,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 					Right:    &ast.Literal{Value: 0.05},
 				},
 			},
-			expected: "(bar.Close + (sma20Series.GetCurrent() * 0.05))",
+			expected: "(bar.Close + sma20Series.GetCurrent() * 0.05)",
 		},
 	}
 

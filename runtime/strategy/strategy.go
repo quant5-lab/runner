@@ -11,6 +11,13 @@ const (
 	Short = "short"
 )
 
+/* OrderAction constants - TradingView order execution model */
+const (
+	OrderActionEntry    = "entry"
+	OrderActionClose    = "close"
+	OrderActionCloseAll = "close_all"
+)
+
 /* Trade represents a single trade (open or closed) */
 type Trade struct {
 	EntryID      string  `json:"entryId"`
@@ -27,14 +34,17 @@ type Trade struct {
 	Profit       float64 `json:"profit"`
 }
 
-/* Order represents a pending order */
+/* Order represents a pending order - unified for entry and close operations */
 type Order struct {
 	ID           string
+	Action       string // OrderActionEntry, OrderActionClose, OrderActionCloseAll
 	Direction    string
 	Qty          float64
 	Type         string
 	CreatedBar   int
 	EntryComment string
+	FromEntry    string // Target entry ID for close orders
+	ExitComment  string // Comment for close orders
 }
 
 /* OrderManager manages pending orders */
@@ -51,18 +61,13 @@ func NewOrderManager() *OrderManager {
 	}
 }
 
-/* CreateOrder creates or replaces an order */
-func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBar int, comment string) Order {
-	// Remove existing order with same ID
-	for i, order := range om.orders {
-		if order.ID == id {
-			om.orders = append(om.orders[:i], om.orders[i+1:]...)
-			break
-		}
-	}
+/* CreateEntryOrder creates a pending entry order */
+func (om *OrderManager) CreateEntryOrder(id, direction string, qty float64, createdBar int, comment string) Order {
+	om.removeOrderByID(id)
 
 	order := Order{
 		ID:           id,
+		Action:       OrderActionEntry,
 		Direction:    direction,
 		Qty:          qty,
 		Type:         "market",
@@ -71,6 +76,53 @@ func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBa
 	}
 	om.orders = append(om.orders, order)
 	return order
+}
+
+/* CreateCloseOrder creates a pending close order for specific entry */
+func (om *OrderManager) CreateCloseOrder(fromEntry string, createdBar int, comment string) Order {
+	orderID := fmt.Sprintf("_close_%s_%d", fromEntry, createdBar)
+	om.removeOrderByID(orderID)
+
+	order := Order{
+		ID:          orderID,
+		Action:      OrderActionClose,
+		Type:        "market",
+		CreatedBar:  createdBar,
+		FromEntry:   fromEntry,
+		ExitComment: comment,
+	}
+	om.orders = append(om.orders, order)
+	return order
+}
+
+/* CreateCloseAllOrder creates a pending close-all order */
+func (om *OrderManager) CreateCloseAllOrder(createdBar int, comment string) Order {
+	orderID := fmt.Sprintf("_close_all_%d", createdBar)
+	om.removeOrderByID(orderID)
+
+	order := Order{
+		ID:          orderID,
+		Action:      OrderActionCloseAll,
+		Type:        "market",
+		CreatedBar:  createdBar,
+		ExitComment: comment,
+	}
+	om.orders = append(om.orders, order)
+	return order
+}
+
+/* CreateOrder creates or replaces an order - legacy compatibility */
+func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBar int, comment string) Order {
+	return om.CreateEntryOrder(id, direction, qty, createdBar, comment)
+}
+
+func (om *OrderManager) removeOrderByID(id string) {
+	for i, order := range om.orders {
+		if order.ID == id {
+			om.orders = append(om.orders[:i], om.orders[i+1:]...)
+			return
+		}
+	}
 }
 
 /* GetPendingOrders returns orders ready to execute */
@@ -305,47 +357,69 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 	return nil
 }
 
-/* Close closes position by entry ID */
+/* Close creates a pending close order - fills at next bar open per TradingView model */
 func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
 
+	// Verify trade exists before creating close order
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
 		if trade.EntryID == id {
-			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime, comment)
+			s.orderManager.CreateCloseOrder(id, s.currentBar, comment)
+			return
+		}
+	}
+}
+
+/* executeCloseOrder executes a close order at given price - internal use only */
+func (s *Strategy) executeCloseOrder(entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
+	openTrades := s.tradeHistory.GetOpenTrades()
+	for _, trade := range openTrades {
+		if trade.EntryID == entryID {
+			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, fillPrice, fillBar, fillTime, comment)
 			if closedTrade != nil {
 				// Update position tracker
 				oppositeDir := Long
 				if trade.Direction == Long {
 					oppositeDir = Short
 				}
-				s.positionTracker.UpdatePosition(trade.Size, currentPrice, oppositeDir)
+				s.positionTracker.UpdatePosition(trade.Size, fillPrice, oppositeDir)
 
 				// Update equity
 				s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
 			}
+			return
 		}
 	}
 }
 
-/* CloseAll closes all open positions */
+/* CloseAll creates a pending close-all order - fills at next bar open per TradingView model */
 func (s *Strategy) CloseAll(currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
 
+	// Only create close-all order if there are open trades
+	openTrades := s.tradeHistory.GetOpenTrades()
+	if len(openTrades) > 0 {
+		s.orderManager.CreateCloseAllOrder(s.currentBar, comment)
+	}
+}
+
+/* executeCloseAllOrder executes a close-all order at given price - internal use only */
+func (s *Strategy) executeCloseAllOrder(fillPrice float64, fillBar int, fillTime int64, comment string) {
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
-		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, currentPrice, s.currentBar, currentTime, comment)
+		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, fillPrice, fillBar, fillTime, comment)
 		if closedTrade != nil {
 			// Update position tracker
 			oppositeDir := Long
 			if trade.Direction == Long {
 				oppositeDir = Short
 			}
-			s.positionTracker.UpdatePosition(trade.Size, currentPrice, oppositeDir)
+			s.positionTracker.UpdatePosition(trade.Size, fillPrice, oppositeDir)
 
 			// Update equity
 			s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
@@ -381,11 +455,11 @@ func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLeve
 	// Check stop loss (long: low <= stop, short: high >= stop)
 	if !math.IsNaN(stopLevel) {
 		if trade.Direction == Long && barLow <= stopLevel {
-			s.Close(fromEntry, stopLevel, barTime, comment)
+			s.executeCloseOrder(fromEntry, stopLevel, s.currentBar, barTime, comment)
 			return
 		}
 		if trade.Direction == Short && barHigh >= stopLevel {
-			s.Close(fromEntry, stopLevel, barTime, comment)
+			s.executeCloseOrder(fromEntry, stopLevel, s.currentBar, barTime, comment)
 			return
 		}
 	}
@@ -393,11 +467,11 @@ func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLeve
 	// Check take profit (long: high >= limit, short: low <= limit)
 	if !math.IsNaN(limitLevel) {
 		if trade.Direction == Long && barHigh >= limitLevel {
-			s.Close(fromEntry, limitLevel, barTime, comment)
+			s.executeCloseOrder(fromEntry, limitLevel, s.currentBar, barTime, comment)
 			return
 		}
 		if trade.Direction == Short && barLow <= limitLevel {
-			s.Close(fromEntry, limitLevel, barTime, comment)
+			s.executeCloseOrder(fromEntry, limitLevel, s.currentBar, barTime, comment)
 			return
 		}
 	}
@@ -414,19 +488,28 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
 
 	for _, order := range pendingOrders {
-		s.reversalHandler.HandleReversal(order.Direction, openPrice, currentBar, openTime)
+		switch order.Action {
+		case OrderActionEntry:
+			s.reversalHandler.HandleReversal(order.Direction, openPrice, currentBar, openTime)
 
-		s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
+			s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
 
-		s.tradeHistory.AddOpenTrade(Trade{
-			EntryID:      order.ID,
-			Direction:    order.Direction,
-			Size:         order.Qty,
-			EntryPrice:   openPrice,
-			EntryBar:     currentBar,
-			EntryTime:    openTime,
-			EntryComment: order.EntryComment,
-		})
+			s.tradeHistory.AddOpenTrade(Trade{
+				EntryID:      order.ID,
+				Direction:    order.Direction,
+				Size:         order.Qty,
+				EntryPrice:   openPrice,
+				EntryBar:     currentBar,
+				EntryTime:    openTime,
+				EntryComment: order.EntryComment,
+			})
+
+		case OrderActionClose:
+			s.executeCloseOrder(order.FromEntry, openPrice, currentBar, openTime, order.ExitComment)
+
+		case OrderActionCloseAll:
+			s.executeCloseAllOrder(openPrice, currentBar, openTime, order.ExitComment)
+		}
 
 		s.orderManager.RemoveOrder(order.ID)
 	}

@@ -192,6 +192,11 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 	}
 
 	if h.IsBuiltinSeriesIdentifier(obj.Name) && expr.Computed {
+		// Delegate variable subscripts to subscriptResolver for loop counter handling
+		if _, isLiteral := expr.Property.(*ast.Literal); !isLiteral {
+			return "", false
+		}
+
 		offset := h.extractOffset(expr.Property)
 		if offset == 0 {
 			if inSecurityContext {

@@ -35,6 +35,10 @@ func (sr *SubscriptResolver) ResolveSubscript(seriesName string, indexExpr ast.E
 		isLoopCounter := g.loopContextStack != nil && g.loopContextStack.IsLoopCounter(ident.Name)
 		if isLoopCounter {
 			if seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" {
+				// Arrow functions use ctx.Data access, main body uses Series
+				if g.inArrowFunctionBody {
+					return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 { return ctx.Data[barIdx].%s }; return math.NaN() }()", ident.Name, capitalize(seriesName))
+				}
 				return fmt.Sprintf("%sSeries.Get(%s)", seriesName, ident.Name)
 			}
 			return fmt.Sprintf("%sSeries.Get(%s)", seriesName, ident.Name)

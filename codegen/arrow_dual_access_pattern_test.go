@@ -103,7 +103,7 @@ average(period) =>
 plot(average(10))
 `,
 			expectedScalar: []string{
-				"avg := ((bar.Close + (bar.Open + (bar.High + bar.Low))) / 4)",
+				"avg := ((((bar.Close + bar.Open) + bar.High) + bar.Low) / 4)",
 			},
 			expectedSeriesSet: []string{
 				"avgSeries.Set(avg)",

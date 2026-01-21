@@ -41,6 +41,18 @@ func (a *ParameterUsageAnalyzer) analyzeStatement(stmt ast.Node) {
 				a.analyzeExpression(decl.Init)
 			}
 		}
+	case *ast.ForStatement:
+		for _, bodyStmt := range s.Body {
+			a.analyzeStatement(bodyStmt)
+		}
+	case *ast.IfStatement:
+		a.analyzeExpression(s.Test)
+		for _, conseq := range s.Consequent {
+			a.analyzeStatement(conseq)
+		}
+		for _, alt := range s.Alternate {
+			a.analyzeStatement(alt)
+		}
 	}
 }
 
@@ -57,6 +69,15 @@ func (a *ParameterUsageAnalyzer) analyzeExpression(expr ast.Expression) {
 		a.analyzeExpression(e.Alternate)
 	case *ast.UnaryExpression:
 		a.analyzeExpression(e.Argument)
+	case *ast.MemberExpression:
+		/* Subscript access on parameter: src[i] marks src as series */
+		if e.Computed {
+			if obj, ok := e.Object.(*ast.Identifier); ok {
+				if _, isParam := a.parameterTypes[obj.Name]; isParam {
+					a.parameterTypes[obj.Name] = ParameterUsageSeries
+				}
+			}
+		}
 	case *ast.Literal:
 		if elemSlice, ok := e.Value.([]ast.Expression); ok {
 			for _, elem := range elemSlice {

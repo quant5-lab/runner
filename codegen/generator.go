@@ -1043,24 +1043,11 @@ func (g *generator) generateForStatement(forStmt *ast.ForStatement) (string, err
 func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
 	isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
 	if g.inArrowFunctionBody || isInLoop {
-		left, err := g.generateArrowFunctionExpression(binExpr.Left)
-		if err != nil {
-			return "", err
-		}
-		right, err := g.generateArrowFunctionExpression(binExpr.Right)
-		if err != nil {
-			return "", err
-		}
-
-		// Modulo operator requires int operands, wrap float64 values in int()
-		if binExpr.Operator == "%" {
-			return fmt.Sprintf("float64(int(%s) %s int(%s))", left, binExpr.Operator, right), nil
-		}
-
-		return fmt.Sprintf("(%s %s %s)", left, binExpr.Operator, right), nil
+		formatter := NewBinaryExpressionFormatter(g.generateArrowFunctionExpression)
+		return formatter.Format(binExpr)
 	}
 
-	// Series context: Binary expressions should be in condition context
+	/* Series context: Binary expressions should be in condition context */
 	return "", fmt.Errorf("binary expression should be used in condition context")
 }
 
@@ -1998,17 +1985,18 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
 	case *ast.BinaryExpression:
-		// Binary expression like sma20[1] > ema50[1] or SMA + EMA
 		/* In security context, need to generate temp series for operands */
 		if g.inSecurityContext {
 			return g.generateBinaryExpressionInSecurityContext(varName, expr)
 		}
 
-		// Normal context: compile-time evaluation
-		binaryCode := g.extractSeriesExpression(expr)
+		/* Format binary expression with operator precedence awareness */
+		formatter := NewBinaryExpressionFormatterWithExtractor(g.extractSeriesExpression)
+		binaryCode := formatter.formatWithExtractor(expr)
+
 		varType := g.inferVariableType(expr)
 		if varType == "bool" {
-			// Convert bool to float64 for Series storage
+			/* Convert bool to float64 for Series storage */
 			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, binaryCode), nil
 		}
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, binaryCode), nil
@@ -2888,7 +2876,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// User-defined variables use Series storage (ForwardSeriesBuffer paradigm)
 		return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
 	case *ast.Literal:
-		// Numeric literal
+		/* Numeric literal */
 		switch v := e.Value.(type) {
 		case float64:
 			return g.literalFormatter.FormatFloat(v)
@@ -2896,18 +2884,11 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return fmt.Sprintf("%d", v)
 		}
 	case *ast.BinaryExpression:
-		// Arithmetic expression like sma20 * 1.02
-		left := g.extractSeriesExpression(e.Left)
-		right := g.extractSeriesExpression(e.Right)
-
-		// Modulo operator requires int operands, wrap float64 values in int() and convert result back to float64
-		if e.Operator == "%" {
-			return fmt.Sprintf("float64(int(%s) %s int(%s))", left, e.Operator, right)
-		}
-
-		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right)
+		/* Binary expressions should be formatted with operator precedence */
+		formatter := NewBinaryExpressionFormatterWithExtractor(g.extractSeriesExpression)
+		return formatter.formatWithExtractor(e)
 	case *ast.UnaryExpression:
-		// Unary expression like -1, +x
+		/* Unary expression like -1, +x */
 		operand := g.extractSeriesExpression(e.Argument)
 		op := e.Operator
 		if op == "not" {

@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Supertrend",
   "dataSource": "SBERP-1h.json",
-  "generatedAt": "2026-01-19T12:54:52Z",
+  "generatedAt": "2026-01-21T07:51:56Z",
   "result": {
     "trades": [
       {

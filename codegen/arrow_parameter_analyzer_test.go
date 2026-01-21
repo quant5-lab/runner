@@ -223,6 +223,53 @@ func TestParameterUsageAnalyzer_AnalyzeArrowFunction(t *testing.T) {
 			expectedUsages: map[string]ParameterUsageType{},
 		},
 		{
+			name: "for-loop with subscript access marks parameter as series",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{
+					{Name: "src"},
+					{Name: "len"},
+				},
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID:   &ast.Identifier{Name: "sum"},
+								Init: &ast.Literal{Value: 0.0},
+							},
+						},
+					},
+					&ast.ForStatement{
+						Counter: "i",
+						From:    &ast.Literal{Value: 0.0},
+						To:      &ast.Identifier{Name: "len"},
+						Body: []ast.Node{
+							&ast.VariableDeclaration{
+								Kind: "var",
+								Declarations: []ast.VariableDeclarator{
+									{
+										ID: &ast.Identifier{Name: "sum"},
+										Init: &ast.BinaryExpression{
+											Left:     &ast.Identifier{Name: "sum"},
+											Operator: "+",
+											Right: &ast.MemberExpression{
+												Object:   &ast.Identifier{Name: "src"},
+												Property: &ast.Identifier{Name: "i"},
+												Computed: true,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"src": ParameterUsageSeries,
+				"len": ParameterUsageScalar,
+			},
+		},
+		{
 			name: "parameter unused in body",
 			arrowFunc: &ast.ArrowFunctionExpression{
 				Params: []ast.Identifier{

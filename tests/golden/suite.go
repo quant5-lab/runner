@@ -39,6 +39,11 @@ func (s *TestSuite) StrategyPath(filename string) string {
 	return filepath.Join(root, "strategies", filename)
 }
 
+func (s *TestSuite) TestFixturePath(filename string) string {
+	root := s.findWorkspaceRoot()
+	return filepath.Join(root, "e2e", "fixtures", "strategies", filename)
+}
+
 func (s *TestSuite) DataPath(filename string) string {
 	return s.golden.DataPath(filename)
 }
@@ -47,6 +52,19 @@ func (s *TestSuite) RunAndValidate(t *testing.T, cfg TestConfig) {
 	t.Helper()
 
 	strategyPath := s.StrategyPath(cfg.StrategyFile)
+	dataPath := s.golden.EnsureDataFile(t, cfg.DataFile)
+
+	actual := s.runner.Execute(t, strategyPath, dataPath, cfg.Symbol, cfg.Timeframe)
+
+	testutil.PrintTradeSummary(t, actual)
+
+	s.golden.ValidateOrUpdate(t, cfg.GoldenFile, cfg.StrategyName, cfg.DataFile, actual)
+}
+
+func (s *TestSuite) RunTestFixtureAndValidate(t *testing.T, cfg TestConfig) {
+	t.Helper()
+
+	strategyPath := s.TestFixturePath(cfg.StrategyFile)
 	dataPath := s.golden.EnsureDataFile(t, cfg.DataFile)
 
 	actual := s.runner.Execute(t, strategyPath, dataPath, cfg.Symbol, cfg.Timeframe)

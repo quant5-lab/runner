@@ -7,12 +7,7 @@ import (
 	"github.com/quant5-lab/runner/tests/util"
 )
 
-/* TestForLoopZeroStep validates zero step runtime error handling
- *
- * Zero step would cause infinite loop, so runtime must panic
- * Validates codegen panic("for loop step cannot be zero")
- * Expected: Binary execution fails with panic message
- */
+/* Zero step causes runtime panic to prevent infinite loop */
 func TestForLoopZeroStep(t *testing.T) {
 	pineScript := `//@version=5
 indicator("For Loop Zero Step", overlay=false)

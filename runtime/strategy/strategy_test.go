@@ -229,6 +229,7 @@ func TestStrategy(t *testing.T) {
 
 	// Close position
 	s.Close("long1", 110, 2000, "")
+	s.OnBarUpdate(2, 110, 2000)
 
 	// Check position closed
 	if s.GetPositionSize() != 0 {
@@ -353,9 +354,9 @@ func TestEquityAfterClosedTrade(t *testing.T) {
 	s.Entry("long1", Long, 10, "")
 	s.OnBarUpdate(1, 100, 1001)
 	s.Close("long1", 110, 1002, "")
+	s.OnBarUpdate(2, 110, 1002)
 
 	/* Equity should reflect realized profit */
-	s.OnBarUpdate(2, 110, 1002)
 	expectedEquity := 10000.0 + 100.0 /* (110-100)*10 */
 
 	if s.Equity() != expectedEquity {
@@ -442,6 +443,7 @@ func TestStrategyEntryComment(t *testing.T) {
 
 	/* Close and verify comment persists */
 	s.Close("long1", 110, 2000, "Target reached")
+	s.OnBarUpdate(2, 110, 2000)
 
 	closedTrades := s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 1 {
@@ -462,6 +464,7 @@ func TestStrategyExitComment(t *testing.T) {
 	s.Entry("long1", Long, 10, "Entry 1")
 	s.OnBarUpdate(1, 100, 1000)
 	s.Close("long1", 105, 2000, "Manual close")
+	s.OnBarUpdate(2, 105, 2000)
 
 	closedTrades := s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 1 {
@@ -473,10 +476,11 @@ func TestStrategyExitComment(t *testing.T) {
 
 	/* Test CloseAll with comment */
 	s.Entry("long2", Long, 5, "Entry 2")
-	s.Entry("long3", Long, 3, "Entry 3")
 	s.OnBarUpdate(2, 110, 3000)
+	s.Entry("long3", Long, 3, "Entry 3")
 	s.OnBarUpdate(3, 115, 4000)
 	s.CloseAll(120, 5000, "Close all positions")
+	s.OnBarUpdate(4, 120, 5000)
 
 	closedTrades = s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 3 {
@@ -493,7 +497,9 @@ func TestStrategyExitComment(t *testing.T) {
 	/* Test Exit with comment */
 	s.Entry("long4", Long, 8, "Entry 4")
 	s.OnBarUpdate(4, 125, 6000)
+	s.OnBarUpdate(5, 130, 7000)
 	s.Exit("exit1", "long4", 130, 7000, "Stop loss hit")
+	s.OnBarUpdate(6, 130, 7000)
 
 	closedTrades = s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 4 {
@@ -519,9 +525,11 @@ func TestStrategyMixedComments(t *testing.T) {
 
 	/* Close with comment */
 	s.Close("long1", 110, 3000, "Exit A")
+	s.OnBarUpdate(3, 110, 3000)
 
 	/* Close without comment */
 	s.Close("long2", 108, 4000, "")
+	s.OnBarUpdate(4, 108, 4000)
 
 	closedTrades := s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 2 {
@@ -560,6 +568,7 @@ func TestStrategyShort(t *testing.T) {
 
 	// Close position with profit (price dropped)
 	s.Close("short1", 90, 2000, "")
+	s.OnBarUpdate(2, 90, 2000)
 
 	// Check profit: (100-90)*5 = 50
 	if s.GetNetProfit() != 50 {
@@ -584,6 +593,7 @@ func TestStrategyCloseAll(t *testing.T) {
 
 	// Close all
 	s.CloseAll(110, 3000, "")
+	s.OnBarUpdate(3, 110, 3000)
 
 	// Check all closed
 	openTrades = s.tradeHistory.GetOpenTrades()

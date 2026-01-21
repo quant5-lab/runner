@@ -1,0 +1,17 @@
+//@version=5
+strategy("Simple For Loop Counter", overlay=true)
+
+// Simple counter function - returns count directly
+simpleCount(len) =>
+    count = 0
+    for i = 0 to len - 1
+        count := count + 1
+    count
+
+// Entry when count equals lookback
+lookback = input.int(10, "Lookback")
+if simpleCount(lookback) == lookback
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0 and bar_index % 20 == 0
+    strategy.close("Long")

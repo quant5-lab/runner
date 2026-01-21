@@ -66,7 +66,7 @@ func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (
 		return e.generateConditionalExpression(ex)
 
 	case *ast.MemberExpression:
-		return e.gen.generateMemberExpression(ex)
+		return e.generateMemberExpression(ex)
 
 	default:
 		return "", fmt.Errorf("unsupported arrow expression type: %T", expr)
@@ -138,6 +138,11 @@ func (e *ArrowExpressionGeneratorImpl) generateFixnanExpression(call *ast.CallEx
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (string, error) {
+	/* Loop counters need float64() cast for arithmetic compatibility */
+	if e.gen.loopContextStack != nil && e.gen.loopContextStack.IsLoopCounter(id.Name) {
+		return fmt.Sprintf("float64(%s)", id.Name), nil
+	}
+
 	// Try access resolver first (parameters and local variables)
 	if access, resolved := e.accessResolver.ResolveAccess(id.Name); resolved {
 		return access, nil
@@ -226,4 +231,110 @@ func (e *ArrowExpressionGeneratorImpl) generateConditionalExpression(condExpr *a
 
 	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 		test, consequent, alternate), nil
+}
+
+func (e *ArrowExpressionGeneratorImpl) generateMemberExpression(mem *ast.MemberExpression) (string, error) {
+	/* Arrow-aware subscript access: obj[index] */
+	if mem.Computed {
+		if obj, ok := mem.Object.(*ast.Identifier); ok {
+			return e.resolveArrowSubscript(obj.Name, mem.Property)
+		}
+	}
+
+	/* Try builtin member expression resolution */
+	if code, resolved := e.gen.builtinHandler.TryResolveMemberExpression(mem, false); resolved {
+		return code, nil
+	}
+
+	/* Non-computed member access: obj.prop */
+	if obj, ok := mem.Object.(*ast.Identifier); ok {
+		if prop, ok := mem.Property.(*ast.Identifier); ok {
+			if obj.Name == "strategy" {
+				switch prop.Name {
+				case "long":
+					return "strategy.Long", nil
+				case "short":
+					return "strategy.Short", nil
+				}
+			}
+			return obj.Name + "." + prop.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("unsupported member expression pattern")
+}
+
+/*
+resolveArrowSubscript generates arrow-aware subscript access code.
+
+Handles three cases:
+1. Series parameter: srcSeries[idx] → srcSeries.Get(int(idx))
+2. Builtin series: close[idx] → ctx.Data[barIdx].Close with bounds check
+3. Local series variable: varSeries[idx] → varSeries.Get(int(idx))
+
+Index expressions use arrow-aware generation (loop counters as scalars).
+*/
+func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, indexExpr ast.Expression) (string, error) {
+	/* Check if seriesName is a series parameter (named with Series suffix in signature) */
+	isSeriesParam := e.accessResolver.IsParameter(seriesName)
+
+	/* Check if seriesName is a builtin series */
+	isBuiltin := seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume"
+
+	/* Generate arrow-aware index expression */
+	indexCode, err := e.generateArrowIndexExpression(indexExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate index expression: %w", err)
+	}
+
+	if isBuiltin {
+		return e.generateBuiltinSubscript(seriesName, indexCode), nil
+	}
+
+	if isSeriesParam {
+		/* Series parameter: srcSeries.Get(int(idx)) */
+		return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode), nil
+	}
+
+	/* Local series variable */
+	return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode), nil
+}
+
+/* generateArrowIndexExpression generates index with arrow context (loop counters as float64 for arithmetic) */
+func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Expression) (string, error) {
+	switch ex := expr.(type) {
+	case *ast.Identifier:
+		/* Loop counters cast to float64 for arithmetic with other floats */
+		if e.gen.loopContextStack != nil && e.gen.loopContextStack.IsLoopCounter(ex.Name) {
+			return fmt.Sprintf("float64(%s)", ex.Name), nil
+		}
+		/* Use access resolver for parameters and local variables */
+		if access, resolved := e.accessResolver.ResolveAccess(ex.Name); resolved {
+			return access, nil
+		}
+		return ex.Name, nil
+
+	case *ast.Literal:
+		return e.generateLiteral(ex)
+
+	case *ast.BinaryExpression:
+		left, err := e.generateArrowIndexExpression(ex.Left)
+		if err != nil {
+			return "", err
+		}
+		right, err := e.generateArrowIndexExpression(ex.Right)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(%s %s %s)", left, ex.Operator, right), nil
+
+	default:
+		return e.generateExpression(expr)
+	}
+}
+
+/* generateBuiltinSubscript generates bounds-checked builtin series access */
+func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, indexCode string) string {
+	capitalName := capitalizeFirstLetter(seriesName)
+	return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return ctx.Data[barIdx].%s }; return math.NaN() }()", indexCode, capitalName)
 }

@@ -34,6 +34,9 @@ func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, erro
 	case *ast.VariableDeclaration:
 		return s.generateVariableDeclaration(st)
 
+	case *ast.ForStatement:
+		return s.generateForStatement(st)
+
 	default:
 		return s.gen.generateStatement(stmt)
 	}
@@ -87,4 +90,67 @@ func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.Arr
 	}
 
 	return s.localStorage.GenerateTupleDualStorage(varNames, exprCode), nil
+}
+
+/* generateForStatement generates arrow-aware for-loop using ArrowExpressionGeneratorImpl */
+func (s *ArrowStatementGenerator) generateForStatement(forStmt *ast.ForStatement) (string, error) {
+	counterVar := forStmt.Counter
+
+	s.gen.loopContextStack.Push(counterVar)
+	defer s.gen.loopContextStack.Pop()
+
+	/* Use arrow-aware expression generator for bounds (respects parameters vs locals) */
+	fromCode, err := s.exprGenerator.Generate(forStmt.From)
+	if err != nil {
+		return "", fmt.Errorf("for-loop from expression failed: %w", err)
+	}
+
+	toCode, err := s.exprGenerator.Generate(forStmt.To)
+	if err != nil {
+		return "", fmt.Errorf("for-loop to expression failed: %w", err)
+	}
+
+	stepCode := "1"
+	if forStmt.Step != nil {
+		stepCode, err = s.exprGenerator.Generate(forStmt.Step)
+		if err != nil {
+			return "", fmt.Errorf("for-loop step expression failed: %w", err)
+		}
+	}
+
+	code := s.gen.ind() + "{\n"
+	s.gen.indent++
+	code += s.gen.ind() + fmt.Sprintf("%s := int(%s)\n", counterVar, fromCode)
+	code += s.gen.ind() + fmt.Sprintf("_to := int(%s)\n", toCode)
+	code += s.gen.ind() + fmt.Sprintf("_step := int(%s)\n", stepCode)
+
+	code += s.gen.ind() + "if _step == 0 {\n"
+	s.gen.indent++
+	code += s.gen.ind() + "panic(\"for loop step cannot be zero\")\n"
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
+
+	code += s.gen.ind() + "_ascending := _step > 0\n"
+	code += s.gen.ind() + fmt.Sprintf("for (_ascending && %s <= _to) || (!_ascending && %s >= _to) {\n", counterVar, counterVar)
+	s.gen.indent++
+
+	/* Generate loop body using arrow-aware statement generator (recursive) */
+	for _, stmt := range forStmt.Body {
+		stmtCode, err := s.GenerateStatement(stmt)
+		if err != nil {
+			return "", fmt.Errorf("for-loop body statement failed: %w", err)
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
+	code += s.gen.ind() + fmt.Sprintf("%s += _step\n", counterVar)
+
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
+
+	return code, nil
 }

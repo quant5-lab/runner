@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Volume Weighted Strategy",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-01-15T20:58:07Z",
+  "generatedAt": "2026-01-21T07:51:56Z",
   "result": {
     "trades": [],
     "openTrades": [],

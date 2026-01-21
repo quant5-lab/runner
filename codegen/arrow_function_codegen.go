@@ -8,10 +8,11 @@ import (
 )
 
 type ArrowFunctionCodegen struct {
-	gen            *generator
-	accessResolver *ArrowSeriesAccessResolver
-	localStorage   *ArrowLocalVariableStorage
-	statementGen   *ArrowStatementGenerator
+	gen              *generator
+	accessResolver   *ArrowSeriesAccessResolver
+	localStorage     *ArrowLocalVariableStorage
+	statementGen     *ArrowStatementGenerator
+	loopModifiedVars map[string]bool
 }
 
 func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
@@ -28,24 +29,24 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 
 	a.gen.signatureRegistrar.RegisterArrowFunction(funcName, arrowFunc.Params, paramUsage, "float64")
 
+	/* LOOP-RETURN FIX: Analyze variables modified in for-loops before code generation */
+	loopAnalyzer := NewArrowLoopModificationAnalyzer()
+	a.loopModifiedVars = loopAnalyzer.FindLoopModifiedVariables(arrowFunc.Body)
+
 	// Register all parameters in access resolver
 	for _, param := range arrowFunc.Params {
 		a.accessResolver.RegisterParameter(param.Name)
 	}
 
-	// Register all local variables in access resolver
-	for _, stmt := range arrowFunc.Body {
-		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
-			for _, declarator := range varDecl.Declarations {
-				if id, ok := declarator.ID.(*ast.Identifier); ok {
-					a.accessResolver.RegisterLocalVariable(id.Name)
-				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
-					for _, elem := range arrayPattern.Elements {
-						a.accessResolver.RegisterLocalVariable(elem.Name)
-					}
-				}
-			}
-		}
+	// Register all local variables in access resolver (including nested in for-loops)
+	varNames := a.collectAllVariableNames(arrowFunc.Body)
+	for _, varName := range varNames {
+		a.accessResolver.RegisterLocalVariable(varName)
+	}
+
+	// Register loop-modified variables for Series access
+	for varName := range a.loopModifiedVars {
+		a.accessResolver.RegisterLoopModified(varName)
 	}
 
 	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc, paramUsage)
@@ -66,13 +67,17 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	code := a.gen.ind() + signature + " " + returnType + " {\n"
 	a.gen.indent++
 
-	code += a.gen.ind() + "ctx := arrowCtx.Context\n\n"
+	code += a.gen.ind() + "ctx := arrowCtx.Context\n"
+	code += a.gen.ind() + "_ = ctx\n\n"
 
 	// Generate Series declarations for ALL local variables (universal ForwardSeriesBuffer)
 	seriesDecls := a.generateAllSeriesDeclarations(arrowFunc)
 	if seriesDecls != "" {
 		code += seriesDecls + "\n"
 	}
+
+	// Suppress unused variable warnings for Series that aren't loop-modified
+	code += a.generateUnusedSeriesSuppression(arrowFunc)
 
 	code += body
 	a.gen.indent--
@@ -156,21 +161,84 @@ func (a *ArrowFunctionCodegen) buildTupleReturnType(count int) string {
 func (a *ArrowFunctionCodegen) generateAllSeriesDeclarations(arrowFunc *ast.ArrowFunctionExpression) string {
 	var code string
 
-	for _, stmt := range arrowFunc.Body {
-		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
-			for _, declarator := range varDecl.Declarations {
-				if id, ok := declarator.ID.(*ast.Identifier); ok {
-					code += a.gen.ind() + fmt.Sprintf("%sSeries := arrowCtx.GetOrCreateSeries(%q)\n", id.Name, id.Name)
-				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
-					for _, elem := range arrayPattern.Elements {
-						code += a.gen.ind() + fmt.Sprintf("%sSeries := arrowCtx.GetOrCreateSeries(%q)\n", elem.Name, elem.Name)
+	// Collect all variable declarations recursively (including nested in for-loops)
+	varNames := a.collectAllVariableNames(arrowFunc.Body)
+
+	for _, varName := range varNames {
+		code += a.gen.ind() + fmt.Sprintf("%sSeries := arrowCtx.GetOrCreateSeries(%q)\n", varName, varName)
+	}
+
+	return code
+}
+
+/* generateUnusedSeriesSuppression adds _ = varSeries for non-loop-modified variables
+ *
+ * Unused Series variables occur when:
+ * - Variable is declared inside if-statement or loop
+ * - Variable is never reassigned (not loop-modified)
+ * - Variable only uses scalar access (never calls Series.GetCurrent())
+ *
+ * This suppresses Go's "declared and not used" compiler error.
+ */
+func (a *ArrowFunctionCodegen) generateUnusedSeriesSuppression(arrowFunc *ast.ArrowFunctionExpression) string {
+	varNames := a.collectAllVariableNames(arrowFunc.Body)
+
+	var suppressions []string
+	for _, varName := range varNames {
+		if !a.loopModifiedVars[varName] {
+			suppressions = append(suppressions, fmt.Sprintf("_ = %sSeries", varName))
+		}
+	}
+
+	if len(suppressions) == 0 {
+		return ""
+	}
+
+	return a.gen.ind() + strings.Join(suppressions, "; ") + "\n\n"
+}
+
+/* collectAllVariableNames recursively finds ALL variable declarations at any scope level
+ *
+ * Universal ForwardSeriesBuffer: EVERY variable gets Series storage regardless of scope.
+ * This ensures correct behavior for nested loops, conditional declarations, etc.
+ */
+func (a *ArrowFunctionCodegen) collectAllVariableNames(statements []ast.Node) []string {
+	var names []string
+	seen := make(map[string]bool)
+
+	var recurse func([]ast.Node)
+	recurse = func(stmts []ast.Node) {
+		for _, stmt := range stmts {
+			switch s := stmt.(type) {
+			case *ast.VariableDeclaration:
+				for _, declarator := range s.Declarations {
+					if id, ok := declarator.ID.(*ast.Identifier); ok {
+						if !seen[id.Name] {
+							names = append(names, id.Name)
+							seen[id.Name] = true
+						}
+					} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+						for _, elem := range arrayPattern.Elements {
+							if !seen[elem.Name] {
+								names = append(names, elem.Name)
+								seen[elem.Name] = true
+							}
+						}
 					}
 				}
+
+			case *ast.ForStatement:
+				recurse(s.Body)
+
+			case *ast.IfStatement:
+				recurse(s.Consequent)
+				recurse(s.Alternate)
 			}
 		}
 	}
 
-	return code
+	recurse(statements)
+	return names
 }
 
 func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunctionExpression) (string, error) {
@@ -291,11 +359,18 @@ func (a *ArrowFunctionCodegen) generateVariableReturnStatement(varDecl *ast.Vari
 	}
 
 	if id, ok := decl.ID.(*ast.Identifier); ok {
-		stmtCode, err := a.gen.generateStatement(varDecl)
+		stmtCode, err := a.statementGen.GenerateStatement(varDecl)
 		if err != nil {
 			return "", err
 		}
-		return stmtCode + a.gen.ind() + "return " + id.Name + "\n", nil
+		/* LOOP-RETURN FIX: Variables modified in loops return from series */
+		returnExpr := id.Name
+		if a.loopModifiedVars[id.Name] {
+			returnExpr = id.Name + "Series.GetCurrent()"
+		}
+
+		code := stmtCode + a.gen.ind() + "return " + returnExpr + "\n"
+		return code, nil
 	}
 
 	return "", fmt.Errorf("unsupported variable declarator pattern: %T", decl.ID)
@@ -346,6 +421,14 @@ func (a *ArrowFunctionCodegen) generateExpressionReturnStatement(exprStmt *ast.E
 	if literal, ok := exprStmt.Expression.(*ast.Literal); ok {
 		if elemSlice, ok := literal.Value.([]ast.Expression); ok {
 			return a.generateTupleReturnFromLiteral(elemSlice)
+		}
+	}
+
+	/* LOOP-RETURN FIX: Check if returning a loop-modified identifier */
+	if id, ok := exprStmt.Expression.(*ast.Identifier); ok {
+		if a.loopModifiedVars[id.Name] {
+			returnExpr := id.Name + "Series.GetCurrent()"
+			return a.gen.ind() + "return " + returnExpr + "\n", nil
 		}
 	}
 
