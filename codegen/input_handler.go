@@ -58,7 +58,9 @@ func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName str
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %.2f\n", varName, defval)
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %.2f\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -84,7 +86,9 @@ func (ih *InputHandler) GenerateInputInt(call *ast.CallExpression, varName strin
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %d\n", varName, defval)
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %d\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -110,7 +114,9 @@ func (ih *InputHandler) GenerateInputBool(call *ast.CallExpression, varName stri
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %t\n", varName, defval)
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %t\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -136,7 +142,9 @@ func (ih *InputHandler) GenerateInputString(call *ast.CallExpression, varName st
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %q\n", varName, defval)
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %q\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -186,7 +194,9 @@ func (ih *InputHandler) GenerateInputSession(call *ast.CallExpression, varName s
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %q\n", varName, defval)
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %q\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -198,7 +208,9 @@ func (ih *InputHandler) GenerateInputSource(call *ast.CallExpression, varName st
 			source = id.Name
 		}
 	}
-	return fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", varName, source), nil
+	/* Sanitize variable name to avoid Go keyword collisions */
+	sanitizedName := SanitizeGoIdentifier(varName)
+	return fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", sanitizedName, source), nil
 }
 
 /* GetInputConstantsMap returns all input constants as map[varName]value for security evaluator */

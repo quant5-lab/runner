@@ -110,9 +110,11 @@ func isTAFunction(funcName string) bool {
 		"ta.highest", "ta.lowest", "ta.change",
 		"ta.crossover", "ta.crossunder",
 		"ta.pivothigh", "ta.pivotlow",
+		"ta.rsi",
 		"sma", "ema", "rma", "wma", "stdev",
 		"highest", "lowest", "change",
 		"crossover", "crossunder",
+		"rsi",
 		"fixnan", "ta.fixnan":
 		return true
 	default:

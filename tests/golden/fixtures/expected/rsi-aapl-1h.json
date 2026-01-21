@@ -1,0 +1,85 @@
+{
+  "version": "1.0",
+  "strategy": "RSI Strategy",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-01-20T21:12:08Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 36,
+        "entryTime": 1760027400,
+        "entryPrice": 253.8800048828125,
+        "entryComment": "",
+        "exitBar": 61,
+        "exitTime": 1760535000,
+        "exitPrice": 250.85000610351562,
+        "exitComment": "",
+        "size": 1,
+        "profit": -3.029998779296875,
+        "direction": "long"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 83,
+        "entryTime": 1760970600,
+        "entryPrice": 259.489990234375,
+        "entryComment": "",
+        "exitBar": 99,
+        "exitTime": 1761150600,
+        "exitPrice": 256.69140625,
+        "exitComment": "",
+        "size": 1,
+        "profit": 2.798583984375,
+        "direction": "short"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 118,
+        "entryTime": 1761575400,
+        "entryPrice": 265.739990234375,
+        "entryComment": "",
+        "exitBar": 152,
+        "exitTime": 1762180200,
+        "exitPrice": 267.6300048828125,
+        "exitComment": "",
+        "size": 1,
+        "profit": -1.8900146484375,
+        "direction": "short"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 265,
+        "entryTime": 1764084600,
+        "entryPrice": 278.8900146484375,
+        "entryComment": "",
+        "exitBar": 303,
+        "exitTime": 1764858600,
+        "exitPrice": 281.2250061035156,
+        "exitComment": "",
+        "size": 1,
+        "profit": -2.334991455078125,
+        "direction": "short"
+      },
+      {
+        "entryId": "Long",
+        "entryBar": 443,
+        "entryTime": 1767634200,
+        "entryPrice": 266.989990234375,
+        "entryComment": "",
+        "exitBar": 478,
+        "exitTime": 1768239000,
+        "exitPrice": 260.8900146484375,
+        "exitComment": "",
+        "size": 1,
+        "profit": -6.0999755859375,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [],
+    "equity": 9989.443603515625,
+    "netProfit": -10.556396484375,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

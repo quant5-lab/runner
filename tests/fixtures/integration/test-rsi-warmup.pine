@@ -1,0 +1,31 @@
+//@version=5
+indicator("RSI Warmup Boundaries", overlay=false)
+
+// Test RSI behavior at warmup period boundaries
+
+// Test 1: Period 14 - first 13 bars should be na, valid from bar 13
+rsi14 = ta.rsi(close, 14)
+
+// Test 2: Period 5 - first 4 bars should be na, valid from bar 4
+rsi5 = ta.rsi(close, 5)
+
+// Test 3: Period 1 - valid from bar 0 (no warmup)
+rsi1 = ta.rsi(close, 1)
+
+// Test 4: Period 50 - first 49 bars should be na, valid from bar 49
+rsi50 = ta.rsi(close, 50)
+
+// Validation flags for warmup boundaries
+rsi14Valid = not na(rsi14)
+rsi5Valid = not na(rsi5)
+rsi50Valid = not na(rsi50)
+
+// Bar index tracking for warmup verification
+barIdx = bar_index
+
+plot(rsi14, "RSI 14", color=color.blue)
+plot(rsi5, "RSI 5", color=color.green)
+plot(rsi1, "RSI 1", color=color.red)
+plot(rsi50, "RSI 50", color=color.orange)
+bgcolor(rsi14Valid ? color.new(color.blue, 95) : color.new(color.red, 95))
+

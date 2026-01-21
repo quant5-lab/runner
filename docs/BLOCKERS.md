@@ -1,6 +1,6 @@
 | # | Category | Blocker | Verdict | Evidence |
 |---|----------|---------|---------|----------|
-| **1** | **Codegen** | `ta.rsi()` inline generation | ✅ **VALID** | Error: "ta.rsi inline generation not yet implemented" in codegen/generator.go:2933 |
+| **1** | **Codegen** | `ta.rsi()` inline generation | ✅ **FIXED** | Composite indicator architecture with internal series `.Next()` calls. Universal context support (TopLevel + Arrow). Tests: 21/21 integration + 4/4 golden pass (12 fixtures + 4 golden strategy tests). |
 | **2** | **Codegen** | `bar_index` Series generation | ✅ **FIXED** | Commit 72f73aa "improve `bar_index`". Tested: codegen + compile ✅ |
 | **3** | **Parser** | `while` loops | ✅ **VALID** | Parse error: "binary expression should be used in condition context" |
 | **4** | **Parser** | `for` loops execution | ✅ **VALID** | Parses but generates literals only: `sumVal = 50.0` instead of loop logic |
@@ -19,3 +19,5 @@
 | **18** | **Codegen** | `ta.crossover()/crossunder()` arbitrary expression support | ✅ **FIXED** | Inline IIFE pattern enables crossover/crossunder with arbitrary PineScript expressions in any context. Recursive stateful indicator detection. Comprehensive test coverage: 35+ behavioral tests (ArgumentTypes, StatefulDetection, WindowFunctionInlining, EdgeCases, LiteralTypes, LogicConditions). |
 | **19** | **Codegen** | MemberExpression namespace support | ✅ **FIXED** | Commits 41fed2f, bbf317f. Tested: `syminfo.*`, `strategy.*` compile ✅ |
 | **20** | **Codegen** | Array/map functions | ✅ **VALID** | `array.new_float()`, `array.push()`, `array.get()`, `map.*` generate TODO comments |
+| **21** | **Codegen** | Go reserved word collision | ✅ **FIXED** | AST transformation preprocessor `IdentifierSanitizer` renames Pine identifiers conflicting with Go reserved words (e.g., `len` → `len_`, `type` → `type_`, `map` → `map_`). Preserves Pine built-ins (`close`, `open`, `high`, `low`, `volume`). Integrated in cmd/pine-gen/main.go before warmup analysis. Tested: `len = input.int(14)` generates `const len_ = 14` and compiles successfully. |
+

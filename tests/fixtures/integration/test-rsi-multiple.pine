@@ -1,0 +1,33 @@
+//@version=5
+indicator("RSI Multiple Instances", overlay=false)
+
+// Test multiple RSI instances with different parameters
+
+// Fast RSI
+rsiFast = ta.rsi(close, 5)
+
+// Standard RSI
+rsiStandard = ta.rsi(close, 14)
+
+// Slow RSI
+rsiSlow = ta.rsi(close, 28)
+
+// Very slow RSI
+rsiVerySlow = ta.rsi(close, 50)
+
+// Multiple instances on different sources
+rsiCloseShort = ta.rsi(close, 9)
+rsiHighShort = ta.rsi(high, 9)
+rsiLowShort = ta.rsi(low, 9)
+
+// Composite conditions using multiple RSIs
+bullish = rsiFast > rsiStandard and rsiStandard > rsiSlow
+bearish = rsiFast < rsiStandard and rsiStandard < rsiSlow
+
+plot(rsiFast, "RSI 5", color=color.red)
+plot(rsiStandard, "RSI 14", color=color.blue)
+plot(rsiSlow, "RSI 28", color=color.green)
+plot(rsiVerySlow, "RSI 50", color=color.orange)
+bgcolor(bullish ? color.new(color.green, 90) : na)
+bgcolor(bearish ? color.new(color.red, 90) : na)
+

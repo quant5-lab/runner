@@ -1,0 +1,27 @@
+//@version=5
+indicator("RSI Period Variations", overlay=false)
+
+// Test RSI with different constant period types
+
+// Test 1: Literal integer period
+rsiLiteral = ta.rsi(close, 14)
+
+// Test 2: Const variable period
+constPeriod = 20
+rsiConst = ta.rsi(close, constPeriod)
+
+// Test 3: Expression period (compile-time constant)
+basePeriod = 7
+rsiExpression = ta.rsi(close, basePeriod * 2)
+
+// Test 4: Different literal periods
+rsiShort = ta.rsi(close, 5)
+rsiLong = ta.rsi(close, 50)
+
+plot(rsiLiteral, "RSI Literal 14", color=color.blue)
+plot(rsiConst, "RSI Const 20", color=color.green)
+plot(rsiExpression, "RSI Expression 14", color=color.orange)
+plot(rsiShort, "RSI Short 5", color=color.red)
+plot(rsiLong, "RSI Long 50", color=color.purple)
+
+

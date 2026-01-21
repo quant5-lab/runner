@@ -492,7 +492,7 @@ func TestCrossoverInlineHandler_EdgeCases(t *testing.T) {
 			errMsg:    "requires 2 arguments",
 		},
 		{
-			name: "unsupported inline TA function",
+			name: "RSI inline TA function now supported",
 			setup: func() (*ast.CallExpression, *generator) {
 				return &ast.CallExpression{
 					Callee: &ast.MemberExpression{
@@ -514,8 +514,7 @@ func TestCrossoverInlineHandler_EdgeCases(t *testing.T) {
 					},
 				}, createTestGenerator()
 			},
-			expectErr: true,
-			errMsg:    "unsupported inline TA function",
+			expectErr: false,
 		},
 		{
 			name: "nested window functions",

@@ -1,0 +1,35 @@
+//@version=5
+indicator("RSI Complex Expressions", overlay=false)
+
+// Test RSI with calculated sources and nested expressions
+
+// Test 1: RSI of SMA
+smaClose = ta.sma(close, 20)
+rsiOfSMA = ta.rsi(smaClose, 14)
+
+// Test 2: RSI of EMA
+emaClose = ta.ema(close, 20)
+rsiOfEMA = ta.rsi(emaClose, 14)
+
+// Test 3: RSI of price change
+priceChange = close - close[1]
+rsiOfChange = ta.rsi(priceChange, 14)
+
+// Test 4: RSI with const-evaluated period
+constPeriod = 5
+rsiConstPeriod = ta.rsi(close, constPeriod)
+
+// Test 5: Base RSI for averaging and crossover
+rsi14 = ta.rsi(close, 14)
+
+// Test 6: Pre-calculated RSI for averaging
+rsi9 = ta.rsi(close, 9)
+rsi21 = ta.rsi(close, 21)
+avgRSI = (rsi9 + rsi14 + rsi21) / 3
+
+plot(rsiOfSMA, "RSI of SMA", color=color.blue)
+plot(rsiOfEMA, "RSI of EMA", color=color.green)
+plot(rsiConstPeriod, "RSI Const Period", color=color.orange)
+plot(avgRSI, "Avg RSI", color=color.purple, linewidth=2)
+hline(50, "Midline", color=color.gray)
+

@@ -76,6 +76,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	identifierSanitizer := preprocessor.NewIdentifierSanitizer()
+	estreeAST, err = identifierSanitizer.Transform(estreeAST)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Identifier sanitization error: %v\n", err)
+		os.Exit(1)
+	}
+
 	astJSON, err := astConverter.ToJSON(estreeAST)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "JSON error: %v\n", err)

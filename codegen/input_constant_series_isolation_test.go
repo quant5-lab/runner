@@ -496,7 +496,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				"var CloseSeries *series.Series",
 			},
 			mustContain: []string{
-				"const Close = 123.45",
+				"const Close_ = 123.45",
 				"var closeSeries *series.Series", // Bar field should still exist
 			},
 			description: "Input constant shadowing bar field name should not affect bar field Series",

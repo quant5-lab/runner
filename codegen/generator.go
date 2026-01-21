@@ -48,6 +48,9 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
 	gen.taRegistry = NewTAFunctionRegistry()
+	gen.compositeIndicatorRegistry = NewCompositeIndicatorRegistry()
+	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
+	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
@@ -110,29 +113,30 @@ type generator struct {
 	boolConverter    *BooleanConverter
 	registryGuard    *VariableRegistryGuard
 
-	inputHandler            *InputHandler
-	mathHandler             *MathHandler
-	valueHandler            *ValueHandler
-	subscriptResolver       *SubscriptResolver
-	builtinHandler          *BuiltinIdentifierHandler
-	taRegistry              *TAFunctionRegistry
-	exprAnalyzer            *ExpressionAnalyzer
-	tempVarMgr              *TempVariableManager
-	constEvaluator          *validation.WarmupAnalyzer
-	plotExprHandler         *PlotExpressionHandler
-	barFieldRegistry        *BarFieldSeriesRegistry
-	inlineRegistry          *InlineFunctionRegistry
-	runtimeOnlyFilter       *RuntimeOnlyFunctionFilter
-	inlineConditionRegistry *InlineConditionHandlerRegistry
-	plotCollector           *PlotCollector
-	callRouter              *CallExpressionRouter
-	funcSigRegistry         *FunctionSignatureRegistry
-	signatureRegistrar      *SignatureRegistrar
-	arrowContextLifecycle   *ArrowContextLifecycleManager
-	returnValueStorage      *ReturnValueSeriesStorageHandler
-	symbolTable             SymbolTable
-	literalFormatter        *LiteralFormatter
-	tupleIndicatorHandler   *TupleIndicatorHandler
+	inputHandler               *InputHandler
+	mathHandler                *MathHandler
+	valueHandler               *ValueHandler
+	subscriptResolver          *SubscriptResolver
+	builtinHandler             *BuiltinIdentifierHandler
+	taRegistry                 *TAFunctionRegistry
+	compositeIndicatorRegistry *CompositeIndicatorRegistry
+	exprAnalyzer               *ExpressionAnalyzer
+	tempVarMgr                 *TempVariableManager
+	constEvaluator             *validation.WarmupAnalyzer
+	plotExprHandler            *PlotExpressionHandler
+	barFieldRegistry           *BarFieldSeriesRegistry
+	inlineRegistry             *InlineFunctionRegistry
+	runtimeOnlyFilter          *RuntimeOnlyFunctionFilter
+	inlineConditionRegistry    *InlineConditionHandlerRegistry
+	plotCollector              *PlotCollector
+	callRouter                 *CallExpressionRouter
+	funcSigRegistry            *FunctionSignatureRegistry
+	signatureRegistrar         *SignatureRegistrar
+	arrowContextLifecycle      *ArrowContextLifecycleManager
+	returnValueStorage         *ReturnValueSeriesStorageHandler
+	symbolTable                SymbolTable
+	literalFormatter           *LiteralFormatter
+	tupleIndicatorHandler      *TupleIndicatorHandler
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -299,6 +303,7 @@ type taFunctionCall struct {
 	varName  string
 	funcName string
 	args     []ast.Expression
+	call     *ast.CallExpression
 }
 
 func (g *generator) generateProgram(program *ast.Program) (string, error) {
@@ -356,7 +361,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			for _, declarator := range varDecl.Declarations {
 				if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
 					for _, elem := range arrayPattern.Elements {
-						varName := elem.Name
+						varName := SanitizeGoIdentifier(elem.Name)
 						// Infer type from initialization
 						varType := g.inferVariableType(declarator.Init)
 						g.variables[varName] = varType
@@ -369,7 +374,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				if !ok {
 					continue
 				}
-				varName := id.Name
+				varName := SanitizeGoIdentifier(id.Name)
 
 				// Skip arrow function declarations (user-defined functions, not variables)
 				if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
@@ -527,15 +532,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 					funcName := g.extractFunctionName(callExpr.Callee)
-					if funcName == "ta.sma" || funcName == "ta.ema" || funcName == "ta.rma" ||
-						funcName == "ta.rsi" || funcName == "ta.atr" || funcName == "ta.stdev" ||
-						funcName == "ta.change" || funcName == "ta.pivothigh" || funcName == "ta.pivotlow" ||
-						funcName == "fixnan" {
+					if g.taRegistry.IsSupported(funcName) {
 						if id, ok := declarator.ID.(*ast.Identifier); ok {
 							g.taFunctions = append(g.taFunctions, taFunctionCall{
 								varName:  id.Name,
 								funcName: funcName,
 								args:     callExpr.Arguments,
+								call:     callExpr,
 							})
 						}
 					}
@@ -554,6 +557,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + constCode
 		}
 		code += "\n"
+	}
+
+	/* Declare internal series for composite indicators using metadata discovery */
+	for _, taFunc := range g.taFunctions {
+		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", seriesName)
+		}
 	}
 
 	code += g.ind() + "// Series storage (ForwardSeriesBuffer paradigm)\n"
@@ -630,6 +641,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	if g.hasBarIndexUsage {
 		code += g.ind() + "bar_indexSeries = series.NewSeries(len(ctx.Data))\n"
+	}
+
+	/* Initialize internal series for composite indicators using metadata discovery */
+	for _, taFunc := range g.taFunctions {
+		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", seriesName)
+		}
 	}
 
 	if len(g.variables) > 0 {
@@ -799,6 +818,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	tempVarNextCalls := g.tempVarMgr.GenerateNextCalls()
 	if tempVarNextCalls != "" {
 		code += tempVarNextCalls
+	}
+
+	// Advance internal series for composite indicators
+	for _, taFunc := range g.taFunctions {
+		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, seriesName)
+		}
 	}
 
 	if len(g.hoistedArrowContexts) > 0 {
@@ -3116,10 +3143,19 @@ func (g *generator) generateRMA(varName string, period int, accessor AccessGener
 	return g.indentCode(builder.BuildRMA()), nil
 }
 
-// generateRSI generates inline RSI (Relative Strength Index) calculation
-// TODO: Implement RSI inline generation
+/* generateRSI generates inline RSI (Relative Strength Index) calculation
+ * RSI = 100 - 100/(1+RS) where RS = RMA(gains, period) / RMA(losses, period)
+ */
 func (g *generator) generateRSI(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	return "", fmt.Errorf("ta.rsi inline generation not yet implemented")
+	var context StatefulIndicatorContext
+	if g.inArrowFunctionBody {
+		context = NewArrowFunctionIndicatorContext()
+	} else {
+		context = NewTopLevelIndicatorContext()
+	}
+
+	builder := NewRSIIndicatorBuilder(varName, NewConstantPeriod(period), accessor, needsNaN, context)
+	return g.indentCode(builder.Build()), nil
 }
 
 // generateChange generates inline change calculation

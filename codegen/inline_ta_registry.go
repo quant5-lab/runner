@@ -41,6 +41,8 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	r.Register("ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
 	r.Register("ta.rma", &RMAIIFEGenerator{namingStrategy: statefulNamer})
 	r.Register("rma", &RMAIIFEGenerator{namingStrategy: statefulNamer})
+	r.Register("ta.rsi", &RSIIIFEGenerator{namingStrategy: statefulNamer})
+	r.Register("rsi", &RSIIIFEGenerator{namingStrategy: statefulNamer})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {
@@ -65,6 +67,8 @@ type SMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 type EMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type RMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
+type RSIIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type WMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
@@ -102,6 +106,17 @@ func (g *RMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 
 	builder := NewStatefulIndicatorBuilder("ta.rma", varName, period, accessor, false, context)
 	statefulCode := builder.BuildRMA()
+	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
+
+	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
+}
+
+func (g *RSIIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	context := NewArrowFunctionIndicatorContext()
+	varName := g.namingStrategy.GenerateName("rsi", period.AsSeriesNamePart(), sourceHash)
+
+	builder := NewRSIIndicatorBuilder(varName, period, accessor, false, context)
+	statefulCode := builder.Build()
 	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
 
 	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)

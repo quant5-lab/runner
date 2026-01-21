@@ -1,0 +1,27 @@
+//@version=5
+indicator("RSI Source Variations", overlay=false)
+
+// Test different price sources for RSI calculation
+
+// Test 1: RSI on close (standard)
+rsiClose = ta.rsi(close, 14)
+
+// Test 2: RSI on open
+rsiOpen = ta.rsi(open, 14)
+
+// Test 3: RSI on high
+rsiHigh = ta.rsi(high, 14)
+
+// Test 4: RSI on low
+rsiLow = ta.rsi(low, 14)
+
+// Test 5: RSI on volume (edge case)
+rsiVolume = ta.rsi(volume, 14)
+
+plot(rsiClose, "RSI Close", color=color.blue)
+plot(rsiOpen, "RSI Open", color=color.green)
+plot(rsiHigh, "RSI High", color=color.orange)
+plot(rsiLow, "RSI Low", color=color.red)
+plot(rsiVolume, "RSI Volume", color=color.purple)
+
+

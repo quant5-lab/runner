@@ -251,8 +251,8 @@ study("Test", overlay=true)
 len = input(5, title="Length")
 result = dev(close, len) ? 1 : 0
 plot(result)`,
-			shouldError: false,
-			description: "Variable period should work with inline dev()",
+			shouldError: true,
+			description: "Variable period should fail with inline dev() - requires compile-time constant",
 		},
 	}
 

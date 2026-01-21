@@ -1,0 +1,10 @@
+//@version=5
+indicator("RSI Calculation Test", overlay=false)
+
+rsi14 = ta.rsi(close, 14)
+rsi20 = ta.rsi(close, 20)
+rsi9 = ta.rsi(close, 9)
+
+plot(rsi14, "RSI 14", color=color.blue)
+plot(rsi20, "RSI 20", color=color.orange)
+plot(rsi9, "RSI 9", color=color.green)

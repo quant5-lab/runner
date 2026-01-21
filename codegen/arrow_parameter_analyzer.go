@@ -94,6 +94,7 @@ func isTAIndicatorFunction(funcName string) bool {
 		"stdev": true, "ta.stdev": true,
 		"highest": true, "ta.highest": true,
 		"lowest": true, "ta.lowest": true,
+		"rsi": true, "ta.rsi": true,
 	}
 	return taFunctions[funcName]
 }
