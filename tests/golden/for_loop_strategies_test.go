@@ -4,14 +4,32 @@ import (
 	"testing"
 )
 
-/* Simple Counter Strategy Tests - SKIP: Codegen limitation with non-arrow functions */
+/* Simple Counter Strategy Tests */
 
 func TestForLoopSimpleCounter_AAPL_1h(t *testing.T) {
-	t.Skip("Codegen limitation: Non-arrow function used in arrow context")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "Simple For Loop Counter",
+		StrategyFile: "test-for-loop-simple-counter.pine",
+		Symbol:       "AAPL",
+		Timeframe:    "1h",
+		DataFile:     "AAPL-1h.json",
+		GoldenFile:   "for_loop_simple_counter_aapl_1h.golden.json",
+	})
 }
 
 func TestForLoopSimpleCounter_BTCUSDT_1h(t *testing.T) {
-	t.Skip("Codegen limitation: Non-arrow function used in arrow context")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "Simple For Loop Counter",
+		StrategyFile: "test-for-loop-simple-counter.pine",
+		Symbol:       "BTCUSDT",
+		Timeframe:    "1h",
+		DataFile:     "BTCUSDT-1h.json",
+		GoldenFile:   "for_loop_simple_counter_btcusdt_1h.golden.json",
+	})
 }
 
 /* Moving Average Strategy Tests */
@@ -98,14 +116,32 @@ func TestForLoopCorrelation_BTCUSDT_1D(t *testing.T) {
 	})
 }
 
-/* Volatility Bands Strategy Tests - SKIP: Codegen limitation */
+/* Volatility Bands Strategy Tests */
 
 func TestForLoopVolatilityBands_AAPL_1h(t *testing.T) {
-	t.Skip("Codegen limitation: Complex nested for-loop with series operations")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "Custom Volatility Bands",
+		StrategyFile: "test-for-loop-volatility-bands.pine",
+		Symbol:       "AAPL",
+		Timeframe:    "1h",
+		DataFile:     "AAPL-1h.json",
+		GoldenFile:   "for_loop_volatility_bands_aapl_1h.golden.json",
+	})
 }
 
 func TestForLoopVolatilityBands_BTCUSDT_1h(t *testing.T) {
-	t.Skip("Codegen limitation: Complex nested for-loop with series operations")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "Custom Volatility Bands",
+		StrategyFile: "test-for-loop-volatility-bands.pine",
+		Symbol:       "BTCUSDT",
+		Timeframe:    "1h",
+		DataFile:     "BTCUSDT-1h.json",
+		GoldenFile:   "for_loop_volatility_bands_btcusdt_1h.golden.json",
+	})
 }
 
 /* Weighted Average Strategy Tests */
@@ -136,12 +172,30 @@ func TestForLoopWeightedAverage_BTCUSDT_1D(t *testing.T) {
 	})
 }
 
-/* Step Variations Strategy Tests - SKIP: Codegen limitation */
+/* Step Variations Strategy Tests */
 
 func TestForLoopStepVariations_AAPL_1h(t *testing.T) {
-	t.Skip("Codegen limitation: For-loop step variations not fully supported")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "For Loop Step Variations",
+		StrategyFile: "test-for-loop-step-variations.pine",
+		Symbol:       "AAPL",
+		Timeframe:    "1h",
+		DataFile:     "AAPL-1h.json",
+		GoldenFile:   "for_loop_step_variations_aapl_1h.golden.json",
+	})
 }
 
 func TestForLoopStepVariations_BTCUSDT_1h(t *testing.T) {
-	t.Skip("Codegen limitation: For-loop step variations not fully supported")
+	suite := NewTestSuite(t)
+
+	suite.RunTestFixtureAndValidate(t, TestConfig{
+		StrategyName: "For Loop Step Variations",
+		StrategyFile: "test-for-loop-step-variations.pine",
+		Symbol:       "BTCUSDT",
+		Timeframe:    "1h",
+		DataFile:     "BTCUSDT-1h.json",
+		GoldenFile:   "for_loop_step_variations_btcusdt_1h.golden.json",
+	})
 }
