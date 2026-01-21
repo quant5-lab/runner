@@ -42,14 +42,14 @@ plot(calc(3))
 				"aSeries := arrowCtx.GetOrCreateSeries(\"a\")",
 				"bSeries := arrowCtx.GetOrCreateSeries(\"b\")",
 				"cSeries := arrowCtx.GetOrCreateSeries(\"c\")",
-				"c := (cSeries.GetCurrent() + 1)",
-				"b := (bSeries.GetCurrent() + cSeries.GetCurrent())",
-				"a := (aSeries.GetCurrent() + bSeries.GetCurrent())",
+				"c = (cSeries.GetCurrent() + 1)",
+				"b = (bSeries.GetCurrent() + cSeries.GetCurrent())",
+				"a = (aSeries.GetCurrent() + bSeries.GetCurrent())",
 			},
 			forbiddenPattern: []string{
-				"c := (c + 1)", // Should use Series
-				"b := (b + c)", // Should use Series
-				"a := (a + b)", // Should use Series
+				"c := (c + 1)", // Should use = not :=
+				"b := (b + c)", // Should use = not :=
+				"a := (a + b)", // Should use = not :=
 			},
 			description: "three-level nested loops use Series at all levels",
 		},
@@ -93,12 +93,12 @@ plot(process(5))
 `,
 			mustContainAll: []string{
 				"sumSeries := arrowCtx.GetOrCreateSeries(\"sum\")",
-				"sum := (sumSeries.GetCurrent() + ",
-				"sum := (sumSeries.GetCurrent() - ",
+				"sum = (sumSeries.GetCurrent() + ",
+				"sum = (sumSeries.GetCurrent() - ",
 			},
 			forbiddenPattern: []string{
-				"sum := (sum +", // Should use Series
-				"sum := (sum -", // Should use Series
+				"sum := (sum +", // Should use = not :=
+				"sum := (sum -", // Should use = not :=
 			},
 			description: "same variable modified in multiple sequential loops uses Series",
 		},
@@ -121,10 +121,10 @@ plot(adjust(1))
 			mustContainAll: []string{
 				"offsetSeries := arrowCtx.GetOrCreateSeries(\"offset\")",
 				"resultSeries := arrowCtx.GetOrCreateSeries(\"result\")",
-				"result := (resultSeries.GetCurrent() + offset)",
+				"result = (resultSeries.GetCurrent() + offset)",
 			},
 			forbiddenPattern: []string{
-				"result := (result + offset)", // Should use Series for result
+				"result := (result + offset)", // Should use = not :=
 			},
 			description: "variables declared in if-statement before loop work correctly",
 		},
@@ -144,10 +144,11 @@ plot(calc(5))
 			mustContainAll: []string{
 				"totalSeries := arrowCtx.GetOrCreateSeries(\"total\")",
 				"tempSeries := arrowCtx.GetOrCreateSeries(\"temp\")",
-				"total := (totalSeries.GetCurrent() + temp)",
+				"total = (totalSeries.GetCurrent() + temp)",
 			},
 			forbiddenPattern: []string{
 				"temp := (tempSeries.GetCurrent()", // temp is loop-local, uses scalar
+				"total := (total",                  // Should use = not :=
 			},
 			description: "loop-local variable gets Series but uses scalar (not modified)",
 		},

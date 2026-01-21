@@ -54,14 +54,18 @@ func (s *ArrowStatementGenerator) generateVariableDeclaration(varDecl *ast.Varia
 	}
 
 	if id, ok := decl.ID.(*ast.Identifier); ok {
-		return s.generateSingleVariableDeclaration(id.Name, decl.Init)
+		operationType := OperationTypeFromASTKind(varDecl.Kind)
+		return s.generateSingleVariableDeclaration(id.Name, decl.Init, operationType)
 	}
 
 	return "", fmt.Errorf("unsupported variable declarator pattern: %T", decl.ID)
 }
 
-func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(varName string, initExpr ast.Expression) (string, error) {
-	// Register in symbol table as series (arrow function variables are always series)
+func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(
+	varName string,
+	initExpr ast.Expression,
+	operationType VariableOperationType,
+) (string, error) {
 	if s.symbolTable != nil {
 		s.symbolTable.Register(varName, VariableTypeSeries)
 	}
@@ -71,7 +75,7 @@ func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(varName stri
 		return "", fmt.Errorf("failed to generate init expression for '%s': %w", varName, err)
 	}
 
-	return s.localStorage.GenerateDualStorage(varName, exprCode), nil
+	return s.localStorage.GenerateScalarAndSeriesStorage(varName, exprCode, operationType), nil
 }
 
 func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.ArrayPattern, initExpr ast.Expression) (string, error) {

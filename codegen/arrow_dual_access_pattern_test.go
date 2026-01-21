@@ -720,7 +720,7 @@ plot(update(10))
 			expectedPattern: []string{
 				"value := initial",
 				"valueSeries.Set(value)",
-				"value := (value * 2)",
+				"value = (value * 2)",
 				"valueSeries.Set(value)",
 			},
 			description: "variable reassignment maintains dual-access pattern",

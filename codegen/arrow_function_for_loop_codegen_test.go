@@ -440,12 +440,12 @@ accumulate(len) =>
 plot(accumulate(10))
 `,
 			mustContainAll: []string{
-				"count := (countSeries.GetCurrent() + 1)", // Intermediate variable pattern
+				"count = (countSeries.GetCurrent() + 1)", // Reassignment uses =
 				"countSeries.Set(count)",
 				"return countSeries.GetCurrent()", // Returns from series
 			},
 			forbiddenPattern: []string{
-				"count := (count + 1)", // Should NOT read from scalar count
+				"count := (count + 1)", // Should NOT use := for reassignment
 			},
 			description: "loop-modified variable uses Series.GetCurrent() for reads",
 		},
@@ -467,12 +467,12 @@ plot(tally(20))
 `,
 			mustContainAll: []string{
 				"upsSeries.Set((upsSeries.GetCurrent() + 1))", // Inline pattern in if-body
-				"downs := (downsSeries.GetCurrent() + 1)",     // Intermediate variable in else
+				"downs = (downsSeries.GetCurrent() + 1)",      // Reassignment uses =
 				"downsSeries.Set(downs)",
 			},
 			forbiddenPattern: []string{
-				"ups := (ups + 1)",    // Should NOT read from scalar
-				"downs := (downs + 1", // Should NOT read from scalar (note: partial match to avoid Set line)
+				"ups := (ups + 1)",   // Should NOT use := for reassignment
+				"downs := (downs + ", // Should NOT use := for reassignment
 			},
 			description: "multiple loop-modified variables tracked independently",
 		},
@@ -515,15 +515,15 @@ plot(nested(5))
 `,
 			mustContainAll: []string{
 				"innerSeries := arrowCtx.GetOrCreateSeries(\"inner\")", // Inner var gets Series storage
-				"inner := float64(0)",                     // Scalar declaration
-				"innerSeries.Set(inner)",                  // Series storage
-				"inner := (innerSeries.GetCurrent() + 1)", // Loop-modified uses Series.GetCurrent()
-				"innerSeries.Set(inner)",                  // Update series
-				"outer := (outerSeries.GetCurrent()",      // Outer uses Series.GetCurrent()
+				"inner := float64(0)",                    // Scalar declaration
+				"innerSeries.Set(inner)",                 // Series storage
+				"inner = (innerSeries.GetCurrent() + 1)", // Reassignment uses =
+				"innerSeries.Set(inner)",                 // Update series
+				"outer = (outerSeries.GetCurrent()",      // Reassignment uses =
 				"outerSeries.Set(outer)",
 			},
 			forbiddenPattern: []string{
-				"inner := (inner + 1)", // Should NOT read from scalar in nested loop
+				"inner := (inner + 1)", // Should NOT use := for reassignment
 			},
 			description: "nested loop variables use Series when modified in inner loops",
 		},
