@@ -56,6 +56,11 @@ func (s *IdentifierSanitizer) walkNode(node ast.Node) {
 		if n.Alternate != nil {
 			s.walkNodes(n.Alternate)
 		}
+	case *ast.ForStatement:
+		s.walkExpression(n.From)
+		s.walkExpression(n.To)
+		s.walkExpression(n.Step)
+		s.walkNodes(n.Body)
 	}
 }
 
