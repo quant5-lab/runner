@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "For Loop Moving Average",
+  "dataSource": "BTCUSDT_1D.json",
+  "generatedAt": "2026-01-21T10:56:04Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

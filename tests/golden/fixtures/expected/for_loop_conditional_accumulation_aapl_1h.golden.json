@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "strategy": "Conditional Accumulation",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-01-21T10:56:04Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 85,
+        "entryTime": 1760977800,
+        "entryPrice": 263.4800109863281,
+        "entryComment": "",
+        "exitBar": 101,
+        "exitTime": 1761157800,
+        "exitPrice": 256.54998779296875,
+        "exitComment": "",
+        "size": 1,
+        "profit": -6.930023193359375,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [],
+    "equity": 9993.06997680664,
+    "netProfit": -6.930023193359375,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}
