@@ -25,7 +25,7 @@ func NewStrategyRunner(t *testing.T) *StrategyRunner {
 	}
 
 	return &StrategyRunner{
-		pineGenPath:   filepath.Join(workspaceRoot, "pine-gen"),
+		pineGenPath:   filepath.Join(workspaceRoot, "build", "pine-gen"),
 		workspaceRoot: workspaceRoot,
 		tempDir:       t.TempDir(),
 	}
