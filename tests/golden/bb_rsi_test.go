@@ -5,7 +5,6 @@ import (
 )
 
 func TestBBRSI_AAPL_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: strat.Equity undefined - see bb-rsi-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +18,6 @@ func TestBBRSI_AAPL_Hourly(t *testing.T) {
 }
 
 func TestBBRSI_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: strat.Equity undefined - see bb-rsi-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +31,6 @@ func TestBBRSI_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestBBRSI_SBERP_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: strat.Equity undefined - see bb-rsi-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
