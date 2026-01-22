@@ -2896,47 +2896,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		}
 		return fmt.Sprintf("%s%s", op, operand)
 	case *ast.CallExpression:
-		funcName := g.extractFunctionName(e.Callee)
-
-		existingVar := g.tempVarMgr.GetVarNameForCall(e)
-		if existingVar != "" {
-			return fmt.Sprintf("%sSeries.GetCurrent()", existingVar)
-		}
-
-		/* Inline value functions generate direct code, not Series variables */
-		if g.valueHandler != nil && g.valueHandler.CanHandle(funcName) {
-			inlineCode, err := g.valueHandler.GenerateInlineCall(funcName, e.Arguments, g)
-			if err != nil {
-				return "0.0"
-			}
-			return inlineCode
-		}
-
-		if (strings.HasPrefix(funcName, "math.") ||
-			funcName == "max" || funcName == "min" || funcName == "abs" ||
-			funcName == "sqrt" || funcName == "floor" || funcName == "ceil" ||
-			funcName == "round" || funcName == "log" || funcName == "exp") && g.mathHandler != nil {
-			mathCode, err := g.mathHandler.GenerateMathCall(funcName, e.Arguments, g)
-			if err != nil {
-				return "0.0"
-			}
-			return mathCode
-		}
-
-		/* User-defined arrow functions need proper call generation */
-		detector := NewUserDefinedFunctionDetector(g.variables)
-		if detector.IsUserDefinedFunction(funcName) {
-			ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
-			argStrings := []string{ctxVarName}
-			for _, arg := range e.Arguments {
-				argCode := g.extractSeriesExpression(arg)
-				argStrings = append(argStrings, argCode)
-			}
-			return fmt.Sprintf("%s(%s)", funcName, strings.Join(argStrings, ", "))
-		}
-
-		varName := strings.ReplaceAll(funcName, ".", "_")
-		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
+		return g.extractCallExpression(e)
 	}
 	return "0.0"
 }
