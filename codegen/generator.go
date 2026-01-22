@@ -2923,6 +2923,18 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return mathCode
 		}
 
+		/* User-defined arrow functions need proper call generation */
+		detector := NewUserDefinedFunctionDetector(g.variables)
+		if detector.IsUserDefinedFunction(funcName) {
+			ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
+			argStrings := []string{ctxVarName}
+			for _, arg := range e.Arguments {
+				argCode := g.extractSeriesExpression(arg)
+				argStrings = append(argStrings, argCode)
+			}
+			return fmt.Sprintf("%s(%s)", funcName, strings.Join(argStrings, ", "))
+		}
+
 		varName := strings.ReplaceAll(funcName, ".", "_")
 		return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 	}

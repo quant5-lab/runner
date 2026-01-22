@@ -102,12 +102,14 @@ result = left(5) + right(10)
 			mustContain: []string{
 				"arrowCtx_left_1 := context.NewArrowContext(ctx)",
 				"arrowCtx_right_1 := context.NewArrowContext(ctx)",
-				"leftSeries.GetCurrent()",
-				"rightSeries.GetCurrent()",
+				"left(arrowCtx_left_1, 5)",
+				"right(arrowCtx_right_1, 10)",
 			},
 			mustNotContain: []string{
 				"left(ctx,",
 				"right(ctx,",
+				"leftSeries.GetCurrent()",
+				"rightSeries.GetCurrent()",
 			},
 			description: "binary expression operands use correct contexts",
 		},
