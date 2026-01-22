@@ -270,15 +270,15 @@ func (b *TAIndicatorBuilder) BuildEMA() string {
 	// Subsequent bars: use previous EMA for proper stateful calculation
 	code += b.indenter.Line(fmt.Sprintf("alpha := 2.0 / float64(%d+1)", b.period))
 	code += b.indenter.Line(fmt.Sprintf("prevEMA := %s", b.seriesStrategy.GenerateGet(b.varName, 1)))
+
+	currentAccess := b.loopGen.accessor.GenerateCurrentValueAccess()
+
 	code += b.indenter.Line("if math.IsNaN(prevEMA) {")
 	b.indenter.IncreaseIndent()
-	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, currentAccess))
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
-
-	// Get current value for EMA calculation
-	currentAccess := b.loopGen.accessor.GenerateCurrentValueAccess()
 	if b.loopGen.RequiresNaNCheck() {
 		code += b.indenter.Line(fmt.Sprintf("val := %s", currentAccess))
 		code += b.indenter.Line("if math.IsNaN(val) {")

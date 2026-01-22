@@ -191,7 +191,8 @@ func TestStatefulIndicatorBuilder_NaNPropagation(t *testing.T) {
 				"val := ",
 				"if math.IsNaN(val)",
 				"break", // Break loop on NaN (not return which exits function)
-				"if math.IsNaN(currentSource) || math.IsNaN(previousValue)",
+				"if math.IsNaN(currentSource)",
+				"else if math.IsNaN(previousValue)",
 			},
 			shouldNotHave: []string{},
 		},

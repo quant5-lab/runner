@@ -100,8 +100,11 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 	})
 
 	t.Run("HasNaNCheckInRecursivePhase", func(t *testing.T) {
-		if !strings.Contains(code, "if math.IsNaN(currentSource) || math.IsNaN(previousValue)") {
-			t.Error("Missing NaN check for current and previous values")
+		if !strings.Contains(code, "if math.IsNaN(currentSource)") {
+			t.Error("Missing NaN check for current source")
+		}
+		if !strings.Contains(code, "else if math.IsNaN(previousValue)") {
+			t.Error("Missing NaN recovery check for previous value")
 		}
 	})
 }
