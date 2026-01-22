@@ -10,8 +10,7 @@
 | 2 | ☐ | **Bollinger Bands + RSI** | Medium | Band breakout + RSI filter, mean reversion | [GitHub](https://github.com/everget/tradingview-pinescript-indicators) |
 | 3 | ☐ | **MACD Crossover Strategy** | Low | Signal line crossover, histogram divergence | [GitHub](https://github.com/Alorse/pinescript-strategies) |
 | 4 | ☐ | **EMA Crossover (Triple EMA)** | Low | 3 EMA cross system, trend confirmation | [GitHub](https://github.com/800cherries/Tradingview-Indicators) |
-| 5 | ☐ | **Ichimoku Cloud Strategy** | High | Cloud breakout, TK cross, Chikou confirmation | [GitHub](https://github.com/everget/tradingview-pinescript-indicators) |
-| 6 | ☐ | **ADX + DI Strategy** | Medium | Trend strength filter, +DI/-DI crossover | [GitHub](https://github.com/Alorse/pinescript-strategies) |
+| 5 | ☐ | **ADX + DI Strategy** | Medium | Trend strength filter, +DI/-DI crossover | [GitHub](https://github.com/Alorse/pinescript-strategies) |
 | 7 | ☐ | **RSI Divergence Strategy** | Medium | Bull/bear divergence detection | [GitHub](https://github.com/just-nilux/awesome-tradingview) |
 | 8 | ☐ | **Supply & Demand Zones** | High | Institutional zone detection, order blocks | [GitHub](https://github.com/800cherries/Tradingview-Indicators) |
 | 9 | ☐ | **Volume Weighted Strategy** | Medium | VWAP deviation, volume confirmation | [GitHub](https://github.com/everget/tradingview-pinescript-indicators) |
@@ -72,7 +71,6 @@
 | ☐ | Bollinger Bands | https://www.tradingview.com/scripts/bollingerbands/ |
 | ☐ | MACD | https://www.tradingview.com/scripts/macd/ |
 | ☐ | RSI | https://www.tradingview.com/scripts/relativestrengthindex/ |
-| ☐ | Ichimoku | https://www.tradingview.com/scripts/ichimoku/ |
 | ☐ | Moving Average | https://www.tradingview.com/scripts/movingaverage/ |
 | ☐ | Volume Profile | https://www.tradingview.com/scripts/volumeprofile/ |
 | ☐ | ADX | https://www.tradingview.com/scripts/adx/ |
@@ -130,7 +128,6 @@ Phase 2: Intermediate Strategies
 ☐ Volume Weighted (#9)
 
 Phase 3: Advanced Strategies
-☐ Ichimoku Cloud (#5)
 ☐ Supply & Demand Zones (#8)
 ☐ Keltner Squeeze (#10)
 ☐ MTF Confirmation (#12)

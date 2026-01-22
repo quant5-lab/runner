@@ -38,9 +38,9 @@ func TestTupleDestructuringUnimplementedFunctions(t *testing.T) {
 		{
 			name:          "five-value function",
 			varNames:      []string{"v1", "v2", "v3", "v4", "v5"},
-			funcName:      "ichimoku",
+			funcName:      "multi_output_indicator",
 			expectedCount: 5,
-			description:   "complex indicator: ichimoku returns 5 values",
+			description:   "complex indicator: returns 5 values",
 		},
 		{
 			name:          "single-value in tuple",
