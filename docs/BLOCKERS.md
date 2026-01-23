@@ -26,4 +26,6 @@
 | **25** | **Codegen** | Color constants treated as Series | ✅ **VALID** | Parse✅ Generate✅ Compile❌. `color.lime`, `color.white` generate `colorSeries.Get(0)` instead of color constants. Blocks keltner-squeeze.pine |
 | **26** | **Codegen** | input.float treated as Series | ✅ **VALID** | Parse✅ Generate✅ Compile❌. `input.float(1.2, ...)` generates `input_floatSeries.GetCurrent()` instead of constant. Blocks keltner-squeeze.pine |
 | **27** | **Codegen** | Crossover literal integer type conversion | ✅ **VALID** | Parse✅ Generate✅ Compile❌. `ta.crossover(rsi, 30)` generates type mismatch: `float64 > int` and `float64 <= int`. Needs float64() cast. Blocks keltner-squeeze.pine |
+| **28** | **Lexer** | Indentation + nested control flow | ✅ **FIXED** | Nested `if`/`for`/`=>` as first statement in block parse correctly. `IndentationLexer` re-checks control keywords after INDENT emission. Tests: 10 parser unit tests + integration test with 19 nesting patterns. |
+| **29** | **Parser** | Tab/space mixing blocker | ✅ **FIXED** | `ExpandTabs()` converts tabs→spaces before parsing. Lexer character-position tracking now matches visual indentation. Tests: 23 unit tests (TestExpandTabs) + parser integration tests. TradingView parity achieved. |
 

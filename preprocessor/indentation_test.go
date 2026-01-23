@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-/* Test IfBlockNormalizer functionality */
-
 func TestNormalizeIfBlocks_SingleLineConditionSingleBody(t *testing.T) {
 	input := `x = 1
 if close > open

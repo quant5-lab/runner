@@ -101,6 +101,11 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 			continue
 		}
 
+		// Skip comments - don't process their indentation
+		if commentType, exists := l.symbols["Comment"]; exists && token.Type == commentType {
+			return token, nil
+		}
+
 		tokenValue := token.Value
 
 		if l.isControlFlowKeyword(tokenValue) {
@@ -122,7 +127,11 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 					Pos:  token.Pos,
 				})
 				l.pending = append(l.pending, token)
-				l.expectingIndent = false // Reset after emitting INDENT
+				l.expectingIndent = false
+				// Re-check if the pending token itself requires indentation
+				if l.isControlFlowKeyword(token.Value) {
+					l.expectingIndent = true
+				}
 				continue
 			}
 

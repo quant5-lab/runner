@@ -33,14 +33,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Pre-parse transformation: Convert V4 input(..., type=input.X) to V5 input.X()
 	sourceStr := string(sourceContent)
+	sourceStr = preprocessor.ExpandTabs(sourceStr)
+
 	pineVersion := detectPineVersion(sourceStr)
 	if pineVersion < 5 {
 		sourceStr = transformInputTypeParameters(sourceStr)
 	}
 
-	// Normalize indented if blocks for parser (parser limitation workaround)
 	sourceStr = preprocessor.NormalizeIfBlocks(sourceStr)
 
 	pineParser, err := parser.NewParser()
