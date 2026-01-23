@@ -1432,6 +1432,14 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 
 	case *ast.CallExpression:
+		if hoistedVarName := g.tempVarMgr.GetVarNameForCall(e); hoistedVarName != "" {
+			code := hoistedVarName + "Series.GetCurrent()"
+			if g.boolConverter.IsBooleanFunction(e) {
+				code = "value.IsTrue(" + code + ")"
+			}
+			return code, nil
+		}
+
 		funcName := g.extractFunctionName(e.Callee)
 
 		/* Delegate to inline condition handler registry */

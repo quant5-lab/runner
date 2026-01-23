@@ -118,13 +118,14 @@ plot(h1)`,
 			mustContain: []string{
 				"h1Series.Set",
 				"value.IsTrue",
-				"ctx.BarIndex < length-1",
+				"dev_",
+				"GetCurrent()",
 				"math.NaN()",
 			},
 			mustNotContain: []string{
 				"undefined:",
 			},
-			description: "IIFE with < operator gets != 0 at call site",
+			description: "dev() function in ternary generates valid code",
 		},
 	}
 
@@ -513,5 +514,295 @@ plot(result1 + result2 + result3 + result4 + result5)`
 	// Assignment context should store value without conversion
 	if !strings.Contains(code, "dSeries.Set") {
 		t.Error("Expected d variable assignment")
+	}
+}
+
+/* TestTAFunctionsInTernaryBranches validates TA function calls within ternary expression branches */
+func TestTAFunctionsInTernaryBranches(t *testing.T) {
+	tests := []struct {
+		name           string
+		script         string
+		mustContain    []string
+		mustNotContain []string
+		description    string
+	}{
+		{
+			name: "single TA function in ternary branches",
+			script: `//@version=5
+indicator("Test")
+period = input.int(10)
+mode = input.int(1)
+ma = mode == 1 ? ta.sma(close, period) : ta.ema(close, period)
+plot(ma)`,
+			mustContain: []string{
+				"maSeries.Set",
+				"func() float64 {",
+				".GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+				"undefined:",
+			},
+			description: "TA functions in ternary branches generate successfully",
+		},
+		{
+			name: "nested ternary with multiple TA functions",
+			script: `//@version=5
+indicator("Test")
+period = input.int(10)
+mode = input.int(1)
+ma = mode == 1 ? ta.sma(close, period) : (mode == 2 ? ta.ema(close, period) : ta.rma(close, period))
+plot(ma)`,
+			mustContain: []string{
+				"maSeries.Set",
+				"func() float64 {",
+				".GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "Nested ternaries with TA functions handle all branches",
+		},
+		{
+			name: "mixed TA and builtin in ternary",
+			script: `//@version=5
+indicator("Test")
+useTA = input.bool(true)
+val = useTA ? ta.sma(close, 10) : close
+plot(val)`,
+			mustContain: []string{
+				"valSeries.Set",
+				"func() float64 {",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "Ternary with TA function and builtin series",
+		},
+		{
+			name: "TA functions with different argument types",
+			script: `//@version=5
+indicator("Test")
+src = input.source(close)
+len1 = input.int(10)
+len2 = input.int(20)
+mode = input.bool(true)
+result = mode ? ta.sma(src, len1) : ta.ema(src, len2)
+plot(result)`,
+			mustContain: []string{
+				"resultSeries.Set",
+				".GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "TA functions with input parameters in ternary",
+		},
+		{
+			name: "chained ternaries with TA functions",
+			script: `//@version=5
+indicator("Test")
+period = input.int(10)
+ma1 = ta.sma(close, period)
+ma2 = ta.ema(close, period)
+condition1 = input.bool(true)
+condition2 = input.bool(false)
+result = condition1 ? ma1 : condition2 ? ma2 : close
+plot(result)`,
+			mustContain: []string{
+				"resultSeries.Set",
+				"func() float64 {",
+			},
+			mustNotContain: []string{
+				"undefined:",
+			},
+			description: "Chained ternaries reference TA-derived series",
+		},
+		{
+			name: "TA function in ternary test condition",
+			script: `//@version=5
+indicator("Test")
+period = input.int(10)
+vol_ma = ta.sma(volume, period)
+signal = volume > vol_ma ? 1.0 : 0.0
+plot(signal)`,
+			mustContain: []string{
+				"signalSeries.Set",
+				"vol_maSeries.GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "TA function result used in ternary test condition",
+		},
+		{
+			name: "TA functions with constants in ternary",
+			script: `//@version=5
+indicator("Test")
+useDefault = input.bool(true)
+ma = useDefault ? ta.sma(close, 20) : ta.ema(close, 10)
+plot(ma)`,
+			mustContain: []string{
+				"maSeries.Set",
+				".GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "TA functions with constant periods in ternary",
+		},
+		{
+			name: "complex expression with TA in ternary",
+			script: `//@version=5
+indicator("Test")
+period = input.int(10)
+multiplier = input.float(2.0)
+mode = input.bool(true)
+result = mode ? ta.sma(close, period) * multiplier : ta.ema(close, period) / multiplier
+plot(result)`,
+			mustContain: []string{
+				"resultSeries.Set",
+				".GetCurrent()",
+			},
+			mustNotContain: []string{
+				"unsupported inline function",
+			},
+			description: "TA functions in arithmetic expressions within ternary branches",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := parser.NewParser()
+			if err != nil {
+				t.Fatalf("Failed to create parser: %v", err)
+			}
+
+			parseResult, err := p.ParseBytes("test.pine", []byte(tt.script))
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+
+			converter := parser.NewConverter()
+			program, err := converter.ToESTree(parseResult)
+			if err != nil {
+				t.Fatalf("Conversion failed: %v", err)
+			}
+
+			result, err := GenerateStrategyCodeFromAST(program)
+			if err != nil {
+				t.Fatalf("Code generation failed: %v\nScript: %s", err, tt.script)
+			}
+
+			code := result.FunctionBody
+
+			for _, pattern := range tt.mustContain {
+				if !strings.Contains(code, pattern) {
+					t.Errorf("%s\nMissing pattern: %q\nGenerated code length: %d bytes",
+						tt.description, pattern, len(code))
+				}
+			}
+
+			for _, pattern := range tt.mustNotContain {
+				if strings.Contains(code, pattern) {
+					t.Errorf("%s\nFound forbidden pattern: %q",
+						tt.description, pattern)
+				}
+			}
+		})
+	}
+}
+
+/* TestTAFunctionsInTernaryEdgeCases validates boundary conditions and error handling */
+func TestTAFunctionsInTernaryEdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		script      string
+		shouldError bool
+		description string
+	}{
+		{
+			name: "ternary with same TA function different params",
+			script: `//@version=5
+indicator("Test")
+len1 = input.int(10)
+len2 = input.int(20)
+mode = input.bool(true)
+ma = mode ? ta.sma(close, len1) : ta.sma(close, len2)
+plot(ma)`,
+			shouldError: false,
+			description: "Same TA function with different period parameters",
+		},
+		{
+			name: "ternary with ta.crossover result",
+			script: `//@version=5
+indicator("Test")
+fast = ta.sma(close, 10)
+slow = ta.sma(close, 20)
+cross_up = ta.crossover(fast, slow)
+cross_down = ta.crossunder(fast, slow)
+signal = cross_up ? 1.0 : cross_down ? -1.0 : 0.0
+plot(signal)`,
+			shouldError: false,
+			description: "Ternary with boolean TA functions (crossover/crossunder)",
+		},
+		{
+			name: "ternary with ta.change in test",
+			script: `//@version=5
+indicator("Test")
+delta = ta.change(close)
+direction = delta > 0 ? 1.0 : delta < 0 ? -1.0 : 0.0
+plot(direction)`,
+			shouldError: false,
+			description: "ta.change result used in nested ternary conditions",
+		},
+		{
+			name: "deeply nested ternary with TA functions",
+			script: `//@version=5
+indicator("Test")
+mode = input.int(1)
+period = input.int(10)
+ma = mode == 1 ? ta.sma(close, period) : 
+     mode == 2 ? ta.ema(close, period) : 
+     mode == 3 ? ta.rma(close, period) : 
+     ta.wma(close, period)
+plot(ma)`,
+			shouldError: false,
+			description: "Deeply nested ternary (4 levels) with different TA functions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := parser.NewParser()
+			if err != nil {
+				t.Fatalf("Failed to create parser: %v", err)
+			}
+
+			parseResult, err := p.ParseBytes("test.pine", []byte(tt.script))
+			if err != nil {
+				if !tt.shouldError {
+					t.Fatalf("Parse failed unexpectedly: %v", err)
+				}
+				return
+			}
+
+			converter := parser.NewConverter()
+			program, err := converter.ToESTree(parseResult)
+			if err != nil {
+				if !tt.shouldError {
+					t.Fatalf("Conversion failed unexpectedly: %v", err)
+				}
+				return
+			}
+
+			_, err = GenerateStrategyCodeFromAST(program)
+			if tt.shouldError && err == nil {
+				t.Errorf("%s: Expected error but code generation succeeded", tt.description)
+			}
+			if !tt.shouldError && err != nil {
+				t.Errorf("%s: Code generation failed unexpectedly: %v", tt.description, err)
+			}
+		})
 	}
 }

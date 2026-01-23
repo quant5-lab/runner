@@ -11,7 +11,8 @@
 | **9** | **Codegen** | `alertcondition()` function | ✅ **VALID** | Generates TODO comment only. Not implemented |
 | **10** | **Codegen** | String functions (`str.*`) | ✅ **VALID** | `str.tostring()`, `str.tonumber()`, `str.split()` generate TODO comments |
 | **11** | **Runtime** | Multi-symbol security() | ✅ **VALID** | Parse✅ Generate✅ Compile✅ Execute❌. Requires data files for multiple symbols |
-| **12** | **Parser** | `input()` type parameter syntax | ✅ **VALID** | Parse❌: "unexpected token ',' at line 5:54". Blocks adx-di-strategy.pine |
+| **12** | **Parser** | `input()` type parameter syntax | ✅ **FIXED** | v4→v5 preprocessing now handles `type=input.string`, `type=input.source`, `type=input.float`. Parse✅ |
+| **13** | **Codegen** | Ternary with TA function calls | ✅ **FIXED** | generateConditionExpression hoisted var lookup. Parse✅ Generate✅. `ma1Type == "EMA" ? ema(src, ma1Len) : sma(src, ma1Len)` compiles. Tests: 12 regression cases. |
 | **14** | **Codegen** | TA member expression arguments | ✅ **FIXED** | Derived price builtins (hl2, hlc3, ohlc4, hlcc4) supported in TA function arguments. DerivedPriceAccessor generates inline calculations with offset support. Tested: `ta.ema(hl2, 10)`, `ta.ema(hl2[1], 10)`, `ta.ema(hl2 + hlc3, 10)` compile ✅ |
 | **15** | **Codegen** | `ta.crossover()` CallExpression requirement | ✅ **FIXED** | Crossover/crossunder now supports variable arguments (Identifier, MemberExpression, etc.) |
 | **16** | **Codegen** | `ta.crossover()` incorrect previous bar access | ✅ **FIXED** | IIFE now uses .Get(1) for previous bar access. Crossover detection working correctly. |
