@@ -55,6 +55,12 @@ func (cr *PineConstantRegistry) registerColorConstants() {
 	cr.register("color.white", NewStringConstant("#FFFFFF"))
 	cr.register("color.lime", NewStringConstant("#00FF00"))
 	cr.register("color.teal", NewStringConstant("#008080"))
+	cr.register("color.maroon", NewStringConstant("#800000"))
+	cr.register("color.fuchsia", NewStringConstant("#FF00FF"))
+	cr.register("color.aqua", NewStringConstant("#00FFFF"))
+	cr.register("color.navy", NewStringConstant("#000080"))
+	cr.register("color.olive", NewStringConstant("#808000"))
+	cr.register("color.silver", NewStringConstant("#C0C0C0"))
 }
 
 func (cr *PineConstantRegistry) registerPlotConstants() {

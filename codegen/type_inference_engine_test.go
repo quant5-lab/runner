@@ -399,3 +399,170 @@ func TestTypeInferenceEngine_MultipleVariables(t *testing.T) {
 		})
 	}
 }
+
+func TestTypeInferenceEngine_InferType_ColorMemberExpression(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     *ast.MemberExpression
+		expected string
+	}{
+		{
+			name: "color.red returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "red"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.lime returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "lime"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.blue returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "blue"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.maroon returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "maroon"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.fuchsia returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "fuchsia"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.aqua returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "aqua"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.navy returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "navy"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.olive returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "olive"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.silver returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "silver"},
+			},
+			expected: "string",
+		},
+		{
+			name: "strategy.long returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "long"},
+			},
+			expected: "string",
+		},
+		{
+			name: "ta.sma returns float64",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "sma"},
+			},
+			expected: "float64",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewTypeInferenceEngine()
+			result := engine.InferType(tt.expr)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTypeInferenceEngine_InferType_ColorConditionalExpression(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     *ast.ConditionalExpression
+		expected string
+	}{
+		{
+			name: "conditional with color branches returns string",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Identifier{Name: "open"},
+				},
+				Consequent: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "lime"},
+				},
+				Alternate: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "red"},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "nested conditional with color branches returns string",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.Identifier{Name: "cond1"},
+				Consequent: &ast.ConditionalExpression{
+					Test: &ast.Identifier{Name: "cond2"},
+					Consequent: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "lime"},
+					},
+					Alternate: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "maroon"},
+					},
+				},
+				Alternate: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "red"},
+				},
+			},
+			expected: "string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewTypeInferenceEngine()
+			result := engine.InferType(tt.expr)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}

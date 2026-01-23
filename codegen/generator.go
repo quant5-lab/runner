@@ -159,6 +159,10 @@ func (g *generator) buildPlotOptions(opts PlotOptions) string {
 	if opts.ColorExpr != nil {
 		if colorValue := g.evaluateStringConstant(opts.ColorExpr); colorValue != "" {
 			optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %q", colorValue))
+		} else if ident, ok := opts.ColorExpr.(*ast.Identifier); ok {
+			if varType, exists := g.variables[ident.Name]; exists && varType == "string" {
+				optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %s", ident.Name))
+			}
 		}
 	}
 
@@ -1822,6 +1826,24 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 
 func (g *generator) generateStringExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
+	case *ast.ConditionalExpression:
+		condCode, err := g.generateConditionExpression(e.Test)
+		if err != nil {
+			return "", err
+		}
+		condCode = g.addBoolConversionIfNeeded(e.Test, condCode)
+
+		consequentCode, err := g.generateStringExpression(e.Consequent)
+		if err != nil {
+			return "", err
+		}
+		alternateCode, err := g.generateStringExpression(e.Alternate)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("func() string { if %s { return %s } else { return %s } }()",
+			condCode, consequentCode, alternateCode), nil
+
 	case *ast.MemberExpression:
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			if obj.Name == "strategy" {
@@ -1832,6 +1854,12 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 					if prop.Name == "short" {
 						return "strategy.Short", nil
 					}
+				}
+			}
+			if obj.Name == "color" {
+				resolver := NewConstantResolver()
+				if colorValue, ok := resolver.ResolveToString(e); ok {
+					return fmt.Sprintf("%q", colorValue), nil
 				}
 			}
 		}

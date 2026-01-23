@@ -648,6 +648,78 @@ func TestConstantResolver_StringResolution(t *testing.T) {
 			shouldOk: true,
 		},
 		{
+			name: "color.lime",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "lime"},
+			},
+			expected: "#00FF00",
+			shouldOk: true,
+		},
+		{
+			name: "color.blue",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "blue"},
+			},
+			expected: "#0000FF",
+			shouldOk: true,
+		},
+		{
+			name: "color.maroon",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "maroon"},
+			},
+			expected: "#800000",
+			shouldOk: true,
+		},
+		{
+			name: "color.fuchsia",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "fuchsia"},
+			},
+			expected: "#FF00FF",
+			shouldOk: true,
+		},
+		{
+			name: "color.aqua",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "aqua"},
+			},
+			expected: "#00FFFF",
+			shouldOk: true,
+		},
+		{
+			name: "color.navy",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "navy"},
+			},
+			expected: "#000080",
+			shouldOk: true,
+		},
+		{
+			name: "color.olive",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "olive"},
+			},
+			expected: "#808000",
+			shouldOk: true,
+		},
+		{
+			name: "color.silver",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "silver"},
+			},
+			expected: "#C0C0C0",
+			shouldOk: true,
+		},
+		{
 			name: "strategy.cash",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "strategy"},

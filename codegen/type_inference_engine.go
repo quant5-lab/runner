@@ -65,6 +65,9 @@ func (te *TypeInferenceEngine) inferMemberExpressionType(e *ast.MemberExpression
 				}
 			}
 		}
+		if obj.Name == "color" {
+			return "string"
+		}
 	}
 	return "float64"
 }
