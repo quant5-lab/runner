@@ -1,6 +1,6 @@
-Codegen limitation: arrow function return value Series declaration
+Codegen limitation: input.float treated as Series + crossover literal type conversion
 
 Parse: ✅ Success
 Generate: ✅ Success
-Compile: ❌ Fails (undefined: bbandSeries, keltnerSeries, colorSeries, input_floatSeries; type mismatches in crossover)
+Compile: ❌ Fails (undefined: input_floatSeries; type mismatches in crossover float64 vs int)
 Execute: ❌ Not reached
