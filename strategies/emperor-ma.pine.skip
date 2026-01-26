@@ -1,0 +1,6 @@
+Parse limitation: for-loop assignment syntax not supported (#10)
+
+Parse: ❌ (unexpected token "=" expected <dedent>)
+Generate: ❌ Not reached
+Compile: ❌ Not reached
+Execute: ❌ Not reached

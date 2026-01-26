@@ -11,6 +11,7 @@ type callExtractor func(call *ast.CallExpression) string
 
 func (g *generator) extractCallExpression(call *ast.CallExpression) string {
 	extractors := []callExtractor{
+		g.extractInputConstant,
 		g.extractTempVariable,
 		g.extractValueFunction,
 		g.extractMathFunction,
@@ -101,4 +102,15 @@ func (g *generator) extractDefaultSeries(call *ast.CallExpression) string {
 	funcName := g.extractFunctionName(call.Callee)
 	varName := strings.ReplaceAll(funcName, ".", "_")
 	return fmt.Sprintf("%sSeries.GetCurrent()", varName)
+}
+
+func (g *generator) extractInputConstant(call *ast.CallExpression) string {
+	if call == nil {
+		return ""
+	}
+	funcName := g.extractFunctionName(call.Callee)
+	if g.inputConstExtractor == nil {
+		return ""
+	}
+	return g.inputConstExtractor.ExtractInputConstant(call, funcName)
 }

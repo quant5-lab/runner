@@ -1,0 +1,6 @@
+Compile limitation: security import not generated (#18)
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅
+Compile: ❌ (undefined: security)
+Execute: ❌ Not reached

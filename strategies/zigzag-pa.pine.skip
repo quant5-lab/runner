@@ -1,0 +1,6 @@
+Codegen limitation: Arrow function nz() call not supported
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ❌ (unhandled call expression: nz in arrow function)
+Compile: ❌ Not reached
+Execute: ❌ Not reached

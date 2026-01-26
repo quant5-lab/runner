@@ -1,0 +1,6 @@
+Codegen limitation: Arrow function security() call not supported
+
+Parse: ✅ (v5)
+Generate: ❌ (unhandled call expression: security in arrow function)
+Compile: ❌ Not reached
+Execute: ❌ Not reached

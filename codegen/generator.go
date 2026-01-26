@@ -44,6 +44,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	}
 
 	gen.inputHandler = NewInputHandler()
+	gen.inputConstExtractor = NewInputConstantExtractor()
 	gen.mathHandler = NewMathHandler()
 	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
@@ -122,6 +123,7 @@ type generator struct {
 	registryGuard    *VariableRegistryGuard
 
 	inputHandler               *InputHandler
+	inputConstExtractor        *InputConstantExtractor
 	mathHandler                *MathHandler
 	valueHandler               *ValueHandler
 	subscriptResolver          *SubscriptResolver
