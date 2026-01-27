@@ -12,7 +12,7 @@
 | **10** | **Parser** | For-loop assignment outside var/variable | VALID | Parse error: "unexpected token =" at `gx = for i = 1 to per-1` | emperor-ma.pine |
 | **11** | **Codegen** | Array/map functions | VALID | `array.new_float()`, `array.push()`, `array.get()`, `map.*` not implemented | pivot-reversal.pine |
 | **12** | **Codegen** | Drawing objects (`line.*`, `label.*`) | VALID | Not implemented | pivot-reversal.pine |
-| **13** | **Codegen** | `input.string` ternary references Series | VALID | Generates `const ma1Type` but code uses `ma1TypeSeries.GetCurrent()` | adx-di-strategy.pine |
+| **13** | **Codegen** | `input.string` ternary references Series | FIXED | Now: `ma1Type == "EMA"` (scalar). Was: `ma1TypeSeries.GetCurrent()` | adx-di-strategy.pine |
 | **14** | **Codegen** | `heikinashi()` function | VALID | Generates TODO comment, function not implemented | utbot-quantnomad.pine |
 | **15** | **Codegen** | `alert()` function | VALID | Not implemented | - |
 | **16** | **Codegen** | `alertcondition()` function | VALID | Not implemented | - |
@@ -23,3 +23,4 @@
 | **21** | **Codegen** | `input.timeframe` not implemented | VALID | No handler in input_handler.go | - |
 | **22** | **Codegen** | `input.symbol` not implemented | VALID | No handler in input_handler.go | - |
 | **23** | **Runtime** | Arrow function SMA/STDEV missing bounds check | VALID | `ctx.Data[ctx.BarIndex-j]` crashes when BarIndex < length | keltner-squeeze.pine |
+| **24** | **Codegen** | `input(boolLiteral)` v4 syntax not recognized | VALID | Generates `// TODO: implement` instead of `const showLong = true` | adx-di-strategy.pine |

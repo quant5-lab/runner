@@ -1,6 +1,6 @@
-Compile limitation: input.float treated as Series (#26), string variable comparison
+FIXED: input.string constant registration (#13)
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅ (ternary+TA fixed #13)
-Compile: ❌ (undefined: ma1TypeSeries, ma2TypeSeries, input_floatSeries)
-Execute: ❌ Not reached
+Compile: ✅ (input.string constants now registered)
+Execute: ✅ Strategy runs successfully

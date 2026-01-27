@@ -449,11 +449,23 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 							continue
 						}
 						if funcName == "input.string" {
-							g.inputHandler.GenerateInputString(callExpr, varName)
+							code, _ := g.inputHandler.GenerateInputString(callExpr, varName)
+							if code != "" {
+								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
+									g.constants[varName] = val
+									g.constantRegistry.Register(varName, val)
+								}
+							}
 							continue
 						}
 						if funcName == "input.session" {
-							g.inputHandler.GenerateInputSession(callExpr, varName)
+							code, _ := g.inputHandler.GenerateInputSession(callExpr, varName)
+							if code != "" {
+								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
+									g.constants[varName] = val
+									g.constantRegistry.Register(varName, val)
+								}
+							}
 							continue
 						}
 					}
