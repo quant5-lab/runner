@@ -23,3 +23,5 @@
 | **21** | **Codegen** | `input.timeframe` not implemented | VALID | No handler in input_handler.go | - |
 | **22** | **Codegen** | `input.symbol` not implemented | VALID | No handler in input_handler.go | - |
 | **23** | **Runtime** | Arrow function SMA/STDEV missing bounds check | VALID | `ctx.Data[ctx.BarIndex-j]` crashes when BarIndex < length | keltner-squeeze.pine |
+| **24** | **Codegen** | `ObjectExpression` in expression generator | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ObjectExpression" | - |
+| **25** | **Codegen** | `ArrowFunctionExpression` inline | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ArrowFunctionExpression" | - |
