@@ -16,11 +16,10 @@
 | **14** | **Codegen** | `heikinashi()` function | VALID | Generates TODO comment, function not implemented | utbot-quantnomad.pine |
 | **15** | **Codegen** | `alert()` function | VALID | Not implemented | - |
 | **16** | **Codegen** | `alertcondition()` function | VALID | Not implemented | - |
-| **17** | **Runtime** | `strategy.exit()` execution | VALID | Trade timing/price is not very accurate vs reference | supertrend.pine |
+| **17** | **Runtime** | `strategy.exit()` execution | FIXED | `when=` parameter extraction implemented. Trades match reference | supertrend.pine |
 | **18** | **Codegen** | `security()` package import missing | VALID | Generates `security.BarEvaluator` but doesn't import security package | utbot-quantnomad.pine |
 | **19** | **Codegen** | `input.color` not implemented | VALID | No handler in input_handler.go | pivot-reversal.pine |
 | **20** | **Codegen** | `input.time` not implemented | VALID | No handler in input_handler.go | - |
 | **21** | **Codegen** | `input.timeframe` not implemented | VALID | No handler in input_handler.go | - |
 | **22** | **Codegen** | `input.symbol` not implemented | VALID | No handler in input_handler.go | - |
 | **23** | **Runtime** | Arrow function SMA/STDEV missing bounds check | VALID | `ctx.Data[ctx.BarIndex-j]` crashes when BarIndex < length | keltner-squeeze.pine |
-| **24** | **Codegen** | `input(boolLiteral)` v4 syntax not recognized | VALID | Generates `// TODO: implement` instead of `const showLong = true` | adx-di-strategy.pine |

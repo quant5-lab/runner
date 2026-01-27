@@ -192,6 +192,10 @@ func inferInputTypeFromLiteral(call *ast.CallExpression) string {
 		return "input.float"
 	case int:
 		return "input.int"
+	case bool:
+		return "input.bool"
+	case string:
+		return "input.string"
 	default:
 		return ""
 	}

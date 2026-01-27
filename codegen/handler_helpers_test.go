@@ -409,6 +409,26 @@ func TestInferInputTypeFromLiteral_AllTypes(t *testing.T) {
 			literal:      0,
 			wantFuncName: "input.int",
 		},
+		{
+			name:         "bool true",
+			literal:      true,
+			wantFuncName: "input.bool",
+		},
+		{
+			name:         "bool false",
+			literal:      false,
+			wantFuncName: "input.bool",
+		},
+		{
+			name:         "string literal",
+			literal:      "example",
+			wantFuncName: "input.string",
+		},
+		{
+			name:         "empty string",
+			literal:      "",
+			wantFuncName: "input.string",
+		},
 	}
 
 	for _, tt := range tests {
@@ -516,22 +536,6 @@ func TestInferInputTypeFromLiteral_NotFound(t *testing.T) {
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
 					&ast.Identifier{Name: "customValue"},
-				},
-			},
-		},
-		{
-			name: "string literal",
-			call: &ast.CallExpression{
-				Arguments: []ast.Expression{
-					&ast.Literal{Value: "text"},
-				},
-			},
-		},
-		{
-			name: "bool literal",
-			call: &ast.CallExpression{
-				Arguments: []ast.Expression{
-					&ast.Literal{Value: true},
 				},
 			},
 		},

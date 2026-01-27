@@ -1,6 +1,0 @@
-FIXED: input.string constant registration (#13)
-
-Parse: ✅ (v4→v5 preprocessing)
-Generate: ✅ (ternary+TA fixed #13)
-Compile: ✅ (input.string constants now registered)
-Execute: ✅ Strategy runs successfully

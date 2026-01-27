@@ -46,6 +46,48 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 			expected: "const factor = 2.50\n",
 		},
 		{
+			name: "positional with metadata properties",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: 3.14},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "Pi Value"},
+							},
+							{
+								Key:   &ast.Identifier{Name: "minval"},
+								Value: &ast.Literal{Value: 0.0},
+							},
+						},
+					},
+				},
+			},
+			varName:  "pi",
+			expected: "const pi = 3.14\n",
+		},
+		{
+			name: "negative value",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: -2.5},
+				},
+			},
+			varName:  "offset",
+			expected: "const offset = -2.50\n",
+		},
+		{
+			name: "zero value",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: 0.0},
+				},
+			},
+			varName:  "baseline",
+			expected: "const baseline = 0.00\n",
+		},
+		{
 			name: "no arguments defaults to 0",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{},
@@ -103,6 +145,60 @@ func TestInputHandler_GenerateInputInt(t *testing.T) {
 			varName:  "period",
 			expected: "const period = 14\n",
 		},
+		{
+			name: "positional with metadata properties",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(14)},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "DI Length"},
+							},
+							{
+								Key:   &ast.Identifier{Name: "minval"},
+								Value: &ast.Literal{Value: float64(1)},
+							},
+							{
+								Key:   &ast.Identifier{Name: "group"},
+								Value: &ast.Identifier{Name: "dmiGroup"},
+							},
+						},
+					},
+				},
+			},
+			varName:  "diLen",
+			expected: "const diLen = 14\n",
+		},
+		{
+			name: "negative value",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(-5)},
+				},
+			},
+			varName:  "offset",
+			expected: "const offset = -5\n",
+		},
+		{
+			name: "zero value",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(0)},
+				},
+			},
+			varName:  "baseline",
+			expected: "const baseline = 0\n",
+		},
+		{
+			name: "no arguments defaults to 0",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{},
+			},
+			varName:  "value",
+			expected: "const value = 0\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -137,7 +233,34 @@ func TestInputHandler_GenerateInputBool(t *testing.T) {
 			expected: "const enabled = true\n",
 		},
 		{
-			name: "named false",
+			name: "positional false",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: false},
+				},
+			},
+			varName:  "disabled",
+			expected: "const disabled = false\n",
+		},
+		{
+			name: "named defval true",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "defval"},
+								Value: &ast.Literal{Value: true},
+							},
+						},
+					},
+				},
+			},
+			varName:  "active",
+			expected: "const active = true\n",
+		},
+		{
+			name: "named defval false",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
 					&ast.ObjectExpression{
@@ -152,6 +275,36 @@ func TestInputHandler_GenerateInputBool(t *testing.T) {
 			},
 			varName:  "showTrades",
 			expected: "const showTrades = false\n",
+		},
+		{
+			name: "positional with metadata properties",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: true},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "Long entries"},
+							},
+							{
+								Key:   &ast.Identifier{Name: "group"},
+								Value: &ast.Identifier{Name: "stratGroup"},
+							},
+						},
+					},
+				},
+			},
+			varName:  "showLong",
+			expected: "const showLong = true\n",
+		},
+		{
+			name: "no arguments defaults to false",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{},
+			},
+			varName:  "flag",
+			expected: "const flag = false\n",
 		},
 	}
 
@@ -187,7 +340,7 @@ func TestInputHandler_GenerateInputString(t *testing.T) {
 			expected: "const symbol = \"BTCUSDT\"\n",
 		},
 		{
-			name: "named string",
+			name: "named defval",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
 					&ast.ObjectExpression{
@@ -202,6 +355,46 @@ func TestInputHandler_GenerateInputString(t *testing.T) {
 			},
 			varName:  "timeframe",
 			expected: "const timeframe = \"1D\"\n",
+		},
+		{
+			name: "positional with metadata properties",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "EMA"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "MA Type"},
+							},
+							{
+								Key:   &ast.Identifier{Name: "group"},
+								Value: &ast.Identifier{Name: "maGroup"},
+							},
+						},
+					},
+				},
+			},
+			varName:  "maType",
+			expected: "const maType = \"EMA\"\n",
+		},
+		{
+			name: "empty string",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: ""},
+				},
+			},
+			varName:  "label",
+			expected: "const label = \"\"\n",
+		},
+		{
+			name: "no arguments defaults to empty string",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{},
+			},
+			varName:  "value",
+			expected: "const value = \"\"\n",
 		},
 	}
 

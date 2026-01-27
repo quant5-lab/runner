@@ -252,3 +252,638 @@ func TestStrategyEntryWhenParameter_IndentationPreserved(t *testing.T) {
 func stringFromInt(n int) string {
 	return string(rune('0' + n))
 }
+
+/*
+TestStrategyCloseWhenParameter verifies when= parameter handling for strategy.close()
+Tests conditional wrapping behavior across all edge cases.
+*/
+func TestStrategyCloseWhenParameter(t *testing.T) {
+	tests := []struct {
+		name        string
+		call        *ast.CallExpression
+		expectIf    bool
+		expectClose string
+		expectCond  string
+	}{
+		{
+			name: "close with when condition wraps in if-block",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Long"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "when"},
+								Value: &ast.Identifier{Name: "exitSignal"},
+							},
+						},
+					},
+				},
+			},
+			expectIf:    true,
+			expectClose: `strat.Close("Long"`,
+			expectCond:  "if value.IsTrue(",
+		},
+		{
+			name: "close without when has no wrapper",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Short"},
+				},
+			},
+			expectIf:    false,
+			expectClose: `strat.Close("Short"`,
+			expectCond:  "",
+		},
+		{
+			name: "close with when and comment parameter",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Position1"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "comment"},
+								Value: &ast.Literal{Value: "Exit signal"},
+							},
+							{
+								Key: &ast.Identifier{Name: "when"},
+								Value: &ast.BinaryExpression{
+									Left:     &ast.Identifier{Name: "rsi"},
+									Operator: ">",
+									Right:    &ast.Literal{Value: 70.0},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIf:    true,
+			expectClose: `strat.Close("Position1"`,
+			expectCond:  "if value.IsTrue(",
+		},
+		{
+			name: "close with complex when condition",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Entry"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key: &ast.Identifier{Name: "when"},
+								Value: &ast.BinaryExpression{
+									Left: &ast.BinaryExpression{
+										Left:     &ast.Identifier{Name: "close"},
+										Operator: "<",
+										Right:    &ast.Identifier{Name: "stopLoss"},
+									},
+									Operator: "or",
+									Right: &ast.BinaryExpression{
+										Left:     &ast.Identifier{Name: "close"},
+										Operator: ">",
+										Right:    &ast.Identifier{Name: "takeProfit"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIf:    true,
+			expectClose: `strat.Close("Entry"`,
+			expectCond:  "if value.IsTrue(",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &generator{
+				strategyConfig: &StrategyConfig{
+					DefaultQtyType:  "strategy.fixed",
+					DefaultQtyValue: 1.0,
+				},
+				indent: 2,
+			}
+
+			handler := NewStrategyActionHandler()
+			generated, err := handler.generateClose(g, tt.call)
+			if err != nil {
+				t.Fatalf("generateClose failed: %v", err)
+			}
+
+			if tt.expectIf {
+				if !containsSubstring(generated, tt.expectCond) {
+					t.Errorf("Expected if-wrapper with %q, got:\n%s", tt.expectCond, generated)
+				}
+			} else {
+				if containsSubstring(generated, "if value.IsTrue(") {
+					t.Errorf("Should NOT have if-wrapper, got:\n%s", generated)
+				}
+			}
+
+			if !containsSubstring(generated, tt.expectClose) {
+				t.Errorf("Expected %q in generated code, got:\n%s", tt.expectClose, generated)
+			}
+		})
+	}
+}
+
+/*
+TestStrategyCloseAllWhenParameter verifies when= parameter handling for strategy.close_all()
+Tests conditional wrapping for closing all positions.
+*/
+func TestStrategyCloseAllWhenParameter(t *testing.T) {
+	tests := []struct {
+		name           string
+		call           *ast.CallExpression
+		expectIf       bool
+		expectCloseAll string
+		expectCond     string
+	}{
+		{
+			name: "close_all with when condition wraps in if-block",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close_all"},
+				},
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "when"},
+								Value: &ast.Identifier{Name: "panicExit"},
+							},
+						},
+					},
+				},
+			},
+			expectIf:       true,
+			expectCloseAll: "strat.CloseAll(",
+			expectCond:     "if value.IsTrue(",
+		},
+		{
+			name: "close_all without when has no wrapper",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close_all"},
+				},
+				Arguments: []ast.Expression{},
+			},
+			expectIf:       false,
+			expectCloseAll: "strat.CloseAll(",
+			expectCond:     "",
+		},
+		{
+			name: "close_all with when and comment",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close_all"},
+				},
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "comment"},
+								Value: &ast.Literal{Value: "Emergency exit"},
+							},
+							{
+								Key: &ast.Identifier{Name: "when"},
+								Value: &ast.BinaryExpression{
+									Left:     &ast.Identifier{Name: "volatility"},
+									Operator: ">",
+									Right:    &ast.Literal{Value: 100.0},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIf:       true,
+			expectCloseAll: "strat.CloseAll(",
+			expectCond:     "if value.IsTrue(",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &generator{
+				strategyConfig: &StrategyConfig{
+					DefaultQtyType:  "strategy.fixed",
+					DefaultQtyValue: 1.0,
+				},
+				indent: 2,
+			}
+
+			handler := NewStrategyActionHandler()
+			generated, err := handler.generateCloseAll(g, tt.call)
+			if err != nil {
+				t.Fatalf("generateCloseAll failed: %v", err)
+			}
+
+			if tt.expectIf {
+				if !containsSubstring(generated, tt.expectCond) {
+					t.Errorf("Expected if-wrapper with %q, got:\n%s", tt.expectCond, generated)
+				}
+			} else {
+				if containsSubstring(generated, "if value.IsTrue(") {
+					t.Errorf("Should NOT have if-wrapper, got:\n%s", generated)
+				}
+			}
+
+			if !containsSubstring(generated, tt.expectCloseAll) {
+				t.Errorf("Expected %q in generated code, got:\n%s", tt.expectCloseAll, generated)
+			}
+		})
+	}
+}
+
+/*
+TestStrategyExitWhenParameter verifies when= parameter handling for strategy.exit()
+Tests conditional wrapping with stop/limit levels.
+*/
+func TestStrategyExitWhenParameter(t *testing.T) {
+	tests := []struct {
+		name       string
+		call       *ast.CallExpression
+		expectIf   bool
+		expectExit string
+		expectCond string
+	}{
+		{
+			name: "exit with when condition wraps in if-block",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "exit"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "ExitOrder"},
+					&ast.Literal{Value: "Long"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "stop"},
+								Value: &ast.Literal{Value: 95.0},
+							},
+							{
+								Key:   &ast.Identifier{Name: "limit"},
+								Value: &ast.Literal{Value: 105.0},
+							},
+							{
+								Key:   &ast.Identifier{Name: "when"},
+								Value: &ast.Identifier{Name: "exitCondition"},
+							},
+						},
+					},
+				},
+			},
+			expectIf:   true,
+			expectExit: `strat.ExitWithLevels("ExitOrder"`,
+			expectCond: "if value.IsTrue(",
+		},
+		{
+			name: "exit without when has no wrapper",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "exit"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Exit1"},
+					&ast.Literal{Value: "Short"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "stop"},
+								Value: &ast.Literal{Value: 100.0},
+							},
+						},
+					},
+				},
+			},
+			expectIf:   false,
+			expectExit: `strat.ExitWithLevels("Exit1"`,
+			expectCond: "",
+		},
+		{
+			name: "exit with when and dynamic stop/limit",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "exit"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "DynamicExit"},
+					&ast.Literal{Value: "Entry"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "stop"},
+								Value: &ast.Identifier{Name: "stopLevel"},
+							},
+							{
+								Key:   &ast.Identifier{Name: "limit"},
+								Value: &ast.Identifier{Name: "profitTarget"},
+							},
+							{
+								Key: &ast.Identifier{Name: "when"},
+								Value: &ast.BinaryExpression{
+									Left:     &ast.Identifier{Name: "barIndex"},
+									Operator: ">",
+									Right:    &ast.Literal{Value: 10.0},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIf:   true,
+			expectExit: `strat.ExitWithLevels("DynamicExit"`,
+			expectCond: "if value.IsTrue(",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &generator{
+				strategyConfig: &StrategyConfig{
+					DefaultQtyType:  "strategy.fixed",
+					DefaultQtyValue: 1.0,
+				},
+				indent: 2,
+			}
+
+			handler := NewStrategyActionHandler()
+			generated, err := handler.generateExit(g, tt.call)
+			if err != nil {
+				t.Fatalf("generateExit failed: %v", err)
+			}
+
+			if tt.expectIf {
+				if !containsSubstring(generated, tt.expectCond) {
+					t.Errorf("Expected if-wrapper with %q, got:\n%s", tt.expectCond, generated)
+				}
+			} else {
+				if containsSubstring(generated, "if value.IsTrue(") {
+					t.Errorf("Should NOT have if-wrapper, got:\n%s", generated)
+				}
+			}
+
+			if !containsSubstring(generated, tt.expectExit) {
+				t.Errorf("Expected %q in generated code, got:\n%s", tt.expectExit, generated)
+			}
+		})
+	}
+}
+
+/*
+TestStrategyActionsWhenParameter_BackwardCompatibility verifies all strategy actions
+without when= parameter generate identical code as before (no regression).
+*/
+func TestStrategyActionsWhenParameter_BackwardCompatibility(t *testing.T) {
+	g := &generator{
+		strategyConfig: &StrategyConfig{
+			DefaultQtyType:  "strategy.fixed",
+			DefaultQtyValue: 1.0,
+		},
+		indent: 2,
+	}
+
+	handler := NewStrategyActionHandler()
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		generate func(*generator, *ast.CallExpression) (string, error)
+		expect   string
+	}{
+		{
+			name: "entry without when",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "entry"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Long"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "strategy"},
+						Property: &ast.Identifier{Name: "long"},
+					},
+				},
+			},
+			generate: handler.generateEntry,
+			expect:   `strat.Entry("Long", strategy.Long, 1, "")`,
+		},
+		{
+			name: "close without when",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Long"},
+				},
+			},
+			generate: handler.generateClose,
+			expect:   `strat.Close("Long", bar.Close, bar.Time, "")`,
+		},
+		{
+			name: "close_all without when",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "close_all"},
+				},
+				Arguments: []ast.Expression{},
+			},
+			generate: handler.generateCloseAll,
+			expect:   `strat.CloseAll(bar.Close, bar.Time, "")`,
+		},
+		{
+			name: "exit without when",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "exit"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Exit"},
+					&ast.Literal{Value: "Long"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "stop"},
+								Value: &ast.Literal{Value: 100.0},
+							},
+						},
+					},
+				},
+			},
+			generate: handler.generateExit,
+			expect:   `strat.ExitWithLevels("Exit", "Long"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generated, err := tt.generate(g, tt.call)
+			if err != nil {
+				t.Fatalf("generate failed: %v", err)
+			}
+
+			if containsSubstring(generated, "if value.IsTrue(") {
+				t.Errorf("Backward compatibility broken: should NOT have if-wrapper without when=, got:\n%s", generated)
+			}
+
+			if !containsSubstring(generated, tt.expect) {
+				t.Errorf("Expected %q in generated code, got:\n%s", tt.expect, generated)
+			}
+		})
+	}
+}
+
+/*
+TestStrategyActionsWhenParameter_IndentationConsistency verifies all strategy actions
+preserve proper indentation when wrapped in if-blocks.
+*/
+func TestStrategyActionsWhenParameter_IndentationConsistency(t *testing.T) {
+	indentLevels := []int{0, 1, 2, 3, 4}
+
+	for _, level := range indentLevels {
+		t.Run(stringFromInt(level)+" tabs", func(t *testing.T) {
+			g := &generator{
+				strategyConfig: &StrategyConfig{
+					DefaultQtyType:  "strategy.fixed",
+					DefaultQtyValue: 1.0,
+				},
+				indent: level,
+			}
+
+			handler := NewStrategyActionHandler()
+
+			actions := []struct {
+				name     string
+				call     *ast.CallExpression
+				generate func(*generator, *ast.CallExpression) (string, error)
+			}{
+				{
+					name: "entry",
+					call: &ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: "entry"},
+						},
+						Arguments: []ast.Expression{
+							&ast.Literal{Value: "Test"},
+							&ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "strategy"},
+								Property: &ast.Identifier{Name: "long"},
+							},
+							&ast.ObjectExpression{
+								Properties: []ast.Property{
+									{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "cond"}},
+								},
+							},
+						},
+					},
+					generate: handler.generateEntry,
+				},
+				{
+					name: "close",
+					call: &ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: "close"},
+						},
+						Arguments: []ast.Expression{
+							&ast.Literal{Value: "Test"},
+							&ast.ObjectExpression{
+								Properties: []ast.Property{
+									{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "cond"}},
+								},
+							},
+						},
+					},
+					generate: handler.generateClose,
+				},
+				{
+					name: "close_all",
+					call: &ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: "close_all"},
+						},
+						Arguments: []ast.Expression{
+							&ast.ObjectExpression{
+								Properties: []ast.Property{
+									{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "cond"}},
+								},
+							},
+						},
+					},
+					generate: handler.generateCloseAll,
+				},
+				{
+					name: "exit",
+					call: &ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: "exit"},
+						},
+						Arguments: []ast.Expression{
+							&ast.Literal{Value: "Exit"},
+							&ast.Literal{Value: "Test"},
+							&ast.ObjectExpression{
+								Properties: []ast.Property{
+									{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 100.0}},
+									{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "cond"}},
+								},
+							},
+						},
+					},
+					generate: handler.generateExit,
+				},
+			}
+
+			for _, action := range actions {
+				t.Run(action.name, func(t *testing.T) {
+					generated, err := action.generate(g, action.call)
+					if err != nil {
+						t.Fatalf("generate failed: %v", err)
+					}
+
+					lines := strings.Split(generated, "\n")
+					expectedPrefix := strings.Repeat("\t", level)
+
+					for i, line := range lines {
+						if line != "" && !strings.HasPrefix(line, expectedPrefix) {
+							t.Errorf("Line %d not properly indented (expected %d tabs): %q\nFull output:\n%s",
+								i, level, line, generated)
+						}
+					}
+				})
+			}
+		})
+	}
+}

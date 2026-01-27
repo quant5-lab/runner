@@ -91,9 +91,7 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 }
 
 func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpression) (string, error) {
-	// strategy.close(id)
 	if len(call.Arguments) < 1 {
-		// Invalid call - generate TODO comment for backward compatibility
 		return g.ind() + "// strategy.close() - invalid arguments\n", nil
 	}
 
@@ -101,21 +99,34 @@ func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpres
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[1:], "comment", 0, `""`)
+	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
-	return g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time, %s)\n", entryID, comment), nil
+	closeCode := g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time, %s)\n", entryID, comment)
+
+	if hasWhen {
+		wrapper := &ConditionalWrapperGenerator{}
+		return wrapper.WrapIfNeeded(whenCondition, closeCode, g.ind()), nil
+	}
+
+	return closeCode, nil
 }
 
 func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExpression) (string, error) {
-	// strategy.close_all()
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", 0, `""`)
+	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
-	return g.ind() + fmt.Sprintf("strat.CloseAll(bar.Close, bar.Time, %s)\n", comment), nil
+	closeAllCode := g.ind() + fmt.Sprintf("strat.CloseAll(bar.Close, bar.Time, %s)\n", comment)
+
+	if hasWhen {
+		wrapper := &ConditionalWrapperGenerator{}
+		return wrapper.WrapIfNeeded(whenCondition, closeAllCode, g.ind()), nil
+	}
+
+	return closeAllCode, nil
 }
 
 func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpression) (string, error) {
-	// strategy.exit(id, from_entry, qty, qty_percent, profit, limit, loss, stop, ...)
-	//               0   1           2    3           4       5      6     7
 	if len(call.Arguments) < 2 {
 		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
 	}
@@ -127,7 +138,15 @@ func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpress
 	limitExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "limit", 3, "math.NaN()")
 	stopExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "stop", 5, "math.NaN()")
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 6, `""`)
+	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
-	return g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
-		exitID, fromEntry, stopExpr, limitExpr, comment), nil
+	exitCode := g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
+		exitID, fromEntry, stopExpr, limitExpr, comment)
+
+	if hasWhen {
+		wrapper := &ConditionalWrapperGenerator{}
+		return wrapper.WrapIfNeeded(whenCondition, exitCode, g.ind()), nil
+	}
+
+	return exitCode, nil
 }

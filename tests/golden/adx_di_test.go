@@ -5,7 +5,6 @@ import (
 )
 
 func TestADXDI_AAPL_Hourly(t *testing.T) {
-	t.Skip("Parser limitation: v4 tooltip with newlines - see adx-di-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +18,6 @@ func TestADXDI_AAPL_Hourly(t *testing.T) {
 }
 
 func TestADXDI_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Parser limitation: v4 tooltip with newlines - see adx-di-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +31,6 @@ func TestADXDI_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestADXDI_SBERP_Hourly(t *testing.T) {
-	t.Skip("Parser limitation: v4 tooltip with newlines - see adx-di-strategy.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -43,5 +40,18 @@ func TestADXDI_SBERP_Hourly(t *testing.T) {
 		Timeframe:    "1h",
 		DataFile:     "SBERP-1h.json",
 		GoldenFile:   "adx-di-sberp-1h.json",
+	})
+}
+
+func TestADXDI_CNRU_Hourly(t *testing.T) {
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "ADX + DI Strategy",
+		StrategyFile: "adx-di-strategy.pine",
+		Symbol:       "CNRU",
+		Timeframe:    "1h",
+		DataFile:     "CNRU-1h.json",
+		GoldenFile:   "adx-di-cnru-1h.json",
 	})
 }
