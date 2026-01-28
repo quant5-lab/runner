@@ -17,6 +17,7 @@ type ArrowExpressionGeneratorImpl struct {
 	identifierResolver *ArrowIdentifierResolver
 	accessorFactory    *ArrowAwareAccessorFactory
 	inlineTAGenerator  *ArrowInlineTACallGenerator
+	valueGenerator     *ArrowValueFunctionGenerator
 }
 
 func NewArrowExpressionGeneratorImpl(gen *generator, resolver *ArrowSeriesAccessResolver) *ArrowExpressionGeneratorImpl {
@@ -31,9 +32,11 @@ func NewArrowExpressionGeneratorImpl(gen *generator, resolver *ArrowSeriesAccess
 	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
 	iifeRegistry := NewInlineTAIIFERegistry()
 	inlineTAGenerator := NewArrowInlineTACallGenerator(accessorFactory, iifeRegistry)
+	valueGenerator := NewArrowValueFunctionGenerator(exprGen)
 
 	exprGen.accessorFactory = accessorFactory
 	exprGen.inlineTAGenerator = inlineTAGenerator
+	exprGen.valueGenerator = valueGenerator
 
 	return exprGen
 }
@@ -74,7 +77,12 @@ func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpression) (string, error) {
-	// Try inline TA generation first (compile-time constant periods)
+	funcName := extractCallFunctionName(call)
+
+	if e.valueGenerator.CanHandle(funcName) {
+		return e.valueGenerator.Generate(call)
+	}
+
 	code, handled, err := e.inlineTAGenerator.GenerateInlineTACall(call)
 	if err != nil {
 		return "", err
@@ -83,16 +91,11 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 		return code, nil
 	}
 
-	// Not handled by inline generator
-	funcName := extractCallFunctionName(call)
-
-	// Check if it's a TA function - if so, use arrow-aware TA handler directly
 	if isTAFunction(funcName) {
 		taHandler := NewArrowFunctionTACallGenerator(e.gen, e)
 		return taHandler.Generate(call)
 	}
 
-	// For non-TA functions (math, user-defined, etc.), try standard call routing
 	if e.gen.callRouter != nil {
 		routedCode, routeErr := e.gen.callRouter.RouteCall(e.gen, call)
 		if routeErr == nil && routedCode != "" {
@@ -100,7 +103,6 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 		}
 	}
 
-	// Final fallback
 	return "", fmt.Errorf("unhandled call expression: %s", funcName)
 }
 
@@ -114,27 +116,11 @@ func isTAFunction(funcName string) bool {
 		"sma", "ema", "rma", "wma", "stdev",
 		"highest", "lowest", "change",
 		"crossover", "crossunder",
-		"rsi",
-		"fixnan", "ta.fixnan":
+		"rsi":
 		return true
 	default:
 		return false
 	}
-}
-
-func (e *ArrowExpressionGeneratorImpl) generateFixnanExpression(call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("fixnan() requires 1 argument")
-	}
-
-	sourceExpr := call.Arguments[0]
-
-	sourceCode, err := e.generateExpression(sourceExpr)
-	if err != nil {
-		return "", fmt.Errorf("fixnan: failed to generate source expression: %w", err)
-	}
-
-	return fmt.Sprintf("func() float64 { val := (%s); if math.IsNaN(val) { return 0.0 }; return val }()", sourceCode), nil
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (string, error) {
@@ -143,17 +129,14 @@ func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (s
 		return fmt.Sprintf("float64(%s)", id.Name), nil
 	}
 
-	// Try access resolver first (parameters and local variables)
 	if access, resolved := e.accessResolver.ResolveAccess(id.Name); resolved {
 		return access, nil
 	}
 
-	// Try builtin handler (close, high, low, etc.)
 	if code, resolved := e.gen.builtinHandler.TryResolveIdentifier(id, false); resolved {
 		return code, nil
 	}
 
-	// Fallback: direct identifier access (constants, etc.)
 	return id.Name, nil
 }
 
@@ -234,19 +217,16 @@ func (e *ArrowExpressionGeneratorImpl) generateConditionalExpression(condExpr *a
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateMemberExpression(mem *ast.MemberExpression) (string, error) {
-	/* Arrow-aware subscript access: obj[index] */
 	if mem.Computed {
 		if obj, ok := mem.Object.(*ast.Identifier); ok {
 			return e.resolveArrowSubscript(obj.Name, mem.Property)
 		}
 	}
 
-	/* Try builtin member expression resolution */
 	if code, resolved := e.gen.builtinHandler.TryResolveMemberExpression(mem, false); resolved {
 		return code, nil
 	}
 
-	/* Non-computed member access: obj.prop */
 	if obj, ok := mem.Object.(*ast.Identifier); ok {
 		if prop, ok := mem.Property.(*ast.Identifier); ok {
 			if obj.Name == "strategy" {
@@ -265,23 +245,14 @@ func (e *ArrowExpressionGeneratorImpl) generateMemberExpression(mem *ast.MemberE
 }
 
 /*
-resolveArrowSubscript generates arrow-aware subscript access code.
+resolveArrowSubscript generates Series.Get() or builtin bounds-checked access.
 
-Handles three cases:
-1. Series parameter: srcSeries[idx] → srcSeries.Get(int(idx))
-2. Builtin series: close[idx] → ctx.Data[barIdx].Close with bounds check
-3. Local series variable: varSeries[idx] → varSeries.Get(int(idx))
-
-Index expressions use arrow-aware generation (loop counters as scalars).
+Handles series parameters, local series variables, and builtin series (close/open/etc).
 */
 func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, indexExpr ast.Expression) (string, error) {
-	/* Check if seriesName is a series parameter (named with Series suffix in signature) */
 	isSeriesParam := e.accessResolver.IsParameter(seriesName)
-
-	/* Check if seriesName is a builtin series */
 	isBuiltin := seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume"
 
-	/* Generate arrow-aware index expression */
 	indexCode, err := e.generateArrowIndexExpression(indexExpr)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate index expression: %w", err)
@@ -292,15 +263,12 @@ func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, 
 	}
 
 	if isSeriesParam {
-		/* Series parameter: srcSeries.Get(int(idx)) */
 		return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode), nil
 	}
 
-	/* Local series variable */
 	return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode), nil
 }
 
-/* generateArrowIndexExpression generates index with arrow context (loop counters as float64 for arithmetic) */
 func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Expression) (string, error) {
 	switch ex := expr.(type) {
 	case *ast.Identifier:
@@ -308,7 +276,6 @@ func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Exp
 		if e.gen.loopContextStack != nil && e.gen.loopContextStack.IsLoopCounter(ex.Name) {
 			return fmt.Sprintf("float64(%s)", ex.Name), nil
 		}
-		/* Use access resolver for parameters and local variables */
 		if access, resolved := e.accessResolver.ResolveAccess(ex.Name); resolved {
 			return access, nil
 		}
@@ -333,7 +300,6 @@ func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Exp
 	}
 }
 
-/* generateBuiltinSubscript generates bounds-checked builtin series access */
 func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, indexCode string) string {
 	capitalName := capitalizeFirstLetter(seriesName)
 	return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return ctx.Data[barIdx].%s }; return math.NaN() }()", indexCode, capitalName)
