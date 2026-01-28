@@ -8,10 +8,11 @@ import (
 )
 
 type ArrowFunctionTACallGenerator struct {
-	gen             *generator
-	exprGen         ArrowExpressionGenerator
-	iifeRegistry    *InlineTAIIFERegistry
-	accessorFactory *ArrowAwareAccessorFactory
+	gen               *generator
+	exprGen           ArrowExpressionGenerator
+	iifeRegistry      *InlineTAIIFERegistry
+	accessorFactory   *ArrowAwareAccessorFactory
+	signatureResolver *ArrowTACallSignatureResolver
 }
 
 func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGenerator) *ArrowFunctionTACallGenerator {
@@ -25,12 +26,14 @@ func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGene
 
 	identifierResolver := NewArrowIdentifierResolver(accessResolver)
 	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
+	signatureRegistry := NewTAFunctionSignatureRegistry()
 
 	return &ArrowFunctionTACallGenerator{
-		gen:             gen,
-		exprGen:         exprGen,
-		iifeRegistry:    NewInlineTAIIFERegistry(),
-		accessorFactory: accessorFactory,
+		gen:               gen,
+		exprGen:           exprGen,
+		iifeRegistry:      NewInlineTAIIFERegistry(),
+		accessorFactory:   accessorFactory,
+		signatureResolver: NewArrowTACallSignatureResolver(signatureRegistry),
 	}
 }
 
@@ -96,19 +99,24 @@ func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call 
 		return a.extractChangeArguments(call)
 	}
 
-	if len(call.Arguments) < 2 {
-		return nil, nil, fmt.Errorf("TA function requires 2 arguments (source, period), got %d", len(call.Arguments))
+	resolved, err := a.signatureResolver.ResolveCall(funcName, call)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve TA call signature: %w", err)
 	}
 
-	sourceArg := call.Arguments[0]
-	periodArg := call.Arguments[1]
+	var sourceArg ast.Expression
+	if resolved.NeedsDefaultSource {
+		sourceArg = &ast.Identifier{Name: resolved.DefaultSourceName}
+	} else {
+		sourceArg = resolved.SourceExpr
+	}
 
 	accessor, err := a.accessorFactory.CreateAccessorForExpression(sourceArg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create accessor: %w", err)
 	}
 
-	periodExpr, err := a.extractPeriodExpression(periodArg)
+	periodExpr, err := a.extractPeriodExpression(resolved.LengthExpr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to extract period: %w", err)
 	}
@@ -137,29 +145,6 @@ func (a *ArrowFunctionTACallGenerator) extractChangeArguments(call *ast.CallExpr
 	}
 
 	return accessor, offsetExpr, nil
-}
-
-func (a *ArrowFunctionTACallGenerator) extractSingleArgumentForm(funcName string, call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {
-	periodArg := call.Arguments[0]
-
-	periodExpr, err := a.extractPeriodExpression(periodArg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to extract period: %w", err)
-	}
-
-	accessor := a.getDefaultSourceAccessor(funcName)
-	return accessor, periodExpr, nil
-}
-
-func (a *ArrowFunctionTACallGenerator) getDefaultSourceAccessor(funcName string) AccessGenerator {
-	switch funcName {
-	case "ta.highest", "highest":
-		return NewOHLCVFieldAccessGenerator("High")
-	case "ta.lowest", "lowest":
-		return NewOHLCVFieldAccessGenerator("Low")
-	default:
-		return NewOHLCVFieldAccessGenerator("Close")
-	}
 }
 
 func (a *ArrowFunctionTACallGenerator) extractPeriodExpression(expr ast.Expression) (PeriodExpression, error) {

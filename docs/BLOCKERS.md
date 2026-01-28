@@ -22,4 +22,5 @@
 | **20** | **Runtime** | Arrow function SMA/STDEV missing bounds check | VALID | `ctx.Data[ctx.BarIndex-j]` crashes when BarIndex < length | keltner-squeeze.pine |
 | **21** | **Codegen** | `ObjectExpression` in expression generator | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ObjectExpression" | - |
 | **22** | **Codegen** | `ArrowFunctionExpression` inline | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ArrowFunctionExpression" | - |
+| **23** | **Codegen** | Arrow accessor literal argument | RESOLVED | `highest(2)` now compiles via TAFunctionSignatureRegistry + ArrowTACallSignatureResolver | zigzag-pa.pine |
 
