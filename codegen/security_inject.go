@@ -227,12 +227,36 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 	/* Simple injection: prepend before existing body */
 	updatedBody := injection.PrefetchCode + functionBody
 
+	mergedImports := mergeImports(code.AdditionalImports, injection.ImportPaths)
+
 	return &StrategyCode{
 		UserDefinedFunctions: code.UserDefinedFunctions,
 		FunctionBody:         updatedBody,
 		StrategyName:         code.StrategyName,
-		AdditionalImports:    injection.ImportPaths,
+		AdditionalImports:    mergedImports,
 	}, nil
+}
+
+/* mergeImports combines two import lists without duplicates */
+func mergeImports(existing, additional []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(existing)+len(additional))
+
+	for _, imp := range existing {
+		if !seen[imp] {
+			seen[imp] = true
+			result = append(result, imp)
+		}
+	}
+
+	for _, imp := range additional {
+		if !seen[imp] {
+			seen[imp] = true
+			result = append(result, imp)
+		}
+	}
+
+	return result
 }
 
 /* normalizeTimeframe converts short forms to canonical format */

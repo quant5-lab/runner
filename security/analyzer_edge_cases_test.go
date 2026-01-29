@@ -6,6 +6,9 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+/* TestAnalyzeAST_EdgeCases verifies robustness against nil, empty, and invalid inputs.
+ * Ensures walker handles boundary conditions gracefully without panics.
+ */
 func TestAnalyzeAST_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -17,7 +20,7 @@ func TestAnalyzeAST_EdgeCases(t *testing.T) {
 			name:      "nil_program",
 			program:   nil,
 			expected:  0,
-			wantPanic: true,
+			wantPanic: false,
 		},
 		{
 			name:     "empty_program",

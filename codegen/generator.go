@@ -8,6 +8,7 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/validation"
+	"github.com/quant5-lab/runner/security"
 )
 
 /* StrategyCode holds generated Go code for strategy execution */
@@ -86,10 +87,16 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		return nil, err
 	}
 
+	additionalImports := []string{}
+	if gen.hasSecurityCalls {
+		additionalImports = append(additionalImports, "github.com/quant5-lab/runner/security")
+	}
+
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
 		FunctionBody:         body,
 		StrategyName:         gen.strategyConfig.Name,
+		AdditionalImports:    additionalImports,
 	}
 
 	return code, nil
@@ -3714,80 +3721,9 @@ func extractConstValue(code string) interface{} {
 	return nil
 }
 
-/* detectSecurityCalls walks AST to detect if security() calls exist */
+/* detectSecurityCalls delegates to security package for complete AST analysis */
 func detectSecurityCalls(program *ast.Program) bool {
-	if program == nil {
-		return false
-	}
-
-	for _, node := range program.Body {
-		if hasSecurityInNode(node) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasSecurityInNode(node ast.Node) bool {
-	switch n := node.(type) {
-	case *ast.VariableDeclaration:
-		for _, decl := range n.Declarations {
-			if hasSecurityInExpression(decl.Init) {
-				return true
-			}
-		}
-	case *ast.ExpressionStatement:
-		return hasSecurityInExpression(n.Expression)
-	case *ast.IfStatement:
-		if hasSecurityInExpression(n.Test) {
-			return true
-		}
-		for _, consequent := range n.Consequent {
-			if hasSecurityInNode(consequent) {
-				return true
-			}
-		}
-		for _, alternate := range n.Alternate {
-			if hasSecurityInNode(alternate) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func hasSecurityInExpression(expr ast.Expression) bool {
-	if expr == nil {
-		return false
-	}
-
-	switch e := expr.(type) {
-	case *ast.CallExpression:
-		if ident, ok := e.Callee.(*ast.Identifier); ok {
-			if ident.Name == "security" {
-				return true
-			}
-		}
-		if member, ok := e.Callee.(*ast.MemberExpression); ok {
-			if obj, ok := member.Object.(*ast.Identifier); ok {
-				if prop, ok := member.Property.(*ast.Identifier); ok {
-					if obj.Name == "request" && prop.Name == "security" {
-						return true
-					}
-				}
-			}
-		}
-		for _, arg := range e.Arguments {
-			if hasSecurityInExpression(arg) {
-				return true
-			}
-		}
-	case *ast.BinaryExpression:
-		return hasSecurityInExpression(e.Left) || hasSecurityInExpression(e.Right)
-	case *ast.ConditionalExpression:
-		return hasSecurityInExpression(e.Test) || hasSecurityInExpression(e.Consequent) || hasSecurityInExpression(e.Alternate)
-	}
-	return false
+	return len(security.AnalyzeAST(program)) > 0
 }
 
 /* detectStrategyRuntimeAccess walks AST to detect strategy.* runtime value access */
