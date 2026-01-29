@@ -1,6 +1,6 @@
-Codegen limitation: input.float treated as Series + crossover literal type conversion
+Runtime limitation: Arrow function SMA/STDEV missing bounds check
 
 Parse: ✅ Success
 Generate: ✅ Success
-Compile: ❌ Fails (undefined: input_floatSeries; type mismatches in crossover float64 vs int)
-Execute: ❌ Not reached
+Compile: ✅ Success
+Execute: ❌ Panic (ctx.Data[ctx.BarIndex-j] index out of range when BarIndex < length)

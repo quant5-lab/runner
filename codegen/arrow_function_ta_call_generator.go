@@ -11,6 +11,7 @@ type ArrowFunctionTACallGenerator struct {
 	gen               *generator
 	exprGen           ArrowExpressionGenerator
 	iifeRegistry      *InlineTAIIFERegistry
+	tupleRegistry     *TupleIndicatorRegistry
 	accessorFactory   *ArrowAwareAccessorFactory
 	signatureResolver *ArrowTACallSignatureResolver
 }
@@ -32,6 +33,7 @@ func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGene
 		gen:               gen,
 		exprGen:           exprGen,
 		iifeRegistry:      NewInlineTAIIFERegistry(),
+		tupleRegistry:     NewTupleIndicatorRegistry(),
 		accessorFactory:   accessorFactory,
 		signatureResolver: NewArrowTACallSignatureResolver(signatureRegistry),
 	}
@@ -40,22 +42,23 @@ func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGene
 func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	// Check if this is a user-defined function first
 	detector := NewUserDefinedFunctionDetector(a.gen.variables)
 	if detector.IsUserDefinedFunction(funcName) {
 		handler := &UserDefinedFunctionHandler{}
 		return handler.GenerateCode(a.gen, call)
 	}
 
-	// Special case: fixnan uses inline IIFE with NaN check
 	if funcName == "fixnan" || funcName == "ta.fixnan" {
 		return a.generateFixnanIIFE(call)
 	}
 
-	// Special case: pivot functions use dual-period interface
 	pivotResolver := NewPivotSignatureResolver()
 	if pivotResolver.IsPivotFunction(funcName) {
 		return a.generatePivotCall(funcName, call)
+	}
+
+	if a.tupleRegistry.IsRegistered(funcName) {
+		return a.generateTupleIIFE(funcName, call)
 	}
 
 	accessor, periodExpr, err := a.extractTAArguments(funcName, call)
@@ -63,7 +66,6 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return "", fmt.Errorf("failed to extract TA arguments: %w", err)
 	}
 
-	// Generate hash from source expression to prevent series name collisions
 	sourceHash := ""
 	if len(call.Arguments) > 0 {
 		hasher := &ExpressionHasher{}
@@ -234,7 +236,76 @@ func (a *ArrowFunctionParameterAccessor) GenerateCurrentValueAccess() string {
 	return fmt.Sprintf("%sSeries.GetCurrent()", a.parameterName)
 }
 
-/* GetBaseOffset returns 0 - arrow function parameter access is current bar relative */
+func (a *ArrowFunctionTACallGenerator) generateTupleIIFE(funcName string, call *ast.CallExpression) (string, error) {
+	spec := a.tupleRegistry.Lookup(funcName)
+	if spec == nil {
+		return "", fmt.Errorf("tuple indicator %s not registered", funcName)
+	}
+
+	argBuilder := NewTupleArgumentBuilder(a.gen, a.accessorFactory)
+	argExpressions, err := argBuilder.BuildArguments(call.Arguments, spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to build tuple arguments: %w", err)
+	}
+
+	argList := ""
+	for i, argExpr := range argExpressions {
+		if i > 0 {
+			argList += ", "
+		}
+		argList += argExpr
+	}
+
+	returnType := "("
+	for i := 0; i < spec.OutputCount; i++ {
+		if i > 0 {
+			returnType += ", "
+		}
+		returnType += "float64"
+	}
+	returnType += ")"
+
+	return fmt.Sprintf("func() %s { return %s(%s) }()", returnType, spec.RuntimeFunction, argList), nil
+}
+
+type TupleArgumentBuilder struct {
+	gen             *generator
+	accessorFactory *ArrowAwareAccessorFactory
+}
+
+func NewTupleArgumentBuilder(gen *generator, accessorFactory *ArrowAwareAccessorFactory) *TupleArgumentBuilder {
+	return &TupleArgumentBuilder{
+		gen:             gen,
+		accessorFactory: accessorFactory,
+	}
+}
+
+func (b *TupleArgumentBuilder) BuildArguments(args []ast.Expression, spec *TupleIndicatorSpec) ([]string, error) {
+	argExpressions := make([]string, len(args))
+
+	for i, arg := range args {
+		if b.isSourceArgument(i, spec) {
+			accessor, err := b.accessorFactory.CreateAccessorForExpression(arg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create accessor for source arg %d: %w", i, err)
+			}
+			argExpressions[i] = accessor.GenerateCurrentValueAccess()
+		} else {
+			argCode, err := b.gen.generateArrowFunctionExpression(arg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate arg %d: %w", i, err)
+			}
+			argExpressions[i] = argCode
+		}
+	}
+
+	return argExpressions, nil
+}
+
+func (b *TupleArgumentBuilder) isSourceArgument(argIndex int, spec *TupleIndicatorSpec) bool {
+	return spec.SourceArgIndex == argIndex
+}
+
 func (a *ArrowFunctionParameterAccessor) GetBaseOffset() int {
 	return 0
 }

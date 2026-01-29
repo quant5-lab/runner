@@ -1,6 +1,6 @@
-Codegen limitation: Arrow function nz() call not supported
+Codegen limitation: heikenashi() function not implemented
 
 Parse: ✅ (v4→v5 preprocessing)
-Generate: ❌ (unhandled call expression: nz in arrow function)
+Generate: ❌ (unsupported inline function in condition: heikenashi)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

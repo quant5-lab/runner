@@ -45,6 +45,30 @@ func (r *TupleIndicatorRegistry) registerBuiltinIndicators() {
 		SourceArgIndex:  -1,
 		PeriodArgCount:  2,
 	})
+
+	r.register(&TupleIndicatorSpec{
+		FunctionName:    "ta.dmi",
+		OutputCount:     3,
+		RuntimeFunction: "ta.Dmi",
+		SourceArgIndex:  -1,
+		PeriodArgCount:  2,
+	})
+
+	r.register(&TupleIndicatorSpec{
+		FunctionName:    "ta.kc",
+		OutputCount:     3,
+		RuntimeFunction: "ta.KeltnerChannels",
+		SourceArgIndex:  0,
+		PeriodArgCount:  2,
+	})
+
+	r.register(&TupleIndicatorSpec{
+		FunctionName:    "ta.supertrend",
+		OutputCount:     2,
+		RuntimeFunction: "ta.Supertrend",
+		SourceArgIndex:  -1,
+		PeriodArgCount:  2,
+	})
 }
 
 func (r *TupleIndicatorRegistry) register(spec *TupleIndicatorSpec) {

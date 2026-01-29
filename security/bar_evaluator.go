@@ -367,6 +367,13 @@ func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression,
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	if propID, ok := expr.Property.(*ast.Identifier); ok {
+		if objID, ok := expr.Object.(*ast.Identifier); ok && objID.Name == "ta" && propID.Name == "tr" {
+			return e.evaluateTrueRangeAtBar(secCtx, barIdx)
+		}
+		return 0.0, newUnsupportedExpressionError(expr)
+	}
+
 	propertyLit, ok := expr.Property.(*ast.Literal)
 	if !ok {
 		return 0.0, newUnsupportedExpressionError(expr)
@@ -390,4 +397,20 @@ func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberEx
 	default:
 		return 0.0, newUnsupportedExpressionError(expr)
 	}
+}
+
+func (e *StreamingBarEvaluator) evaluateTrueRangeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
+	if barIdx < 0 || barIdx >= len(secCtx.Data) {
+		return 0.0, newBarIndexOutOfRangeError(barIdx, len(secCtx.Data))
+	}
+
+	isFirstBar := barIdx == 0
+
+	var prevClose float64
+	if !isFirstBar {
+		prevClose = secCtx.Data[barIdx-1].Close
+	}
+
+	trCalculator := NewTrueRangeCalculator()
+	return trCalculator.CalculateAtBar(secCtx.Data, barIdx, prevClose, isFirstBar), nil
 }
