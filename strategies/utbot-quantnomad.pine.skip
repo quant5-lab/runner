@@ -1,6 +1,10 @@
-Compile limitation: security import not generated (#18)
+Runtime limitation: heikinashi() function returns empty data (#12)
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅
-Compile: ❌ (undefined: security)
-Execute: ❌ Not reached
+Compile: ✅
+Execute: ❌ (heikinashi() returns empty data at runtime)
+
+Fixed blockers:
+- #15: security() detection in nested conditionals
+- #27: timeframe.period runtime resolution

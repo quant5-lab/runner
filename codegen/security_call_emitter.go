@@ -85,6 +85,17 @@ func (e *SecurityCallEmitter) extractTimeframeCode(expr ast.Expression) (string,
 			return fmt.Sprintf("%q", s), nil
 		}
 	}
+
+	if mem, ok := expr.(*ast.MemberExpression); ok {
+		if obj, ok := mem.Object.(*ast.Identifier); ok {
+			if prop, ok := mem.Property.(*ast.Identifier); ok {
+				if obj.Name == "timeframe" && prop.Name == "period" {
+					return "ctx.Timeframe", nil
+				}
+			}
+		}
+	}
+
 	return "", fmt.Errorf("invalid timeframe expression")
 }
 

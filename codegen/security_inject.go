@@ -43,18 +43,18 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	dedupMap := make(map[string][]security.SecurityCall)
 	for _, call := range calls {
 		sym := call.Symbol
-		isRuntimeSymbol := sym == "" || sym == "tickerid" || sym == "syminfo.tickerid"
-
-		if isRuntimeSymbol {
-			sym = "%s"
+		if isRuntimeSymbol(sym) {
+			sym = runtimePlaceholder()
 		}
 
 		tf := normalizeTimeframe(call.Timeframe)
+		if isRuntimeTimeframe(tf) {
+			tf = runtimePlaceholder()
+		}
+
 		key := fmt.Sprintf("%s:%s", sym, tf)
 		dedupMap[key] = append(dedupMap[key], call)
 	}
-
-	/* Don't create new map - use parameter passed to function */
 
 	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
@@ -69,22 +69,36 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		tf := parts[len(parts)-1]
 		sym := strings.Join(parts[:len(parts)-1], ":")
 
-		isPlaceholder := sym == "%s"
+		isSymbolPlaceholder := sym == runtimePlaceholder()
+		isTimeframePlaceholder := tf == runtimePlaceholder()
 
 		symbolCode := "ctx.Symbol"
-		if !isPlaceholder {
+		if !isSymbolPlaceholder {
 			symbolCode = fmt.Sprintf("%q", firstCall.Symbol)
 		}
 
+		timeframeCode := "ctx.Timeframe"
 		timeframe := normalizeTimeframe(tf)
-		varName := generateContextVarName(key, isPlaceholder)
-
-		runtimeKey := key
-		if isPlaceholder {
-			runtimeKey = fmt.Sprintf("%%s:%s", tf)
+		if !isTimeframePlaceholder {
+			timeframeCode = fmt.Sprintf("%q", timeframe)
 		}
 
-		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
+		varName := generateContextVarName(key, isSymbolPlaceholder, isTimeframePlaceholder)
+
+		runtimeKey := key
+		if isSymbolPlaceholder && isTimeframePlaceholder {
+			runtimeKey = fmt.Sprintf("%%s:%%s")
+		} else if isSymbolPlaceholder {
+			runtimeKey = fmt.Sprintf("%%s:%s", tf)
+		} else if isTimeframePlaceholder {
+			runtimeKey = fmt.Sprintf("%s:%%s", sym)
+		}
+
+		if isTimeframePlaceholder {
+			codeBuilder.WriteString("\tsecTimeframeSeconds = context.TimeframeToSeconds(ctx.Timeframe)\n")
+		} else {
+			codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
+		}
 		codeBuilder.WriteString("\tif secTimeframeSeconds == 0 {\n")
 		codeBuilder.WriteString("\t\tsecTimeframeSeconds = baseTimeframeSeconds\n")
 		codeBuilder.WriteString("\t}\n")
@@ -116,28 +130,37 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\t\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = baseSecurityBars + requiredWarmup\n", varName))
 		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %q, %s_limit)\n",
-			varName, varName, symbolCode, timeframe, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %s, %s_limit)\n",
+			varName, varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_err != nil {\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %q, %s_err)\n", symbolCode, timeframe, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %s, %s_err)\n", symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
 		codeBuilder.WriteString("\t}\n")
 
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %q, len(%s_data))\n",
-			varName, symbolCode, timeframe, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
+			varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")
 
-		if isPlaceholder {
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n", runtimeKey, varName))
+		if isSymbolPlaceholder || isTimeframePlaceholder {
+			var runtimeKeyArgs []string
+			if isSymbolPlaceholder {
+				runtimeKeyArgs = append(runtimeKeyArgs, "ctx.Symbol")
+			}
+			if isTimeframePlaceholder {
+				runtimeKeyArgs = append(runtimeKeyArgs, "ctx.Timeframe")
+			}
+			keyExpr := fmt.Sprintf("fmt.Sprintf(%q, %s)", runtimeKey, strings.Join(runtimeKeyArgs, ", "))
+
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%s] = %s_ctx\n", keyExpr, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
 			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString("\t} else {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString("\t}\n")
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[fmt.Sprintf(%q, ctx.Symbol)] = %s_mapper\n\n", runtimeKey, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%s] = %s_mapper\n\n", keyExpr, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", key, varName))
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
@@ -274,10 +297,20 @@ func normalizeTimeframe(tf string) string {
 }
 
 /* generateContextVarName creates unique variable name for each symbol:timeframe */
-func generateContextVarName(key string, isPlaceholder bool) string {
-	if isPlaceholder {
-		parts := strings.Split(key, ":")
-		return sanitizeVarName(fmt.Sprintf("sec_%s", parts[1]))
+func generateContextVarName(key string, isSymbolPlaceholder, isTimeframePlaceholder bool) string {
+	parts := strings.Split(key, ":")
+	if len(parts) < 2 {
+		return sanitizeVarName(key)
+	}
+	sym := strings.Join(parts[:len(parts)-1], ":")
+	tf := parts[len(parts)-1]
+
+	if isSymbolPlaceholder && isTimeframePlaceholder {
+		return "sec_runtime"
+	} else if isSymbolPlaceholder {
+		return sanitizeVarName(fmt.Sprintf("sec_runtime_%s", tf))
+	} else if isTimeframePlaceholder {
+		return sanitizeVarName(fmt.Sprintf("sec_%s_runtime", sym))
 	}
 	return sanitizeVarName(key)
 }
