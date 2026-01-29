@@ -23,4 +23,8 @@
 | **21** | **Codegen** | `ObjectExpression` in expression generator | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ObjectExpression" | - |
 | **22** | **Codegen** | `ArrowFunctionExpression` inline | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ArrowFunctionExpression" | - |
 | **23** | **Codegen** | Arrow accessor literal argument | RESOLVED | `highest(2)` now compiles via TAFunctionSignatureRegistry + ArrowTACallSignatureResolver | zigzag-pa.pine |
+| **24** | **Codegen** | Arrow TA: implicit OHLC builtins (ta.tr, ta.atr) | VALID | ta.tr() 0-arg, ta.atr(length) 1-arg use implicit high/low/close, need dedicated IIFE generators | - |
+| **25** | **Codegen** | Arrow TA: dual-period functions (ta.pivothigh, ta.pivotlow) | VALID | Dual-period interface implemented, no strategy uses pivot in arrow context | - |
+| **26** | **Codegen** | Arrow TA: multi-output tuples (ta.bb, ta.macd, ta.stoch) | VALID | Return tuples, need TupleIndicatorRegistry routing in arrow context | - |
+
 

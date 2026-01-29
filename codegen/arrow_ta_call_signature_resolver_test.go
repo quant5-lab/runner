@@ -457,13 +457,13 @@ func TestArrowTACallSignatureResolver_UnknownFunctionHandling(t *testing.T) {
 
 			resolved, err := resolver.ResolveCall(fn, call)
 			if err == nil {
-				t.Errorf("ResolveCall(%q) expected error for unknown function, got nil", fn)
+				t.Errorf("ResolveCall(%q) expected error for unknown function with 1 arg, got nil", fn)
 			}
 			if resolved != nil {
-				t.Errorf("ResolveCall(%q) expected nil result for unknown function, got %+v", fn, resolved)
+				t.Errorf("ResolveCall(%q) expected nil result for unknown function with 1 arg, got %+v", fn, resolved)
 			}
 			if err != nil && err.Error() != "" {
-				expectedSubstring := "unknown TA function"
+				expectedSubstring := "requires exactly 2 arguments"
 				if !stringContains(err.Error(), expectedSubstring) {
 					t.Errorf("ResolveCall(%q) error message should contain %q, got: %v", fn, expectedSubstring, err)
 				}
@@ -549,6 +549,382 @@ func TestArrowTACallSignatureResolver_ExpressionTypeVariety(t *testing.T) {
 
 		if _, ok := resolved.SourceExpr.(*ast.BinaryExpression); !ok {
 			t.Errorf("ResolveCall should preserve BinaryExpression, got %T", resolved.SourceExpr)
+		}
+	})
+}
+
+func TestArrowTACallSignatureResolver_UnknownFunctionFallback(t *testing.T) {
+	registry := NewTAFunctionSignatureRegistry()
+	resolver := NewArrowTACallSignatureResolver(registry)
+
+	t.Run("two arg functions use explicit source and length", func(t *testing.T) {
+		unknownFunctions := []string{
+			"ta.atr",
+			"ta.alma",
+			"ta.bb",
+			"ta.cci",
+			"ta.cmo",
+			"ta.cog",
+			"ta.dmi",
+			"ta.mfi",
+			"ta.mom",
+			"ta.roc",
+			"ta.tsi",
+			"ta.vwap",
+			"ta.tr",
+			"custom_indicator",
+			"my_ta_function",
+		}
+
+		for _, fn := range unknownFunctions {
+			t.Run(fn, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: "14"},
+					},
+				}
+
+				resolved, err := resolver.ResolveCall(fn, call)
+				if err != nil {
+					t.Fatalf("unknown function %q with 2 args should not error: %v", fn, err)
+				}
+				if resolved == nil {
+					t.Fatalf("unknown function %q returned nil", fn)
+				}
+				if resolved.SourceExpr == nil {
+					t.Errorf("unknown function %q should have SourceExpr", fn)
+				}
+				if resolved.LengthExpr == nil {
+					t.Errorf("unknown function %q should have LengthExpr", fn)
+				}
+				if resolved.NeedsDefaultSource {
+					t.Errorf("unknown function %q should not need default source", fn)
+				}
+				if resolved.DefaultSourceName != "" {
+					t.Errorf("unknown function %q should have empty DefaultSourceName, got %q", fn, resolved.DefaultSourceName)
+				}
+
+				sourceIdent, ok := resolved.SourceExpr.(*ast.Identifier)
+				if !ok {
+					t.Errorf("unknown function %q SourceExpr should be *ast.Identifier, got %T", fn, resolved.SourceExpr)
+				} else if sourceIdent.Name != "close" {
+					t.Errorf("unknown function %q SourceExpr.Name = %q, want \"close\"", fn, sourceIdent.Name)
+				}
+
+				lengthLit, ok := resolved.LengthExpr.(*ast.Literal)
+				if !ok {
+					t.Errorf("unknown function %q LengthExpr should be *ast.Literal, got %T", fn, resolved.LengthExpr)
+				} else if lengthLit.Value != "14" {
+					t.Errorf("unknown function %q LengthExpr.Value = %v, want \"14\"", fn, lengthLit.Value)
+				}
+			})
+		}
+	})
+
+	t.Run("complex expressions preserved in fallback", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			sourceExpr ast.Expression
+			lengthExpr ast.Expression
+		}{
+			{
+				name:       "binary expression source",
+				sourceExpr: &ast.BinaryExpression{Left: &ast.Identifier{Name: "high"}, Operator: "+", Right: &ast.Identifier{Name: "low"}},
+				lengthExpr: &ast.Literal{Value: "20"},
+			},
+			{
+				name: "conditional expression source",
+				sourceExpr: &ast.ConditionalExpression{
+					Test:       &ast.BinaryExpression{Left: &ast.Identifier{Name: "x"}, Operator: ">", Right: &ast.Literal{Value: "0"}},
+					Consequent: &ast.Identifier{Name: "x"},
+					Alternate:  &ast.Literal{Value: "0"},
+				},
+				lengthExpr: &ast.Literal{Value: "14"},
+			},
+			{
+				name:       "call expression source",
+				sourceExpr: &ast.CallExpression{Callee: &ast.Identifier{Name: "abs"}, Arguments: []ast.Expression{&ast.Identifier{Name: "diff"}}},
+				lengthExpr: &ast.Literal{Value: "10"},
+			},
+			{
+				name:       "identifier length",
+				sourceExpr: &ast.Identifier{Name: "volume"},
+				lengthExpr: &ast.Identifier{Name: "period"},
+			},
+			{
+				name:       "binary expression length",
+				sourceExpr: &ast.Identifier{Name: "close"},
+				lengthExpr: &ast.BinaryExpression{Left: &ast.Identifier{Name: "len"}, Operator: "*", Right: &ast.Literal{Value: "2"}},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Arguments: []ast.Expression{tt.sourceExpr, tt.lengthExpr},
+				}
+
+				resolved, err := resolver.ResolveCall("ta.unknown", call)
+				if err != nil {
+					t.Fatalf("fallback with complex expressions should not error: %v", err)
+				}
+				if resolved == nil {
+					t.Fatal("fallback returned nil")
+				}
+
+				if resolved.SourceExpr != tt.sourceExpr {
+					t.Errorf("SourceExpr not preserved: got %T, want %T", resolved.SourceExpr, tt.sourceExpr)
+				}
+				if resolved.LengthExpr != tt.lengthExpr {
+					t.Errorf("LengthExpr not preserved: got %T, want %T", resolved.LengthExpr, tt.lengthExpr)
+				}
+			})
+		}
+	})
+
+	t.Run("invalid argument counts return clear errors", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			argCount int
+			args     []ast.Expression
+		}{
+			{
+				name:     "zero args",
+				argCount: 0,
+				args:     []ast.Expression{},
+			},
+			{
+				name:     "one arg",
+				argCount: 1,
+				args:     []ast.Expression{&ast.Literal{Value: "14"}},
+			},
+			{
+				name:     "three args",
+				argCount: 3,
+				args:     []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: "14"}, &ast.Literal{Value: "2"}},
+			},
+			{
+				name:     "four args",
+				argCount: 4,
+				args: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: "14"},
+					&ast.Literal{Value: "2"},
+					&ast.Literal{Value: "1"},
+				},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				call := &ast.CallExpression{Arguments: tt.args}
+
+				resolved, err := resolver.ResolveCall("ta.unknown", call)
+				if err == nil {
+					t.Errorf("expected error for %d args, got nil", tt.argCount)
+				}
+				if resolved != nil {
+					t.Errorf("expected nil result for %d args, got %+v", tt.argCount, resolved)
+				}
+				if err != nil && !stringContains(err.Error(), "requires exactly 2 arguments") {
+					t.Errorf("error message should mention 2 arguments requirement, got: %v", err)
+				}
+				if err != nil && !stringContains(err.Error(), "source, length") {
+					t.Errorf("error message should mention source and length, got: %v", err)
+				}
+			})
+		}
+	})
+
+	t.Run("fallback does not interfere with registered functions", func(t *testing.T) {
+		registeredFunctions := []struct {
+			name          string
+			defaultSource string
+		}{
+			{"highest", "high"},
+			{"ta.sma", ""},
+			{"ta.ema", ""},
+			{"change", ""},
+		}
+
+		for _, fn := range registeredFunctions {
+			t.Run(fn.name, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: "14"},
+					},
+				}
+
+				resolved, err := resolver.ResolveCall(fn.name, call)
+				if err != nil {
+					t.Fatalf("registered function %q should resolve: %v", fn.name, err)
+				}
+				if resolved == nil {
+					t.Fatalf("registered function %q returned nil", fn.name)
+				}
+
+				if fn.defaultSource != "" {
+					if resolved.NeedsDefaultSource {
+						t.Errorf("registered function %q with 2 args should not need default source", fn.name)
+					}
+				}
+			})
+		}
+	})
+}
+
+func TestArrowTACallSignatureResolver_ArgumentCountBoundaries(t *testing.T) {
+	registry := NewTAFunctionSignatureRegistry()
+	resolver := NewArrowTACallSignatureResolver(registry)
+
+	t.Run("zero arguments across all patterns", func(t *testing.T) {
+		testFunctions := []string{
+			"highest",
+			"ta.sma",
+			"change",
+			"ta.unknown",
+		}
+
+		for _, fn := range testFunctions {
+			t.Run(fn, func(t *testing.T) {
+				call := &ast.CallExpression{Arguments: []ast.Expression{}}
+				resolved, err := resolver.ResolveCall(fn, call)
+
+				if err == nil {
+					t.Errorf("%q with 0 args should error", fn)
+				}
+				if resolved != nil {
+					t.Errorf("%q with 0 args should return nil, got %+v", fn, resolved)
+				}
+			})
+		}
+	})
+
+	t.Run("excessive arguments across all patterns", func(t *testing.T) {
+		excessiveArgs := []ast.Expression{
+			&ast.Identifier{Name: "arg1"},
+			&ast.Identifier{Name: "arg2"},
+			&ast.Identifier{Name: "arg3"},
+			&ast.Identifier{Name: "arg4"},
+			&ast.Identifier{Name: "arg5"},
+		}
+
+		testFunctions := []string{
+			"highest",
+			"ta.sma",
+			"change",
+			"ta.unknown",
+		}
+
+		for _, fn := range testFunctions {
+			t.Run(fn, func(t *testing.T) {
+				call := &ast.CallExpression{Arguments: excessiveArgs}
+				resolved, err := resolver.ResolveCall(fn, call)
+
+				if err == nil {
+					t.Errorf("%q with 5 args should error", fn)
+				}
+				if resolved != nil {
+					t.Errorf("%q with 5 args should return nil, got %+v", fn, resolved)
+				}
+			})
+		}
+	})
+}
+
+func TestArrowTACallSignatureResolver_EdgeCases(t *testing.T) {
+	registry := NewTAFunctionSignatureRegistry()
+	resolver := NewArrowTACallSignatureResolver(registry)
+
+	t.Run("empty function name", func(t *testing.T) {
+		call := &ast.CallExpression{
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Literal{Value: "14"},
+			},
+		}
+
+		resolved, err := resolver.ResolveCall("", call)
+		if err == nil && resolved != nil {
+			if resolved.SourceExpr == nil || resolved.LengthExpr == nil {
+				t.Error("fallback should populate both SourceExpr and LengthExpr")
+			}
+		}
+	})
+
+	t.Run("nil expression in arguments", func(t *testing.T) {
+		call := &ast.CallExpression{
+			Arguments: []ast.Expression{nil, &ast.Literal{Value: "14"}},
+		}
+
+		_, err := resolver.ResolveCall("ta.sma", call)
+		if err != nil {
+			return
+		}
+	})
+
+	t.Run("mixed namespace and bare function names", func(t *testing.T) {
+		pairs := [][2]string{
+			{"highest", "ta.highest"},
+			{"sma", "ta.sma"},
+			{"change", "ta.change"},
+		}
+
+		for _, pair := range pairs {
+			bare, namespaced := pair[0], pair[1]
+			t.Run(bare+" vs "+namespaced, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Arguments: []ast.Expression{
+						&ast.Literal{Value: "10"},
+					},
+				}
+
+				resolved1, err1 := resolver.ResolveCall(bare, call)
+				resolved2, err2 := resolver.ResolveCall(namespaced, call)
+
+				if (err1 == nil) != (err2 == nil) {
+					t.Errorf("bare and namespaced should have same error state: %v vs %v", err1, err2)
+				}
+
+				if resolved1 != nil && resolved2 != nil {
+					if resolved1.NeedsDefaultSource != resolved2.NeedsDefaultSource {
+						t.Errorf("bare and namespaced should have same NeedsDefaultSource: %v vs %v",
+							resolved1.NeedsDefaultSource, resolved2.NeedsDefaultSource)
+					}
+					if resolved1.DefaultSourceName != resolved2.DefaultSourceName {
+						t.Errorf("bare and namespaced should have same DefaultSourceName: %q vs %q",
+							resolved1.DefaultSourceName, resolved2.DefaultSourceName)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("special characters in function names", func(t *testing.T) {
+		specialNames := []string{
+			"ta._internal",
+			"ta.123invalid",
+			"ta.",
+			".function",
+			"ta..double",
+		}
+
+		for _, fn := range specialNames {
+			t.Run(fn, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: "14"},
+					},
+				}
+
+				_, err := resolver.ResolveCall(fn, call)
+				if err != nil {
+					return
+				}
+			})
 		}
 	})
 }

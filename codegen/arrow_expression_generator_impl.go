@@ -107,13 +107,11 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 }
 
 func isTAFunction(funcName string) bool {
+	if len(funcName) > 3 && funcName[:3] == "ta." {
+		return true
+	}
 	switch funcName {
-	case "ta.sma", "ta.ema", "ta.rma", "ta.wma", "ta.stdev",
-		"ta.highest", "ta.lowest", "ta.change",
-		"ta.crossover", "ta.crossunder",
-		"ta.pivothigh", "ta.pivotlow",
-		"ta.rsi",
-		"sma", "ema", "rma", "wma", "stdev",
+	case "sma", "ema", "rma", "wma", "stdev",
 		"highest", "lowest", "change",
 		"crossover", "crossunder",
 		"rsi":

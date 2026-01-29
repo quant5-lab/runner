@@ -25,11 +25,11 @@ func NewArrowTACallSignatureResolver(registry *TAFunctionSignatureRegistry) *Arr
 
 func (r *ArrowTACallSignatureResolver) ResolveCall(functionName string, call *ast.CallExpression) (*ResolvedTACall, error) {
 	signature, exists := r.registry.GetSignature(functionName)
-	if !exists {
-		return nil, fmt.Errorf("unknown TA function: %s", functionName)
-	}
-
 	argCount := len(call.Arguments)
+
+	if !exists {
+		return r.resolveFallback(call, argCount)
+	}
 
 	switch signature.ArgumentPattern {
 	case TAPatternSingleArgIsLength:
@@ -41,6 +41,18 @@ func (r *ArrowTACallSignatureResolver) ResolveCall(functionName string, call *as
 	default:
 		return nil, fmt.Errorf("unsupported argument pattern: %v", signature.ArgumentPattern)
 	}
+}
+
+func (r *ArrowTACallSignatureResolver) resolveFallback(call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {
+	if argCount == 2 {
+		return &ResolvedTACall{
+			SourceExpr:         call.Arguments[0],
+			LengthExpr:         call.Arguments[1],
+			NeedsDefaultSource: false,
+			DefaultSourceName:  "",
+		}, nil
+	}
+	return nil, fmt.Errorf("unknown function requires exactly 2 arguments (source, length), got %d", argCount)
 }
 
 func (r *ArrowTACallSignatureResolver) resolveSingleArgIsLength(signature TAFunctionSignature, call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {

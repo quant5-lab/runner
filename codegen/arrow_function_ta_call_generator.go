@@ -52,8 +52,10 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return a.generateFixnanIIFE(call)
 	}
 
-	if !a.iifeRegistry.IsSupported(funcName) {
-		return "", fmt.Errorf("TA function %s not supported in arrow function context", funcName)
+	// Special case: pivot functions use dual-period interface
+	pivotResolver := NewPivotSignatureResolver()
+	if pivotResolver.IsPivotFunction(funcName) {
+		return a.generatePivotCall(funcName, call)
 	}
 
 	accessor, periodExpr, err := a.extractTAArguments(funcName, call)
@@ -70,7 +72,7 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 
 	code, ok := a.iifeRegistry.Generate(funcName, accessor, periodExpr, sourceHash)
 	if !ok {
-		return "", fmt.Errorf("failed to generate IIFE for %s", funcName)
+		return "", fmt.Errorf("TA function %s requires IIFE generator implementation", funcName)
 	}
 
 	return code, nil
@@ -92,6 +94,39 @@ func (a *ArrowFunctionTACallGenerator) generateFixnanIIFE(call *ast.CallExpressi
 	}
 
 	return fmt.Sprintf("func() float64 { val := %s; if math.IsNaN(val) { return 0.0 }; return val }()", sourceCode), nil
+}
+
+func (a *ArrowFunctionTACallGenerator) generatePivotCall(funcName string, call *ast.CallExpression) (string, error) {
+	pivotResolver := NewPivotSignatureResolver()
+	resolved, err := pivotResolver.Resolve(funcName, call)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve pivot signature: %w", err)
+	}
+
+	accessor, err := a.accessorFactory.CreateAccessorForExpression(resolved.SourceExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for pivot source: %w", err)
+	}
+
+	leftPeriod, err := a.extractPeriodExpression(resolved.LeftPeriod)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract left period: %w", err)
+	}
+
+	rightPeriod, err := a.extractPeriodExpression(resolved.RightPeriod)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract right period: %w", err)
+	}
+
+	hasher := &ExpressionHasher{}
+	sourceHash := hasher.Hash(resolved.SourceExpr)
+
+	code, ok := a.iifeRegistry.GenerateDualPeriod(funcName, accessor, leftPeriod, rightPeriod, sourceHash)
+	if !ok {
+		return "", fmt.Errorf("pivot function %s requires dual-period IIFE generator", funcName)
+	}
+
+	return code, nil
 }
 
 func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {
