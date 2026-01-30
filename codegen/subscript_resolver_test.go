@@ -185,14 +185,65 @@ func TestSubscriptResolver_AllBuiltinSeries(t *testing.T) {
 		t.Run(builtin, func(t *testing.T) {
 			result := sr.ResolveSubscript(builtin, indexExpr, g)
 
-			// Should NOT use builtin name + "Series" pattern (e.g., "closeSeries")
 			builtinSeries := builtin + "Series"
 			if strings.Contains(result, builtinSeries) {
 				t.Errorf("builtin %s should not use %s: %s", builtin, builtinSeries, result)
 			}
-			// Should use ctx.Data access
 			if !strings.Contains(result, "ctx.Data") {
 				t.Errorf("builtin %s should use ctx.Data: %s", builtin, result)
+			}
+		})
+	}
+}
+
+func TestSubscriptResolver_BarIndexHistoricalAccess(t *testing.T) {
+	sr := NewSubscriptResolver()
+	g := &generator{
+		variables: make(map[string]string),
+		constants: make(map[string]interface{}),
+	}
+
+	tests := []struct {
+		name      string
+		indexExpr ast.Expression
+		expected  string
+	}{
+		{
+			name:      "literal offset 0",
+			indexExpr: &ast.Literal{Value: float64(0)},
+			expected:  "bar_indexSeries.Get(0)",
+		},
+		{
+			name:      "literal offset 1",
+			indexExpr: &ast.Literal{Value: float64(1)},
+			expected:  "bar_indexSeries.Get(1)",
+		},
+		{
+			name:      "literal offset 5",
+			indexExpr: &ast.Literal{Value: float64(5)},
+			expected:  "bar_indexSeries.Get(5)",
+		},
+		{
+			name:      "variable offset",
+			indexExpr: &ast.Identifier{Name: "offset"},
+			expected:  "bar_indexSeries.Get(int(offsetSeries.GetCurrent()))",
+		},
+		{
+			name: "expression offset",
+			indexExpr: &ast.BinaryExpression{
+				Operator: "*",
+				Left:     &ast.Identifier{Name: "period"},
+				Right:    &ast.Literal{Value: 2.0},
+			},
+			expected: "bar_indexSeries.Get(int((periodSeries.GetCurrent() * 2)))",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sr.ResolveSubscript("bar_index", tt.indexExpr, g)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
 	}

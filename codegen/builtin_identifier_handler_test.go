@@ -92,12 +92,11 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess_TrueRange(t *testing.
 
 	result := handler.GenerateCurrentBarAccess("tr")
 
-	/* Verify tr generates inline calculation with expected components */
 	expectedComponents := []string{
 		"bar.High", "bar.Low",
-		"ctx.Data", "Close", /* prevClose from previous bar */
+		"ctx.Data", "Close",
 		"math.Max", "math.Abs",
-		"if ctx.BarIndex < 1", /* First bar edge case */
+		"if ctx.BarIndex < 1",
 	}
 
 	for _, component := range expectedComponents {
@@ -106,7 +105,6 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess_TrueRange(t *testing.
 		}
 	}
 
-	/* Verify IIFE wrapper */
 	if !contains(result, "func() float64") {
 		t.Errorf("GenerateCurrentBarAccess(tr) should wrap in IIFE\nGot: %s", result)
 	}
@@ -142,13 +140,12 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess_TrueRange(t *tes
 
 	result := handler.GenerateSecurityContextAccess("tr")
 
-	/* Verify tr in security() context generates inline calculation */
 	expectedComponents := []string{
 		"ctx.Data[ctx.BarIndex].High",
 		"ctx.Data[ctx.BarIndex].Low",
-		"Close", /* prevClose from previous bar */
+		"Close",
 		"math.Max", "math.Abs",
-		"if ctx.BarIndex < 1", /* First bar edge case */
+		"if ctx.BarIndex < 1",
 	}
 
 	for _, component := range expectedComponents {
@@ -157,7 +154,6 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess_TrueRange(t *tes
 		}
 	}
 
-	/* Verify IIFE wrapper */
 	if !contains(result, "func() float64") {
 		t.Errorf("GenerateSecurityContextAccess(tr) should wrap in IIFE\nGot: %s", result)
 	}
@@ -190,6 +186,18 @@ func TestBuiltinIdentifierHandler_GenerateHistoricalAccess(t *testing.T) {
 			10,
 			"func() float64 { if i-10 >= 0 { return ctx.Data[i-10].High }; return math.NaN() }()",
 		},
+		{
+			"bar_index[1]",
+			"bar_index",
+			1,
+			"bar_indexSeries.Get(1)",
+		},
+		{
+			"bar_index[5]",
+			"bar_index",
+			5,
+			"bar_indexSeries.Get(5)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -218,7 +226,6 @@ func TestBuiltinIdentifierHandler_GenerateHistoricalAccess_TrueRange(t *testing.
 		t.Run(tt.name, func(t *testing.T) {
 			result := handler.GenerateHistoricalAccess("tr", tt.offset)
 
-			/* Verify historical tr access generates inline calculation with offset */
 			expectedComponents := []string{
 				"func() float64",
 				"ctx.Data",
@@ -310,7 +317,6 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier_TrueRange(t *testing.T) {
 			}
 
 			if resolved {
-				/* Verify tr generates inline calculation */
 				expectedComponents := []string{"math.Max", "High", "Low", "Close"}
 				for _, component := range expectedComponents {
 					if !contains(code, component) {

@@ -1,6 +1,6 @@
 | # | Category | Blocker | Status | Evidence | Blocks |
 |---|----------|---------|--------|----------|--------|
-| **1** | **Codegen** | `bar_index` historical access | VALID | Generates `prevBarIndexSeries.Set()` with missing argument | test-bar-index-*.pine |
+| **1** | **Codegen** | `bar_index` historical access | RESOLVED | `bar_indexSeries.Get(N)` for literal/variable/loop offsets | test-bar-index-*.pine |
 | **2** | **Codegen** | String functions (`str.*`) | VALID | `str.tostring()`, `str.tonumber()`, `str.split()` not implemented | - |
 | **3** | **Parser** | `while` loops | VALID | Not implemented in grammar/codegen | - |
 | **4** | **Parser** | `varip` declarations | VALID | Not implemented. No matches in codegen/*.go | - |

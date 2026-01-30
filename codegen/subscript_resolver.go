@@ -34,6 +34,9 @@ func (sr *SubscriptResolver) ResolveSubscript(seriesName string, indexExpr ast.E
 	if ident, ok := indexExpr.(*ast.Identifier); ok {
 		isLoopCounter := g.loopContextStack != nil && g.loopContextStack.IsLoopCounter(ident.Name)
 		if isLoopCounter {
+			if seriesName == "bar_index" {
+				return fmt.Sprintf("bar_indexSeries.Get(%s)", ident.Name)
+			}
 			if seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" {
 				// Arrow functions use ctx.Data access, main body uses Series
 				if g.inArrowFunctionBody {
@@ -49,6 +52,10 @@ func (sr *SubscriptResolver) ResolveSubscript(seriesName string, indexExpr ast.E
 		if floatVal, ok := lit.Value.(float64); ok {
 			intVal := int(floatVal)
 
+			if seriesName == "bar_index" {
+				return fmt.Sprintf("bar_indexSeries.Get(%d)", intVal)
+			}
+
 			// For built-in series, use ctx.Data access
 			if seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" {
 				if intVal == 0 {
@@ -63,6 +70,10 @@ func (sr *SubscriptResolver) ResolveSubscript(seriesName string, indexExpr ast.E
 
 	// Variable index - evaluate expression using generator's extractSeriesExpression
 	indexCode := g.extractSeriesExpression(indexExpr)
+
+	if seriesName == "bar_index" {
+		return fmt.Sprintf("bar_indexSeries.Get(int(%s))", indexCode)
+	}
 
 	// For built-in series with variable index, need to use ctx.Data[i-index]
 	if seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" {

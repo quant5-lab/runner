@@ -104,6 +104,10 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		return fmt.Sprintf("func() float64 { if i-%d >= 0 { return %s }; return math.NaN() }()", offset, formula)
 	}
 
+	if name == "bar_index" {
+		return fmt.Sprintf("bar_indexSeries.Get(%d)", offset)
+	}
+
 	field := ""
 	switch name {
 	case "close":

@@ -2,26 +2,30 @@
 indicator("bar_index Historical Access", overlay=false)
 
 // Pattern: Historical reference of bar_index
-// Tests: bar_index[N] lookback
+// Tests: bar_index[N] lookback with literal offsets
 
-// Test 1: Previous bar index
+// Test 1: Zero offset - current bar
+currentBarIndex = bar_index[0]
+
+// Test 2: Previous bar index
 prevBarIndex = bar_index[1]
 
-// Test 2: Two bars ago
+// Test 3: Two bars ago
 twoBack = bar_index[2]
 
-// Test 3: Difference between current and previous
+// Test 4: Difference between current and previous
 barDiff = bar_index - nz(bar_index[1])
 
-// Test 4: Check if bar index incremented by 1
+// Test 5: Check if bar index incremented by 1
 incrementedBy1 = (bar_index - nz(bar_index[1])) == 1 ? 1 : 0
 
-// Test 5: Bar index history tracking
+// Test 6: Bar index history tracking
 barHistory0 = bar_index
 barHistory1 = bar_index[1]
 barHistory2 = bar_index[2]
 barHistory3 = bar_index[3]
 
+plot(currentBarIndex, "Current Bar Index [0]", color=color.white)
 plot(prevBarIndex, "Previous Bar Index", color=color.blue)
 plot(twoBack, "Two Bars Back", color=color.green)
 plot(barDiff, "Bar Difference", color=color.orange)
@@ -30,3 +34,4 @@ plot(barHistory0, "History [0]", color=color.purple)
 plot(barHistory1, "History [1]", color=color.gray)
 plot(barHistory2, "History [2]", color=color.yellow)
 plot(barHistory3, "History [3]", color=color.maroon)
+

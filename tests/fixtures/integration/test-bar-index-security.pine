@@ -2,7 +2,7 @@
 indicator("bar_index in security() - CRITICAL", overlay=false)
 
 // CRITICAL TEST: bar_index inside security() context
-// This is the exact bb9 bug pattern that was failing
+// Tests current bar_index AND historical bar_index[N] access
 
 // Test 1: bar_index in security context (basic)
 secBarIndex = security(syminfo.tickerid, "1D", bar_index)
@@ -17,8 +17,15 @@ secDoubled = security(syminfo.tickerid, "1D", bar_index * 2)
 // Test 4: bar_index comparison in security
 secGtTen = security(syminfo.tickerid, "1D", bar_index > 10)
 
+// Test 5: Historical bar_index access in security context
+secPrevBarIndex = security(syminfo.tickerid, "1D", bar_index[1])
+secTwoBack = security(syminfo.tickerid, "1D", bar_index[2])
+
 plot(secBarIndex, "Security Bar Index", color=color.blue)
 plot(secMod20Condition ? 1 : 0, "Security Mod 20", color=color.red)
 plot(secMod20Value, "Security Mod 20 Value", color=color.green)
 plot(secDoubled, "Security Doubled", color=color.orange)
 plot(secGtTen ? 1 : 0, "Security > 10", color=color.purple)
+plot(secPrevBarIndex, "Security Previous Bar", color=color.yellow)
+plot(secTwoBack, "Security Two Back", color=color.maroon)
+
