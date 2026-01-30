@@ -498,6 +498,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				varType := g.inferVariableType(declarator.Init)
 				g.variables[varName] = varType
 				g.typeSystem.RegisterVariable(varName, varType)
+
+				/* Store string literal constants for security() resolution */
+				if varType == "string" {
+					if lit, ok := declarator.Init.(*ast.Literal); ok {
+						if strVal, ok := lit.Value.(string); ok {
+							g.constants[varName] = strVal
+							g.constantRegistry.Register(varName, strVal)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -2102,73 +2112,36 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 	switch funcName {
 	case "request.security", "security":
-		/* security(symbol, timeframe, expression) - runtime evaluation with cached context
-		 * 1. Lookup security context from prefetch cache
-		 * 2. Find matching bar index using timestamp alignment
-		 * 3. Evaluate expression in security context at that bar
-		 */
 		if len(call.Arguments) < 3 {
 			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // security() missing arguments\n", varName), nil
 		}
 
-		/* Extract symbol and timeframe literals */
-		symbolExpr := call.Arguments[0]
-		timeframeExpr := call.Arguments[1]
+		argExtractor := NewSecurityArgumentExtractor(g)
 
-		/* Get symbol string (tickerid → ctx.Symbol, literal → "BTCUSDT") */
-		symbolStr := ""
-		if id, ok := symbolExpr.(*ast.Identifier); ok {
-			if id.Name == "tickerid" {
-				symbolStr = "ctx.Symbol"
-			} else {
-				symbolStr = fmt.Sprintf("%q", id.Name)
-			}
-		} else if mem, ok := symbolExpr.(*ast.MemberExpression); ok {
-			/* syminfo.tickerid */
-			_ = mem
-			symbolStr = "ctx.Symbol"
-		} else if lit, ok := symbolExpr.(*ast.Literal); ok {
-			if s, ok := lit.Value.(string); ok {
-				symbolStr = fmt.Sprintf("%q", s)
-			}
+		symbolResult, err := argExtractor.ExtractSymbol(call.Arguments[0])
+		if err != nil {
+			return "", fmt.Errorf("failed to extract security symbol: %w", err)
 		}
 
-		/* Get timeframe string */
-		timeframeStr := ""
-		if lit, ok := timeframeExpr.(*ast.Literal); ok {
-			if s, ok := lit.Value.(string); ok {
-				tf := strings.Trim(s, "'\"") /* Strip Pine string quotes */
-				/* Normalize: D→1D, W→1W, M→1M */
-				if tf == "D" {
-					tf = "1D"
-				} else if tf == "W" {
-					tf = "1W"
-				} else if tf == "M" {
-					tf = "1M"
-				}
-				timeframeStr = tf /* Use normalized value directly without quoting yet */
-			}
-		}
-
-		if symbolStr == "" || timeframeStr == "" {
-			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
+		timeframeResult, err := argExtractor.ExtractTimeframe(call.Arguments[1])
+		if err != nil {
+			return "", fmt.Errorf("failed to extract security timeframe: %w", err)
 		}
 
 		g.hasSecurityCalls = true
 
-		/* Build cache key using normalized timeframe */
-		cacheKey := fmt.Sprintf("%%s:%s", timeframeStr)
-		if symbolStr == "ctx.Symbol" {
-			cacheKey = fmt.Sprintf("%s:%s", "%s", timeframeStr)
-		} else {
-			cacheKey = fmt.Sprintf("%s:%s", strings.Trim(symbolStr, `"`), timeframeStr)
-		}
+		keyBuilder := NewSecurityCacheKeyBuilder()
+		keyComponents := keyBuilder.Build(symbolResult, timeframeResult)
 
-		code := g.ind() + fmt.Sprintf("/* security(%s, %s, ...) */\n", symbolStr, timeframeStr)
+		code := g.ind() + fmt.Sprintf("/* security(%s, %s, ...) */\n", symbolResult.Code, timeframeResult.Code)
 		code += g.ind() + "{\n"
 		g.indent++
 
-		code += g.ind() + fmt.Sprintf("secKey := fmt.Sprintf(%q, %s)\n", cacheKey, symbolStr)
+		if keyComponents.FormatArgs == "" {
+			code += g.ind() + fmt.Sprintf("secKey := %q\n", keyComponents.KeyPattern)
+		} else {
+			code += g.ind() + fmt.Sprintf("secKey := fmt.Sprintf(%q, %s)\n", keyComponents.KeyPattern, keyComponents.FormatArgs)
+		}
 		code += g.ind() + "secCtx, secFound := securityContexts[secKey]\n"
 		code += g.ind() + "if !secFound {\n"
 		g.indent++
@@ -2208,7 +2181,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 		/* Calculate lookahead for bar mapper */
 		code += g.ind() + fmt.Sprintf("secLookahead := %v\n", lookahead)
-		code += g.ind() + fmt.Sprintf("if %q == ctx.Timeframe {\n", timeframeStr)
+		code += g.ind() + fmt.Sprintf("if %s == ctx.Timeframe {\n", timeframeResult.Code)
 		g.indent++
 		code += g.ind() + "secLookahead = true\n"
 		g.indent--

@@ -32,10 +32,12 @@ func matchSecurityCall(call *ast.CallExpression) *SecurityCall {
 	}
 
 	return &SecurityCall{
-		Symbol:     extractSymbol(call.Arguments[0]),
-		Timeframe:  extractTimeframe(call.Arguments[1]),
-		Expression: call.Arguments[2],
-		ExprName:   extractExpressionName(call.Arguments[2]),
+		Symbol:        extractSymbol(call.Arguments[0]),
+		Timeframe:     extractTimeframe(call.Arguments[1]),
+		Expression:    call.Arguments[2],
+		ExprName:      extractExpressionName(call.Arguments[2]),
+		SymbolExpr:    call.Arguments[0],
+		TimeframeExpr: call.Arguments[1],
 	}
 }
 

@@ -32,6 +32,14 @@ func (te *TypeInferenceEngine) InferType(expr ast.Expression) string {
 	}
 
 	switch e := expr.(type) {
+	case *ast.Literal:
+		if _, isString := e.Value.(string); isString {
+			return "string"
+		}
+		if _, isBool := e.Value.(bool); isBool {
+			return "bool"
+		}
+		return "float64"
 	case *ast.MemberExpression:
 		return te.inferMemberExpressionType(e)
 	case *ast.BinaryExpression:
