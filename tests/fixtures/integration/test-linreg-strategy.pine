@@ -1,0 +1,18 @@
+//@version=5
+strategy("Linreg Strategy Test", overlay=true)
+
+trend = ta.linreg(close, 20, 0)
+signal = ta.linreg(close, 5, 0)
+
+bullish = signal > trend
+bearish = signal < trend
+
+if bullish
+    strategy.entry("Long", strategy.long)
+
+if bearish
+    strategy.close("Long")
+
+plot(trend, "Trend", color=color.blue, linewidth=2)
+plot(signal, "Signal", color=color.orange, linewidth=1)
+bgcolor(bullish ? color.new(color.green, 90) : bearish ? color.new(color.red, 90) : na)

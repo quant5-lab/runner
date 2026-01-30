@@ -5,7 +5,7 @@
 | **3** | **Parser** | `while` loops | VALID | Not implemented in grammar/codegen | - |
 | **4** | **Parser** | `varip` declarations | VALID | Not implemented. No matches in codegen/*.go | - |
 | **5** | **Parser** | `map.new<K,V>()` generics | VALID | Parse error: "unexpected token ," on generic syntax | - |
-| **6** | **Codegen** | Unimplemented TA functions | VALID | `ta.linreg` generates TODO comment, not implemented | keltner-squeeze.pine |
+| **6** | **Codegen** | Unimplemented TA functions | RESOLVED | `ta.linreg` implemented with 3-argument signature (source, length, offset) | keltner-squeeze.pine |
 | **7** | **Parser** | `switch` expression | VALID | Parse error: "unexpected token =>" at line 31 | pivot-reversal.pine |
 | **8** | **Parser** | For-loop assignment outside var/variable | VALID | Parse error: "unexpected token =" at `gx = for i = 1 to per-1` | emperor-ma.pine |
 | **9** | **Codegen** | Array/map functions | VALID | `array.new_float()`, `array.push()`, `array.get()`, `map.*` not implemented | pivot-reversal.pine |
@@ -21,3 +21,4 @@
 | **19** | **Codegen** | `ArrowFunctionExpression` inline | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ArrowFunctionExpression" | - |
 | **20** | **Codegen** | Arrow TA: ta.atr (1-arg implicit OHLC) | VALID | "unknown function requires exactly 2 arguments, got 1" - needs 1-arg pattern in ArrowTACallSignatureResolver | - |
 | **21** | **Codegen** | Arrow TA: ta.pivothigh/ta.pivotlow (3-arg) | VALID | "unknown function requires exactly 2 arguments, got 3" - needs 3-arg pattern in ArrowTACallSignatureResolver | - |
+| **22** | **Codegen** | Arrow function IIFE missing warmup guard | VALID | Runtime panic: index out of range [-1] at ctx.Data[ctx.BarIndex-j] when BarIndex=0 | keltner-squeeze.pine |

@@ -52,6 +52,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&ValuewhenHandler{},
 			&HighestHandler{},
 			&LowestHandler{},
+			&LinregHandler{},
 		},
 	}
 }

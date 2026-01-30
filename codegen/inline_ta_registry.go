@@ -44,6 +44,8 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	r.Register("lowest", &LowestIIFEGenerator{namingStrategy: windowNamer})
 	r.Register("ta.change", &ChangeIIFEGenerator{namingStrategy: windowNamer})
 	r.Register("change", &ChangeIIFEGenerator{namingStrategy: windowNamer})
+	r.Register("ta.linreg", &LinregIIFEGenerator{namingStrategy: windowNamer})
+	r.Register("linreg", &LinregIIFEGenerator{namingStrategy: windowNamer})
 
 	r.Register("ta.ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
 	r.Register("ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
@@ -89,6 +91,17 @@ func (r *InlineTAIIFERegistry) GenerateDualPeriod(funcName string, accessor Acce
 	return gen.GenerateDualPeriod(accessor, leftPeriod, rightPeriod, sourceHash), true
 }
 
+func (r *InlineTAIIFERegistry) GenerateLinreg(accessor AccessGenerator, period PeriodExpression, offset int, sourceHash string) (string, bool) {
+	gen, ok := r.generators["ta.linreg"]
+	if !ok {
+		return "", false
+	}
+	if linregGen, ok := gen.(*LinregIIFEGenerator); ok {
+		return linregGen.GenerateWithOffset(accessor, period, offset, sourceHash), true
+	}
+	return "", false
+}
+
 type SMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type EMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
@@ -106,6 +119,8 @@ type HighestIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 type LowestIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type ChangeIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
+type LinregIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
@@ -198,6 +213,28 @@ func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset PeriodEx
 	body += "return current - previous"
 
 	warmupPeriod := offsetInt + 1 + accessor.GetBaseOffset()
+	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+}
+
+func (g *LinregIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	return g.GenerateWithOffset(accessor, period, 0, sourceHash)
+}
+
+func (g *LinregIIFEGenerator) GenerateWithOffset(accessor AccessGenerator, period PeriodExpression, offset int, sourceHash string) string {
+	periodInt := period.AsInt()
+	formulaMultiplier := periodInt - 1 - offset
+
+	body := "n := " + period.AsFloat64Cast() + "; "
+	body += "sumX := 0.0; sumY := 0.0; sumXY := 0.0; sumX2 := 0.0; "
+	body += fmt.Sprintf("for j := 0; j < %s; j++ { ", period.AsIntCast())
+	body += fmt.Sprintf("x := float64(j); y := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d - j - 1", periodInt)))
+	body += "sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x"
+	body += " }; "
+	body += "slope := (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX); "
+	body += "intercept := (sumY - slope * sumX) / n; "
+	body += fmt.Sprintf("return intercept + slope * float64(%d)", formulaMultiplier)
+
+	warmupPeriod := periodInt + accessor.GetBaseOffset()
 	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
 }
 

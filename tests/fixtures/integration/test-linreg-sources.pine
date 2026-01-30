@@ -1,0 +1,14 @@
+//@version=5
+indicator("Linreg Multiple Sources", overlay=true)
+
+linreg_close = ta.linreg(close, 14, 0)
+linreg_high = ta.linreg(high, 14, 0)
+linreg_low = ta.linreg(low, 14, 0)
+linreg_hl2 = ta.linreg(hl2, 14, 0)
+linreg_hlc3 = ta.linreg(hlc3, 14, 0)
+
+plot(linreg_close, "Close", color=color.blue, linewidth=2)
+plot(linreg_high, "High", color=color.green, linewidth=1)
+plot(linreg_low, "Low", color=color.red, linewidth=1)
+plot(linreg_hl2, "HL2", color=color.orange, linewidth=1)
+plot(linreg_hlc3, "HLC3", color=color.purple, linewidth=1)
