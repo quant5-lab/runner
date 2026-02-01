@@ -17,7 +17,6 @@ type TAFunctionHandler interface {
 	CanHandle(funcName string) bool
 
 	// GenerateCode produces the inline calculation code for this TA function.
-	// Returns the generated code string or an error if generation fails.
 	GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error)
 }
 
@@ -58,7 +57,6 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 }
 
 // FindHandler locates the appropriate handler for the given function name.
-// Returns nil if no handler can process this function.
 func (r *TAFunctionRegistry) FindHandler(funcName string) TAFunctionHandler {
 	for _, handler := range r.handlers {
 		if handler.CanHandle(funcName) {
@@ -87,12 +85,10 @@ func (r *TAFunctionRegistry) GenerateInlineTA(g *generator, varName string, func
 // normalizeFunctionName converts Pine v4 syntax to v5 (e.g., "sma" -> "ta.sma").
 // This ensures consistent function naming across different Pine versions.
 func normalizeFunctionName(funcName string) string {
-	// Already normalized (ta.xxx format)
 	if len(funcName) > 3 && funcName[:3] == "ta." {
 		return funcName
 	}
 
-	// Known v4 functions that need ta. prefix
 	v4Functions := map[string]bool{
 		"sma": true, "ema": true, "rma": true, "rsi": true,
 		"atr": true, "stdev": true, "change": true,

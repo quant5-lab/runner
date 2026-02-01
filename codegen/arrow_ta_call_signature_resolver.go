@@ -1,8 +1,6 @@
 package codegen
 
 import (
-	"fmt"
-
 	"github.com/quant5-lab/runner/ast"
 )
 
@@ -14,100 +12,53 @@ type ResolvedTACall struct {
 }
 
 type ArrowTACallSignatureResolver struct {
-	registry *TAFunctionSignatureRegistry
+	legacyRegistry    *TAFunctionSignatureRegistry
+	signatureRegistry *TASignatureRegistry
+	callResolver      *TACallResolver
 }
 
 func NewArrowTACallSignatureResolver(registry *TAFunctionSignatureRegistry) *ArrowTACallSignatureResolver {
+	signatureRegistry := NewTASignatureRegistry()
 	return &ArrowTACallSignatureResolver{
-		registry: registry,
+		legacyRegistry:    registry,
+		signatureRegistry: signatureRegistry,
+		callResolver:      NewTACallResolver(signatureRegistry),
 	}
 }
 
 func (r *ArrowTACallSignatureResolver) ResolveCall(functionName string, call *ast.CallExpression) (*ResolvedTACall, error) {
-	signature, exists := r.registry.GetSignature(functionName)
-	argCount := len(call.Arguments)
-
-	if !exists {
-		return r.resolveFallback(call, argCount)
+	newResolved, err := r.callResolver.Resolve(functionName, call)
+	if err != nil {
+		return nil, err
 	}
 
-	switch signature.ArgumentPattern {
-	case TAPatternSingleArgIsLength:
-		return r.resolveSingleArgIsLength(signature, call, argCount)
-	case TAPatternSingleArgIsSource:
-		return r.resolveSingleArgIsSource(call, argCount)
-	case TAPatternExplicitSourceAndLength:
-		return r.resolveExplicitSourceAndLength(call, argCount)
-	default:
-		return nil, fmt.Errorf("unsupported argument pattern: %v", signature.ArgumentPattern)
-	}
+	return r.adaptToLegacyFormat(newResolved), nil
 }
 
-func (r *ArrowTACallSignatureResolver) resolveFallback(call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {
-	if argCount == 2 {
-		return &ResolvedTACall{
-			SourceExpr:         call.Arguments[0],
-			LengthExpr:         call.Arguments[1],
-			NeedsDefaultSource: false,
-			DefaultSourceName:  "",
-		}, nil
-	}
-	return nil, fmt.Errorf("unknown function requires exactly 2 arguments (source, length), got %d", argCount)
-}
+func (r *ArrowTACallSignatureResolver) adaptToLegacyFormat(resolved *TAResolvedCall) *ResolvedTACall {
+	var sourceExpr ast.Expression
+	var lengthExpr ast.Expression
 
-func (r *ArrowTACallSignatureResolver) resolveSingleArgIsLength(signature TAFunctionSignature, call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {
-	if argCount == 1 {
-		return &ResolvedTACall{
-			SourceExpr:         nil,
-			LengthExpr:         call.Arguments[0],
-			NeedsDefaultSource: true,
-			DefaultSourceName:  signature.DefaultSource,
-		}, nil
+	if resolved.DefaultSourceApplied {
+		if len(resolved.SeriesArguments) > 1 {
+			sourceExpr = resolved.SeriesArguments[1]
+		}
+	} else {
+		if len(resolved.SeriesArguments) > 0 {
+			sourceExpr = resolved.SeriesArguments[0]
+		}
 	}
 
-	if argCount == 2 {
-		return &ResolvedTACall{
-			SourceExpr:         call.Arguments[0],
-			LengthExpr:         call.Arguments[1],
-			NeedsDefaultSource: false,
-			DefaultSourceName:  "",
-		}, nil
-	}
-
-	return nil, fmt.Errorf("expected 1 or 2 arguments, got %d", argCount)
-}
-
-func (r *ArrowTACallSignatureResolver) resolveSingleArgIsSource(call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {
-	if argCount == 1 {
-		return &ResolvedTACall{
-			SourceExpr:         call.Arguments[0],
-			LengthExpr:         &ast.Literal{Value: "1"},
-			NeedsDefaultSource: false,
-			DefaultSourceName:  "",
-		}, nil
-	}
-
-	if argCount == 2 {
-		return &ResolvedTACall{
-			SourceExpr:         call.Arguments[0],
-			LengthExpr:         call.Arguments[1],
-			NeedsDefaultSource: false,
-			DefaultSourceName:  "",
-		}, nil
-	}
-
-	return nil, fmt.Errorf("expected 1 or 2 arguments, got %d", argCount)
-}
-
-func (r *ArrowTACallSignatureResolver) resolveExplicitSourceAndLength(call *ast.CallExpression, argCount int) (*ResolvedTACall, error) {
-	if argCount != 2 {
-		return nil, fmt.Errorf("expected exactly 2 arguments, got %d", argCount)
+	if len(resolved.ScalarArguments) > 0 {
+		lengthExpr = resolved.ScalarArguments[0]
+	} else if (resolved.FunctionName == "ta.change" || resolved.FunctionName == "change") && len(resolved.SeriesArguments) > 0 {
+		lengthExpr = &ast.Literal{Value: "1"}
 	}
 
 	return &ResolvedTACall{
-		SourceExpr:         call.Arguments[0],
-		LengthExpr:         call.Arguments[1],
-		NeedsDefaultSource: false,
-		DefaultSourceName:  "",
-	}, nil
+		SourceExpr:         sourceExpr,
+		LengthExpr:         lengthExpr,
+		NeedsDefaultSource: resolved.DefaultSourceApplied,
+		DefaultSourceName:  resolved.DefaultSourceName,
+	}
 }

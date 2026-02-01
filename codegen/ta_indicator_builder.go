@@ -54,10 +54,7 @@ type TAIndicatorBuilder struct {
 //   - period: Lookback period for the indicator
 //   - accessor: AccessGenerator for retrieving data values (Series or OHLCV field)
 //   - needsNaN: Whether to add NaN checking in the accumulation loop
-//
-// Returns a builder that must be configured with an accumulator before calling Build().
 func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGenerator, needsNaN bool) *TAIndicatorBuilder {
-	// Extract base offset from accessor if available
 	baseOffset := 0
 	if ohlcvAccessor, ok := accessor.(*OHLCVFieldAccessGenerator); ok {
 		baseOffset = ohlcvAccessor.baseOffset
