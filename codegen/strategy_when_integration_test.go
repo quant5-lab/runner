@@ -130,7 +130,8 @@ func TestStrategyEntryWhenParameter_DirectHandlerIntegration(t *testing.T) {
 					DefaultQtyType:  tt.qtyType,
 					DefaultQtyValue: tt.qtyValue,
 				},
-				indent: 2,
+				indent:             2,
+				directionExtractor: NewDefaultDirectionExtractor(),
 			}
 
 			handler := NewStrategyActionHandler()

@@ -18,4 +18,4 @@
 | **19** | **Codegen** | Arrow TA: ta.pivothigh/ta.pivotlow (3-arg) | FIXED | Universal TASignatureRegistry with multi-arg overload support | - |
 | **20** | **Codegen** | `ticker.*` functions incomplete | VALID | `ticker.modify()` returns ctx.Symbol (no modification), `ticker.new()`/`ticker.inherit()` do string concat only | - |
 | **21** | **Codegen** | Non-HA chart types return identity | VALID | Renko, Kagi, LineBreak, PointFig transformers return IdentityTransformer (stubs) | - |
-| **22** | **Codegen** | `iff()` function | VALID | Generates TODO comment, function not implemented | utbot-quantnomad.pine |
+| **22** | **Codegen** | `iff()` function | FIXED | Preprocessor IffToTernaryTransformer converts to ternary | - |

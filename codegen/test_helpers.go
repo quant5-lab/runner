@@ -45,6 +45,7 @@ func newTestGenerator() *generator {
 	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
 	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
+	gen.directionExtractor = NewDefaultDirectionExtractor()
 
 	return gen
 }

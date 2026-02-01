@@ -419,5 +419,6 @@ func newTestGeneratorForTupleTests() *generator {
 	gen.plotCollector = NewPlotCollector()
 	gen.mathHandler = NewMathHandler()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
+	gen.directionExtractor = NewDefaultDirectionExtractor()
 	return gen
 }

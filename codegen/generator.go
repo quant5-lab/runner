@@ -71,6 +71,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.symbolTable = NewSymbolTable()
 	gen.literalFormatter = NewLiteralFormatter()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
+	gen.directionExtractor = NewDefaultDirectionExtractor()
 
 	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)
@@ -158,6 +159,7 @@ type generator struct {
 	symbolTable                SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
+	directionExtractor         *ChainDirectionExtractor
 
 	conditionalArgAnalyzer *ConditionalArgumentAnalyzer
 	conditionalCodeGen     *ConditionalCodeGenerator
@@ -2744,18 +2746,10 @@ func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
 }
 
 func (g *generator) extractDirectionConstant(expr ast.Expression) string {
-	// Handle strategy.long, strategy.short
-	if mem, ok := expr.(*ast.MemberExpression); ok {
-		if prop, ok := mem.Property.(*ast.Identifier); ok {
-			switch prop.Name {
-			case "long":
-				return "strategy.Long"
-			case "short":
-				return "strategy.Short"
-			}
-		}
+	if g.directionExtractor == nil {
+		g.directionExtractor = NewDefaultDirectionExtractor()
 	}
-	return "strategy.Long"
+	return g.directionExtractor.Extract(expr)
 }
 
 func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
