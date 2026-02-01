@@ -5,7 +5,6 @@ import (
 )
 
 func TestKeltnerSqueeze_AAPL_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: nested TA calls - see keltner-squeeze.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -19,7 +18,6 @@ func TestKeltnerSqueeze_AAPL_Hourly(t *testing.T) {
 }
 
 func TestKeltnerSqueeze_BTCUSDT_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: nested TA calls - see keltner-squeeze.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -33,7 +31,6 @@ func TestKeltnerSqueeze_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestKeltnerSqueeze_SBERP_Hourly(t *testing.T) {
-	t.Skip("Codegen limitation: nested TA calls - see keltner-squeeze.pine.skip")
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -43,5 +40,18 @@ func TestKeltnerSqueeze_SBERP_Hourly(t *testing.T) {
 		Timeframe:    "1h",
 		DataFile:     "SBERP-1h.json",
 		GoldenFile:   "keltner-squeeze-sberp-1h.json",
+	})
+}
+
+func TestKeltnerSqueeze_PLZL_Hourly(t *testing.T) {
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "Keltner Squeeze",
+		StrategyFile: "keltner-squeeze.pine",
+		Symbol:       "PLZL",
+		Timeframe:    "1h",
+		DataFile:     "PLZL-1h.json",
+		GoldenFile:   "keltner-squeeze-plzl-1h.json",
 	})
 }

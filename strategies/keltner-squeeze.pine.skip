@@ -1,6 +1,0 @@
-Runtime limitation: Arrow function SMA/STDEV missing bounds check
-
-Parse: ✅ Success
-Generate: ✅ Success
-Compile: ✅ Success
-Execute: ❌ Panic (ctx.Data[ctx.BarIndex-j] index out of range when BarIndex < length)
