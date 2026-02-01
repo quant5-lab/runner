@@ -1,10 +1,11 @@
-Runtime limitation: heikinashi() function returns empty data (#12)
+Codegen limitation: iff() function not implemented (#22)
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅
 Compile: ✅
-Execute: ❌ (heikinashi() returns empty data at runtime)
+Execute: ❌ (iff() generates TODO, xATRTrailingStop=0 → no trades)
 
 Fixed blockers:
+- #9: heikinashi() function (now implemented)
 - #15: security() detection in nested conditionals
 - #27: timeframe.period runtime resolution

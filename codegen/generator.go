@@ -91,6 +91,9 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	if gen.hasSecurityCalls {
 		additionalImports = append(additionalImports, "github.com/quant5-lab/runner/security")
 	}
+	if gen.hasTickerCalls {
+		additionalImports = append(additionalImports, "github.com/quant5-lab/runner/runtime/ticker")
+	}
 
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
@@ -120,6 +123,7 @@ type generator struct {
 	hasSecurityExprEvals     bool
 	hasStrategyRuntimeAccess bool
 	hasBarIndexUsage         bool
+	hasTickerCalls           bool
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
 	hoistedArrowContexts     []ArrowCallSite

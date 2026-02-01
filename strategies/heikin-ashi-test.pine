@@ -1,0 +1,21 @@
+// @version=5
+strategy("Heikin Ashi Test", overlay=true)
+
+// Get Heikin Ashi close using ticker.heikinashi (v5 syntax)
+haClose = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, close)
+
+// SMA crossover on HA data for reliable trade signals
+fastMA = ta.sma(haClose, 10)
+slowMA = ta.sma(haClose, 30)
+
+plot(fastMA, "Fast MA", color=color.green)
+plot(slowMA, "Slow MA", color=color.red)
+
+// Trade on MA crossover
+longCondition = ta.crossover(fastMA, slowMA)
+shortCondition = ta.crossunder(fastMA, slowMA)
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)

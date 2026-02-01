@@ -41,6 +41,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(NewStrategyActionHandler())
 	router.RegisterHandler(&MathCallHandler{})
 	router.RegisterHandler(&TAIndicatorCallHandler{})
+	router.RegisterHandler(NewTickerFunctionHandler())
 	router.RegisterHandler(&UserDefinedFunctionHandler{})
 	router.RegisterHandler(&UnknownFunctionHandler{})
 

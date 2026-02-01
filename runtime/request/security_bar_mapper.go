@@ -9,6 +9,7 @@ type MappingMode int
 const (
 	ModeDownscaling MappingMode = iota // Security TF < Base TF (e.g., H→D)
 	ModeUpscaling                      // Security TF > Base TF (e.g., M→D, W→D)
+	ModeIdentity                       // Same TF or HA on same TF
 )
 
 /*
@@ -109,6 +110,20 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 }
 
 /*
+BuildIdentityMapping creates 1:1 mappings for same-timeframe security calls.
+
+Used when security and base timeframes are identical (e.g., HA on same TF).
+Each bar index maps directly to itself: secBarIdx = mainBarIdx.
+
+Parameters:
+  - barCount: Number of bars to map
+*/
+func (m *SecurityBarMapper) BuildIdentityMapping(barCount int) {
+	m.mode = ModeIdentity
+	m.ranges = nil // Identity mode doesn't use ranges
+}
+
+/*
 BuildMappingForUpscaling creates upscaling mappings (Lower TF → Higher TF bar ranges).
 
 Used when security timeframe > base timeframe (e.g., Weekly base with Daily security).
@@ -172,6 +187,10 @@ func (m *SecurityBarMapper) BuildMappingForUpscaling(
 /*
 FindDailyBarIndex dispatches to the appropriate lookup algorithm based on mapping mode.
 
+IDENTITY MODE (same TF, e.g., HA on same TF):
+  - Direct 1:1 mapping: returns barIndex unchanged
+  - Ignores lookahead parameter
+
 UPSCALING MODE (security TF > base TF, e.g., M→D, W→D):
   - Direct index lookup: ranges[baseBarIndex] contains the security bar range
   - Returns StartIdx (first bar in period) by default
@@ -187,6 +206,9 @@ Returns -1 if no valid mapping found.
 Thread-safe after mapper initialization.
 */
 func (m *SecurityBarMapper) FindDailyBarIndex(barIndex int, lookahead bool) int {
+	if m.mode == ModeIdentity {
+		return barIndex
+	}
 	if m.mode == ModeUpscaling {
 		return m.findUpscalingIndex(barIndex, lookahead)
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/datafetcher"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/ticker"
 )
 
 /* SecurityPrefetcher orchestrates the security() data prefetch workflow:
@@ -27,45 +28,41 @@ func NewSecurityPrefetcher(fetcher datafetcher.DataFetcher) *SecurityPrefetcher 
 	}
 }
 
-/* PrefetchRequest represents deduplicated security() call */
+/* PrefetchRequest represents deduplicated security() call with transformation */
 type PrefetchRequest struct {
-	Symbol      string
-	Timeframe   string
+	CacheKey    string                    // Full symbol (may include modifier prefix)
+	BaseSymbol  string                    // Base symbol for fetching
+	Timeframe   string                    // Timeframe
+	Transformer ticker.BarTransformer     // Transformer for bar conversion
 	Expressions map[string]ast.Expression // "sma20" -> ta.sma(close, 20)
 }
 
-/* Prefetch executes complete workflow: analyze → fetch → cache contexts */
+/* Prefetch executes complete workflow: analyze → fetch → transform → cache contexts */
 func (p *SecurityPrefetcher) Prefetch(program *ast.Program, limit int) error {
-	/* Step 1: Analyze AST for security() calls */
 	calls := AnalyzeAST(program)
 	if len(calls) == 0 {
-		return nil // No security() calls - skip prefetch
+		return nil
 	}
 
-	/* Step 2: Deduplicate requests (group by symbol:timeframe) */
-	requests := p.deduplicateCalls(calls)
+	requests := p.deduplicateCallsWithModifiers(calls)
 
-	/* Step 3: Fetch data and store contexts */
 	for _, req := range requests {
-		/* Fetch OHLCV data for symbol+timeframe */
-		ohlcvData, err := p.fetcher.Fetch(req.Symbol, req.Timeframe, limit)
+		ohlcvData, err := p.fetcher.Fetch(req.BaseSymbol, req.Timeframe, limit)
 		if err != nil {
-			return fmt.Errorf("fetch %s:%s: %w", req.Symbol, req.Timeframe, err)
+			return fmt.Errorf("fetch %s:%s: %w", req.BaseSymbol, req.Timeframe, err)
 		}
 
-		/* Create security context from fetched data */
-		secCtx := context.New(req.Symbol, req.Timeframe, len(ohlcvData))
-		for _, bar := range ohlcvData {
+		transformedData := req.Transformer.Transform(ohlcvData)
+
+		secCtx := context.New(req.CacheKey, req.Timeframe, len(transformedData))
+		for _, bar := range transformedData {
 			secCtx.AddBar(bar)
 		}
 
-		/* Create cache entry with context only */
 		entry := &CacheEntry{
 			Context: secCtx,
 		}
-
-		/* Store entry in cache */
-		p.cache.Set(req.Symbol, req.Timeframe, entry)
+		p.cache.Set(req.CacheKey, req.Timeframe, entry)
 	}
 
 	return nil
@@ -76,25 +73,32 @@ func (p *SecurityPrefetcher) GetCache() *SecurityCache {
 	return p.cache
 }
 
-/* deduplicateCalls groups security calls by symbol:timeframe */
-func (p *SecurityPrefetcher) deduplicateCalls(calls []SecurityCall) map[string]*PrefetchRequest {
+/* deduplicateCallsWithModifiers groups security calls by symbol:timeframe with transformation */
+func (p *SecurityPrefetcher) deduplicateCallsWithModifiers(calls []SecurityCall) map[string]*PrefetchRequest {
 	requests := make(map[string]*PrefetchRequest)
+	extractor := NewSymbolExtractor()
 
 	for _, call := range calls {
-		key := fmt.Sprintf("%s:%s", call.Symbol, call.Timeframe)
+		baseSymbol, modifierType := extractor.Extract(call.SymbolExpr)
+		if baseSymbol == "" {
+			baseSymbol = call.Symbol
+		}
 
-		/* Get or create request for this symbol+timeframe */
+		cacheKey := call.Symbol
+		key := fmt.Sprintf("%s:%s:%s", cacheKey, baseSymbol, call.Timeframe)
+
 		req, exists := requests[key]
 		if !exists {
 			req = &PrefetchRequest{
-				Symbol:      call.Symbol,
+				CacheKey:    cacheKey,
+				BaseSymbol:  baseSymbol,
 				Timeframe:   call.Timeframe,
+				Transformer: ticker.NewTransformer(modifierType),
 				Expressions: make(map[string]ast.Expression),
 			}
 			requests[key] = req
 		}
 
-		/* Add expression to request (use exprName as key) */
 		if call.ExprName != "" {
 			req.Expressions[call.ExprName] = call.Expression
 		}

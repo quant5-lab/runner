@@ -550,3 +550,33 @@ func timeFromString(s string) (int64, error) {
 func parseUTC(value, layout string) (t time.Time, err error) {
 	return time.Parse(layout, value)
 }
+
+func TestSecurityBarMapper_BuildIdentityMapping(t *testing.T) {
+	mapper := NewSecurityBarMapper()
+	mapper.BuildIdentityMapping(1000)
+
+	if mapper.mode != ModeIdentity {
+		t.Errorf("expected ModeIdentity, got %v", mapper.mode)
+	}
+
+	tests := []struct {
+		barIndex  int
+		lookahead bool
+		expected  int
+	}{
+		{0, false, 0},
+		{0, true, 0},
+		{100, false, 100},
+		{100, true, 100},
+		{999, false, 999},
+		{999, true, 999},
+	}
+
+	for _, tt := range tests {
+		result := mapper.FindDailyBarIndex(tt.barIndex, tt.lookahead)
+		if result != tt.expected {
+			t.Errorf("FindDailyBarIndex(%d, %v) = %d, want %d",
+				tt.barIndex, tt.lookahead, result, tt.expected)
+		}
+	}
+}

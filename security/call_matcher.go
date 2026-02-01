@@ -56,25 +56,9 @@ func extractFunctionName(callee ast.Expression) string {
 }
 
 func extractSymbol(expr ast.Expression) string {
-	if lit, ok := expr.(*ast.Literal); ok {
-		if s, ok := lit.Value.(string); ok {
-			return strings.Trim(s, "\"'")
-		}
-	}
-
-	if id, ok := expr.(*ast.Identifier); ok {
-		return id.Name
-	}
-
-	if mem, ok := expr.(*ast.MemberExpression); ok {
-		obj := extractIdentifier(mem.Object)
-		prop := extractIdentifier(mem.Property)
-		if obj != "" && prop != "" {
-			return obj + "." + prop
-		}
-	}
-
-	return ""
+	extractor := NewSymbolExtractor()
+	/* Return raw symbol including modifier prefix for cache key matching */
+	return extractor.extractRaw(expr)
 }
 
 func extractTimeframe(expr ast.Expression) string {

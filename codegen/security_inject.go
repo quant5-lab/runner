@@ -15,11 +15,12 @@ type SecurityInjection struct {
 }
 
 type resolvedSecurityCall struct {
-	call         security.SecurityCall
-	resolvedSym  string
-	resolvedTf   string
-	isSymRuntime bool
-	isTfRuntime  bool
+	call           security.SecurityCall
+	resolvedSym    string
+	resolvedTf     string
+	isSymRuntime   bool
+	isTfRuntime    bool
+	modifierPrefix string // e.g., "HEIKINASHI" if symbol was "HEIKINASHI:syminfo.tickerid"
 }
 
 func buildVariableMap(program *ast.Program) map[string]string {
@@ -96,12 +97,20 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	for i, call := range calls {
 		sym, symRuntime := resolveSecurityArgument(call.SymbolExpr, call.Symbol, vars)
 		tf, tfRuntime := resolveSecurityArgument(call.TimeframeExpr, call.Timeframe, vars)
+
+		/* Extract modifier prefix from symbol (e.g., HEIKINASHI:syminfo.tickerid → prefix=HEIKINASHI, sym=syminfo.tickerid) */
+		modPrefix, baseSym, hasModifier := extractModifierPrefix(sym)
+		if hasModifier {
+			sym = baseSym
+		}
+
 		resolved[i] = resolvedSecurityCall{
-			call:         call,
-			resolvedSym:  sym,
-			resolvedTf:   normalizeTimeframe(tf),
-			isSymRuntime: symRuntime,
-			isTfRuntime:  tfRuntime,
+			call:           call,
+			resolvedSym:    sym,
+			resolvedTf:     normalizeTimeframe(tf),
+			isSymRuntime:   symRuntime,
+			isTfRuntime:    tfRuntime,
+			modifierPrefix: modPrefix,
 		}
 	}
 
@@ -206,6 +215,14 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
 		codeBuilder.WriteString("\t}\n")
 
+		hasModifier := firstCall.modifierPrefix != ""
+
+		/* Transform data if modifier exists (before context creation) */
+		if hasModifier {
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_data = ticker.NewTransformer(%q).Transform(%s_data)\n",
+				varName, firstCall.modifierPrefix, varName))
+		}
+
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
 			varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
@@ -216,8 +233,12 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		if isSymbolPlaceholder || isTimeframePlaceholder {
 			var runtimeKeyArgs []string
+			symbolArg := "ctx.Symbol"
+			if hasModifier {
+				symbolArg = generateModifierCall(firstCall.modifierPrefix, "ctx.Symbol")
+			}
 			if isSymbolPlaceholder {
-				runtimeKeyArgs = append(runtimeKeyArgs, "ctx.Symbol")
+				runtimeKeyArgs = append(runtimeKeyArgs, symbolArg)
 			}
 			if isTimeframePlaceholder {
 				runtimeKeyArgs = append(runtimeKeyArgs, "ctx.Timeframe")
@@ -228,6 +249,8 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
 			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
 			codeBuilder.WriteString("\t} else {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString("\t}\n")
@@ -237,6 +260,8 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
 			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+			codeBuilder.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
+			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
 			codeBuilder.WriteString("\t} else {\n")
 			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
 			codeBuilder.WriteString("\t}\n")
