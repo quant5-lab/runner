@@ -120,8 +120,8 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateSecurityContextAccess(t 
 			name:      "hl2 in security context",
 			priceName: "hl2",
 			wantContains: []string{
-				"ctx.Data[ctx.BarIndex].High",
-				"ctx.Data[ctx.BarIndex].Low",
+				"highSeries.GetCurrent()",
+				"lowSeries.GetCurrent()",
 				"/ 2",
 			},
 		},
@@ -129,9 +129,9 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateSecurityContextAccess(t 
 			name:      "hlc3 in security context",
 			priceName: "hlc3",
 			wantContains: []string{
-				"ctx.Data[ctx.BarIndex].High",
-				"ctx.Data[ctx.BarIndex].Low",
-				"ctx.Data[ctx.BarIndex].Close",
+				"highSeries.GetCurrent()",
+				"lowSeries.GetCurrent()",
+				"closeSeries.GetCurrent()",
 				"/ 3",
 			},
 		},
@@ -139,10 +139,10 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateSecurityContextAccess(t 
 			name:      "ohlc4 in security context",
 			priceName: "ohlc4",
 			wantContains: []string{
-				"ctx.Data[ctx.BarIndex].Open",
-				"ctx.Data[ctx.BarIndex].High",
-				"ctx.Data[ctx.BarIndex].Low",
-				"ctx.Data[ctx.BarIndex].Close",
+				"openSeries.GetCurrent()",
+				"highSeries.GetCurrent()",
+				"lowSeries.GetCurrent()",
+				"closeSeries.GetCurrent()",
 				"/ 4",
 			},
 		},
@@ -150,9 +150,9 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateSecurityContextAccess(t 
 			name:      "hlcc4 in security context",
 			priceName: "hlcc4",
 			wantContains: []string{
-				"ctx.Data[ctx.BarIndex].High",
-				"ctx.Data[ctx.BarIndex].Low",
-				"ctx.Data[ctx.BarIndex].Close",
+				"highSeries.GetCurrent()",
+				"lowSeries.GetCurrent()",
+				"closeSeries.GetCurrent()",
 				"/ 4",
 			},
 		},
@@ -191,8 +191,8 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 			wantContains: []string{
 				"func() float64",
 				"if i-1 >= 0",
-				"ctx.Data[i-1].High",
-				"ctx.Data[i-1].Low",
+				"highSeries.Get(i-1)",
+				"lowSeries.Get(i-1)",
 				"/ 2",
 				"math.NaN()",
 			},
@@ -204,9 +204,9 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 			wantContains: []string{
 				"func() float64",
 				"if i-2 >= 0",
-				"ctx.Data[i-2].High",
-				"ctx.Data[i-2].Low",
-				"ctx.Data[i-2].Close",
+				"highSeries.Get(i-2)",
+				"lowSeries.Get(i-2)",
+				"closeSeries.Get(i-2)",
 				"/ 3",
 				"math.NaN()",
 			},
@@ -218,10 +218,10 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 			wantContains: []string{
 				"func() float64",
 				"if i-1 >= 0",
-				"ctx.Data[i-1].Open",
-				"ctx.Data[i-1].High",
-				"ctx.Data[i-1].Low",
-				"ctx.Data[i-1].Close",
+				"openSeries.Get(i-1)",
+				"highSeries.Get(i-1)",
+				"lowSeries.Get(i-1)",
+				"closeSeries.Get(i-1)",
 				"/ 4",
 				"math.NaN()",
 			},
@@ -233,9 +233,9 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 			wantContains: []string{
 				"func() float64",
 				"if i-3 >= 0",
-				"ctx.Data[i-3].High",
-				"ctx.Data[i-3].Low",
-				"ctx.Data[i-3].Close",
+				"highSeries.Get(i-3)",
+				"lowSeries.Get(i-3)",
+				"closeSeries.Get(i-3)",
 				"/ 4",
 				"math.NaN()",
 			},
@@ -247,8 +247,8 @@ func TestBuiltinIdentifierHandler_DerivedPrices_GenerateHistoricalAccess(t *test
 			wantContains: []string{
 				"func() float64",
 				"if i-10 >= 0",
-				"ctx.Data[i-10].High",
-				"ctx.Data[i-10].Low",
+				"highSeries.Get(i-10)",
+				"lowSeries.Get(i-10)",
 				"math.NaN()",
 			},
 		},
@@ -295,11 +295,11 @@ func TestBuiltinIdentifierHandler_DerivedPrices_ConsistencyAcrossContexts(t *tes
 			if !strings.Contains(currentBar, "bar.High") && !strings.Contains(currentBar, "bar.Low") {
 				t.Errorf("Current bar access for %s should use bar accessor", price)
 			}
-			if !strings.Contains(securityCtx, "ctx.Data[ctx.BarIndex]") {
-				t.Errorf("Security context access for %s should use ctx.Data[ctx.BarIndex]", price)
+			if !strings.Contains(securityCtx, "GetCurrent()") {
+				t.Errorf("Security context access for %s should use Series.GetCurrent()", price)
 			}
-			if !strings.Contains(historical, "ctx.Data[i-1]") {
-				t.Errorf("Historical access for %s should use ctx.Data[i-offset]", price)
+			if !strings.Contains(historical, "Series.Get(i-1)") {
+				t.Errorf("Historical access for %s should use Series.Get(offset)", price)
 			}
 		})
 	}

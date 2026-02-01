@@ -224,10 +224,10 @@ func TestDerivedPriceFormulaGenerator_Generate_AccessorFlexibility(t *testing.T)
 		},
 		{
 			name:        "ctx.Data current",
-			highAccess:  "ctx.Data[ctx.BarIndex].High",
-			lowAccess:   "ctx.Data[ctx.BarIndex].Low",
-			closeAccess: "ctx.Data[ctx.BarIndex].Close",
-			openAccess:  "ctx.Data[ctx.BarIndex].Open",
+			highAccess:  "highSeries.GetCurrent()",
+			lowAccess:   "lowSeries.GetCurrent()",
+			closeAccess: "closeSeries.GetCurrent()",
+			openAccess:  "openSeries.GetCurrent()",
 		},
 		{
 			name:        "ctx.Data offset",

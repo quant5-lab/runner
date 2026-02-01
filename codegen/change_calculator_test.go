@@ -18,8 +18,8 @@ func TestChangeCalculator_SourceTypes(t *testing.T) {
 			name:               "OHLCV field source",
 			accessor:           NewOHLCVFieldAccessGenerator("Close"),
 			varName:            "priceChange",
-			mustContainCurrent: "ctx.Data[ctx.BarIndex].Close",
-			mustContainPrev:    "ctx.Data[ctx.BarIndex-1].Close",
+			mustContainCurrent: "closeSeries.GetCurrent()",
+			mustContainPrev:    "closeSeries.Get(1)",
 		},
 		{
 			name:               "Series variable source",
@@ -120,12 +120,11 @@ func TestChangeCalculator_DebugInstrumentation(t *testing.T) {
 	calc := NewChangeCalculator(accessor)
 	code := calc.GenerateChangeCode("change")
 
-	/* Code self-documents through variable naming and structure */
 	if !strings.Contains(code, "var change float64") {
-		t.Error("Missing self-explanatory variable declaration")
+		t.Error("Missing variable declaration")
 	}
 	if !strings.Contains(code, "ctx.BarIndex < 1") {
-		t.Error("Missing warmup guard (code should speak for itself)")
+		t.Error("Missing warmup guard")
 	}
 }
 

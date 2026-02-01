@@ -19,8 +19,7 @@ func TestFixnanIIFEGenerator_GenerateWithSelfReference(t *testing.T) {
 			targetSeriesVar: "resultSeries",
 			mustContain: []string{
 				"func() float64",
-				"val := ctx.Data[ctx.BarIndex",
-				".Close",
+				"val := closeSeries.Get(0)",
 				"if math.IsNaN(val) { return 0.0 }",
 				"return val",
 			},
@@ -53,7 +52,7 @@ func TestFixnanIIFEGenerator_GenerateWithSelfReference(t *testing.T) {
 			targetSeriesVar: "highFixedSeries",
 			mustContain: []string{
 				"func() float64",
-				".High",
+				"highSeries.Get(0)",
 				"if math.IsNaN(val)",
 				"return 0.0",
 			},
@@ -64,7 +63,7 @@ func TestFixnanIIFEGenerator_GenerateWithSelfReference(t *testing.T) {
 			targetSeriesVar: "lowFixedSeries",
 			mustContain: []string{
 				"func() float64",
-				".Low",
+				"lowSeries.Get(0)",
 				"return val",
 			},
 		},

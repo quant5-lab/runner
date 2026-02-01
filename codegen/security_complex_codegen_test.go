@@ -221,9 +221,9 @@ func TestSecurityATRGeneration(t *testing.T) {
 	/* Verify ATR-specific patterns */
 	expectedPatterns := []string{
 		"Inline ATR(14)",
-		"ctx.Data[ctx.BarIndex].High",
-		"ctx.Data[ctx.BarIndex].Low",
-		"ctx.Data[ctx.BarIndex-1].Close",       // Previous close for TR
+		"highSeries.GetCurrent()",
+		"lowSeries.GetCurrent()",
+		"closeSeries.Get(1)",                   // Previous close for TR
 		"tr := math.Max(hl, math.Max(hc, lc))", // True Range calculation
 		"alpha := 1.0 / 14",                    // RMA smoothing
 		"prevATR :=",                           // RMA uses previous value
@@ -294,12 +294,12 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	/* Verify STDEV algorithm steps */
 	expectedPatterns := []string{
 		"ta.stdev(20)",
-		"sum := 0.0",                // Mean calculation
-		"mean := sum / float64(20)", // Mean result
-		"variance := 0.0",           // Variance calculation
-		"diff := ctx.Data[ctx.BarIndex-j].Close - mean", // Uses built-in with relative offset
-		"variance += diff * diff",                       // Squared deviation
-		"math.Sqrt(variance / float64(20))",             // Final STDEV
+		"sum := 0.0",                        // Mean calculation
+		"mean := sum / float64(20)",         // Mean result
+		"variance := 0.0",                   // Variance calculation
+		"diff := closeSeries.Get(j) - mean", // Uses built-in with relative offset
+		"variance += diff * diff",           // Squared deviation
+		"math.Sqrt(variance / float64(20))", // Final STDEV
 	}
 
 	for _, pattern := range expectedPatterns {

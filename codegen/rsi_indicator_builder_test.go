@@ -128,13 +128,13 @@ func TestRSIIndicatorBuilder_VariablePeriod(t *testing.T) {
 
 	t.Run("variable_period_in_warmup", func(t *testing.T) {
 		if !strings.Contains(code, "if ctx.BarIndex < int(userPeriod)") {
-			t.Error("Missing variable period warmup guard (self-documenting structure)")
+			t.Error("Missing variable period warmup guard")
 		}
 	})
 
 	t.Run("variable period in RMA", func(t *testing.T) {
 		if !strings.Contains(code, "alpha") && !strings.Contains(code, "userPeriod") {
-			t.Error("Missing variable period in RMA calculations (self-documenting structure)")
+			t.Error("Missing variable period in RMA calculations")
 		}
 	})
 }
@@ -186,7 +186,7 @@ func TestRSIIndicatorBuilder_CompositionOrder(t *testing.T) {
 	rsPos := strings.Index(code, "rs :=")
 
 	if changePos == -1 || nanCheckPos == -1 || rmaPos == -1 || rsPos == -1 {
-		t.Fatal("Missing expected computation steps in generated code (self-documenting structure)")
+		t.Fatal("Missing expected computation steps")
 	}
 
 	if !(changePos < nanCheckPos && nanCheckPos < rmaPos && rmaPos < rsPos) {
@@ -211,8 +211,8 @@ func TestRSIIndicatorBuilder_NoFuturePeek(t *testing.T) {
 		t.Error("FUTURE PEEK DETECTED: negative offset in series access")
 	}
 
-	/* Should use ctx.BarIndex-1 for previous bar */
-	if !strings.Contains(code, "ctx.Data[ctx.BarIndex-1]") {
+	/* Should use closeSeries.Get(1) for previous bar */
+	if !strings.Contains(code, "closeSeries.Get(1)") {
 		t.Error("Missing correct previous bar access pattern")
 	}
 }
@@ -325,7 +325,7 @@ func TestRSIIndicatorBuilder_WarmupBoundaries(t *testing.T) {
 	})
 
 	t.Run("change_calc_first_bar", func(t *testing.T) {
-		if !strings.Contains(code, "ctx.Data[ctx.BarIndex-1]") {
+		if !strings.Contains(code, "closeSeries.Get(1)") {
 			t.Error("Change calculation needs previous bar access")
 		}
 	})
@@ -347,13 +347,13 @@ func TestRSIIndicatorBuilder_NaNPropagation(t *testing.T) {
 
 	t.Run("change_nan_handling", func(t *testing.T) {
 		if !strings.Contains(code, "ctx.BarIndex < 1") {
-			t.Error("Change warmup guard missing (self-explanatory structure)")
+			t.Error("Change warmup guard missing")
 		}
 	})
 
 	t.Run("rma_nan_propagation", func(t *testing.T) {
 		if !strings.Contains(code, "alpha") || !strings.Contains(code, "previousValue") {
-			t.Error("RMA calculation structure missing (code should self-document)")
+			t.Error("RMA calculation structure missing")
 		}
 	})
 
@@ -530,6 +530,13 @@ func TestRSIIndicatorBuilder_AccessorVariations(t *testing.T) {
 
 	t.Run("ohlcv_field_accessor", func(t *testing.T) {
 		fields := []string{"Open", "High", "Low", "Close", "Volume"}
+		expectedSeries := map[string]string{
+			"Open":   "openSeries.Get(",
+			"High":   "highSeries.Get(",
+			"Low":    "lowSeries.Get(",
+			"Close":  "closeSeries.Get(",
+			"Volume": "volumeSeries.Get(",
+		}
 		for _, field := range fields {
 			context := NewTopLevelIndicatorContext()
 			accessor := NewOHLCVFieldAccessGenerator(field)
@@ -540,7 +547,8 @@ func TestRSIIndicatorBuilder_AccessorVariations(t *testing.T) {
 				t.Errorf("Empty code generated for field %s", field)
 			}
 
-			if !strings.Contains(code, "ctx.Data[ctx.BarIndex]."+field) {
+			expectedPattern := expectedSeries[field]
+			if !strings.Contains(code, expectedPattern) {
 				t.Errorf("Missing OHLCV field access for %s", field)
 			}
 		}

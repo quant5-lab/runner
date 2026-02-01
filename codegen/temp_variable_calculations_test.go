@@ -142,14 +142,14 @@ func TestTempVariableManager_GenerateCalculations_DifferentSources(t *testing.T)
 			sourceExpr: &ast.Identifier{Name: "close"},
 			funcName:   "ta.sma",
 			period:     50,
-			wantAccess: "ctx.Data[ctx.BarIndex-j].Close",
+			wantAccess: "closeSeries.Get(j)",
 		},
 		{
 			name:       "SMA of high",
 			sourceExpr: &ast.Identifier{Name: "high"},
 			funcName:   "ta.sma",
 			period:     20,
-			wantAccess: "ctx.Data[ctx.BarIndex-j].High",
+			wantAccess: "highSeries.Get(j)",
 		},
 		{
 			name: "SMA of close[4]",
@@ -160,7 +160,7 @@ func TestTempVariableManager_GenerateCalculations_DifferentSources(t *testing.T)
 			},
 			funcName:   "ta.sma",
 			period:     200,
-			wantAccess: "ctx.Data[ctx.BarIndex-(j+4)].Close",
+			wantAccess: "closeSeries.Get(j+4)",
 		},
 	}
 
@@ -256,7 +256,7 @@ func TestTempVariableManager_GenerateCalculations_ATRFunction(t *testing.T) {
 	}
 
 	// Should calculate True Range
-	if !strings.Contains(code, "hl := ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low") {
+	if !strings.Contains(code, "hl := highSeries.GetCurrent() - lowSeries.GetCurrent()") {
 		t.Error("Expected True Range calculation not found")
 	}
 

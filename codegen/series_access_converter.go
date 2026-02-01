@@ -260,29 +260,26 @@ func (c *SeriesAccessConverter) isBuiltinField(name string) bool {
 }
 
 func (c *SeriesAccessConverter) convertBuiltinField(field string) string {
-	// Map to ctx.Data[i-offset].Field access
-	fieldMap := map[string]string{
-		"open":   "Open",
-		"high":   "High",
-		"low":    "Low",
-		"close":  "Close",
-		"volume": "Volume",
+	if field == "open" || field == "high" || field == "low" || field == "close" || field == "volume" {
+		seriesNameMap := map[string]string{
+			"open":   "openSeries",
+			"high":   "highSeries",
+			"low":    "lowSeries",
+			"close":  "closeSeries",
+			"volume": "volumeSeries",
+		}
+		return fmt.Sprintf("%s.Get(%s)", seriesNameMap[field], c.offset)
 	}
 
-	if goField, exists := fieldMap[field]; exists {
-		return fmt.Sprintf("ctx.Data[i-%s].%s", c.offset, goField)
-	}
-
-	// Computed fields need special handling
 	switch field {
 	case "hl2":
-		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low) / 2", c.offset, c.offset)
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s)) / 2", c.offset, c.offset)
 	case "hlc3":
-		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 3", c.offset, c.offset, c.offset)
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s)) / 3", c.offset, c.offset, c.offset)
 	case "ohlc4":
-		return fmt.Sprintf("(ctx.Data[i-%s].Open + ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 4", c.offset, c.offset, c.offset, c.offset)
+		return fmt.Sprintf("(openSeries.Get(%s) + highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s)) / 4", c.offset, c.offset, c.offset, c.offset)
 	case "hlcc4":
-		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close + ctx.Data[i-%s].Close) / 4", c.offset, c.offset, c.offset, c.offset)
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s) + closeSeries.Get(%s)) / 4", c.offset, c.offset, c.offset, c.offset)
 	}
 
 	return field

@@ -365,9 +365,9 @@ func TestExpressionAccessGenerator_OffsetRewriting(t *testing.T) {
 			name:           "bar field current",
 			exprCode:       "bar.Close",
 			loopVar:        "k",
-			wantLoopAccess: "ctx.Data[ctx.BarIndex-k].Close",
+			wantLoopAccess: "closeSeries.Get(k)",
 			period:         50,
-			wantInitAccess: "ctx.Data[ctx.BarIndex-49].Close",
+			wantInitAccess: "closeSeries.Get(49)",
 			description:    "bar.Field should use ctx.Data with offset",
 		},
 		{

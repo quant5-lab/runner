@@ -174,8 +174,8 @@ func TestStatefulIndicatorBuilder_AccessorTypes(t *testing.T) {
 		{
 			name:          "OHLCV field accessor",
 			accessor:      NewOHLCVFieldAccessGenerator("Close"),
-			expectInLoop:  "ctx.Data[ctx.BarIndex-j].Close",
-			expectRecurse: "ctx.Data[ctx.BarIndex-0].Close",
+			expectInLoop:  "closeSeries.Get(j)",
+			expectRecurse: "closeSeries.Get(0)",
 			description:   "OHLCV fields should use ctx.Data array access",
 		},
 		{

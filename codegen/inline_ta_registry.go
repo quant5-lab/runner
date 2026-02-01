@@ -126,9 +126,10 @@ func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += fmt.Sprintf("return sum / %s", period.AsFloat64Cast())
 
-	/* Previous bar access requires additional warmup bar */
-	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -168,8 +169,10 @@ func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := float64(%s - j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsGoExpr(), accessor.GenerateLoopValueAccess("j"))
 	body += "return sum / weightSum"
 
-	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -178,64 +181,147 @@ func (g *STDEVIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExp
 	body += fmt.Sprintf("variance := 0.0; for j := 0; j < %s; j++ { diff := %s - mean; variance += diff * diff }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += fmt.Sprintf("return math.Sqrt(variance / %s)", period.AsFloat64Cast())
 
-	warmupPeriod := period.AsInt() + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func (g *HighestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
-	periodInt := period.AsInt()
-	body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
-	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+	if period.IsConstant() {
+		periodInt := period.AsInt()
+		body := fmt.Sprintf("highest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
+		body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v > highest { highest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+		body += "return highest"
+
+		return NewIIFECodeBuilder().
+			WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+			WithBody(body).
+			Build()
+	}
+
+	body := fmt.Sprintf("periodVal := %s; ", period.AsIntCast())
+	body += fmt.Sprintf("highest := %s; ", accessor.GenerateLoopValueAccess("periodVal - 1"))
+	body += fmt.Sprintf("for j := periodVal - 1; j >= 0; j-- { v := %s; if v > highest { highest = v } }; ", accessor.GenerateLoopValueAccess("j"))
 	body += "return highest"
 
-	warmupPeriod := periodInt + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func (g *LowestIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
-	periodInt := period.AsInt()
-	body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
-	body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+	if period.IsConstant() {
+		periodInt := period.AsInt()
+		body := fmt.Sprintf("lowest := %s; ", accessor.GenerateInitialValueAccess(periodInt))
+		body += fmt.Sprintf("for j := %d; j >= 0; j-- { v := %s; if v < lowest { lowest = v } }; ", periodInt-1, accessor.GenerateLoopValueAccess("j"))
+		body += "return lowest"
+
+		return NewIIFECodeBuilder().
+			WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+			WithBody(body).
+			Build()
+	}
+
+	body := fmt.Sprintf("periodVal := %s; ", period.AsIntCast())
+	body += fmt.Sprintf("lowest := %s; ", accessor.GenerateLoopValueAccess("periodVal - 1"))
+	body += fmt.Sprintf("for j := periodVal - 1; j >= 0; j-- { v := %s; if v < lowest { lowest = v } }; ", accessor.GenerateLoopValueAccess("j"))
 	body += "return lowest"
 
-	warmupPeriod := periodInt + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func (g *ChangeIIFEGenerator) Generate(accessor AccessGenerator, offset PeriodExpression, sourceHash string) string {
-	offsetInt := offset.AsInt()
-	if offsetInt <= 0 {
-		offsetInt = 1
+	if offset.IsConstant() {
+		offsetInt := offset.AsInt()
+		if offsetInt <= 0 {
+			offsetInt = 1
+		}
+
+		body := fmt.Sprintf("current := %s; ", accessor.GenerateLoopValueAccess("0"))
+		body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offsetInt)))
+		body += "return current - previous"
+
+		offsetPeriod := NewConstantPeriod(offsetInt + 1)
+		return NewIIFECodeBuilder().
+			WithWarmupCheckPeriodExpression(offsetPeriod, accessor.GetBaseOffset()).
+			WithBody(body).
+			Build()
 	}
 
-	body := fmt.Sprintf("current := %s; ", accessor.GenerateLoopValueAccess("0"))
-	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d", offsetInt)))
+	body := fmt.Sprintf("offsetVal := %s; ", offset.AsIntCast())
+	body += "if offsetVal <= 0 { offsetVal = 1 }; "
+	body += fmt.Sprintf("current := %s; ", accessor.GenerateLoopValueAccess("0"))
+	body += fmt.Sprintf("previous := %s; ", accessor.GenerateLoopValueAccess("offsetVal"))
 	body += "return current - previous"
 
-	warmupPeriod := offsetInt + 1 + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	runtimeWarmup := &runtimeOffsetPlusOne{base: offset}
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(runtimeWarmup, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
+
+type runtimeOffsetPlusOne struct {
+	base PeriodExpression
+}
+
+func (r *runtimeOffsetPlusOne) IsConstant() bool { return false }
+func (r *runtimeOffsetPlusOne) AsInt() int       { return -1 }
+func (r *runtimeOffsetPlusOne) AsGoExpr() string { return r.base.AsGoExpr() + "+1" }
+func (r *runtimeOffsetPlusOne) AsIntCast() string {
+	return fmt.Sprintf("(%s+1)", r.base.AsIntCast())
+}
+func (r *runtimeOffsetPlusOne) AsFloat64Cast() string {
+	return fmt.Sprintf("float64(%s+1)", r.base.AsIntCast())
+}
+func (r *runtimeOffsetPlusOne) AsSeriesNamePart() string { return "runtime" }
 
 func (g *LinregIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	return g.GenerateWithOffset(accessor, period, 0, sourceHash)
 }
 
 func (g *LinregIIFEGenerator) GenerateWithOffset(accessor AccessGenerator, period PeriodExpression, offset int, sourceHash string) string {
-	periodInt := period.AsInt()
-	formulaMultiplier := periodInt - 1 - offset
+	if period.IsConstant() {
+		periodInt := period.AsInt()
+		formulaMultiplier := periodInt - 1 - offset
 
-	body := "n := " + period.AsFloat64Cast() + "; "
+		body := "n := " + period.AsFloat64Cast() + "; "
+		body += "sumX := 0.0; sumY := 0.0; sumXY := 0.0; sumX2 := 0.0; "
+		body += fmt.Sprintf("for j := 0; j < %s; j++ { ", period.AsIntCast())
+		body += fmt.Sprintf("x := float64(j); y := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d - j - 1", periodInt)))
+		body += "sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x"
+		body += " }; "
+		body += "slope := (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX); "
+		body += "intercept := (sumY - slope * sumX) / n; "
+		body += fmt.Sprintf("return intercept + slope * float64(%d)", formulaMultiplier)
+
+		return NewIIFECodeBuilder().
+			WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+			WithBody(body).
+			Build()
+	}
+
+	body := fmt.Sprintf("periodVal := %s; ", period.AsIntCast())
+	body += "n := " + period.AsFloat64Cast() + "; "
+	body += fmt.Sprintf("formulaMultiplier := periodVal - 1 - %d; ", offset)
 	body += "sumX := 0.0; sumY := 0.0; sumXY := 0.0; sumX2 := 0.0; "
-	body += fmt.Sprintf("for j := 0; j < %s; j++ { ", period.AsIntCast())
-	body += fmt.Sprintf("x := float64(j); y := %s; ", accessor.GenerateLoopValueAccess(fmt.Sprintf("%d - j - 1", periodInt)))
+	body += "for j := 0; j < periodVal; j++ { "
+	body += fmt.Sprintf("x := float64(j); y := %s; ", accessor.GenerateLoopValueAccess("periodVal - j - 1"))
 	body += "sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x"
 	body += " }; "
 	body += "slope := (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX); "
 	body += "intercept := (sumY - slope * sumX) / n; "
-	body += fmt.Sprintf("return intercept + slope * float64(%d)", formulaMultiplier)
+	body += "return intercept + slope * float64(formulaMultiplier)"
 
-	warmupPeriod := periodInt + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 type PivotHighIIFEGenerator struct{ namingStrategy series_naming.Strategy }
@@ -277,8 +363,11 @@ func generatePivotUnrolled(accessor AccessGenerator, leftInt, rightInt int, comp
 	body += "if isPivot { return centerValue }; "
 	body += "return math.NaN()"
 
-	warmupPeriod := totalWindow + accessor.GetBaseOffset()
-	return NewIIFECodeBuilder().WithWarmupCheck(warmupPeriod).WithBody(body).Build()
+	pivotPeriod := NewConstantPeriod(totalWindow)
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(pivotPeriod, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
 }
 
 func generatePivotRuntimeLoop(accessor AccessGenerator, leftPeriod, rightPeriod PeriodExpression, comparisonOp string) string {

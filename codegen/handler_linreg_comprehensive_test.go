@@ -365,8 +365,10 @@ func TestLinregHandler_WarmupBehavior(t *testing.T) {
 				t.Fatalf("GenerateCode() error = %v", err)
 			}
 
-			if !strings.Contains(code, "ctx.BarIndex") {
-				t.Error("Generated code missing warmup check")
+			if tt.wantWarmupEdge > 0 {
+				if !strings.Contains(code, "ctx.BarIndex") {
+					t.Error("Generated code missing warmup check")
+				}
 			}
 		})
 	}

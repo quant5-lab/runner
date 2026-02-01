@@ -132,49 +132,49 @@ func TestOHLCVFieldAccessor(t *testing.T) {
 			name:             "Simple close field",
 			sourceExpr:       "close",
 			expectedField:    "close",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-10].close",
+			expectedAccess:   "closeSeries.Get(10)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "Bar.Close with dot notation",
 			sourceExpr:       "bar.Close",
 			expectedField:    "Close",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-5].Close",
+			expectedAccess:   "closeSeries.Get(5)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "Nested dot notation",
 			sourceExpr:       "ctx.Data.Close",
 			expectedField:    "Close",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-0].Close",
+			expectedAccess:   "closeSeries.Get(0)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "High field",
 			sourceExpr:       "high",
 			expectedField:    "high",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-20].high",
+			expectedAccess:   "highSeries.Get(20)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "Low field",
 			sourceExpr:       "low",
 			expectedField:    "low",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-15].low",
+			expectedAccess:   "lowSeries.Get(15)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "Open field",
 			sourceExpr:       "open",
 			expectedField:    "open",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-1].open",
+			expectedAccess:   "openSeries.Get(1)",
 			requiresNaNCheck: false,
 		},
 		{
 			name:             "Volume field",
 			sourceExpr:       "volume",
 			expectedField:    "volume",
-			expectedAccess:   "ctx.Data[ctx.BarIndex-7].volume",
+			expectedAccess:   "volumeSeries.Get(7)",
 			requiresNaNCheck: false,
 		},
 	}
@@ -300,7 +300,8 @@ func TestCreateSeriesAccessor(t *testing.T) {
 					t.Errorf("GetAccessExpression(10) = %q, want %q", accessExpr, expectedPattern)
 				}
 			} else {
-				expectedPattern := "ctx.Data[ctx.BarIndex-10]." + tt.expectedIdentifier
+				seriesName := OHLCVFieldToSeriesName(tt.expectedIdentifier)
+				expectedPattern := seriesName + ".Get(10)"
 				if accessExpr != expectedPattern {
 					t.Errorf("GetAccessExpression(10) = %q, want %q", accessExpr, expectedPattern)
 				}

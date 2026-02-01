@@ -72,7 +72,8 @@ func (a *OHLCVFieldAccessor) IsApplicable(sourceExpr string) bool {
 }
 
 func (a *OHLCVFieldAccessor) GetAccessExpression(offset string) string {
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", offset, a.fieldName)
+	seriesName := OHLCVFieldToSeriesName(a.fieldName)
+	return fmt.Sprintf("%s.Get(%s)", seriesName, offset)
 }
 
 func (a *OHLCVFieldAccessor) GetSourceIdentifier() string {

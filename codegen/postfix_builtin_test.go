@@ -21,7 +21,7 @@ func TestBuiltinIdentifiers_InTAFunctions(t *testing.T) {
 indicator("Test")
 x = ta.sma(close, 20)
 `,
-			expected: "ctx.Data[ctx.BarIndex-j].Close",
+			expected: "closeSeries.Get(j)",
 		},
 		{
 			name: "open in ema",
@@ -29,7 +29,7 @@ x = ta.sma(close, 20)
 indicator("Test")
 x = ta.ema(open, 10)
 `,
-			expected: "ctx.Data[ctx.BarIndex-j].Open",
+			expected: "openSeries.Get(j)",
 		},
 		{
 			name: "high in stdev",
@@ -37,7 +37,7 @@ x = ta.ema(open, 10)
 indicator("Test")
 x = ta.stdev(high, 20)
 `,
-			expected: "ctx.Data[ctx.BarIndex-j].High",
+			expected: "highSeries.Get(j)",
 		},
 
 		{
@@ -46,7 +46,7 @@ x = ta.stdev(high, 20)
 indicator("Test")
 x = ta.sma(volume, 20)
 `,
-			expected: "ctx.Data[ctx.BarIndex-j].Volume",
+			expected: "volumeSeries.Get(j)",
 		},
 	}
 
@@ -317,7 +317,7 @@ x = close[1]
 indicator("Test")
 x = ta.sma(close, 20)
 `,
-			mustHave: []string{"ta.sma", "ctx.Data[ctx.BarIndex-j].Close"},
+			mustHave: []string{"ta.sma", "closeSeries.Get(j)"},
 		},
 		{
 			name: "security with ta function",

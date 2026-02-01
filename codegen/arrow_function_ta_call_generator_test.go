@@ -317,8 +317,9 @@ func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 			expr: &ast.Identifier{Name: "close"},
 			checkType: func(t *testing.T, gen AccessGenerator) {
 				code := gen.GenerateLoopValueAccess("j")
-				if !strings.Contains(code, "Close") {
-					t.Errorf("Expected Close field, got %s", code)
+				/* Arrow functions use ctx.Data pattern - no access to main scope Series variables */
+				if !strings.Contains(code, "ctx.Data[ctx.BarIndex-j].Close") {
+					t.Errorf("Expected ctx.Data pattern, got %s", code)
 				}
 			},
 		},
@@ -327,8 +328,9 @@ func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 			expr: &ast.Identifier{Name: "high"},
 			checkType: func(t *testing.T, gen AccessGenerator) {
 				code := gen.GenerateLoopValueAccess("j")
-				if !strings.Contains(code, "High") {
-					t.Errorf("Expected High field, got %s", code)
+				/* Arrow functions use ctx.Data pattern - no access to main scope Series variables */
+				if !strings.Contains(code, "ctx.Data[ctx.BarIndex-j].High") {
+					t.Errorf("Expected ctx.Data pattern, got %s", code)
 				}
 			},
 		},
@@ -360,8 +362,9 @@ func TestArrowFunctionTACallGenerator_SourceClassification(t *testing.T) {
 			},
 			checkType: func(t *testing.T, gen AccessGenerator) {
 				code := gen.GenerateLoopValueAccess("j")
-				if !strings.Contains(code, "Close") {
-					t.Errorf("Expected Close field, got %s", code)
+				/* Arrow functions use ctx.Data pattern - no access to main scope Series variables */
+				if !strings.Contains(code, "ctx.Data[ctx.BarIndex-j].Close") {
+					t.Errorf("Expected ctx.Data pattern, got %s", code)
 				}
 			},
 		},

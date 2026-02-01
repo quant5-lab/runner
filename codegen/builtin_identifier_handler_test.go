@@ -118,11 +118,11 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"close in security", "close", "ctx.Data[ctx.BarIndex].Close"},
-		{"open in security", "open", "ctx.Data[ctx.BarIndex].Open"},
-		{"high in security", "high", "ctx.Data[ctx.BarIndex].High"},
-		{"low in security", "low", "ctx.Data[ctx.BarIndex].Low"},
-		{"volume in security", "volume", "ctx.Data[ctx.BarIndex].Volume"},
+		{"close in security", "close", "closeSeries.GetCurrent()"},
+		{"open in security", "open", "openSeries.GetCurrent()"},
+		{"high in security", "high", "highSeries.GetCurrent()"},
+		{"low in security", "low", "lowSeries.GetCurrent()"},
+		{"volume in security", "volume", "volumeSeries.GetCurrent()"},
 	}
 
 	for _, tt := range tests {
@@ -141,8 +141,8 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess_TrueRange(t *tes
 	result := handler.GenerateSecurityContextAccess("tr")
 
 	expectedComponents := []string{
-		"ctx.Data[ctx.BarIndex].High",
-		"ctx.Data[ctx.BarIndex].Low",
+		"highSeries.GetCurrent()",
+		"lowSeries.GetCurrent()",
 		"Close",
 		"math.Max", "math.Abs",
 		"if ctx.BarIndex < 1",
@@ -279,7 +279,7 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier(t *testing.T) {
 	}{
 		{"na identifier", "na", false, "math.NaN()", true},
 		{"close current bar", "close", false, "bar.Close", true},
-		{"close in security", "close", true, "ctx.Data[ctx.BarIndex].Close", true},
+		{"close in security", "close", true, "closeSeries.GetCurrent()", true},
 		{"user variable", "my_var", false, "", false},
 	}
 
@@ -317,10 +317,19 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier_TrueRange(t *testing.T) {
 			}
 
 			if resolved {
-				expectedComponents := []string{"math.Max", "High", "Low", "Close"}
-				for _, component := range expectedComponents {
-					if !contains(code, component) {
-						t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+				if tt.inSecurityContext {
+					expectedComponents := []string{"math.Max", "highSeries.GetCurrent()", "lowSeries.GetCurrent()", "closeSeries.Get(1)"}
+					for _, component := range expectedComponents {
+						if !contains(code, component) {
+							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+						}
+					}
+				} else {
+					expectedComponents := []string{"math.Max", "bar.High", "bar.Low", "ctx.Data[ctx.BarIndex-1].Close"}
+					for _, component := range expectedComponents {
+						if !contains(code, component) {
+							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+						}
 					}
 				}
 			}
@@ -368,7 +377,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			true,
 			0,
 			true,
-			"ctx.Data[ctx.BarIndex].Close",
+			"closeSeries.GetCurrent()",
 			true,
 		},
 		{

@@ -10,7 +10,7 @@ func TestPlotInlineTA_SMA(t *testing.T) {
 	NewCodeVerifier(code, t).MustContain(
 		"collector.Add",
 		"ctx.BarIndex < 19",
-		"sum += ctx.Data[ctx.BarIndex-j].Close",
+		"sum += closeSeries.Get(j)",
 	)
 }
 

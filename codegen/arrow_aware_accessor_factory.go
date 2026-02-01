@@ -74,6 +74,12 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 		return NewBuiltinTrueRangeAccessor(), nil
 	}
 
+	// Check OHLCV builtins - use arrow-specific accessor (ctx.Data pattern)
+	// Arrow functions can't access main scope Series variables like highSeries
+	if isOHLCVBuiltin(id.Name) {
+		return NewArrowOHLCVFieldAccessGenerator(capitalizeFirstLetter(id.Name)), nil
+	}
+
 	// Try other builtin resolution (high, low, close, etc.)
 	code, resolved := f.gen.builtinHandler.TryResolveIdentifier(id, false)
 	if resolved {
@@ -109,7 +115,8 @@ func (f *ArrowAwareAccessorFactory) createMemberAccessor(member *ast.MemberExpre
 
 	if okProp && obj.Name == "ctx" {
 		fieldName := capitalizeFirstLetter(prop.Name)
-		return NewOHLCVFieldAccessGenerator(fieldName), nil
+		// Use arrow-specific accessor - arrow functions can't access main scope Series
+		return NewArrowOHLCVFieldAccessGenerator(fieldName), nil
 	}
 
 	code, resolved := f.gen.builtinHandler.TryResolveMemberExpression(member, false)
@@ -137,6 +144,16 @@ func capitalizeFirstLetter(s string) string {
 		return string(s[0]-32) + s[1:]
 	}
 	return s
+}
+
+/* isOHLCVBuiltin checks if identifier is an OHLCV builtin (open, high, low, close, volume) */
+func isOHLCVBuiltin(name string) bool {
+	switch name {
+	case "open", "high", "low", "close", "volume":
+		return true
+	default:
+		return false
+	}
 }
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {

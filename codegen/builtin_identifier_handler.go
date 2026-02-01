@@ -65,27 +65,26 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 
 func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) string {
 	if h.registry.IsDerivedPrice(name) {
-		accessor := "ctx.Data[ctx.BarIndex]"
 		return h.formulaGen.Generate(name,
-			accessor+".High",
-			accessor+".Low",
-			accessor+".Close",
-			accessor+".Open")
+			"highSeries.GetCurrent()",
+			"lowSeries.GetCurrent()",
+			"closeSeries.GetCurrent()",
+			"openSeries.GetCurrent()")
 	}
 
 	switch name {
 	case "close":
-		return "ctx.Data[ctx.BarIndex].Close"
+		return "closeSeries.GetCurrent()"
 	case "open":
-		return "ctx.Data[ctx.BarIndex].Open"
+		return "openSeries.GetCurrent()"
 	case "high":
-		return "ctx.Data[ctx.BarIndex].High"
+		return "highSeries.GetCurrent()"
 	case "low":
-		return "ctx.Data[ctx.BarIndex].Low"
+		return "lowSeries.GetCurrent()"
 	case "volume":
-		return "ctx.Data[ctx.BarIndex].Volume"
+		return "volumeSeries.GetCurrent()"
 	case "tr":
-		return h.generateTrueRangeCalculation("ctx.Data[ctx.BarIndex]")
+		return h.generateTrueRangeCalculationSeries()
 	case "bar_index":
 		return "float64(ctx.BarIndex)"
 	default:
@@ -238,6 +237,12 @@ func (h *BuiltinIdentifierHandler) generateTrueRangeCalculation(barAccessor stri
 		barAccessor, barAccessor,
 		barAccessor, barAccessor, barAccessor, barAccessor,
 	)
+}
+
+func (h *BuiltinIdentifierHandler) generateTrueRangeCalculationSeries() string {
+	return "func() float64 { if ctx.BarIndex < 1 { return highSeries.GetCurrent() - lowSeries.GetCurrent() }; " +
+		"prevClose := closeSeries.Get(1); " +
+		"return math.Max(highSeries.GetCurrent() - lowSeries.GetCurrent(), math.Max(math.Abs(highSeries.GetCurrent() - prevClose), math.Abs(lowSeries.GetCurrent() - prevClose))) }()"
 }
 
 func (h *BuiltinIdentifierHandler) generateHistoricalTrueRange(offset int) string {

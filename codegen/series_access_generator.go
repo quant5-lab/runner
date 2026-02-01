@@ -73,25 +73,32 @@ func NewOHLCVFieldAccessGeneratorWithOffset(fieldName string, baseOffset int) *O
 
 func (g *OHLCVFieldAccessGenerator) GenerateInitialValueAccess(period int) string {
 	totalOffset := period - 1 + g.baseOffset
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", totalOffset, g.fieldName)
+	seriesName := g.fieldNameToSeriesName()
+	return fmt.Sprintf("%s.Get(%d)", seriesName, totalOffset)
 }
 
 func (g *OHLCVFieldAccessGenerator) GenerateLoopValueAccess(loopVar string) string {
+	seriesName := g.fieldNameToSeriesName()
 	if g.baseOffset == 0 {
-		return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", loopVar, g.fieldName)
+		return fmt.Sprintf("%s.Get(%s)", seriesName, loopVar)
 	}
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-(%s+%d)].%s", loopVar, g.baseOffset, g.fieldName)
+	return fmt.Sprintf("%s.Get(%s+%d)", seriesName, loopVar, g.baseOffset)
 }
 
 func (g *OHLCVFieldAccessGenerator) GenerateCurrentValueAccess() string {
+	seriesName := g.fieldNameToSeriesName()
 	if g.baseOffset == 0 {
-		return fmt.Sprintf("ctx.Data[ctx.BarIndex].%s", g.fieldName)
+		return fmt.Sprintf("%s.GetCurrent()", seriesName)
 	}
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", g.baseOffset, g.fieldName)
+	return fmt.Sprintf("%s.Get(%d)", seriesName, g.baseOffset)
 }
 
 func (g *OHLCVFieldAccessGenerator) GetBaseOffset() int {
 	return g.baseOffset
+}
+
+func (g *OHLCVFieldAccessGenerator) fieldNameToSeriesName() string {
+	return OHLCVFieldToSeriesName(g.fieldName)
 }
 
 // CreateAccessGenerator creates the appropriate access generator based on source info.

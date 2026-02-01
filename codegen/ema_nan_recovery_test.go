@@ -172,8 +172,8 @@ func TestEMAAccessorCompatibility(t *testing.T) {
 		{
 			name:            "OHLCV field accessor",
 			accessor:        NewOHLCVFieldAccessGenerator("High"),
-			expectInWarmup:  "ctx.Data[ctx.BarIndex-j].High",
-			expectRecursive: "currentSource := ctx.Data[ctx.BarIndex-0].High",
+			expectInWarmup:  "highSeries.Get(j)",
+			expectRecursive: "currentSource := highSeries.Get(0)",
 			description:     "OHLCV field access",
 		},
 		{

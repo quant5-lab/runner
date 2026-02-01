@@ -277,7 +277,7 @@ func (m *mockWindowAccessor) GenerateLoopValueAccess(loopVar string) string {
 }
 
 func (m *mockWindowAccessor) GenerateCurrentValueAccess() string {
-	return "ctx.Data[ctx.BarIndex].Close"
+	return "closeSeries.GetCurrent()"
 }
 
 func (m *mockWindowAccessor) GetBaseOffset() int {
