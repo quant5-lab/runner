@@ -11,10 +11,7 @@
 | **9** | **Codegen** | `heikinashi()` function | FIXED | Implemented in `call_handler_ticker.go`, `runtime/ticker/` | - |
 | **10** | **Codegen** | `alert()` function | VALID | Not implemented | - |
 | **11** | **Codegen** | `alertcondition()` function | VALID | Not implemented | - |
-| **12** | **Codegen** | `input.color` not implemented | VALID | No handler in input_handler.go | pivot-reversal.pine |
-| **13** | **Codegen** | `input.time` not implemented | VALID | No handler in input_handler.go | - |
-| **14** | **Codegen** | `input.timeframe` not implemented | VALID | No handler in input_handler.go | - |
-| **15** | **Codegen** | `input.symbol` not implemented | VALID | No handler in input_handler.go | - |
+| **12** | **Codegen** | `input.*` missing handlers | VALID | `input.color`, `input.time`, `input.timeframe`, `input.symbol` not implemented | pivot-reversal.pine |
 | **16** | **Codegen** | `ObjectExpression` in expression generator | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ObjectExpression" | - |
 | **17** | **Codegen** | `ArrowFunctionExpression` inline | VALID | `generateExpression` returns error: "unsupported expression type: *ast.ArrowFunctionExpression" | - |
 | **18** | **Codegen** | Arrow TA: ta.atr (1-arg implicit OHLC) | FIXED | Universal TASignatureRegistry with implicit OHLC support | - |
