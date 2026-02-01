@@ -948,6 +948,8 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 		return g.generateLiteral(e)
 	case *ast.MemberExpression:
 		return g.generateMemberExpression(e)
+	case *ast.ObjectExpression:
+		return "", fmt.Errorf("ObjectExpression should not reach generateExpression - call handlers must use ArgumentExtractor for named arguments")
 	default:
 		return "", fmt.Errorf("unsupported expression type: %T", expr)
 	}
@@ -2925,6 +2927,8 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		return fmt.Sprintf("%s%s", op, operand)
 	case *ast.CallExpression:
 		return g.extractCallExpression(e)
+	case *ast.ObjectExpression:
+		return "/* ERROR: ObjectExpression requires ArgumentExtractor */"
 	}
 	return "0.0"
 }
