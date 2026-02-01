@@ -159,9 +159,14 @@ func TestConvertSeriesAccessToPrev(t *testing.T) {
 			expected: "sma20Series.Get(1)",
 		},
 		{
-			name:     "user variable (placeholder)",
+			name:     "constant value unchanged",
+			series:   "30",
+			expected: "30",
+		},
+		{
+			name:     "user variable unchanged",
 			series:   "sma20",
-			expected: "0.0",
+			expected: "sma20",
 		},
 	}
 

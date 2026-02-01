@@ -2418,15 +2418,15 @@ func (g *generator) generateInlineATR(varName string, period int) (string, error
 	g.indent++
 
 	/* Calculate TR for current bar */
-	code += g.ind() + "hl := ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low\n"
-	code += g.ind() + "hc := math.Abs(ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex-1].Close)\n"
-	code += g.ind() + "lc := math.Abs(ctx.Data[ctx.BarIndex].Low - ctx.Data[ctx.BarIndex-1].Close)\n"
+	code += g.ind() + "hl := highSeries.GetCurrent() - lowSeries.GetCurrent()\n"
+	code += g.ind() + "hc := math.Abs(highSeries.GetCurrent() - closeSeries.Get(1))\n"
+	code += g.ind() + "lc := math.Abs(lowSeries.GetCurrent() - closeSeries.Get(1))\n"
 	code += g.ind() + "tr := math.Max(hl, math.Max(hc, lc))\n"
 
 	/* RMA smoothing of TR */
 	code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d {\n", period)
 	g.indent++
-	/* Warmup: use SMA for first period bars */
+	/* Warmup: use SMA for first period bars - loop uses absolute indices */
 	code += g.ind() + "sum := 0.0\n"
 	code += g.ind() + "for j := 0; j <= ctx.BarIndex; j++ {\n"
 	g.indent++
@@ -2906,12 +2906,12 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		// User-defined variables use Series storage (ForwardSeriesBuffer paradigm)
 		return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
 	case *ast.Literal:
-		/* Numeric literal */
+		/* Numeric literal - always use float64 for consistency */
 		switch v := e.Value.(type) {
 		case float64:
 			return g.literalFormatter.FormatFloat(v)
 		case int:
-			return fmt.Sprintf("%d", v)
+			return fmt.Sprintf("%d.0", v)
 		}
 	case *ast.BinaryExpression:
 		/* Binary expressions should be formatted with operator precedence */
@@ -2963,8 +2963,8 @@ func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
 		return strings.ReplaceAll(seriesCode, "Series.GetCurrent()", "Series.Get(1)")
 	}
 
-	// For non-Series user variables, return 0.0 (shouldn't happen in crossover with Series)
-	return "0.0"
+	// For constants (numeric values), return unchanged - they don't need previous bar access
+	return seriesCode
 }
 
 func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar string) string {
@@ -2973,10 +2973,10 @@ func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar str
 		if seriesName, exists := g.barFieldRegistry.GetSeriesName("bar." + field); exists {
 			return fmt.Sprintf("%s.Get(%s)", seriesName, offsetVar)
 		}
-		return fmt.Sprintf("ctx.Data[i-%s].%s", offsetVar, field)
+		seriesName := g.fieldNameToOHLCVSeriesName(field)
+		return fmt.Sprintf("%s.Get(%s)", seriesName, offsetVar)
 	}
 
-	// Handle expressions with GetCurrent() patterns
 	if strings.Contains(seriesCode, "Series.GetCurrent()") {
 		re := regexp.MustCompile(`(\w+Series)\.GetCurrent\(\)`)
 		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetVar))
@@ -2984,8 +2984,6 @@ func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar str
 	}
 
 	if strings.Contains(seriesCode, "Series.Get(") {
-		// Handle expressions with multiple series references (e.g., "(closeSeries.Get(0) > openSeries.Get(0))")
-		// Use regex to replace all Series.Get(...) patterns
 		re := regexp.MustCompile(`(\w+Series)\.Get\([^)]*\)`)
 		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetVar))
 		return result
@@ -3003,10 +3001,10 @@ func (g *generator) convertSeriesAccessToIntOffset(seriesCode string, offset int
 		if seriesName, exists := g.barFieldRegistry.GetSeriesName("bar." + field); exists {
 			return fmt.Sprintf("%s.Get(%d)", seriesName, offset)
 		}
-		return fmt.Sprintf("ctx.Data[i-%d].%s", offset, field)
+		seriesName := g.fieldNameToOHLCVSeriesName(field)
+		return fmt.Sprintf("%s.Get(%d)", seriesName, offset)
 	}
 
-	// Handle expressions with GetCurrent() patterns
 	if strings.Contains(seriesCode, "Series.GetCurrent()") {
 		re := regexp.MustCompile(`(\w+Series)\.GetCurrent\(\)`)
 		result := re.ReplaceAllString(seriesCode, fmt.Sprintf("$1.Get(%s)", offsetStr))
@@ -3020,6 +3018,10 @@ func (g *generator) convertSeriesAccessToIntOffset(seriesCode string, offset int
 	}
 
 	return seriesCode
+}
+
+func (g *generator) fieldNameToOHLCVSeriesName(fieldName string) string {
+	return OHLCVFieldToSeriesName(fieldName)
 }
 
 /* extractIntArgument extracts integer argument from AST expression */

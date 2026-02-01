@@ -3,6 +3,8 @@ package codegen
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
 	"github.com/quant5-lab/runner/ast"
 )
@@ -106,7 +108,10 @@ func generateCrossDetection(g *generator, varName string, call *ast.CallExpressi
 	code += g.ind() + "if i > 0 {\n"
 	g.indent++
 	code += g.ind() + fmt.Sprintf("%s := %s\n", prev1Var, g.convertSeriesAccessToPrev(series1))
-	code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, g.convertSeriesAccessToPrev(series2))
+	// Ensure prev2 is float64 when comparing with series (which returns float64)
+	prev2Value := g.convertSeriesAccessToPrev(series2)
+	prev2Value = ensureFloat64Literal(prev2Value)
+	code += g.ind() + fmt.Sprintf("%s := %s\n", prev2Var, prev2Value)
 	code += g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { %s }())\n", varName, condition)
 	g.indent--
 	code += g.ind() + "} else {\n"
@@ -116,6 +121,23 @@ func generateCrossDetection(g *generator, varName string, call *ast.CallExpressi
 	code += g.ind() + "}\n"
 
 	return code, nil
+}
+
+/* ensureFloat64Literal ensures a numeric literal has .0 suffix for Go type safety */
+func ensureFloat64Literal(s string) string {
+	// Don't modify non-numeric values (series accesses, bar. accesses, etc.)
+	if strings.Contains(s, "Series") || strings.Contains(s, "bar.") || strings.Contains(s, "ctx.") {
+		return s
+	}
+	// Don't modify if already has decimal or scientific notation
+	if strings.Contains(s, ".") || strings.Contains(s, "e") || strings.Contains(s, "E") {
+		return s
+	}
+	// Try to parse as number - if successful, add .0 suffix
+	if _, err := strconv.ParseFloat(s, 64); err == nil {
+		return s + ".0"
+	}
+	return s
 }
 
 /* detectV4InputType detects Pine v4 input() type parameter, returns normalized v5 function name */
