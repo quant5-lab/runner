@@ -1,8 +1,0 @@
-Runtime limitation: strategy.exit() execution misalignment vs TradingView
-
-Parse: ✅ Success
-Generate: ✅ Success
-Compile: ✅ Success
-Execute: ⚠️ Partial (entries work, exits trigger but timing/prices misaligned)
-
-Evidence: Manual comparison shows exit bars and prices differ from PineScript reference execution
