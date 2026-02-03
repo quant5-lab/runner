@@ -13,3 +13,12 @@
 | **11** | **Codegen** | `input.*` missing handlers | VALID | `input.color`, `input.time`, `input.timeframe`, `input.symbol` not implemented | pivot-reversal.pine |
 | **12** | **Codegen** | `ticker.*` functions incomplete | VALID | `ticker.modify()` returns ctx.Symbol (no modification), `ticker.new()`/`ticker.inherit()` do string concat only | - |
 | **13** | **Codegen** | Non-HA chart types return identity | VALID | Renko, Kagi, LineBreak, PointFig transformers return IdentityTransformer (stubs) | - |
+| **14** | **Codegen** | Color constants (`blue`, `silver`, `green`, `red`, etc.) | VALID | undefined: blueSeries, silverSeries, greenSeries, redSeries | test.pine |
+| **15** | **Codegen** | Boolean comparison in ternary generates float64 vs bool | VALID | mismatched types float64 and untyped bool | test.pine |
+| **16** | **Codegen** | `math.sum()` function | VALID | unhandled call expression: math.sum | test.pine |
+| **17** | **Codegen** | `cos()` function | VALID | unhandled call expression: cos | test.pine |
+| **18** | **Codegen** | Call expression as period argument | VALID | unsupported period expression type: *ast.CallExpression | test.pine |
+| **19** | **Parser** | Multiple variable declaration with comma | VALID | Parse error: unexpected token "," at `src = close,` | test.pine |
+| **20** | **Parser** | Tuple destructuring assignment | VALID | Parse error: unexpected token "," at `[t08, s08] = security(...)` | test.pine |
+| **21** | **Codegen** | Arbitrary function composition | VALID | Functions not composable into arbitrary contexts (e.g., `plot(math.avg(...))`, `heikenashi(tickerid)` in ternary) - misaligned from PineScript behavior | - |
+| **22** | **Lexer** | Numbers with leading decimal point | VALID | Parse error: unexpected token ":=" at `_value0 := .66 * ...` - `.66` not recognized | test.pine |

@@ -1,0 +1,116 @@
+//@version=4
+strategy(overlay=true, shorttitle="BB RSI MeanRev", default_qty_type=strategy.percent_of_equity, initial_capital=100000, default_qty_value=100, pyramiding=0, title="Bollinger Bands RSI Mean Reversion Strategy", currency='USD')
+
+//=== Strategy Version Selection ===
+useBasicMode = input(true, title="Basic Mode (No SL/TP)")
+useRsiExitMode = input(false, title="RSI Exit Mode (With SL/TP)")
+useMfiMode = input(false, title="MFI Filter Mode (With SL/TP)")
+
+//=== Stop Loss / Take Profit Settings ===
+rsiExitStopLossPct = input(6.604, title='RSI Mode Stop Loss %', type=input.float, minval=0.01) / 100
+rsiExitTakeProfitPct = input(2.328, title='RSI Mode Take Profit %', type=input.float, minval=0.01) / 100
+rsiExitStopLevel = strategy.position_avg_price * (1 - rsiExitStopLossPct)
+rsiExitProfitLevel = strategy.position_avg_price * (1 + rsiExitTakeProfitPct)
+
+mfiModeStopLossPct = input(8.882, title='MFI Mode Stop Loss %', type=input.float, minval=0.01) / 100
+mfiModeTakeProfitPct = input(2.317, title='MFI Mode Take Profit %', type=input.float, minval=0.01) / 100
+mfiModeStopLevel = strategy.position_avg_price * (1 - mfiModeStopLossPct)
+mfiModeProfitLevel = strategy.position_avg_price * (1 + mfiModeTakeProfitPct)
+
+//=== SL/TP Visualization ===
+plot(useRsiExitMode and rsiExitStopLevel ? rsiExitStopLevel : na, color=color.red, style=plot.style_linebr, linewidth=2, title="RSI Mode Stop")
+plot(useRsiExitMode and rsiExitProfitLevel ? rsiExitProfitLevel : na, color=color.green, style=plot.style_linebr, linewidth=2, title="RSI Mode Profit")
+plot(useMfiMode and mfiModeStopLevel ? mfiModeStopLevel : na, color=color.red, style=plot.style_linebr, linewidth=2, title="MFI Mode Stop")
+plot(useMfiMode and mfiModeProfitLevel ? mfiModeProfitLevel : na, color=color.green, style=plot.style_linebr, linewidth=2, title="MFI Mode Profit")
+
+//=== RSI Calculation ===
+rsiLength = 14
+rsiSource = close
+rsiGainEma = rma(max(change(rsiSource), 0), rsiLength)
+rsiLossEma = rma(-min(change(rsiSource), 0), rsiLength)
+rsiValue = rsiLossEma == 0 ? 100 : rsiGainEma == 0 ? 0 : 100 - 100 / (1 + rsiGainEma / rsiLossEma)
+
+//=== MFI Calculation ===
+mfiLength = 14
+mfiSource = hlc3
+mfiPositiveFlow = sum(volume * (change(mfiSource) <= 0 ? 0 : mfiSource), mfiLength)
+mfiNegativeFlow = sum(volume * (change(mfiSource) >= 0 ? 0 : mfiSource), mfiLength)
+
+calcMfi(posFlow, negFlow) =>
+    if negFlow == 0
+        100
+    if posFlow == 0
+        0
+    100.0 - (100.0 / (1.0 + posFlow / negFlow))
+
+mfiValue = calcMfi(mfiPositiveFlow, mfiNegativeFlow)
+
+//=== Bollinger Bands - Basic/MFI Mode (20 period) ===
+bbBasicLength = 20
+bbBasicSource = close
+bbBasicMult = 1.0
+bbBasicMid = sma(bbBasicSource, bbBasicLength)
+bbBasicDev = bbBasicMult * stdev(bbBasicSource, bbBasicLength)
+bbBasicUpper = bbBasicMid + bbBasicDev
+bbBasicLower = bbBasicMid - bbBasicDev
+
+//=== Bollinger Bands - RSI Exit Mode (17 period) ===
+bbRsiModeLength = 17
+bbRsiModeSource = close
+bbRsiModeMult = 1.0
+bbRsiModeMid = sma(bbRsiModeSource, bbRsiModeLength)
+bbRsiModeDev = bbRsiModeMult * stdev(bbRsiModeSource, bbRsiModeLength)
+bbRsiModeUpper = bbRsiModeMid + bbRsiModeDev
+bbRsiModeLower = bbRsiModeMid - bbRsiModeDev
+
+//=== Basic Mode Parameters ===
+basicRsiBuyThreshold = 42
+basicRsiSellThreshold = 70
+basicBuySignal = bbBasicSource < bbBasicLower
+basicSellSignal = bbBasicSource > bbBasicUpper
+basicRsiBuyFilter = rsiValue > basicRsiBuyThreshold
+basicRsiSellFilter = rsiValue > basicRsiSellThreshold
+
+//=== RSI Exit Mode Parameters ===
+rsiModeRsiBuyThreshold = 42
+rsiModeRsiSellThreshold = 76
+rsiModeBuySignal = bbRsiModeSource < bbRsiModeLower
+rsiModeSellSignal = bbRsiModeSource > bbRsiModeUpper
+rsiModeRsiBuyFilter = rsiValue > rsiModeRsiBuyThreshold
+rsiModeRsiSellFilter = rsiValue > rsiModeRsiSellThreshold
+
+//=== MFI Mode Parameters ===
+mfiModeMfiBuyThreshold = 60
+mfiModeRsiSellThreshold = 65
+mfiModeMfiSellThreshold = 64
+mfiModeBuySignal = bbBasicSource < bbBasicLower
+mfiModeSellSignal = bbBasicSource > bbBasicUpper
+mfiModeMfiBuyFilter = mfiValue < mfiModeMfiBuyThreshold
+mfiModeRsiSellFilter = rsiValue > mfiModeRsiSellThreshold
+mfiModeMfiSellFilter = mfiValue > mfiModeMfiSellThreshold
+
+//=== Strategy Execution: Basic Mode ===
+basicEntryCondition = basicBuySignal and basicRsiBuyFilter
+basicExitCondition = basicSellSignal and basicRsiSellFilter
+
+if useBasicMode
+    strategy.entry("Long", strategy.long, when=basicEntryCondition, alert_message="Basic Mode - Entry")
+    strategy.close("Long", when=basicExitCondition, alert_message="Basic Mode - Exit")
+
+//=== Strategy Execution: RSI Exit Mode ===
+rsiModeEntryCondition = rsiModeBuySignal and rsiModeRsiBuyFilter
+rsiModeExitCondition = rsiModeSellSignal and rsiModeRsiSellFilter
+
+if useRsiExitMode
+    strategy.entry("Long", strategy.long, when=rsiModeEntryCondition, alert_message="RSI Mode - Entry")
+    strategy.close("Long", when=rsiModeExitCondition, alert_message="RSI Mode - Exit")
+    strategy.exit("SL/TP", "Long", stop=rsiExitStopLevel, limit=rsiExitProfitLevel)
+
+//=== Strategy Execution: MFI Mode ===
+mfiModeEntryCondition = mfiModeBuySignal and mfiModeMfiBuyFilter
+mfiModeExitCondition = mfiModeSellSignal and mfiModeRsiSellFilter and mfiModeMfiSellFilter
+
+if useMfiMode
+    strategy.entry("Long", strategy.long, when=mfiModeEntryCondition, alert_message="MFI Mode - Entry")
+    strategy.close("Long", when=mfiModeExitCondition, alert_message="MFI Mode - Exit")
+    strategy.exit("SL/TP", "Long", stop=mfiModeStopLevel, limit=mfiModeProfitLevel)
