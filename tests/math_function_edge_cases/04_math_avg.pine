@@ -1,0 +1,7 @@
+//@version=5
+strategy("Math Avg Function", overlay=true)
+// math.avg - average of values
+a = math.avg(close, open)
+b = math.avg(high, low, close)
+c = math.avg(1, 2, 3, 4)
+strategy.entry("test", strategy.long)

@@ -15,10 +15,9 @@
 | **13** | **Codegen** | Non-HA chart types return identity | VALID | Renko, Kagi, LineBreak, PointFig transformers return IdentityTransformer (stubs) | - |
 | **14** | **Codegen** | Color constants (`blue`, `silver`, `green`, `red`, etc.) | VALID | undefined: blueSeries, silverSeries, greenSeries, redSeries | test.pine |
 | **15** | **Codegen** | Boolean comparison in ternary generates float64 vs bool | VALID | mismatched types float64 and untyped bool | test.pine |
-| **16** | **Codegen** | `math.sum()` function | VALID | unhandled call expression: math.sum | test.pine |
-| **17** | **Codegen** | `cos()` function | VALID | unhandled call expression: cos | test.pine |
-| **18** | **Codegen** | Call expression as period argument | VALID | unsupported period expression type: *ast.CallExpression | test.pine |
-| **19** | **Parser** | Multiple variable declaration with comma | VALID | Parse error: unexpected token "," at `src = close,` | test.pine |
-| **20** | **Parser** | Tuple destructuring assignment | VALID | Parse error: unexpected token "," at `[t08, s08] = security(...)` | test.pine |
-| **21** | **Codegen** | Arbitrary function composition | VALID | Functions not composable into arbitrary contexts (e.g., `plot(math.avg(...))`, `heikenashi(tickerid)` in ternary) - misaligned from PineScript behavior | - |
-| **22** | **Lexer** | Incomplete number literal formats | VALID | Missing: leading decimal (`.5`), trailing decimal (`1.`), scientific notation (`6.02e23`), underscore separators (`1_000_000`). See `tests/number_format_edge_cases/` | test.pine |
+| **16** | **Codegen** | Incomplete math namespace functions | VALID | Missing: sin, cos, tan, asin, acos, atan, log10, avg, sign, random, todegrees, toradians, round_to_mintick. Bug: `math.sum` incorrectly implemented as SMA (divides by length). See `tests/math_function_edge_cases/` | test.pine |
+| **17** | **Codegen** | Call expression as period argument | VALID | unsupported period expression type: *ast.CallExpression | test.pine |
+| **18** | **Parser** | Multiple variable declaration with comma | VALID | Parse error: unexpected token "," at `src = close,` | test.pine |
+| **19** | **Parser** | Tuple destructuring assignment | VALID | Parse error: unexpected token "," at `[t08, s08] = security(...)` | test.pine |
+| **20** | **Codegen** | Arbitrary function composition | VALID | Functions not composable into arbitrary contexts (e.g., `plot(math.avg(...))`, `heikenashi(tickerid)` in ternary) - misaligned from PineScript behavior | - |
+| **21** | **Lexer** | Incomplete number literal formats | VALID | Missing: leading decimal (`.5`), trailing decimal (`1.`), scientific notation (`6.02e23`), underscore separators (`1_000_000`). See `tests/number_format_edge_cases/` | test.pine |

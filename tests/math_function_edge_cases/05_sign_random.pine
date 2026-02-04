@@ -1,0 +1,8 @@
+//@version=5
+strategy("Sign and Random Functions", overlay=true)
+// math.sign, math.random
+a = math.sign(-5)
+b = math.sign(5)
+c = math.random()
+d = math.random(0, 100)
+strategy.entry("test", strategy.long)

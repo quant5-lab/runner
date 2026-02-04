@@ -1,0 +1,5 @@
+//@version=5
+strategy("Math Sum Function", overlay=true)
+// math.sum - cumulative sum over length
+a = math.sum(close, 14)
+strategy.entry("test", strategy.long)

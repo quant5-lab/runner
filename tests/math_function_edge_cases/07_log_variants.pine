@@ -1,0 +1,7 @@
+//@version=5
+strategy("Log Variants", overlay=true)
+// Various log functions
+a = math.log(10)
+b = math.log10(10)
+c = math.log2(8)
+strategy.entry("test", strategy.long)
