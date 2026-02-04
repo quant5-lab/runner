@@ -212,7 +212,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Keyword", Pattern: `\b(if|for|to|by|while|and|or|not|true|false)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
-	{Name: "Float", Pattern: `\d+\.\d+`},
+	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
 	{Name: "Punct", Pattern: `:=|=>|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
