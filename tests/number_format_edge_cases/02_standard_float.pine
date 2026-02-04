@@ -1,0 +1,6 @@
+//@version=5
+indicator("Standard Float Test", overlay=true)
+x = 3.14
+y = 1.0
+z = 0.5
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

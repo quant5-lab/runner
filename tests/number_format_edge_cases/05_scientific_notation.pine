@@ -1,0 +1,8 @@
+//@version=5
+indicator("Scientific Notation Test", overlay=true)
+x = 6.02e23
+y = 1.6e-19
+z = 3e8
+w = 1E10
+v = 2.5E-5
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

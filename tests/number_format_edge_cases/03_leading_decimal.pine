@@ -1,0 +1,6 @@
+//@version=5
+indicator("Leading Decimal Test", overlay=true)
+x = .5
+y = .66
+z = .123
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

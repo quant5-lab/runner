@@ -1,0 +1,6 @@
+//@version=5
+indicator("Trailing Decimal Test", overlay=true)
+x = 1.
+y = 42.
+z = 100.
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

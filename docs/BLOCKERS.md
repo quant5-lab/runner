@@ -21,4 +21,4 @@
 | **19** | **Parser** | Multiple variable declaration with comma | VALID | Parse error: unexpected token "," at `src = close,` | test.pine |
 | **20** | **Parser** | Tuple destructuring assignment | VALID | Parse error: unexpected token "," at `[t08, s08] = security(...)` | test.pine |
 | **21** | **Codegen** | Arbitrary function composition | VALID | Functions not composable into arbitrary contexts (e.g., `plot(math.avg(...))`, `heikenashi(tickerid)` in ternary) - misaligned from PineScript behavior | - |
-| **22** | **Lexer** | Numbers with leading decimal point | VALID | Parse error: unexpected token ":=" at `_value0 := .66 * ...` - `.66` not recognized | test.pine |
+| **22** | **Lexer** | Incomplete number literal formats | VALID | Missing: leading decimal (`.5`), trailing decimal (`1.`), scientific notation (`6.02e23`), underscore separators (`1_000_000`). See `tests/number_format_edge_cases/` | test.pine |
