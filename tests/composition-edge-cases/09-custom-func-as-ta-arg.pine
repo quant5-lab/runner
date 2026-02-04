@@ -1,0 +1,5 @@
+//@version=5
+// TEST: Custom function as arg to TA - SHOULD WORK
+indicator("Composition: ta.ema(myFunc())")
+myFunc(src) => ta.sma(src, 10)
+plot(ta.ema(myFunc(close), 20))

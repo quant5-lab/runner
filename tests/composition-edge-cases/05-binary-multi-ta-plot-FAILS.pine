@@ -1,0 +1,5 @@
+//@version=5
+// TEST: Binary expr with multiple TA in plot - FAILS (BLOCKER #21-B)
+// Error: "unsupported inline function in condition: ta.sma"
+indicator("Composition: plot(ta.sma() + ta.ema())")
+plot(ta.sma(close, 14) + ta.ema(close, 14))

@@ -1,0 +1,4 @@
+//@version=5
+// TEST: Nested TA in plot - SHOULD WORK
+indicator("Composition: plot(ta.sma(ta.ema()))")
+plot(ta.sma(ta.ema(close, 10), 20))

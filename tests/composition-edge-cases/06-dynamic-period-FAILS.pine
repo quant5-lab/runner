@@ -1,0 +1,5 @@
+//@version=5
+// TEST: Dynamic period via input - FAILS (BLOCKER #21-C)
+// Error: "ta.sma period must be literal"
+indicator("Composition: ta.sma(input.int())")
+plot(ta.sma(close, input.int(14, "Period")))

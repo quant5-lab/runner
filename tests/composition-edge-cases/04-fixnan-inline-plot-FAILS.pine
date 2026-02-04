@@ -1,0 +1,5 @@
+//@version=5
+// TEST: fixnan() inline in plot - FAILS (BLOCKER #21-A)
+// Error: "unsupported inline function in plot: fixnan"
+indicator("Composition: plot(fixnan())")
+plot(fixnan(ta.sma(close, 14)))

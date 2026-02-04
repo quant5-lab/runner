@@ -1,0 +1,5 @@
+//@version=5
+// TEST: Ternary with TA branches - SHOULD WORK
+indicator("Composition: ternary ? ta.sma : ta.ema")
+result = close > open ? ta.sma(close, 14) : ta.ema(close, 14)
+plot(result)

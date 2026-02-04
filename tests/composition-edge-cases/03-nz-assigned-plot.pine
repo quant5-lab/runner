@@ -1,0 +1,5 @@
+//@version=5
+// TEST: nz() assigned first - SHOULD WORK (workaround for #21-A)
+indicator("Composition: nz() assigned")
+val = nz(ta.sma(close, 14), 0)
+plot(val)
