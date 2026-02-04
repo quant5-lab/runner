@@ -1,0 +1,7 @@
+//@version=5
+// TEST: supertrend with dynamic period - WORKS
+// Note: supertrend accepts dynamic period unlike other TA functions
+indicator("Dynamic period: ta.supertrend(3.0, getPeriod())")
+getPeriod() => 10
+[st, dir] = ta.supertrend(3.0, getPeriod())
+plot(st)

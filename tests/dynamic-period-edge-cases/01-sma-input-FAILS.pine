@@ -1,0 +1,5 @@
+//@version=5
+// TEST: Call expression as SMA period - FAILS (BLOCKER #18)
+// Error: "ta.sma period must be literal"
+indicator("Dynamic period: ta.sma(close, input.int())")
+plot(ta.sma(close, input.int(14, "Period")))

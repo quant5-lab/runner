@@ -1,0 +1,6 @@
+//@version=5
+// TEST: highest() with dynamic period - FAILS (BLOCKER #18)
+// Error: "ta.highest period must be literal"
+indicator("Dynamic period: ta.highest(close, getPeriod())")
+getPeriod() => 14
+plot(ta.highest(close, getPeriod()))

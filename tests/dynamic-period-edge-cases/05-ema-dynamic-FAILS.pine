@@ -1,0 +1,6 @@
+//@version=5
+// TEST: EMA with dynamic period - FAILS (BLOCKER #18)
+// Error: "ta.ema period must be literal"
+indicator("Dynamic period: ta.ema(close, getPeriod())")
+getPeriod() => 14
+plot(ta.ema(close, getPeriod()))

@@ -1,0 +1,6 @@
+//@version=5
+// TEST: Custom function as source - WORKS
+// Note: Source parameter accepts dynamic values
+indicator("Dynamic source: ta.sma(getSource(), 14)")
+getSource() => close
+plot(ta.sma(getSource(), 14))
