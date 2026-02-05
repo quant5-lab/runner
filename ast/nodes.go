@@ -150,7 +150,8 @@ type IfStatement struct {
 	Alternate  []Node     `json:"alternate,omitempty"`
 }
 
-func (i *IfStatement) Type() NodeType { return TypeIfStatement }
+func (i *IfStatement) Type() NodeType  { return TypeIfStatement }
+func (i *IfStatement) expressionNode() {}
 
 type ForStatement struct {
 	NodeType NodeType   `json:"type"`
@@ -161,7 +162,8 @@ type ForStatement struct {
 	Body     []Node     `json:"body"`
 }
 
-func (f *ForStatement) Type() NodeType { return TypeForStatement }
+func (f *ForStatement) Type() NodeType  { return TypeForStatement }
+func (f *ForStatement) expressionNode() {}
 
 type ConditionalExpression struct {
 	NodeType   NodeType   `json:"type"`

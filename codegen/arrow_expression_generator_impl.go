@@ -47,6 +47,14 @@ func (e *ArrowExpressionGeneratorImpl) Generate(expr ast.Expression) (string, er
 
 func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (string, error) {
 	switch ex := expr.(type) {
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(e.gen)
+		return cfGenerator.GenerateForExpressionAsIIFE(ex)
+
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(e.gen)
+		return cfGenerator.GenerateIfExpressionAsIIFE(ex)
+
 	case *ast.Identifier:
 		return e.generateIdentifier(ex)
 

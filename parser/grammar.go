@@ -78,8 +78,27 @@ type ArrayLiteral struct {
 	Elements []*TernaryExpr `parser:"'[' ( @@ ( ',' @@ )* )? ']'"`
 }
 
+type ForExpr struct {
+	Counter string       `parser:"'for' @Ident '='"`
+	From    *ArithExpr   `parser:"@@"`
+	To      *ArithExpr   `parser:"'to' @@"`
+	Step    *ArithExpr   `parser:"( 'by' @@ )?"`
+	Indent  *string      `parser:"@Indent"`
+	Body    []*Statement `parser:"@@+"`
+	Dedent  *string      `parser:"@Dedent"`
+}
+
+type IfExpr struct {
+	Condition *OrExpr      `parser:"'if' @@"`
+	Indent    *string      `parser:"@Indent"`
+	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent"`
+}
+
 type Expression struct {
-	Ternary      *TernaryExpr  `parser:"@@"`
+	ForExpr      *ForExpr      `parser:"@@"`
+	IfExpr       *IfExpr       `parser:"| @@"`
+	Ternary      *TernaryExpr  `parser:"| @@"`
 	Array        *ArrayLiteral `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`

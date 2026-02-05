@@ -916,6 +916,12 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 
 func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateForExpressionAsIIFE(e)
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateIfExpressionAsIIFE(e)
 	case *ast.CallExpression:
 		return g.generateCallExpression(e)
 	case *ast.BinaryExpression:

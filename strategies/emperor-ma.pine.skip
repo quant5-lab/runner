@@ -1,6 +1,6 @@
-Parse limitation: for-loop assignment syntax not supported (#10)
+Codegen limitation: missing math functions asin, pow in arrow context (#16)
 
-Parse: ❌ (unexpected token "=" expected <dedent>)
-Generate: ❌ Not reached
+Parse: ✅
+Generate: ❌ (unhandled call expression: asin)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

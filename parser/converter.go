@@ -68,6 +68,12 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
+	if expr.ForExpr != nil {
+		return c.convertForExprToStatement(expr.ForExpr)
+	}
+	if expr.IfExpr != nil {
+		return c.convertIfExprToStatement(expr.IfExpr)
+	}
 	if expr.Array != nil {
 		elements := []ast.Expression{}
 		for _, elem := range expr.Array.Elements {
@@ -686,6 +692,70 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	}
 
 	return nil, fmt.Errorf("empty factor")
+}
+
+func (c *Converter) convertForExprToStatement(forExpr *ForExpr) (ast.Expression, error) {
+	fromExpr, err := c.convertArithExpr(forExpr.From)
+	if err != nil {
+		return nil, fmt.Errorf("converting for-loop from expression: %w", err)
+	}
+
+	toExpr, err := c.convertArithExpr(forExpr.To)
+	if err != nil {
+		return nil, fmt.Errorf("converting for-loop to expression: %w", err)
+	}
+
+	var stepExpr ast.Expression
+	if forExpr.Step != nil {
+		stepExpr, err = c.convertArithExpr(forExpr.Step)
+		if err != nil {
+			return nil, fmt.Errorf("converting for-loop step expression: %w", err)
+		}
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range forExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting for-loop body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	return &ast.ForStatement{
+		NodeType: ast.TypeForStatement,
+		Counter:  forExpr.Counter,
+		From:     fromExpr,
+		To:       toExpr,
+		Step:     stepExpr,
+		Body:     body,
+	}, nil
+}
+
+func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, error) {
+	test, err := c.convertOrExpr(ifExpr.Condition)
+	if err != nil {
+		return nil, fmt.Errorf("converting if-expression condition: %w", err)
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range ifExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting if-expression body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	return &ast.IfStatement{
+		NodeType:   ast.TypeIfStatement,
+		Test:       test,
+		Consequent: body,
+	}, nil
 }
 
 func (c *Converter) ToJSON(program *ast.Program) ([]byte, error) {
