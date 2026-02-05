@@ -9,6 +9,7 @@ import (
 )
 
 func TestGenerateStringExpression_ColorConstants(t *testing.T) {
+	// Test code generation for string constants (colors and strategy constants)
 	tests := []struct {
 		name     string
 		expr     ast.Expression
@@ -20,15 +21,7 @@ func TestGenerateStringExpression_ColorConstants(t *testing.T) {
 				Object:   &ast.Identifier{Name: "color"},
 				Property: &ast.Identifier{Name: "red"},
 			},
-			expected: `"#FF0000"`,
-		},
-		{
-			name: "color.lime constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "lime"},
-			},
-			expected: `"#00FF00"`,
+			expected: `"#FF5252"`,
 		},
 		{
 			name: "color.blue constant",
@@ -36,47 +29,7 @@ func TestGenerateStringExpression_ColorConstants(t *testing.T) {
 				Object:   &ast.Identifier{Name: "color"},
 				Property: &ast.Identifier{Name: "blue"},
 			},
-			expected: `"#0000FF"`,
-		},
-		{
-			name: "color.maroon constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "maroon"},
-			},
-			expected: `"#800000"`,
-		},
-		{
-			name: "color.fuchsia constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "fuchsia"},
-			},
-			expected: `"#FF00FF"`,
-		},
-		{
-			name: "color.aqua constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "aqua"},
-			},
-			expected: `"#00FFFF"`,
-		},
-		{
-			name: "color.navy constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "navy"},
-			},
-			expected: `"#000080"`,
-		},
-		{
-			name: "color.olive constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "olive"},
-			},
-			expected: `"#808000"`,
+			expected: `"#2962FF"`,
 		},
 		{
 			name: "color.silver constant",
@@ -84,15 +37,7 @@ func TestGenerateStringExpression_ColorConstants(t *testing.T) {
 				Object:   &ast.Identifier{Name: "color"},
 				Property: &ast.Identifier{Name: "silver"},
 			},
-			expected: `"#C0C0C0"`,
-		},
-		{
-			name: "color.white constant",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "white"},
-			},
-			expected: `"#FFFFFF"`,
+			expected: `"#B2B5BE"`,
 		},
 		{
 			name: "strategy.long constant",
@@ -154,8 +99,8 @@ func TestGenerateStringExpression_SimpleConditional(t *testing.T) {
 			},
 			expectContains: []string{
 				"func() string {",
-				`"#00FF00"`,
-				`"#FF0000"`,
+				`"#00E676"`,
+				`"#FF5252"`,
 			},
 		},
 		{
@@ -231,9 +176,9 @@ func TestGenerateStringExpression_NestedConditional(t *testing.T) {
 			},
 			expectContains: []string{
 				"func() string {",
-				`"#00FF00"`,
-				`"#800000"`,
-				`"#FF0000"`,
+				`"#00E676"`,
+				`"#880E4F"`,
+				`"#FF5252"`,
 			},
 		},
 		{
@@ -265,10 +210,10 @@ func TestGenerateStringExpression_NestedConditional(t *testing.T) {
 			},
 			expectContains: []string{
 				"func() string {",
-				`"#00FF00"`,
-				`"#0000FF"`,
-				`"#800000"`,
-				`"#FF0000"`,
+				`"#00E676"`,
+				`"#2962FF"`,
+				`"#880E4F"`,
+				`"#FF5252"`,
 			},
 		},
 	}

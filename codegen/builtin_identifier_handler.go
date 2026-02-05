@@ -7,14 +7,16 @@ import (
 )
 
 type BuiltinIdentifierHandler struct {
-	registry   *BuiltinIdentifierRegistry
-	formulaGen *DerivedPriceFormulaGenerator
+	registry      *BuiltinIdentifierRegistry
+	formulaGen    *DerivedPriceFormulaGenerator
+	colorResolver *ColorConstantResolver
 }
 
 func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 	return &BuiltinIdentifierHandler{
-		registry:   NewBuiltinIdentifierRegistry(),
-		formulaGen: NewDerivedPriceFormulaGenerator(),
+		registry:      NewBuiltinIdentifierRegistry(),
+		formulaGen:    NewDerivedPriceFormulaGenerator(),
+		colorResolver: NewColorConstantResolver(),
 	}
 }
 
@@ -146,9 +148,38 @@ func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string
 	}
 }
 
+func (h *BuiltinIdentifierHandler) IsColorIdentifier(name string) bool {
+	if h == nil || h.colorResolver == nil {
+		return false
+	}
+	return h.colorResolver.IsColorIdentifier(name)
+}
+
+func (h *BuiltinIdentifierHandler) ResolveColorHex(name string) (string, bool) {
+	if h == nil || h.colorResolver == nil {
+		return "", false
+	}
+	return h.colorResolver.ResolveIdentifierToHex(name)
+}
+
+func (h *BuiltinIdentifierHandler) ResolveMemberExpressionColorHex(expr *ast.MemberExpression) (string, bool) {
+	if h == nil || h.colorResolver == nil {
+		return "", false
+	}
+	return h.colorResolver.ResolveMemberExpressionToHex(expr)
+}
+
 func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, inSecurityContext bool) (string, bool) {
+	if h == nil || h.colorResolver == nil {
+		return "", false
+	}
+
 	if expr.Name == "na" {
 		return "math.NaN()", true
+	}
+
+	if hex, found := h.colorResolver.ResolveIdentifierToHex(expr.Name); found {
+		return fmt.Sprintf("%q", hex), true
 	}
 
 	if !h.IsBuiltinSeriesIdentifier(expr.Name) {

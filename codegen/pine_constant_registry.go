@@ -44,23 +44,23 @@ func (cr *PineConstantRegistry) registerStrategyConstants() {
 }
 
 func (cr *PineConstantRegistry) registerColorConstants() {
-	cr.register("color.red", NewStringConstant("#FF0000"))
-	cr.register("color.green", NewStringConstant("#00FF00"))
-	cr.register("color.blue", NewStringConstant("#0000FF"))
-	cr.register("color.yellow", NewStringConstant("#FFFF00"))
-	cr.register("color.orange", NewStringConstant("#FFA500"))
-	cr.register("color.purple", NewStringConstant("#800080"))
-	cr.register("color.gray", NewStringConstant("#808080"))
-	cr.register("color.black", NewStringConstant("#000000"))
-	cr.register("color.white", NewStringConstant("#FFFFFF"))
-	cr.register("color.lime", NewStringConstant("#00FF00"))
-	cr.register("color.teal", NewStringConstant("#008080"))
-	cr.register("color.maroon", NewStringConstant("#800000"))
-	cr.register("color.fuchsia", NewStringConstant("#FF00FF"))
-	cr.register("color.aqua", NewStringConstant("#00FFFF"))
-	cr.register("color.navy", NewStringConstant("#000080"))
+	cr.register("color.aqua", NewStringConstant("#00BCD4"))
+	cr.register("color.black", NewStringConstant("#363A45"))
+	cr.register("color.blue", NewStringConstant("#2962FF"))
+	cr.register("color.fuchsia", NewStringConstant("#E040FB"))
+	cr.register("color.gray", NewStringConstant("#787B86"))
+	cr.register("color.green", NewStringConstant("#4CAF50"))
+	cr.register("color.lime", NewStringConstant("#00E676"))
+	cr.register("color.maroon", NewStringConstant("#880E4F"))
+	cr.register("color.navy", NewStringConstant("#311B92"))
 	cr.register("color.olive", NewStringConstant("#808000"))
-	cr.register("color.silver", NewStringConstant("#C0C0C0"))
+	cr.register("color.orange", NewStringConstant("#FF9800"))
+	cr.register("color.purple", NewStringConstant("#9C27B0"))
+	cr.register("color.red", NewStringConstant("#FF5252"))
+	cr.register("color.silver", NewStringConstant("#B2B5BE"))
+	cr.register("color.teal", NewStringConstant("#00897B"))
+	cr.register("color.white", NewStringConstant("#FFFFFF"))
+	cr.register("color.yellow", NewStringConstant("#FFEB3B"))
 }
 
 func (cr *PineConstantRegistry) registerPlotConstants() {
@@ -72,4 +72,17 @@ func (cr *PineConstantRegistry) registerPlotConstants() {
 	cr.register("plot.style_area", NewStringConstant("area"))
 	cr.register("plot.style_columns", NewStringConstant("columns"))
 	cr.register("plot.style_circles", NewStringConstant("circles"))
+}
+
+func (cr *PineConstantRegistry) IsColorName(name string) bool {
+	_, exists := cr.constants["color."+name]
+	return exists
+}
+
+func (cr *PineConstantRegistry) GetColorHex(name string) (string, bool) {
+	val, exists := cr.constants["color."+name]
+	if !exists {
+		return "", false
+	}
+	return val.AsString()
 }

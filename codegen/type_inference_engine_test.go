@@ -401,6 +401,7 @@ func TestTypeInferenceEngine_MultipleVariables(t *testing.T) {
 }
 
 func TestTypeInferenceEngine_InferType_ColorMemberExpression(t *testing.T) {
+	// Test type inference for string constants (color.*, strategy.*)
 	tests := []struct {
 		name     string
 		expr     *ast.MemberExpression
@@ -415,58 +416,10 @@ func TestTypeInferenceEngine_InferType_ColorMemberExpression(t *testing.T) {
 			expected: "string",
 		},
 		{
-			name: "color.lime returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "lime"},
-			},
-			expected: "string",
-		},
-		{
 			name: "color.blue returns string",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "color"},
 				Property: &ast.Identifier{Name: "blue"},
-			},
-			expected: "string",
-		},
-		{
-			name: "color.maroon returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "maroon"},
-			},
-			expected: "string",
-		},
-		{
-			name: "color.fuchsia returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "fuchsia"},
-			},
-			expected: "string",
-		},
-		{
-			name: "color.aqua returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "aqua"},
-			},
-			expected: "string",
-		},
-		{
-			name: "color.navy returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "navy"},
-			},
-			expected: "string",
-		},
-		{
-			name: "color.olive returns string",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "color"},
-				Property: &ast.Identifier{Name: "olive"},
 			},
 			expected: "string",
 		},

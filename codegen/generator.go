@@ -1829,6 +1829,12 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 
 func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expression) (string, error) {
 	switch expr := initExpr.(type) {
+	case *ast.Identifier:
+		if hex, found := g.builtinHandler.ResolveColorHex(expr.Name); found {
+			return g.ind() + fmt.Sprintf("%s = %q\n", varName, hex), nil
+		}
+		return "", fmt.Errorf("unsupported string identifier: %s", expr.Name)
+
 	case *ast.ConditionalExpression:
 		condCode, err := g.generateConditionExpression(expr.Test)
 		if err != nil {
@@ -1848,6 +1854,10 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 			varName, condCode, consequentCode, alternateCode), nil
 
 	case *ast.MemberExpression:
+		if hex, found := g.builtinHandler.ResolveMemberExpressionColorHex(expr); found {
+			return g.ind() + fmt.Sprintf("%s = %q\n", varName, hex), nil
+		}
+
 		if obj, ok := expr.Object.(*ast.Identifier); ok {
 			if obj.Name == "strategy" {
 				if prop, ok := expr.Property.(*ast.Identifier); ok {
@@ -1866,6 +1876,12 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 
 func (g *generator) generateStringExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
+	case *ast.Identifier:
+		if hex, found := g.builtinHandler.ResolveColorHex(e.Name); found {
+			return fmt.Sprintf("%q", hex), nil
+		}
+		return "", fmt.Errorf("unsupported string identifier: %s", e.Name)
+
 	case *ast.ConditionalExpression:
 		condCode, err := g.generateConditionExpression(e.Test)
 		if err != nil {

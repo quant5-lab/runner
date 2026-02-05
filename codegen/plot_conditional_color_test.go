@@ -280,12 +280,12 @@ func TestBuildPlotOptions_ColorExtractionFromConstant(t *testing.T) {
 		{
 			name:      "color.red constant",
 			colorExpr: MemberExpr("color", "red"),
-			wantColor: "#FF0000",
+			wantColor: "#FF5252",
 		},
 		{
 			name:      "color.lime constant",
 			colorExpr: MemberExpr("color", "lime"),
-			wantColor: "#00FF00",
+			wantColor: "#00E676",
 		},
 		{
 			name:      "color literal string",

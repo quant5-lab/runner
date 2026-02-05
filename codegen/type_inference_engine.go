@@ -7,14 +7,16 @@ import (
 // TypeInferenceEngine determines variable types from AST expressions.
 // Type system: "float64" (default), "bool", "string"
 type TypeInferenceEngine struct {
-	variables map[string]string
-	constants map[string]interface{}
+	variables    map[string]string
+	constants    map[string]interface{}
+	pineRegistry *PineConstantRegistry
 }
 
 func NewTypeInferenceEngine() *TypeInferenceEngine {
 	return &TypeInferenceEngine{
-		variables: make(map[string]string),
-		constants: make(map[string]interface{}),
+		variables:    make(map[string]string),
+		constants:    make(map[string]interface{}),
+		pineRegistry: NewPineConstantRegistry(),
 	}
 }
 
@@ -38,6 +40,11 @@ func (te *TypeInferenceEngine) InferType(expr ast.Expression) string {
 		}
 		if _, isBool := e.Value.(bool); isBool {
 			return "bool"
+		}
+		return "float64"
+	case *ast.Identifier:
+		if te.pineRegistry.IsColorName(e.Name) {
+			return "string"
 		}
 		return "float64"
 	case *ast.MemberExpression:
