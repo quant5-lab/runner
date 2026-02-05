@@ -1,0 +1,49 @@
+//@version=5
+strategy("Conditional Numeric Coercion - For Loop", overlay=true)
+
+calcBoolSum() =>
+    sum = 0.0
+    for i = 1 to 10
+        add = i > 5 ? true : false
+        sum := sum + add
+    sum
+
+calcNestedBoolSum() =>
+    sum = 0.0
+    for i = 1 to 10
+        result = i > 3 ? (i > 7 ? true : false) : false
+        sum := sum + result
+    sum
+
+calcMixedSum() =>
+    sum = 0.0
+    for i = 1 to 10
+        bool_add = i > 5 ? true : false
+        int_add = i > 5 ? 1 : 0
+        sum := sum + bool_add + int_add
+    sum
+
+bool_sum = calcBoolSum()
+nested_sum = calcNestedBoolSum()
+mixed_sum = calcMixedSum()
+
+// Use price comparison for entries
+bullish = close > open
+
+// Entry when sum indicates favorable condition
+if bool_sum >= 5 and bullish
+    strategy.entry("Long", strategy.long)
+
+if bool_sum < 5 and not bullish
+    strategy.entry("Short", strategy.short)
+
+// Exit
+if strategy.position_size > 0 and not bullish
+    strategy.close("Long")
+
+if strategy.position_size < 0 and bullish
+    strategy.close("Short")
+
+plot(bool_sum, "Bool Sum", color=color.green)
+plot(nested_sum, "Nested Sum", color=color.red)
+plot(mixed_sum, "Mixed Sum", color=color.blue)

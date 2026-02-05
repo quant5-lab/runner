@@ -1,0 +1,37 @@
+//@version=5
+strategy("Conditional Numeric Coercion - Mixed Types", overlay=true)
+
+bool_result = close > open ? true : false
+
+int_result = close > open ? 1 : 0
+
+float_result = close > open ? 1.5 : 0.5
+
+mixedCalc(src, threshold) =>
+    bool_val = src > threshold ? true : false
+    int_val = src > threshold ? 1 : 0
+    float_val = src > threshold ? 1.0 : 0.0
+    bool_val + int_val + float_val
+
+threshold = ta.sma(close, 14)
+mixed = mixedCalc(close, threshold)
+
+sum = 0.0
+sum := sum + bool_result + int_result + float_result
+
+if mixed > 2.5
+    strategy.entry("Long", strategy.long)
+
+if mixed < 0.6
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0 and mixed < 1.5
+    strategy.close("Long")
+
+if strategy.position_size < 0 and mixed > 1.5
+    strategy.close("Short")
+
+plot(bool_result, "Bool", color=color.green)
+plot(int_result, "Int", color=color.blue)
+plot(float_result, "Float", color=color.red)
+plot(mixed, "Mixed", color=color.purple)

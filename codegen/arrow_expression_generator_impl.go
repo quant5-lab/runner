@@ -142,6 +142,19 @@ func (e *ArrowExpressionGeneratorImpl) generateLiteral(lit *ast.Literal) (string
 	return fmt.Sprintf("%v", lit.Value), nil
 }
 
+func (e *ArrowExpressionGeneratorImpl) generateNumericExpression(expr ast.Expression) (string, error) {
+	if lit, ok := expr.(*ast.Literal); ok {
+		if boolVal, ok := lit.Value.(bool); ok {
+			if boolVal {
+				return "1.0", nil
+			}
+			return "0.0", nil
+		}
+	}
+
+	return e.generateExpression(expr)
+}
+
 func (e *ArrowExpressionGeneratorImpl) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
 	left, err := e.generateExpression(binExpr.Left)
 	if err != nil {
@@ -197,15 +210,14 @@ func (e *ArrowExpressionGeneratorImpl) generateConditionalExpression(condExpr *a
 		return "", err
 	}
 
-	// Add bool conversion if needed
 	test = e.gen.addBoolConversionIfNeeded(condExpr.Test, test)
 
-	consequent, err := e.generateExpression(condExpr.Consequent)
+	consequent, err := e.generateNumericExpression(condExpr.Consequent)
 	if err != nil {
 		return "", err
 	}
 
-	alternate, err := e.generateExpression(condExpr.Alternate)
+	alternate, err := e.generateNumericExpression(condExpr.Alternate)
 	if err != nil {
 		return "", err
 	}

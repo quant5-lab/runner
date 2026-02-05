@@ -1213,35 +1213,28 @@ func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (s
 }
 
 func (g *generator) generateConditionalExpression(condExpr *ast.ConditionalExpression) (string, error) {
-	// Generate test condition
 	testCode, err := g.generateConditionExpression(condExpr.Test)
 	if err != nil {
 		return "", err
 	}
 
-	// If the test accesses a bool Series variable, add != 0 conversion
 	testCode = g.addBoolConversionIfNeeded(condExpr.Test, testCode)
 
-	// Generate consequent (true branch)
-	consequentCode, err := g.generateConditionExpression(condExpr.Consequent)
+	consequentCode, err := g.generateNumericExpression(condExpr.Consequent)
 	if err != nil {
 		return "", err
 	}
 
-	// Generate alternate (false branch)
-	alternateCode, err := g.generateConditionExpression(condExpr.Alternate)
+	alternateCode, err := g.generateNumericExpression(condExpr.Alternate)
 	if err != nil {
 		return "", err
 	}
 
-	// Generate Go ternary-style code using if-else expression
-	// Go doesn't have ternary operator, so we use a function-like pattern
 	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
 		testCode, consequentCode, alternateCode), nil
 }
 
-// addBoolConversionIfNeeded checks if the expression accesses a bool Series variable
-// and wraps the code with != 0 conversion for use in boolean contexts
+// addBoolConversionIfNeeded wraps bool Series variables with conversion for boolean contexts
 func (g *generator) addBoolConversionIfNeeded(expr ast.Expression, code string) string {
 	return g.boolConverter.ConvertBoolSeriesForIfStatement(expr, code)
 }
@@ -1332,11 +1325,11 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 		testCode = g.addBoolConversionIfNeeded(e.Test, testCode)
 
-		consequentCode, err := g.generateConditionExpression(e.Consequent)
+		consequentCode, err := g.generateNumericExpression(e.Consequent)
 		if err != nil {
 			return "", err
 		}
-		alternateCode, err := g.generateConditionExpression(e.Alternate)
+		alternateCode, err := g.generateNumericExpression(e.Alternate)
 		if err != nil {
 			return "", err
 		}

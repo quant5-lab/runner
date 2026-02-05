@@ -412,3 +412,129 @@ func TestConditionalExpressionOperatorPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func TestConditionalExpressionNumericCoercion(t *testing.T) {
+	tests := []struct {
+		name     string
+		program  *ast.Program
+		mustHave []string
+	}{
+		{
+			name: "boolean literals coerce to float64",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "signal"},
+								Init: &ast.ConditionalExpression{
+									Test: &ast.BinaryExpression{
+										Operator: ">",
+										Left:     &ast.Identifier{Name: "close"},
+										Right:    &ast.Identifier{Name: "open"},
+									},
+									Consequent: &ast.Literal{Value: true},
+									Alternate:  &ast.Literal{Value: false},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHave: []string{
+				"return 1.0",
+				"return 0.0",
+			},
+		},
+		{
+			name: "nested ternary with boolean literals",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "nested"},
+								Init: &ast.ConditionalExpression{
+									Test: &ast.BinaryExpression{
+										Operator: ">",
+										Left:     &ast.Identifier{Name: "close"},
+										Right:    &ast.Literal{Value: 100.0},
+									},
+									Consequent: &ast.ConditionalExpression{
+										Test: &ast.BinaryExpression{
+											Operator: ">",
+											Left:     &ast.Identifier{Name: "close"},
+											Right:    &ast.Literal{Value: 150.0},
+										},
+										Consequent: &ast.Literal{Value: true},
+										Alternate:  &ast.Literal{Value: false},
+									},
+									Alternate: &ast.Literal{Value: false},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHave: []string{
+				"return 1.0",
+				"return 0.0",
+				"func() float64",
+			},
+		},
+		{
+			name: "boolean ternary in condition position",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "result"},
+								Init: &ast.ConditionalExpression{
+									Test: &ast.BinaryExpression{
+										Operator: ">",
+										Left: &ast.ConditionalExpression{
+											Test: &ast.BinaryExpression{
+												Operator: ">",
+												Left:     &ast.Identifier{Name: "close"},
+												Right:    &ast.Literal{Value: 100.0},
+											},
+											Consequent: &ast.Literal{Value: true},
+											Alternate:  &ast.Literal{Value: false},
+										},
+										Right: &ast.Literal{Value: 0.5},
+									},
+									Consequent: &ast.Literal{Value: 10.0},
+									Alternate:  &ast.Literal{Value: 20.0},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHave: []string{
+				"return 1.0",
+				"return 0.0",
+				"return 10",
+				"return 20",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+
+			code, err := gen.generateProgram(tt.program)
+			if err != nil {
+				t.Fatalf("Generate failed: %v", err)
+			}
+
+			for _, pattern := range tt.mustHave {
+				if !strings.Contains(code, pattern) {
+					t.Errorf("Required pattern %q not found in generated code", pattern)
+				}
+			}
+		})
+	}
+}

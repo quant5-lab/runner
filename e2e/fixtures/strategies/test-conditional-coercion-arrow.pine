@@ -1,0 +1,42 @@
+//@version=5
+strategy("Conditional Numeric Coercion - Arrow Function", overlay=true)
+
+isUp(src, threshold) =>
+    result = src > threshold ? true : false
+    result
+
+isDown(src, threshold) =>
+    result = src < threshold ? true : false
+    result
+
+trend(src, fast_th, slow_th) =>
+    strong_up = src > fast_th ? (src > slow_th ? true : false) : false
+    strong_up
+
+threshold = ta.sma(close, 20)
+up_signal = isUp(close, threshold)
+down_signal = isDown(close, threshold)
+trend_signal = trend(close, threshold * 1.01, threshold * 1.02)
+
+up_sum = 0.0
+down_sum = 0.0
+up_sum := up_sum + up_signal
+down_sum := down_sum + down_signal
+
+// Entry based on arrow function boolean results
+if up_signal and up_sum > 3
+    strategy.entry("Long", strategy.long)
+
+if down_signal and down_sum > 3
+    strategy.entry("Short", strategy.short)
+
+// Exit
+if strategy.position_size > 0 and down_signal
+    strategy.close("Long")
+
+if strategy.position_size < 0 and up_signal
+    strategy.close("Short")
+
+plot(up_sum, "Up Sum", color=color.green)
+plot(down_sum, "Down Sum", color=color.red)
+plot(trend_signal, "Trend", color=color.blue)
