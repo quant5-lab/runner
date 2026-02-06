@@ -112,27 +112,27 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 		return "", fmt.Errorf("%s requires at least 2 arguments (source, period)", funcName)
 	}
 
-	sourceExpr := h.generator.extractSeriesExpression(call.Arguments[0])
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessor := CreateAccessGenerator(sourceInfo)
-
-	periodArg, ok := call.Arguments[1].(*ast.Literal)
-	if !ok {
-		return "", fmt.Errorf("%s period must be literal", funcName)
-	}
-
-	period, err := h.extractPeriod(periodArg)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", funcName, err)
-	}
-
 	if !strings.HasPrefix(funcName, "ta.") {
 		funcName = "ta." + funcName
 	}
 
+	sourceExpr, periodResult := extractTAArgumentsWithDynamic(h.generator, call, funcName)
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("%s: %s", funcName, periodResult.FailureReason)
+	}
+
+	if periodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("inline plot() with runtime dynamic period not supported for %s", funcName)
+	}
+
+	period := periodResult.StaticValue
+	sourceExprStr := h.generator.extractSeriesExpression(sourceExpr)
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExprStr)
+	accessor := CreateAccessGenerator(sourceInfo)
+
 	hasher := &ExpressionHasher{}
-	sourceHash := hasher.Hash(call.Arguments[0])
+	sourceHash := hasher.Hash(sourceExpr)
 
 	code, ok := h.taRegistry.Generate(funcName, accessor, NewConstantPeriod(period), sourceHash)
 	if !ok {
@@ -143,22 +143,16 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 }
 
 func (h *PlotExpressionHandler) HandleATRFunction(call *ast.CallExpression, funcName string) (string, error) {
-	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("%s requires 1 argument (period)", funcName)
+	periodResult := extractSinglePeriodWithDynamic(h.generator, call, "ta.atr")
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("ta.atr: %s", periodResult.FailureReason)
 	}
 
-	periodArg, ok := call.Arguments[0].(*ast.Literal)
-	if !ok {
-		return "", fmt.Errorf("%s period must be literal", funcName)
-	}
-
-	_, err := h.extractPeriod(periodArg)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", funcName, err)
+	if periodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("inline plot() with runtime dynamic period not supported for ta.atr")
 	}
 
 	argHash := h.generator.exprAnalyzer.ComputeArgHash(call)
-
 	callInfo := CallInfo{
 		Call:     call,
 		FuncName: "ta.atr",

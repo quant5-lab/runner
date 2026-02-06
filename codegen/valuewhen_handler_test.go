@@ -75,7 +75,7 @@ func TestValuewhenHandler_GenerateCode_ArgumentValidation(t *testing.T) {
 				&ast.Identifier{Name: "src"},
 				&ast.Literal{Value: "invalid"},
 			},
-			wantErr: "period must be numeric",
+			wantErr: "value must be numeric",
 		},
 	}
 

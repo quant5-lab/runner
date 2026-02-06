@@ -1,8 +1,11 @@
 package codegen
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"fmt"
 
-/* ATRHandler generates inline code for Average True Range calculations */
+	"github.com/quant5-lab/runner/ast"
+)
+
 type ATRHandler struct{}
 
 func (h *ATRHandler) CanHandle(funcName string) bool {
@@ -10,10 +13,19 @@ func (h *ATRHandler) CanHandle(funcName string) bool {
 }
 
 func (h *ATRHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	period, err := extractSinglePeriodArgument(g, call, "ta.atr")
-	if err != nil {
-		return "", err
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("ta.atr requires period argument")
 	}
 
-	return g.generateInlineATR(varName, period)
+	periodResult := evaluatePeriodExpression(g, call.Arguments[0])
+
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("ta.atr: %s", periodResult.FailureReason)
+	}
+
+	if periodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("ta.atr period must be compile-time constant (PineScript requires simple int)")
+	}
+
+	return g.generateInlineATR(varName, periodResult.StaticValue)
 }

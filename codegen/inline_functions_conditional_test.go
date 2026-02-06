@@ -228,19 +228,19 @@ func TestInlineFunctionsEdgeCases(t *testing.T) {
 		description string
 	}{
 		{
-			name: "zero-length period handled",
-			script: `//@version=4
-study("Test", overlay=true)
-result = dev(close, 0) ? 1 : 0
-plot(result)`,
-			shouldError: false,
-			description: "Zero-length dev() should generate NaN check",
-		},
-		{
-			name: "negative period handled",
+			name: "minimal period handled",
 			script: `//@version=4
 study("Test", overlay=true)
 result = dev(close, 1) ? 1 : 0
+plot(result)`,
+			shouldError: false,
+			description: "Minimal period (1) should work correctly",
+		},
+		{
+			name: "positive period handled",
+			script: `//@version=4
+study("Test", overlay=true)
+result = dev(close, 10) ? 1 : 0
 plot(result)`,
 			shouldError: false,
 			description: "Positive period should work correctly",

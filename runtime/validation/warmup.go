@@ -36,16 +36,19 @@ type WarmupRequirement struct {
 type WarmupAnalyzer struct {
 	requirements        []WarmupRequirement
 	constantRegistry    *ConstantRegistry
+	functionRegistry    *FunctionRegistry
 	expressionEvaluator *ExpressionEvaluator
 }
 
 // NewWarmupAnalyzer creates a new warmup analyzer
 func NewWarmupAnalyzer() *WarmupAnalyzer {
 	registry := NewConstantRegistry()
+	funcRegistry := NewFunctionRegistry()
 	return &WarmupAnalyzer{
 		requirements:        []WarmupRequirement{},
 		constantRegistry:    registry,
-		expressionEvaluator: NewExpressionEvaluator(registry),
+		functionRegistry:    funcRegistry,
+		expressionEvaluator: NewExpressionEvaluatorWithFunctions(registry, funcRegistry),
 	}
 }
 
@@ -57,6 +60,7 @@ func (w *WarmupAnalyzer) AddConstant(name string, value float64) {
 func (w *WarmupAnalyzer) AnalyzeScript(program *ast.Program) []WarmupRequirement {
 	w.requirements = []WarmupRequirement{}
 	w.constantRegistry.Clear()
+	w.functionRegistry.Clear()
 
 	for _, node := range program.Body {
 		w.collectConstants(node)
@@ -69,7 +73,7 @@ func (w *WarmupAnalyzer) AnalyzeScript(program *ast.Program) []WarmupRequirement
 	return w.requirements
 }
 
-// CollectConstants extracts constant values from variable declarations
+// CollectConstants extracts constant values and function definitions from variable declarations
 // Public method for use by codegen package
 func (w *WarmupAnalyzer) CollectConstants(node ast.Node) {
 	switch n := node.(type) {
@@ -77,6 +81,10 @@ func (w *WarmupAnalyzer) CollectConstants(node ast.Node) {
 		for _, decl := range n.Declarations {
 			if decl.Init != nil {
 				if id, ok := decl.ID.(*ast.Identifier); ok {
+					if arrowFunc, ok := decl.Init.(*ast.ArrowFunctionExpression); ok {
+						w.functionRegistry.Set(id.Name, arrowFunc)
+						continue
+					}
 					if val := w.EvaluateConstant(decl.Init); !math.IsNaN(val) {
 						w.constantRegistry.Set(id.Name, val)
 					}

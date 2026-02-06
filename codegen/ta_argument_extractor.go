@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/quant5-lab/runner/ast"
 )
@@ -38,23 +37,31 @@ func NewTAArgumentExtractor(g *generator) *TAArgumentExtractor {
 	}
 }
 
-/* Extract prepares components needed for TA indicator generation */
-func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string) (*TAArgumentComponents, error) {
+type TAArgumentComponentsWithDynamic struct {
+	SourceExpr    ast.Expression
+	PeriodResult  PeriodEvaluationResult
+	SourceInfo    SourceInfo
+	AccessGen     AccessGenerator
+	NeedsNaNCheck bool
+	Preamble      string
+}
+
+func (e *TAArgumentExtractor) ExtractWithDynamic(call *ast.CallExpression, funcName string) (*TAArgumentComponentsWithDynamic, error) {
 	if len(call.Arguments) < 2 {
 		return nil, fmt.Errorf("%s requires at least 2 arguments", funcName)
 	}
 
 	sourceExpr := call.Arguments[0]
-	period, err := e.extractPeriod(call.Arguments[1], funcName)
-	if err != nil {
-		return nil, err
+	periodResult := e.extractPeriodResult(call.Arguments[1], funcName)
+
+	if periodResult.IsFailed() {
+		return nil, fmt.Errorf("%s: %s", funcName, periodResult.FailureReason)
 	}
 
-	// Check for tr builtin (identifier "tr" or member "ta.tr")
 	if e.isTrBuiltin(sourceExpr) {
-		return &TAArgumentComponents{
+		return &TAArgumentComponentsWithDynamic{
 			SourceExpr:    sourceExpr,
-			Period:        period,
+			PeriodResult:  periodResult,
 			SourceInfo:    SourceInfo{},
 			AccessGen:     NewBuiltinTrueRangeAccessor(),
 			NeedsNaNCheck: false,
@@ -77,13 +84,47 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 		needsNaN = true
 	}
 
-	return &TAArgumentComponents{
+	return &TAArgumentComponentsWithDynamic{
 		SourceExpr:    sourceExpr,
-		Period:        period,
+		PeriodResult:  periodResult,
 		SourceInfo:    sourceInfo,
 		AccessGen:     accessGen,
 		NeedsNaNCheck: needsNaN,
 		Preamble:      preamble,
+	}, nil
+}
+
+/* Extract prepares components for TA indicators requiring compile-time constant period.
+ * Delegates to ExtractWithDynamic and converts PeriodEvaluationResult to int period.
+ * Arrow function context returns sentinel period=-1 for deferred resolution.
+ * Returns error for runtime dynamic periods outside arrow context. */
+func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string) (*TAArgumentComponents, error) {
+	dynComp, err := e.ExtractWithDynamic(call, funcName)
+	if err != nil {
+		return nil, err
+	}
+
+	if dynComp.PeriodResult.IsRuntimeDynamic() {
+		if e.generator.inArrowFunctionBody {
+			return &TAArgumentComponents{
+				SourceExpr:    dynComp.SourceExpr,
+				Period:        -1,
+				SourceInfo:    dynComp.SourceInfo,
+				AccessGen:     dynComp.AccessGen,
+				NeedsNaNCheck: dynComp.NeedsNaNCheck,
+				Preamble:      dynComp.Preamble,
+			}, nil
+		}
+		return nil, fmt.Errorf("%s period must be compile-time constant (got dynamic expression)", funcName)
+	}
+
+	return &TAArgumentComponents{
+		SourceExpr:    dynComp.SourceExpr,
+		Period:        dynComp.PeriodResult.StaticValue,
+		SourceInfo:    dynComp.SourceInfo,
+		AccessGen:     dynComp.AccessGen,
+		NeedsNaNCheck: dynComp.NeedsNaNCheck,
+		Preamble:      dynComp.Preamble,
 	}, nil
 }
 
@@ -183,28 +224,21 @@ func (e *TAArgumentExtractor) registerNestedTempVars(expr ast.Expression) (strin
 	return code, nil
 }
 
-func (e *TAArgumentExtractor) extractPeriod(periodArg ast.Expression, funcName string) (int, error) {
-	if periodLit, ok := periodArg.(*ast.Literal); ok {
-		return extractPeriodFromLiteral(periodLit)
-	}
-
-	periodValue := e.generator.constEvaluator.EvaluateConstant(periodArg)
-	if math.IsNaN(periodValue) || periodValue <= 0 {
-		// Allow runtime periods within arrow functions (use -1 as sentinel)
-		if e.generator.inArrowFunctionBody {
-			return -1, nil
-		}
-		return 0, fmt.Errorf("%s period must be compile-time constant (got %T that evaluates to NaN)", funcName, periodArg)
-	}
-
-	return int(periodValue), nil
+func (e *TAArgumentExtractor) extractPeriodResult(periodArg ast.Expression, funcName string) PeriodEvaluationResult {
+	return evaluatePeriodExpression(e.generator, periodArg)
 }
 
 func extractPeriodFromLiteral(lit *ast.Literal) (int, error) {
 	switch v := lit.Value.(type) {
 	case float64:
+		if v <= 0 {
+			return 0, fmt.Errorf("period must be positive, got %.0f", v)
+		}
 		return int(v), nil
 	case int:
+		if v <= 0 {
+			return 0, fmt.Errorf("period must be positive, got %d", v)
+		}
 		return v, nil
 	default:
 		return 0, fmt.Errorf("period must be numeric, got %T", v)

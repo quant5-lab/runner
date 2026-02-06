@@ -6,7 +6,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* RSIHandler generates inline code for Relative Strength Index calculations */
 type RSIHandler struct{}
 
 func (h *RSIHandler) CanHandle(funcName string) bool {
@@ -15,12 +14,20 @@ func (h *RSIHandler) CanHandle(funcName string) bool {
 
 func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
 	extractor := NewTAArgumentExtractor(g)
-	comp, err := extractor.Extract(call, "ta.rsi")
+	comp, err := extractor.ExtractWithDynamic(call, "ta.rsi")
 	if err != nil {
 		return "", err
 	}
 
-	code, err := g.generateRSI(varName, comp.Period, comp.AccessGen, comp.NeedsNaNCheck)
+	if comp.PeriodResult.IsFailed() {
+		return "", fmt.Errorf("ta.rsi: %s", comp.PeriodResult.FailureReason)
+	}
+
+	if comp.PeriodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("ta.rsi period must be compile-time constant (PineScript requires simple int)")
+	}
+
+	code, err := g.generateRSI(varName, comp.PeriodResult.StaticValue, comp.AccessGen, comp.NeedsNaNCheck)
 	if err != nil {
 		return "", err
 	}

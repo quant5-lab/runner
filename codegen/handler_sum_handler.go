@@ -53,12 +53,14 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 			VariableName: tempVarName,
 		}
 
-		extractor := NewTAArgumentExtractor(g)
-		extractedPeriod, err := extractor.extractPeriod(call.Arguments[1], "sum")
-		if err != nil {
-			return "", err
+		periodResult := evaluatePeriodExpression(g, call.Arguments[1])
+		if periodResult.IsFailed() {
+			return "", fmt.Errorf("sum: %s", periodResult.FailureReason)
 		}
-		period = extractedPeriod
+		if periodResult.IsRuntimeDynamic() {
+			return "", fmt.Errorf("sum period must be compile-time constant (got dynamic expression)")
+		}
+		period = periodResult.StaticValue
 	} else {
 		extractor := NewTAArgumentExtractor(g)
 		comp, err := extractor.Extract(call, "sum")
@@ -67,6 +69,8 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		}
 		sourceInfo = comp.SourceInfo
 		period = comp.Period
+
+		code += comp.Preamble
 	}
 
 	accessGen := CreateAccessGenerator(sourceInfo)
