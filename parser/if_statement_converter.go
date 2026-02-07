@@ -18,16 +18,16 @@ func NewIfStatementConverter(
 }
 
 func (i *IfStatementConverter) CanHandle(stmt *Statement) bool {
-	return stmt.If != nil
+	return stmt.Core != nil && stmt.Core.If != nil
 }
 
 func (i *IfStatementConverter) Convert(stmt *Statement) (ast.Node, error) {
-	test, err := i.orExprConverter(stmt.If.Condition)
+	test, err := i.orExprConverter(stmt.Core.If.Condition)
 	if err != nil {
 		return nil, err
 	}
 
-	consequent, err := i.convertBody(stmt.If.Body)
+	consequent, err := i.convertBody(stmt.Core.If.Body)
 	if err != nil {
 		return nil, err
 	}

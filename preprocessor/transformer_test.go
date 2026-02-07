@@ -26,12 +26,12 @@ func TestTANamespaceTransformer_SimpleAssignment(t *testing.T) {
 	}
 
 	// Check that sma was renamed to ta.sma
-	if result.Statements[0].Assignment == nil {
+	if result.Statements[0].Core.Assignment == nil {
 		t.Fatal("Expected assignment statement")
 	}
 
 	// The Call is nested inside Ternary.Condition.Left...Left.Left.Call
-	expr := result.Statements[0].Assignment.Value
+	expr := result.Statements[0].Core.Assignment.Value
 	if expr.Ternary == nil || expr.Ternary.Condition == nil {
 		t.Fatal("Expected ternary with condition")
 	}
@@ -105,7 +105,7 @@ rsiVal = rsi(close, 14)
 		{"ta", "rsi"},
 	}
 	for i, expected := range expectedCallees {
-		expr := result.Statements[i].Assignment.Value
+		expr := result.Statements[i].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		assertMemberAccessCallee(t, call, expected.obj, expected.prop)
 	}
@@ -130,7 +130,7 @@ func TestTANamespaceTransformer_Crossover(t *testing.T) {
 		t.Fatalf("Transform failed: %v", err)
 	}
 
-	expr := result.Statements[0].Assignment.Value
+	expr := result.Statements[0].Core.Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	assertMemberAccessCallee(t, call, "ta", "crossover")
 }
@@ -161,7 +161,7 @@ ma200 = sma(close, 200)
 
 	// All three sma calls should be transformed to ta.sma
 	for i := 0; i < 3; i++ {
-		expr := result.Statements[i].Assignment.Value
+		expr := result.Statements[i].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
@@ -186,7 +186,7 @@ func TestStudyToIndicatorTransformer(t *testing.T) {
 		t.Fatalf("Transform failed: %v", err)
 	}
 
-	expr := result.Statements[0].Expression.Expr
+	expr := result.Statements[0].Core.Expression.Expr
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {
 		t.Fatal("Expected call expression")
@@ -227,7 +227,7 @@ ma200 = sma(close, 200)
 	}
 
 	// Check study → indicator
-	studyExpr := result.Statements[0].Expression.Expr
+	studyExpr := result.Statements[0].Core.Expression.Expr
 	studyCall := findCallInFactor(studyExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if studyCall == nil {
 		t.Fatal("Expected study call expression")
@@ -241,7 +241,7 @@ ma200 = sma(close, 200)
 
 	// Check sma → ta.sma (3 occurrences)
 	for i := 1; i <= 3; i++ {
-		expr := result.Statements[i].Assignment.Value
+		expr := result.Statements[i].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call expression", i)

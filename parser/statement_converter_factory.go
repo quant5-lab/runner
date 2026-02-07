@@ -15,11 +15,15 @@ func NewStatementConverterFactory(
 	orExprConverter func(*OrExpr) (ast.Expression, error),
 	arithExprConverter func(*ArithExpr) (ast.Expression, error),
 	statementConverter func(*Statement) (ast.Node, error),
+	parentConverter *Converter,
 ) *StatementConverterFactory {
+	funcDeclConverter := NewFunctionDeclarationConverter(statementConverter, expressionConverter)
+	funcDeclConverter.SetParentConverter(parentConverter)
+
 	return &StatementConverterFactory{
 		converters: []StatementConverter{
 			NewTupleAssignmentConverter(expressionConverter),
-			NewFunctionDeclarationConverter(statementConverter, expressionConverter),
+			funcDeclConverter,
 			NewTypedAssignmentConverter(expressionConverter),
 			NewAssignmentConverter(expressionConverter),
 			NewReassignmentConverter(expressionConverter),

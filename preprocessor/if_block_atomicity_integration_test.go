@@ -38,12 +38,12 @@ func countIfStatementsInScript(script *parser.Script) int {
 	var visitStatements func([]*parser.Statement)
 	visitStatements = func(statements []*parser.Statement) {
 		for _, stmt := range statements {
-			if stmt.If != nil {
+			if stmt.Core.If != nil {
 				count++
-				visitStatements(stmt.If.Body)
+				visitStatements(stmt.Core.If.Body)
 			}
-			if stmt.FunctionDecl != nil && stmt.FunctionDecl.MultiLineBody != nil {
-				visitStatements(stmt.FunctionDecl.MultiLineBody)
+			if stmt.Core.FunctionDecl != nil && stmt.Core.FunctionDecl.MultiLineBody != nil {
+				visitStatements(stmt.Core.FunctionDecl.MultiLineBody)
 			}
 		}
 	}
@@ -56,12 +56,12 @@ func findIfStatementsInScript(script *parser.Script) []*parser.IfStatement {
 	var visitStatements func([]*parser.Statement)
 	visitStatements = func(statements []*parser.Statement) {
 		for _, stmt := range statements {
-			if stmt.If != nil {
-				ifNodes = append(ifNodes, stmt.If)
-				visitStatements(stmt.If.Body)
+			if stmt.Core.If != nil {
+				ifNodes = append(ifNodes, stmt.Core.If)
+				visitStatements(stmt.Core.If.Body)
 			}
-			if stmt.FunctionDecl != nil && stmt.FunctionDecl.MultiLineBody != nil {
-				visitStatements(stmt.FunctionDecl.MultiLineBody)
+			if stmt.Core.FunctionDecl != nil && stmt.Core.FunctionDecl.MultiLineBody != nil {
+				visitStatements(stmt.Core.FunctionDecl.MultiLineBody)
 			}
 		}
 	}
@@ -88,8 +88,8 @@ func TestIfBlockAtomicity_BasicMultipleAssignments(t *testing.T) {
 	}
 
 	for i, stmt := range body {
-		if stmt.Reassignment == nil {
-			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Assignment != nil)
+		if stmt.Core.Reassignment == nil {
+			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Core.Assignment != nil)
 		}
 	}
 }
@@ -115,7 +115,7 @@ func TestIfBlockAtomicity_StateMachine(t *testing.T) {
 
 	for blockIdx, block := range ifNodes {
 		for stmtIdx, stmt := range block.Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", blockIdx, stmtIdx)
 			}
 		}
@@ -164,10 +164,10 @@ func TestIfBlockAtomicity_NestedBlocks(t *testing.T) {
 	hasReassignment := false
 	hasNestedIf := false
 	for _, stmt := range outerBlock.Body {
-		if stmt.Reassignment != nil {
+		if stmt.Core.Reassignment != nil {
 			hasReassignment = true
 		}
-		if stmt.If != nil {
+		if stmt.Core.If != nil {
 			hasNestedIf = true
 		}
 	}
@@ -200,7 +200,7 @@ func TestIfBlockAtomicity_ConsecutiveBlocks(t *testing.T) {
 		}
 
 		for stmtIdx, stmt := range ifNodes[i].Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", i, stmtIdx)
 			}
 		}
@@ -233,7 +233,7 @@ func TestIfBlockAtomicity_MixedStatements(t *testing.T) {
 
 	for blockIdx, block := range ifNodes {
 		for stmtIdx, stmt := range block.Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", blockIdx, stmtIdx)
 			}
 		}
@@ -329,8 +329,8 @@ if close_all_avg
 	}
 
 	for i, stmt := range body {
-		if stmt.Reassignment == nil {
-			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Assignment != nil)
+		if stmt.Core.Reassignment == nil {
+			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Core.Assignment != nil)
 		}
 	}
 }

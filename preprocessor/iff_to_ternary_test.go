@@ -64,11 +64,11 @@ func TestIffToTernary_BasicTransformation(t *testing.T) {
 	}
 
 	stmt := result.Statements[0]
-	if stmt.Assignment == nil {
+	if stmt.Core.Assignment == nil {
 		t.Fatal("Expected assignment statement")
 	}
 
-	assertTernaryTransformation(t, stmt.Assignment.Value, "Basic iff()")
+	assertTernaryTransformation(t, stmt.Core.Assignment.Value, "Basic iff()")
 }
 
 /* TEST CATEGORY: Nesting Depth */
@@ -120,10 +120,10 @@ func TestIffToTernary_NestingDepth(t *testing.T) {
 			}
 
 			stmt := result.Statements[0]
-			assertTernaryTransformation(t, stmt.Assignment.Value, "Outer iff()")
+			assertTernaryTransformation(t, stmt.Core.Assignment.Value, "Outer iff()")
 
 			/* Verify nested transformations */
-			outerTernary := stmt.Assignment.Value.Ternary
+			outerTernary := stmt.Core.Assignment.Value.Ternary
 			if tt.depth >= 2 {
 				/* Check at least one branch has nested ternary */
 				hasNested := (outerTernary.TrueVal != nil && outerTernary.TrueVal.Ternary != nil) ||
@@ -149,11 +149,11 @@ func TestIffToTernary_ExpressionContexts(t *testing.T) {
 			source: `plot(iff(close > open, close, open))`,
 			verify: func(t *testing.T, script *parser.Script) {
 				stmt := script.Statements[0]
-				if stmt.Expression == nil {
+				if stmt.Core.Expression == nil {
 					t.Fatal("Expected expression statement")
 				}
 				/* plot() call is wrapped in incomplete ternary */
-				plotExpr := stmt.Expression.Expr
+				plotExpr := stmt.Core.Expression.Expr
 				if plotExpr.Ternary == nil {
 					t.Fatal("Expected ternary wrapper")
 				}
@@ -174,7 +174,7 @@ func TestIffToTernary_ExpressionContexts(t *testing.T) {
 			source: `if iff(x > 0, true, false)
     a = 1`,
 			verify: func(t *testing.T, script *parser.Script) {
-				ifStmt := script.Statements[0].If
+				ifStmt := script.Statements[0].Core.If
 				if ifStmt == nil {
 					t.Fatal("Expected if statement")
 				}
@@ -190,7 +190,7 @@ func TestIffToTernary_ExpressionContexts(t *testing.T) {
 			source: `for i = 0 to iff(condition, 10, 20)
     a = i`,
 			verify: func(t *testing.T, script *parser.Script) {
-				forStmt := script.Statements[0].For
+				forStmt := script.Statements[0].Core.For
 				if forStmt == nil {
 					t.Fatal("Expected for statement")
 				}
@@ -204,7 +204,7 @@ func TestIffToTernary_ExpressionContexts(t *testing.T) {
 			name:   "multiple_arguments",
 			source: `plot(iff(a > b, 1, 2), iff(c > d, 3, 4))`,
 			verify: func(t *testing.T, script *parser.Script) {
-				plotCall := findCallInCondition(script.Statements[0].Expression.Expr)
+				plotCall := findCallInCondition(script.Statements[0].Core.Expression.Expr)
 				if len(plotCall.Args) != 2 {
 					t.Fatalf("Expected 2 args, got %d", len(plotCall.Args))
 				}
@@ -285,10 +285,10 @@ func TestIffToTernary_ComplexConditions(t *testing.T) {
 			}
 
 			stmt := result.Statements[0]
-			assertTernaryTransformation(t, stmt.Assignment.Value, "Complex condition")
+			assertTernaryTransformation(t, stmt.Core.Assignment.Value, "Complex condition")
 
 			/* Verify condition preserved */
-			ternary := stmt.Assignment.Value.Ternary
+			ternary := stmt.Core.Assignment.Value.Ternary
 			if ternary.Condition == nil {
 				t.Error("Condition should be preserved")
 			}
@@ -340,10 +340,10 @@ func TestIffToTernary_ComplexArguments(t *testing.T) {
 			}
 
 			stmt := result.Statements[0]
-			assertTernaryTransformation(t, stmt.Assignment.Value, "Complex arguments")
+			assertTernaryTransformation(t, stmt.Core.Assignment.Value, "Complex arguments")
 
 			/* Verify branches exist */
-			ternary := stmt.Assignment.Value.Ternary
+			ternary := stmt.Core.Assignment.Value.Ternary
 			if ternary.TrueVal == nil || ternary.FalseVal == nil {
 				t.Error("Both branches should be populated")
 			}
@@ -417,7 +417,7 @@ func TestIffToTernary_NonIffPreservation(t *testing.T) {
 			verify: func(t *testing.T, script *parser.Script) {
 				stmt := script.Statements[0]
 				/* sma() remains in incomplete ternary wrapper */
-				expr := stmt.Assignment.Value
+				expr := stmt.Core.Assignment.Value
 				if expr.Ternary == nil {
 					t.Error("Expected ternary wrapper for expression")
 				}
@@ -431,7 +431,7 @@ func TestIffToTernary_NonIffPreservation(t *testing.T) {
 			source: `x = close > open ? 1 : 0`,
 			verify: func(t *testing.T, script *parser.Script) {
 				stmt := script.Statements[0]
-				ternary := stmt.Assignment.Value.Ternary
+				ternary := stmt.Core.Assignment.Value.Ternary
 				if ternary == nil {
 					t.Fatal("Expected ternary")
 				}
@@ -446,7 +446,7 @@ func TestIffToTernary_NonIffPreservation(t *testing.T) {
 			source: `x = 42`,
 			verify: func(t *testing.T, script *parser.Script) {
 				stmt := script.Statements[0]
-				expr := stmt.Assignment.Value
+				expr := stmt.Core.Assignment.Value
 				/* Literals wrapped in incomplete ternary */
 				if expr.Ternary == nil {
 					t.Error("Expected ternary wrapper")
@@ -464,11 +464,11 @@ c = iff(y > 0, 2, 3)`,
 					t.Fatalf("Expected 3 statements, got %d", len(script.Statements))
 				}
 				/* Statement 0: iff() transformed */
-				assertTernaryTransformation(t, script.Statements[0].Assignment.Value, "First iff()")
+				assertTernaryTransformation(t, script.Statements[0].Core.Assignment.Value, "First iff()")
 				/* Statement 1: sma() unchanged */
-				assertNoTransformation(t, script.Statements[1].Assignment.Value, "sma()")
+				assertNoTransformation(t, script.Statements[1].Core.Assignment.Value, "sma()")
 				/* Statement 2: iff() transformed */
-				assertTernaryTransformation(t, script.Statements[2].Assignment.Value, "Second iff()")
+				assertTernaryTransformation(t, script.Statements[2].Core.Assignment.Value, "Second iff()")
 			},
 		},
 	}
@@ -526,11 +526,11 @@ z = iff(e == f, 5, 6)
 	}
 
 	for i, stmt := range result.Statements {
-		if stmt.Assignment == nil {
+		if stmt.Core.Assignment == nil {
 			t.Errorf("Statement %d: Expected assignment", i)
 			continue
 		}
-		assertTernaryTransformation(t, stmt.Assignment.Value, "iff() "+string(rune('x'+i)))
+		assertTernaryTransformation(t, stmt.Core.Assignment.Value, "iff() "+string(rune('x'+i)))
 	}
 }
 
@@ -575,12 +575,12 @@ func TestIffToTernary_StatementTypes(t *testing.T) {
 
 			stmt := result.Statements[0]
 			var expr *parser.Expression
-			if stmt.Assignment != nil {
-				expr = stmt.Assignment.Value
-			} else if stmt.TypedAssignment != nil {
-				expr = stmt.TypedAssignment.Value
-			} else if stmt.Reassignment != nil {
-				expr = stmt.Reassignment.Value
+			if stmt.Core.Assignment != nil {
+				expr = stmt.Core.Assignment.Value
+			} else if stmt.Core.TypedAssignment != nil {
+				expr = stmt.Core.TypedAssignment.Value
+			} else if stmt.Core.Reassignment != nil {
+				expr = stmt.Core.Reassignment.Value
 			} else {
 				t.Fatal("No assignment statement found")
 			}
@@ -619,14 +619,14 @@ trailing_stop := iff(price > stop[1] and price[1] > stop[1], max(stop[1], price 
 
 	/* Second statement is the reassignment with nested iff() */
 	stmt := result.Statements[1]
-	if stmt.Reassignment == nil {
+	if stmt.Core.Reassignment == nil {
 		t.Fatal("Expected reassignment statement")
 	}
 
-	assertTernaryTransformation(t, stmt.Reassignment.Value, "Outer iff()")
+	assertTernaryTransformation(t, stmt.Core.Reassignment.Value, "Outer iff()")
 
 	/* Verify nested transformations */
-	outerTernary := stmt.Reassignment.Value.Ternary
+	outerTernary := stmt.Core.Reassignment.Value.Ternary
 	if outerTernary.FalseVal == nil || outerTernary.FalseVal.Ternary == nil {
 		t.Error("Expected nested ternary in alternate branch")
 		return
@@ -678,15 +678,15 @@ func TestIffToTernary_EdgeCases(t *testing.T) {
 					t.Errorf("Transform failed: %v", err)
 				}
 				/* Verify nested if body contains transformed iff() */
-				outerIf := script.Statements[0].If
+				outerIf := script.Statements[0].Core.If
 				if outerIf == nil || len(outerIf.Body) == 0 {
 					t.Fatal("Expected outer if with body")
 				}
-				innerIf := outerIf.Body[0].If
+				innerIf := outerIf.Body[0].Core.If
 				if innerIf == nil || len(innerIf.Body) == 0 {
 					t.Fatal("Expected inner if with body")
 				}
-				assignment := innerIf.Body[0].Assignment
+				assignment := innerIf.Body[0].Core.Assignment
 				if assignment == nil {
 					t.Fatal("Expected assignment in inner if body")
 				}

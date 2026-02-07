@@ -1,0 +1,7 @@
+//@version=5
+indicator("Intermediate Calculations")
+
+momentum(src, len) => prev = src[len], delta = src - prev, delta / prev * 100
+
+mom = momentum(close, 14)
+plot(mom)

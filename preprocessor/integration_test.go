@@ -43,7 +43,7 @@ func TestIntegration_DailyLinesSimple(t *testing.T) {
 	}
 
 	// Statement 0: study() → indicator()
-	studyExpr := result.Statements[0].Expression
+	studyExpr := result.Statements[0].Core.Expression
 	if studyExpr == nil || studyExpr.Expr == nil {
 		t.Fatal("Expected study/indicator call in first statement")
 	}
@@ -63,14 +63,14 @@ func TestIntegration_DailyLinesSimple(t *testing.T) {
 	expectedVars := []string{"ma20", "ma50", "ma200"}
 	for i, varName := range expectedVars {
 		stmt := result.Statements[i+1]
-		if stmt.Assignment == nil {
+		if stmt.Core.Assignment == nil {
 			t.Fatalf("Statement %d: expected assignment", i+1)
 		}
-		if stmt.Assignment.Name != varName {
-			t.Errorf("Statement %d: expected variable '%s', got '%s'", i+1, varName, stmt.Assignment.Name)
+		if stmt.Core.Assignment.Name != varName {
+			t.Errorf("Statement %d: expected variable '%s', got '%s'", i+1, varName, stmt.Core.Assignment.Name)
 		}
 
-		expr := stmt.Assignment.Value
+		expr := stmt.Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		assertMemberAccessCallee(t, call, "ta", "sma")
 	}
@@ -118,8 +118,8 @@ ma = sma(close, 20)
 	}
 
 	// Check first statement (study → indicator)
-	call1 := findCallInFactor(result1.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
-	call2 := findCallInFactor(result2.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	call1 := findCallInFactor(result1.Statements[0].Core.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	call2 := findCallInFactor(result2.Statements[0].Core.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
 
 	if call1 == nil || call2 == nil {
 		t.Fatal("Expected call expressions")
@@ -173,7 +173,7 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 	}
 
 	/* Statement 0: study → indicator (simple Ident rename) */
-	studyCall := findCallInFactor(result.Statements[0].Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
+	studyCall := findCallInFactor(result.Statements[0].Core.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if studyCall == nil || studyCall.Callee.Ident == nil {
 		t.Errorf("Statement 0: expected Ident, got '%v'", studyCall.Callee)
 	}
@@ -186,10 +186,10 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 		var call *parser.CallExpr
 
 		stmt := result.Statements[exp.stmtIndex]
-		if stmt.Expression != nil {
-			call = findCallInFactor(stmt.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
-		} else if stmt.Assignment != nil {
-			call = findCallInFactor(stmt.Assignment.Value.Ternary.Condition.Left.Left.Left.Left.Left)
+		if stmt.Core.Expression != nil {
+			call = findCallInFactor(stmt.Core.Expression.Expr.Ternary.Condition.Left.Left.Left.Left.Left)
+		} else if stmt.Core.Assignment != nil {
+			call = findCallInFactor(stmt.Core.Assignment.Value.Ternary.Condition.Left.Left.Left.Left.Left)
 		}
 
 		assertMemberAccessCallee(t, call, exp.obj, exp.prop)
@@ -250,7 +250,7 @@ func TestIntegration_LargeFile(t *testing.T) {
 
 	// Spot check a few transformations
 	for _, idx := range []int{1, 50, 100} {
-		expr := result.Statements[idx].Assignment.Value
+		expr := result.Statements[idx].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		assertMemberAccessCallee(t, call, "ta", "sma")
 	}

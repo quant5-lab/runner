@@ -1,0 +1,7 @@
+//@version=5
+indicator("Multi-Step TA Calculation")
+
+customRsi(src, len) => gain = math.max(src - src[1], 0), loss = math.max(src[1] - src, 0), avgGain = ta.sma(gain, len), avgLoss = ta.sma(loss, len), rs = avgGain / avgLoss, 100 - (100 / (1 + rs))
+
+rsi = customRsi(close, 14)
+plot(rsi)

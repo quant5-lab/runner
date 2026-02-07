@@ -1,0 +1,7 @@
+//@version=5
+indicator("Variable Initialization Chain")
+
+init(base) => lo = base - 10, hi = base + 10, lo
+
+val = init(close)
+plot(val)

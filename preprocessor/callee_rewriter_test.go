@@ -162,7 +162,7 @@ result = max(a, b)
 	if len(script.Statements) < 2 {
 		t.Fatal("Expected at least 2 statements")
 	}
-	assignment := script.Statements[1].Assignment
+	assignment := script.Statements[1].Core.Assignment
 	if assignment == nil {
 		t.Fatal("Expected assignment statement")
 	}
@@ -173,7 +173,7 @@ result = max(a, b)
 		t.Fatalf("Transform failed: %v", err)
 	}
 
-	assignment = transformed.Statements[1].Assignment
+	assignment = transformed.Statements[1].Core.Assignment
 	t.Logf("After transform - Value type: %T", assignment.Value)
 
 	// Parser grammar shows Expression can be Ternary, Call, MemberAccess, Ident, etc.

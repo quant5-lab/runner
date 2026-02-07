@@ -75,7 +75,7 @@ func TestIfStatement_NestedIf(t *testing.T) {
 				t.Fatal("No statements parsed")
 			}
 
-			outerIf := script.Statements[0].If
+			outerIf := script.Statements[0].Core.If
 			if outerIf == nil {
 				t.Fatal("Expected outer IF statement")
 			}
@@ -90,9 +90,9 @@ func TestIfStatement_NestedIf(t *testing.T) {
 			for {
 				found := false
 				for _, stmt := range current.Body {
-					if stmt.If != nil {
+					if stmt.Core.If != nil {
 						depth++
-						current = stmt.If
+						current = stmt.Core.If
 						found = true
 						break
 					}
@@ -148,7 +148,7 @@ func TestIfStatement_NestedFor(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			outerIf := script.Statements[0].If
+			outerIf := script.Statements[0].Core.If
 			if outerIf == nil {
 				t.Fatal("Expected IF statement")
 			}
@@ -159,7 +159,7 @@ func TestIfStatement_NestedFor(t *testing.T) {
 
 			hasFor := false
 			for _, stmt := range outerIf.Body {
-				if stmt.For != nil {
+				if stmt.Core.For != nil {
 					hasFor = true
 					break
 				}
@@ -211,7 +211,7 @@ func TestForStatement_NestedIf(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			outerFor := script.Statements[0].For
+			outerFor := script.Statements[0].Core.For
 			if outerFor == nil {
 				t.Fatal("Expected FOR statement")
 			}
@@ -222,7 +222,7 @@ func TestForStatement_NestedIf(t *testing.T) {
 
 			hasIf := false
 			for _, stmt := range outerFor.Body {
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					hasIf = true
 					break
 				}
@@ -284,7 +284,7 @@ func TestForStatement_NestedFor(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			outerFor := script.Statements[0].For
+			outerFor := script.Statements[0].Core.For
 			if outerFor == nil {
 				t.Fatal("Expected outer FOR statement")
 			}
@@ -299,9 +299,9 @@ func TestForStatement_NestedFor(t *testing.T) {
 			for {
 				found := false
 				for _, stmt := range current.Body {
-					if stmt.For != nil {
+					if stmt.Core.For != nil {
 						depth++
-						current = stmt.For
+						current = stmt.Core.For
 						found = true
 						break
 					}
@@ -373,7 +373,7 @@ func TestFunctionDecl_NestedControlFlow(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected function declaration")
 			}
@@ -390,10 +390,10 @@ func TestFunctionDecl_NestedControlFlow(t *testing.T) {
 			hasIf := false
 			hasFor := false
 			for _, stmt := range body {
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					hasIf = true
 				}
-				if stmt.For != nil {
+				if stmt.Core.For != nil {
 					hasFor = true
 				}
 			}
@@ -468,11 +468,11 @@ getValue() =>
 			for i, expectedType := range tt.expectedStmtType {
 				stmt := script.Statements[i]
 				var actualType string
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					actualType = "if"
-				} else if stmt.For != nil {
+				} else if stmt.Core.For != nil {
 					actualType = "for"
-				} else if stmt.FunctionDecl != nil {
+				} else if stmt.Core.FunctionDecl != nil {
 					actualType = "function"
 				} else {
 					actualType = "other"
@@ -538,21 +538,21 @@ func TestControlFlow_ExtremeNesting(t *testing.T) {
 			var countDepth func([]*Statement) int
 			countDepth = func(body []*Statement) int {
 				for _, stmt := range body {
-					if stmt.If != nil {
-						return 1 + countDepth(stmt.If.Body)
+					if stmt.Core.If != nil {
+						return 1 + countDepth(stmt.Core.If.Body)
 					}
-					if stmt.For != nil {
-						return 1 + countDepth(stmt.For.Body)
+					if stmt.Core.For != nil {
+						return 1 + countDepth(stmt.Core.For.Body)
 					}
 				}
 				return 0
 			}
 
 			firstStmt := script.Statements[0]
-			if firstStmt.If != nil {
-				depth = 1 + countDepth(firstStmt.If.Body)
-			} else if firstStmt.For != nil {
-				depth = 1 + countDepth(firstStmt.For.Body)
+			if firstStmt.Core.If != nil {
+				depth = 1 + countDepth(firstStmt.Core.If.Body)
+			} else if firstStmt.Core.For != nil {
+				depth = 1 + countDepth(firstStmt.Core.For.Body)
 			}
 
 			if depth != tt.expectedDepth {
@@ -620,7 +620,7 @@ func TestIndentation_MixedSizes(t *testing.T) {
 			}
 
 			firstStmt := script.Statements[0]
-			if tt.expectedStmtType == "if" && firstStmt.If == nil {
+			if tt.expectedStmtType == "if" && firstStmt.Core.If == nil {
 				t.Fatal("Expected IF statement")
 			}
 		})
@@ -684,7 +684,7 @@ func TestIndentation_TabsVsSpaces(t *testing.T) {
 			}
 
 			firstStmt := script.Statements[0]
-			if firstStmt.If == nil {
+			if firstStmt.Core.If == nil {
 				t.Fatal("Expected IF statement")
 			}
 		})

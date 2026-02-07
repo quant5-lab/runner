@@ -1,0 +1,6 @@
+//@version=5
+indicator("Same Line Comma Separation")
+
+fastMa = ta.ema(close, 5), slowMa = ta.ema(close, 20)
+signal = fastMa - slowMa
+plot(signal)

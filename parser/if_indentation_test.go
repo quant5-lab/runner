@@ -54,7 +54,7 @@ func TestIfStatement_IndentationLevels(t *testing.T) {
 				t.Fatalf("Expected 1 statement, got %d", len(script.Statements))
 			}
 
-			ifStmt := script.Statements[0].If
+			ifStmt := script.Statements[0].Core.If
 			if ifStmt == nil {
 				t.Fatal("Expected IfStatement, got nil")
 			}
@@ -119,7 +119,7 @@ if x == 0
 			}
 
 			for i := 0; i < tt.expectedIfs; i++ {
-				if script.Statements[i].If == nil {
+				if script.Statements[i].Core.If == nil {
 					t.Errorf("Statement %d: expected IF, got nil", i)
 				}
 			}
@@ -165,7 +165,7 @@ func TestIfStatement_WithEmptyLines(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			ifStmt := script.Statements[0].If
+			ifStmt := script.Statements[0].Core.If
 			if ifStmt == nil {
 				t.Fatal("Expected IF statement")
 			}
@@ -213,7 +213,7 @@ func TestIfStatement_WithComments(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			ifStmt := script.Statements[0].If
+			ifStmt := script.Statements[0].Core.If
 			if ifStmt == nil {
 				t.Fatal("Expected IF statement")
 			}
@@ -275,11 +275,11 @@ c = 3`,
 			for i, expected := range tt.expectedPattern {
 				stmt := script.Statements[i]
 				var actual string
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					actual = "if"
-				} else if stmt.Assignment != nil {
+				} else if stmt.Core.Assignment != nil {
 					actual = "assign"
-				} else if stmt.Reassignment != nil {
+				} else if stmt.Core.Reassignment != nil {
 					actual = "reassign"
 				} else {
 					actual = "other"
@@ -334,7 +334,7 @@ func TestIfStatement_InsideFunctionBody(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected function declaration")
 			}
@@ -346,7 +346,7 @@ func TestIfStatement_InsideFunctionBody(t *testing.T) {
 
 			hasIf := false
 			for _, stmt := range body {
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					hasIf = true
 					break
 				}
@@ -396,8 +396,8 @@ if condition
 			// Find IF statement
 			var ifStmt *IfStatement
 			for _, stmt := range script.Statements {
-				if stmt.If != nil {
-					ifStmt = stmt.If
+				if stmt.Core.If != nil {
+					ifStmt = stmt.Core.If
 					break
 				}
 			}
@@ -409,7 +409,7 @@ if condition
 			// Verify at least one reassignment in body
 			hasReassign := false
 			for _, stmt := range ifStmt.Body {
-				if stmt.Reassignment != nil {
+				if stmt.Core.Reassignment != nil {
 					hasReassign = true
 					break
 				}

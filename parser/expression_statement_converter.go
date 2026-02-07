@@ -13,11 +13,11 @@ func NewExpressionStatementConverter(expressionConverter func(*Expression) (ast.
 }
 
 func (e *ExpressionStatementConverter) CanHandle(stmt *Statement) bool {
-	return stmt.Expression != nil
+	return stmt.Core != nil && stmt.Core.Expression != nil
 }
 
 func (e *ExpressionStatementConverter) Convert(stmt *Statement) (ast.Node, error) {
-	expr, err := e.expressionConverter(stmt.Expression.Expr)
+	expr, err := e.expressionConverter(stmt.Core.Expression.Expr)
 	if err != nil {
 		return nil, err
 	}

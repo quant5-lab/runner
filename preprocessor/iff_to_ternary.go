@@ -27,35 +27,35 @@ func (t *IffToTernaryTransformer) Transform(script *parser.Script) (*parser.Scri
 }
 
 func (t *IffToTernaryTransformer) visitStatement(stmt *parser.Statement) error {
-	if stmt == nil {
+	if stmt == nil || stmt.Core == nil {
 		return nil
 	}
 
-	if stmt.Assignment != nil {
-		return t.visitExpression(stmt.Assignment.Value)
+	if stmt.Core.Assignment != nil {
+		return t.visitExpression(stmt.Core.Assignment.Value)
 	}
 
-	if stmt.TypedAssignment != nil {
-		return t.visitExpression(stmt.TypedAssignment.Value)
+	if stmt.Core.TypedAssignment != nil {
+		return t.visitExpression(stmt.Core.TypedAssignment.Value)
 	}
 
-	if stmt.Reassignment != nil {
-		return t.visitExpression(stmt.Reassignment.Value)
+	if stmt.Core.Reassignment != nil {
+		return t.visitExpression(stmt.Core.Reassignment.Value)
 	}
 
-	if stmt.If != nil {
-		if err := t.visitOrExpr(stmt.If.Condition); err != nil {
+	if stmt.Core.If != nil {
+		if err := t.visitOrExpr(stmt.Core.If.Condition); err != nil {
 			return err
 		}
-		for _, bodyStmt := range stmt.If.Body {
+		for _, bodyStmt := range stmt.Core.If.Body {
 			if err := t.visitStatement(bodyStmt); err != nil {
 				return err
 			}
 		}
 	}
 
-	if stmt.Expression != nil {
-		return t.visitExpression(stmt.Expression.Expr)
+	if stmt.Core.Expression != nil {
+		return t.visitExpression(stmt.Core.Expression.Expr)
 	}
 
 	return nil

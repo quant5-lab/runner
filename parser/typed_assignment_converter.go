@@ -13,17 +13,17 @@ func NewTypedAssignmentConverter(expressionConverter func(*Expression) (ast.Expr
 }
 
 func (t *TypedAssignmentConverter) CanHandle(stmt *Statement) bool {
-	return stmt.TypedAssignment != nil
+	return stmt.Core != nil && stmt.Core.TypedAssignment != nil
 }
 
 func (t *TypedAssignmentConverter) Convert(stmt *Statement) (ast.Node, error) {
-	init, err := t.expressionConverter(stmt.TypedAssignment.Value)
+	init, err := t.expressionConverter(stmt.Core.TypedAssignment.Value)
 	if err != nil {
 		return nil, err
 	}
 
 	return buildVariableDeclaration(
-		buildIdentifier(stmt.TypedAssignment.Name),
+		buildIdentifier(stmt.Core.TypedAssignment.Name),
 		init,
 		"let",
 	), nil

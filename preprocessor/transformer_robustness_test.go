@@ -32,7 +32,7 @@ ma50 = ta.ema(close, 50)
 
 	// Should remain unchanged (ta.sma should not become ta.ta.sma)
 	for i := 0; i < 2; i++ {
-		expr := result.Statements[i].Assignment.Value
+		expr := result.Statements[i].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call expression", i)
@@ -69,7 +69,7 @@ my_sma = sma(close, 20)
 	}
 
 	// Should transform built-in sma to ta.sma
-	expr := result.Statements[0].Assignment.Value
+	expr := result.Statements[0].Core.Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	assertMemberAccessCallee(t, call, "ta", "sma")
 }
@@ -148,7 +148,7 @@ func TestTANamespaceTransformer_UnknownFunction(t *testing.T) {
 	}
 
 	// Should remain unchanged (custom function, not a builtin)
-	expr := result.Statements[0].Assignment.Value
+	expr := result.Statements[0].Core.Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {
 		t.Fatal("Expected call expression")
@@ -217,7 +217,7 @@ val = abs(5)
 	}
 
 	// Check study → indicator (simple Ident rename)
-	studyExpr := result.Statements[0].Expression.Expr
+	studyExpr := result.Statements[0].Core.Expression.Expr
 	studyCall := findCallInFactor(studyExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if studyCall == nil || studyCall.Callee.Ident == nil {
 		t.Error("study should be transformed to indicator (Ident)")
@@ -227,12 +227,12 @@ val = abs(5)
 	}
 
 	// Check sma → ta.sma (namespace transform, uses MemberAccess)
-	smaExpr := result.Statements[1].Assignment.Value
+	smaExpr := result.Statements[1].Core.Assignment.Value
 	smaCall := findCallInFactor(smaExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	assertMemberAccessCallee(t, smaCall, "ta", "sma")
 
 	// Check abs → math.abs (namespace transform, uses MemberAccess)
-	absExpr := result.Statements[2].Assignment.Value
+	absExpr := result.Statements[2].Core.Assignment.Value
 	absCall := findCallInFactor(absExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	assertMemberAccessCallee(t, absCall, "math", "abs")
 }
@@ -243,10 +243,12 @@ func TestTANamespaceTransformer_NilPointerSafety(t *testing.T) {
 	ast := &parser.Script{
 		Statements: []*parser.Statement{
 			{
-				Assignment: &parser.Assignment{
-					Name: "test",
-					Value: &parser.Expression{
-						Ternary: nil, // Nil ternary
+				Core: &parser.StatementCore{
+					Assignment: &parser.Assignment{
+						Name: "test",
+						Value: &parser.Expression{
+							Ternary: nil, // Nil ternary
+						},
 					},
 				},
 			},
@@ -289,7 +291,7 @@ rsi14 = rsi(close, 14)
 	// All should be transformed to ta. namespace
 	expectedNames := []string{"ta.sma", "ta.ema", "ta.rsi"}
 	for i, expected := range expectedNames {
-		expr := result.Statements[i].Assignment.Value
+		expr := result.Statements[i].Core.Assignment.Value
 		call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 		if call == nil {
 			t.Fatalf("Statement %d: expected call", i)
@@ -371,7 +373,7 @@ func TestAllTransformers_Coverage(t *testing.T) {
 				t.Fatalf("Transform failed: %v", err)
 			}
 
-			expr := result.Statements[0].Assignment.Value
+			expr := result.Statements[0].Core.Assignment.Value
 			call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 			assertMemberAccessCallee(t, call, tc.checkObj, tc.checkProp)
 		})

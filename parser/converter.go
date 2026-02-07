@@ -40,6 +40,7 @@ func NewConverter() *Converter {
 		c.convertOrExpr,
 		c.convertArithExpr,
 		c.convertStatement,
+		c,
 	)
 	return c
 }

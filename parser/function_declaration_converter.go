@@ -1,10 +1,15 @@
 package parser
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"fmt"
+
+	"github.com/quant5-lab/runner/ast"
+)
 
 type FunctionDeclarationConverter struct {
 	statementConverter  func(*Statement) (ast.Node, error)
 	expressionConverter func(*Expression) (ast.Expression, error)
+	parentConverter     *Converter
 }
 
 func NewFunctionDeclarationConverter(
@@ -14,15 +19,20 @@ func NewFunctionDeclarationConverter(
 	return &FunctionDeclarationConverter{
 		statementConverter:  statementConverter,
 		expressionConverter: expressionConverter,
+		parentConverter:     nil,
 	}
 }
 
+func (f *FunctionDeclarationConverter) SetParentConverter(c *Converter) {
+	f.parentConverter = c
+}
+
 func (f *FunctionDeclarationConverter) CanHandle(stmt *Statement) bool {
-	return stmt.FunctionDecl != nil
+	return stmt.Core != nil && stmt.Core.FunctionDecl != nil
 }
 
 func (f *FunctionDeclarationConverter) Convert(stmt *Statement) (ast.Node, error) {
-	funcDecl := stmt.FunctionDecl
+	funcDecl := stmt.Core.FunctionDecl
 
 	params := buildIdentifiers(funcDecl.Params)
 	body, err := f.convertFunctionBody(funcDecl)
@@ -44,6 +54,13 @@ func (f *FunctionDeclarationConverter) Convert(stmt *Statement) (ast.Node, error
 }
 
 func (f *FunctionDeclarationConverter) convertFunctionBody(funcDecl *FunctionDecl) ([]ast.Node, error) {
+	if funcDecl.InlineStatementList != nil {
+		if f.parentConverter == nil {
+			return nil, fmt.Errorf("parent converter not set")
+		}
+		converter := NewInlineStatementListConverter(f.parentConverter)
+		return converter.Convert(funcDecl.InlineStatementList)
+	}
 	if funcDecl.InlineBody != nil {
 		return f.convertInlineBody(funcDecl.InlineBody)
 	}

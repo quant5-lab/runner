@@ -1,0 +1,7 @@
+//@version=5
+indicator("Ternary Final Expression")
+
+adaptive(src, condition) => fast = 5, slow = 20, len = condition ? fast : slow, ta.sma(src, len)
+
+adaptiveMa = adaptive(close, close > open)
+plot(adaptiveMa)

@@ -1,0 +1,7 @@
+//@version=5
+indicator("Complex Expression Chain")
+
+signal(src, fast, slow) => fastMa = ta.ema(src, fast), slowMa = ta.ema(src, slow), diff = fastMa - slowMa, signalLine = ta.ema(diff, 9), histogram = diff - signalLine, histogram
+
+macdHistogram = signal(close, 12, 26)
+plot(macdHistogram)

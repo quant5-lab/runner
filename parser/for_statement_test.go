@@ -63,7 +63,7 @@ func TestForStatement_BasicSyntax(t *testing.T) {
 				t.Fatalf("Expected 1 top-level statement, got %d", len(script.Statements))
 			}
 
-			forStmt := script.Statements[0].For
+			forStmt := script.Statements[0].Core.For
 			if forStmt == nil {
 				t.Fatal("Expected ForStatement, got nil")
 			}
@@ -126,7 +126,7 @@ func TestForStatement_WithStep(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			forStmt := script.Statements[0].For
+			forStmt := script.Statements[0].Core.For
 			if forStmt == nil {
 				t.Fatal("Expected ForStatement, got nil")
 			}
@@ -180,7 +180,7 @@ func TestForStatement_ComplexBounds(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			forStmt := script.Statements[0].For
+			forStmt := script.Statements[0].Core.For
 			if forStmt == nil {
 				t.Fatal("Expected ForStatement, got nil")
 			}
@@ -247,7 +247,7 @@ func TestForStatement_NestedLoops(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			outerFor := script.Statements[0].For
+			outerFor := script.Statements[0].Core.For
 			if outerFor == nil {
 				t.Fatal("Expected outer ForStatement, got nil")
 			}
@@ -259,7 +259,7 @@ func TestForStatement_NestedLoops(t *testing.T) {
 			if tt.hasNested {
 				foundNested := false
 				for _, stmt := range outerFor.Body {
-					if stmt.For != nil {
+					if stmt.Core.For != nil {
 						foundNested = true
 						break
 					}
@@ -311,7 +311,7 @@ func TestForStatement_WithVariableOperations(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			forStmt := script.Statements[0].For
+			forStmt := script.Statements[0].Core.For
 			if forStmt == nil {
 				t.Fatal("Expected ForStatement, got nil")
 			}
@@ -366,7 +366,7 @@ for k = 0 to 10
 			}
 
 			for i, stmt := range script.Statements {
-				if stmt.For == nil {
+				if stmt.Core.For == nil {
 					t.Errorf("Statement %d is not a ForStatement", i)
 				}
 			}
@@ -427,11 +427,11 @@ end = x + 1`,
 				stmt := script.Statements[i]
 				switch expected {
 				case "for":
-					if stmt.For == nil {
+					if stmt.Core.For == nil {
 						t.Errorf("Statement %d: expected for, got other type", i)
 					}
 				case "assign":
-					if stmt.Assignment == nil && stmt.Reassignment == nil {
+					if stmt.Core.Assignment == nil && stmt.Core.Reassignment == nil {
 						t.Errorf("Statement %d: expected assignment, got other type", i)
 					}
 				}
@@ -545,7 +545,7 @@ func TestForStatement_EmptyLinesAndComments(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			forStmt := script.Statements[0].For
+			forStmt := script.Statements[0].Core.For
 			if forStmt == nil {
 				t.Fatal("Expected ForStatement, got nil")
 			}

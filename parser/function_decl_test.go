@@ -12,6 +12,9 @@ func getBodyLength(funcDecl *FunctionDecl) int {
 	if funcDecl.InlineBody != nil {
 		return 1
 	}
+	if funcDecl.InlineStatementList != nil {
+		return len(funcDecl.InlineStatementList.Statements) + 1
+	}
 	if funcDecl.MultiLineBody != nil {
 		return len(funcDecl.MultiLineBody)
 	}
@@ -80,7 +83,7 @@ func TestFunctionDecl_StatementCounts(t *testing.T) {
 				t.Fatalf("Expected 1 statement, got %d", len(script.Statements))
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl, got nil")
 			}
@@ -142,7 +145,7 @@ func TestFunctionDecl_ParameterCounts(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl")
 			}
@@ -217,7 +220,7 @@ helper(z) =>
 			}
 
 			for i, expectedName := range tt.expectedFuncs {
-				funcDecl := script.Statements[i].FunctionDecl
+				funcDecl := script.Statements[i].Core.FunctionDecl
 				if funcDecl == nil {
 					t.Fatalf("Statement %d: expected FunctionDecl, got nil", i)
 				}
@@ -275,7 +278,7 @@ func TestFunctionDecl_WithEmptyLines(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl")
 			}
@@ -332,7 +335,7 @@ func TestFunctionDecl_WithComments(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl")
 			}
@@ -391,7 +394,7 @@ func TestFunctionDecl_ReturnValues(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl")
 			}
@@ -405,7 +408,7 @@ func TestFunctionDecl_ReturnValues(t *testing.T) {
 			}
 
 			lastStmt := funcDecl.MultiLineBody[len(funcDecl.MultiLineBody)-1]
-			if lastStmt.Expression == nil && lastStmt.TupleAssignment == nil && lastStmt.Assignment == nil {
+			if lastStmt.Core.Expression == nil && lastStmt.Core.TupleAssignment == nil && lastStmt.Core.Assignment == nil {
 				t.Error("Last statement should be an expression, tuple, or assignment")
 			}
 		})
@@ -473,17 +476,17 @@ dirmov(len) =>
 				stmt := script.Statements[i]
 				var actual string
 				switch {
-				case stmt.FunctionDecl != nil:
+				case stmt.Core.FunctionDecl != nil:
 					actual = "func"
-				case stmt.Assignment != nil:
+				case stmt.Core.Assignment != nil:
 					actual = "assign"
-				case stmt.TupleAssignment != nil:
+				case stmt.Core.TupleAssignment != nil:
 					actual = "tuple"
-				case stmt.Expression != nil:
+				case stmt.Core.Expression != nil:
 					actual = "expr"
-				case stmt.If != nil:
+				case stmt.Core.If != nil:
 					actual = "if"
-				case stmt.Reassignment != nil:
+				case stmt.Core.Reassignment != nil:
 					actual = "reassign"
 				default:
 					actual = "unknown"
@@ -538,7 +541,7 @@ func TestFunctionDecl_NestedIfStatements(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			funcDecl := script.Statements[0].FunctionDecl
+			funcDecl := script.Statements[0].Core.FunctionDecl
 			if funcDecl == nil {
 				t.Fatal("Expected FunctionDecl")
 			}
@@ -554,7 +557,7 @@ func TestFunctionDecl_NestedIfStatements(t *testing.T) {
 			// Verify at least one IF statement exists
 			hasIf := false
 			for _, stmt := range funcDecl.MultiLineBody {
-				if stmt.If != nil {
+				if stmt.Core.If != nil {
 					hasIf = true
 					break
 				}
@@ -653,20 +656,25 @@ func TestFunctionDecl_EdgeCases(t *testing.T) {
 			name: "function without indent",
 			source: `func(x) =>
 x + 1`,
-			shouldErr: false, // Inline expression now supported
+			shouldErr: false,
 		},
 		{
 			name: "empty function body",
 			source: `func(x) =>
 `,
-			shouldErr: true, // No expression after =>
+			shouldErr: true,
 		},
 		{
 			name: "inconsistent indentation - lexer lenient",
 			source: `func(x) =>
     a = 1
-  b = 2`, // Different indent levels
-			shouldErr: false, // Lexer treats any dedent as valid
+  b = 2`,
+			shouldErr: false,
+		},
+		{
+			name:      "inline simple expression",
+			source:    `f(x) => x + 1`,
+			shouldErr: false,
 		},
 	}
 
@@ -760,4 +768,198 @@ main(y) =>
 			}
 		})
 	}
+}
+
+/* TestInlineStatementList validates single-line function bodies with comma-separated statements */
+func TestInlineStatementList(t *testing.T) {
+	t.Run("ValidSyntax", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			source        string
+			expectedStmts int
+		}{
+			{"single assignment", `f(x) => a = 1, a`, 2},
+			{"multiple assignments", `f(x) => a = 1, b = 2, a + b`, 3},
+			{"reassignment chain", `f(x) => a = 1, a := a + 1, a := a * 2, a`, 4},
+			{"mixed operators", `f(x) => a = 1, b := 2, c = 3, b + c`, 4},
+			{"parameter usage", `f(x) => a = x * 2, b = a + x, b`, 3},
+			{"nested expressions", `f(x) => a = (x + 1) * 2, b = a / 2, b`, 3},
+			{"call expressions", `f(x) => a = ta.sma(x, 10), b = ta.ema(a, 5), b`, 3},
+			{"member access", `f(x) => a = close[1], b = high[2], a + b`, 3},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p, err := NewParser()
+				if err != nil {
+					t.Fatalf("Failed to create parser: %v", err)
+				}
+
+				script, err := p.ParseBytes("test.pine", []byte(tt.source))
+				if err != nil {
+					t.Fatalf("Parse failed: %v", err)
+				}
+
+				funcDecl := script.Statements[0].Core.FunctionDecl
+				if funcDecl == nil || funcDecl.InlineStatementList == nil {
+					t.Fatal("Expected InlineStatementList")
+				}
+
+				actualStmts := len(funcDecl.InlineStatementList.Statements) + 1
+				if actualStmts != tt.expectedStmts {
+					t.Errorf("Expected %d statements, got %d", tt.expectedStmts, actualStmts)
+				}
+			})
+		}
+	})
+
+	t.Run("FinalExpressions", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"identifier", `f(x) => a = 1, a`},
+			{"binary expression", `f(x) => a = 1, a + 1`},
+			{"ternary expression", `f(x) => a = 1, a > 0 ? a : 0`},
+			{"call expression", `f(x) => a = close, ta.sma(a, 10)`},
+			{"member access", `f(x) => a = 1, high[1]`},
+			{"tuple", `f(x) => a = 1, b = 2, [a, b]`},
+			{"complex arithmetic", `f(x) => a = 1, (a * 2 + 3) / 4`},
+			{"nested ternary", `f(x) => a = 1, a > 0 ? (a > 10 ? 10 : a) : 0`},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p, err := NewParser()
+				if err != nil {
+					t.Fatalf("Failed to create parser: %v", err)
+				}
+
+				script, err := p.ParseBytes("test.pine", []byte(tt.source))
+				if err != nil {
+					t.Fatalf("Parse failed: %v", err)
+				}
+
+				funcDecl := script.Statements[0].Core.FunctionDecl
+				if funcDecl == nil || funcDecl.InlineStatementList == nil {
+					t.Fatal("Expected InlineStatementList")
+				}
+
+				if funcDecl.InlineStatementList.FinalExpression == nil {
+					t.Error("Expected FinalExpression, got nil")
+				}
+			})
+		}
+	})
+
+	t.Run("InvalidSyntax", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"double comma", `f(x) => a = 1,, a`},
+			{"leading comma", `f(x) =>, a = 1, a`},
+			{"missing final expression", `f(x) => a = 1,`},
+			{"only comma", `f(x) => ,`},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p, err := NewParser()
+				if err != nil {
+					t.Fatalf("Failed to create parser: %v", err)
+				}
+
+				_, err = p.ParseBytes("test.pine", []byte(tt.source))
+				if err == nil {
+					t.Error("Expected parse error for invalid syntax")
+				}
+			})
+		}
+	})
+
+	t.Run("ASTConversion", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			source        string
+			expectedStmts int
+		}{
+			{"single assignment", `f(x) => a = 1, a`, 2},
+			{"multiple assignments", `f(x) => a = 1, b = 2, a + b`, 3},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p, err := NewParser()
+				if err != nil {
+					t.Fatalf("Failed to create parser: %v", err)
+				}
+
+				script, err := p.ParseBytes("test.pine", []byte(tt.source))
+				if err != nil {
+					t.Fatalf("Parse failed: %v", err)
+				}
+
+				converter := NewConverter()
+				program, err := converter.ToESTree(script)
+				if err != nil {
+					t.Fatalf("Conversion failed: %v", err)
+				}
+
+				varDecl, ok := program.Body[0].(*ast.VariableDeclaration)
+				if !ok {
+					t.Fatalf("Expected VariableDeclaration, got %T", program.Body[0])
+				}
+
+				arrowFunc, ok := varDecl.Declarations[0].Init.(*ast.ArrowFunctionExpression)
+				if !ok {
+					t.Fatalf("Expected ArrowFunctionExpression, got %T", varDecl.Declarations[0].Init)
+				}
+
+				if len(arrowFunc.Body) != tt.expectedStmts {
+					t.Errorf("Expected %d body statements, got %d", tt.expectedStmts, len(arrowFunc.Body))
+				}
+
+				lastStmt := arrowFunc.Body[len(arrowFunc.Body)-1]
+				if _, ok := lastStmt.(*ast.ExpressionStatement); !ok {
+					t.Errorf("Expected final statement to be ExpressionStatement, got %T", lastStmt)
+				}
+			})
+		}
+	})
+
+	t.Run("RegressionPrevention", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			source     string
+			isInlineSL bool
+		}{
+			{"simple inline body still works", `f(x) => x + 1`, false},
+			{"multiline body still works", "f(x) =>\n    a = 1\n    a", false},
+			{"comma syntax detected", `f(x) => a = 1, a`, true},
+			{"simple expr not misidentified", `f(x) => x`, false},
+			{"binary expr not misidentified", `f(x) => x + y`, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p, err := NewParser()
+				if err != nil {
+					t.Fatalf("Failed to create parser: %v", err)
+				}
+
+				script, err := p.ParseBytes("test.pine", []byte(tt.source))
+				if err != nil {
+					t.Fatalf("Parse failed: %v", err)
+				}
+
+				funcDecl := script.Statements[0].Core.FunctionDecl
+				hasInlineSL := funcDecl.InlineStatementList != nil
+
+				if hasInlineSL != tt.isInlineSL {
+					t.Errorf("Expected InlineStatementList=%v, got %v", tt.isInlineSL, hasInlineSL)
+				}
+			})
+		}
+	})
 }

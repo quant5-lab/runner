@@ -71,30 +71,34 @@ func TestNamespaceTransformer_InvalidASTStructure(t *testing.T) {
 	ast := &parser.Script{
 		Statements: []*parser.Statement{
 			{
-				Assignment: &parser.Assignment{
-					Name: "test",
-					Value: &parser.Expression{
-						Ternary: &parser.TernaryExpr{
-							Condition: nil, /* Nil condition */
-						},
-					},
-				},
-			},
-			{
-				Assignment: &parser.Assignment{
-					Name: "test2",
-					Value: &parser.Expression{
-						Ternary: &parser.TernaryExpr{
-							Condition: &parser.OrExpr{
-								Left: nil, /* Nil left operand */
+				Core: &parser.StatementCore{
+					Assignment: &parser.Assignment{
+						Name: "test",
+						Value: &parser.Expression{
+							Ternary: &parser.TernaryExpr{
+								Condition: nil, /* Nil condition */
 							},
 						},
 					},
 				},
 			},
 			{
-				/* Nil assignment */
-				Assignment: nil,
+				Core: &parser.StatementCore{
+					Assignment: &parser.Assignment{
+						Name: "test2",
+						Value: &parser.Expression{
+							Ternary: &parser.TernaryExpr{
+								Condition: &parser.OrExpr{
+									Left: nil, /* Nil left operand */
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				/* Nil core - invalid but won't crash transformer */
+				Core: nil,
 			},
 		},
 	}
@@ -371,7 +375,7 @@ func TestNamespaceTransformer_MultipleTransformersSameNode(t *testing.T) {
 		t.Fatalf("Math Transform failed: %v", err)
 	}
 
-	expr := result2.Statements[0].Assignment.Value
+	expr := result2.Statements[0].Core.Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {
 		t.Fatal("Expected call expression")
@@ -416,7 +420,7 @@ mixed = Sma(close, 20)
 	}
 
 	/* Only lowercase 'sma' should be transformed (PineScript is case-sensitive) */
-	lowerExpr := result.Statements[0].Assignment.Value
+	lowerExpr := result.Statements[0].Core.Assignment.Value
 	lowerCall := findCallInFactor(lowerExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if lowerCall != nil && lowerCall.Callee.MemberAccess != nil {
 		if lowerCall.Callee.MemberAccess.Properties[0] != "sma" {
@@ -425,7 +429,7 @@ mixed = Sma(close, 20)
 	}
 
 	/* Uppercase 'SMA' should NOT be transformed */
-	upperExpr := result.Statements[1].Assignment.Value
+	upperExpr := result.Statements[1].Core.Assignment.Value
 	upperCall := findCallInFactor(upperExpr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if upperCall != nil && upperCall.Callee.Ident != nil {
 		if *upperCall.Callee.Ident != "SMA" {
@@ -460,7 +464,7 @@ func TestNamespaceTransformer_ConsecutiveTransforms(t *testing.T) {
 	}
 
 	/* Should still be ta.sma (not ta.ta.ta.ta.ta.sma) */
-	expr := result.Statements[0].Assignment.Value
+	expr := result.Statements[0].Core.Assignment.Value
 	call := findCallInFactor(expr.Ternary.Condition.Left.Left.Left.Left.Left)
 	if call == nil {
 		t.Fatal("Expected call expression")

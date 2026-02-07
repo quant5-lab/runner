@@ -22,23 +22,23 @@ func (t *SimpleRenameTransformer) Transform(script *parser.Script) (*parser.Scri
 }
 
 func (t *SimpleRenameTransformer) visitStatement(stmt *parser.Statement) {
-	if stmt == nil {
+	if stmt == nil || stmt.Core == nil {
 		return
 	}
 
-	if stmt.Assignment != nil {
-		t.visitExpression(stmt.Assignment.Value)
+	if stmt.Core.Assignment != nil {
+		t.visitExpression(stmt.Core.Assignment.Value)
 	}
 
-	if stmt.If != nil {
-		t.visitOrExpr(stmt.If.Condition)
-		for _, bodyStmt := range stmt.If.Body {
+	if stmt.Core.If != nil {
+		t.visitOrExpr(stmt.Core.If.Condition)
+		for _, bodyStmt := range stmt.Core.If.Body {
 			t.visitStatement(bodyStmt)
 		}
 	}
 
-	if stmt.Expression != nil {
-		t.visitExpression(stmt.Expression.Expr)
+	if stmt.Core.Expression != nil {
+		t.visitExpression(stmt.Core.Expression.Expr)
 	}
 }
 

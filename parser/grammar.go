@@ -17,6 +17,11 @@ type VersionDirective struct {
 }
 
 type Statement struct {
+	Core          *StatementCore `parser:"@@"`
+	TrailingComma *string        `parser:"@','?"`
+}
+
+type StatementCore struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
 	If              *IfStatement     `parser:"| @@"`
 	For             *ForStatement    `parser:"| @@"`
@@ -45,13 +50,14 @@ type ForStatement struct {
 }
 
 type FunctionDecl struct {
-	Name            string       `parser:"@Ident"`
-	Params          []string     `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
-	Arrow           string       `parser:"@'=>'"`
-	InlineBody      *Expression  `parser:"( Newline? @@"`
-	MultiLineIndent *string      `parser:"| Newline? @Indent"`
-	MultiLineBody   []*Statement `parser:"@@+"`
-	MultiLineDedent *string      `parser:"@Dedent )"`
+	Name                string               `parser:"@Ident"`
+	Params              []string             `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
+	Arrow               string               `parser:"@'=>'"`
+	MultiLineIndent     *string              `parser:"( Newline? @Indent"`
+	MultiLineBody       []*Statement         `parser:"@@+"`
+	MultiLineDedent     *string              `parser:"@Dedent"`
+	InlineStatementList *InlineStatementList `parser:"| Newline? @@"`
+	InlineBody          *Expression          `parser:"| Newline? @@ )"`
 }
 
 type TupleAssignment struct {
@@ -243,6 +249,6 @@ func NewParser() (*participle.Parser[Script], error) {
 	return participle.Build[Script](
 		participle.Lexer(indentAwareLexer),
 		participle.Elide("Comment", "Whitespace", "Newline"),
-		participle.UseLookahead(8),
+		participle.UseLookahead(16),
 	)
 }

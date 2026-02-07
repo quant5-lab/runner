@@ -18,11 +18,11 @@ func NewForStatementConverter(
 }
 
 func (f *ForStatementConverter) CanHandle(stmt *Statement) bool {
-	return stmt.For != nil
+	return stmt.Core != nil && stmt.Core.For != nil
 }
 
 func (f *ForStatementConverter) Convert(stmt *Statement) (ast.Node, error) {
-	forStmt := stmt.For
+	forStmt := stmt.Core.For
 
 	fromExpr, err := f.arithExprConverter(forStmt.From)
 	if err != nil {
