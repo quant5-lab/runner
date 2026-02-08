@@ -1,0 +1,8 @@
+Parser limitation: switch expression (#5), input.color (#11), drawing objects line.*/label.* (#8)
+
+Parse: ❌ (switch expression at line 30)
+Generate: ❌ Not reached
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Note: Tuple destructuring with security() (#19) is FIXED

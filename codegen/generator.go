@@ -2187,26 +2187,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		lookahead := false
-		if len(call.Arguments) >= 4 {
-			fourthArg := call.Arguments[3]
-			resolver := NewConstantResolver()
-
-			if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
-				for _, prop := range objExpr.Properties {
-					if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
-						if resolved, ok := resolver.ResolveToBool(prop.Value); ok {
-							lookahead = resolved
-						}
-						break
-					}
-				}
-			} else {
-				if resolved, ok := resolver.ResolveToBool(fourthArg); ok {
-					lookahead = resolved
-				}
-			}
-		}
+		lookahead := extractSecurityLookahead(call)
 
 		code += g.ind() + "securityBarMapper, mapperFound := securityBarMappers[secKey]\n"
 		code += g.ind() + "if !mapperFound {\n"
@@ -2619,6 +2600,11 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 	/* Delegate tuple-returning TA functions to specialized handlers */
 	if g.tupleIndicatorHandler.CanHandle(funcName) {
 		return g.tupleIndicatorHandler.GenerateTupleCode(g, varNames, callExpr)
+	}
+
+	/* Route security()/request.security() tuple calls to specialized handler */
+	if funcName == "request.security" || funcName == "security" {
+		return g.generateTupleSecurityDeclaration(varNames, callExpr)
 	}
 
 	initCode, err := g.generateCallExpression(callExpr)

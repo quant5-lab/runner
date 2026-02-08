@@ -153,3 +153,30 @@ func (e *SecurityArgumentExtractor) normalizeTimeframe(tf string) string {
 		return tf
 	}
 }
+
+func extractSecurityLookahead(call *ast.CallExpression) bool {
+	if len(call.Arguments) < 4 {
+		return false
+	}
+
+	fourthArg := call.Arguments[3]
+	resolver := NewConstantResolver()
+
+	if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
+		for _, prop := range objExpr.Properties {
+			if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
+				if resolved, ok := resolver.ResolveToBool(prop.Value); ok {
+					return resolved
+				}
+				break
+			}
+		}
+		return false
+	}
+
+	if resolved, ok := resolver.ResolveToBool(fourthArg); ok {
+		return resolved
+	}
+
+	return false
+}

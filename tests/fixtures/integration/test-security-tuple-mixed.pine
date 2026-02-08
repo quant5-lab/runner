@@ -1,0 +1,8 @@
+//@version=5
+indicator("Security Tuple Mixed", overlay=false)
+
+[c, ema_d, v] = request.security(syminfo.tickerid, "1D", [close, ta.ema(close, 10), volume])
+
+plot(c, "Close")
+plot(ema_d, "EMA 10")
+plot(v, "Volume")
