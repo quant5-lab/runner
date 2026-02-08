@@ -542,9 +542,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
-	// Pre-analyze security() calls to register temp vars BEFORE declarations
-	g.preAnalyzeSecurityCalls(program)
-
 	// Generate user-defined functions at module level
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
@@ -660,6 +657,13 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 	code += "\n"
+
+	/* Scan for inline TA calls requiring hoisting (must run before GenerateDeclarations) */
+	inlineScanner := NewInlineExpressionScanner(g)
+	hoistableCalls := inlineScanner.ScanProgram(program)
+	for _, callInfo := range hoistableCalls {
+		g.tempVarMgr.GetOrCreate(callInfo)
+	}
 
 	if g.hasSecurityCalls {
 		code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
@@ -804,6 +808,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "sm.SampleCurrentBar(strat, bar.Close)\n"
 	}
 	code += "\n"
+
+	/* Generate hoisted TA calculations (InlineExpressionScanner registrations) */
+	tempVarCalcs, err := g.tempVarMgr.GenerateCalculations()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp var calculations: %w", err)
+	}
+	if tempVarCalcs != "" {
+		code += tempVarCalcs
+		code += "\n"
+	}
 
 	statementCounter.Reset()
 	for _, stmt := range program.Body {
@@ -3487,54 +3501,6 @@ func (g *generator) scanForSubscriptedCalls(expr ast.Expression) {
 		g.scanForSubscriptedCalls(e.Test)
 		g.scanForSubscriptedCalls(e.Consequent)
 		g.scanForSubscriptedCalls(e.Alternate)
-	}
-}
-
-/* preAnalyzeSecurityCalls scans AST for ALL expressions with nested TA calls,
- * registers temp vars BEFORE declaration phase to prevent "undefined: ta_sma_XXX" errors.
- * Skips pivot/fixnan (runtime-only evaluation) and inline-only functions.
- * EXCEPTION: Inline functions inside security() need Series for runtime evaluation.
- */
-func (g *generator) preAnalyzeSecurityCalls(program *ast.Program) {
-	for _, stmt := range program.Body {
-		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
-			for _, declarator := range varDecl.Declarations {
-				if declarator.Init != nil {
-					// Scan ALL expressions for nested TA calls (not just security())
-					nestedCalls := g.exprAnalyzer.FindNestedCalls(declarator.Init)
-					for i := len(nestedCalls) - 1; i >= 0; i-- {
-						callInfo := nestedCalls[i]
-
-						if g.inlineRegistry != nil && g.inlineRegistry.IsInlineOnly(callInfo.FuncName) {
-							// Inline functions need Series when inside security() runtime context
-							if !g.exprAnalyzer.IsInsideSecurityCall(callInfo.Call, declarator.Init) {
-								continue
-							}
-						}
-
-						if g.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {
-							continue
-						}
-
-						isTAFunction := g.taRegistry.IsSupported(callInfo.FuncName)
-						containsNestedTA := false
-						if !isTAFunction {
-							mathNestedCalls := g.exprAnalyzer.FindNestedCalls(callInfo.Call)
-							for _, mathNested := range mathNestedCalls {
-								if mathNested.Call != callInfo.Call && g.taRegistry.IsSupported(mathNested.FuncName) {
-									containsNestedTA = true
-									break
-								}
-							}
-						}
-
-						if isTAFunction || containsNestedTA {
-							g.tempVarMgr.GetOrCreate(callInfo)
-						}
-					}
-				}
-			}
-		}
 	}
 }
 

@@ -391,6 +391,8 @@ func TestBooleanTypeTracking(t *testing.T) {
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
+	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
+	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 
 	code, err := gen.generateProgram(program)
 	if err != nil {

@@ -132,8 +132,34 @@ func (m *TempVariableManager) GenerateDeclarations() string {
 	code := ""
 	code += indent + "// Temp variables for inline TA calls in expressions\n"
 
+	hasFixnan := false
 	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("var %sSeries *series.Series\n", varName)
+
+		/* Generate internal Series for composite indicators (RSI needs gains/losses Series) */
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("var %sSeries *series.Series\n", internalName)
+				}
+				if info.FuncName == "fixnan" {
+					hasFixnan = true
+				}
+			}
+		}
+	}
+
+	/* fixnan requires cross-bar state variable for forward-fill */
+	if hasFixnan {
+		code += indent + "// State variables for fixnan forward-fill (temp vars)\n"
+		for _, varName := range m.orderedVars {
+			info, exists := m.varToCallInfo[varName]
+			if exists && info.FuncName == "fixnan" {
+				code += indent + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", varName)
+			}
+		}
 	}
 
 	return code
@@ -160,6 +186,17 @@ func (m *TempVariableManager) GenerateInitializations() string {
 
 	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
+
+		/* Initialize internal Series for composite indicators */
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", internalName)
+				}
+			}
+		}
 	}
 
 	return code
