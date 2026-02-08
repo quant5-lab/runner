@@ -14,4 +14,4 @@
 | **13** | **Codegen** | Non-HA chart types return identity | VALID | Renko, Kagi, LineBreak, PointFig transformers return IdentityTransformer (stubs) | - |
 | **19** | **Parser** | Tuple destructuring assignment | VALID | Parse error: unexpected token "," at `[t08, s08] = security(...)` | test.pine |
 | **20** | **Codegen** | Inline function composition in plot() | VALID | Three failure modes: (A) `plot(nz(...))` fails with "unsupported inline function in plot"; (B) `plot(ta.sma() + ta.ema())` fails; (C) `ta.sma(close, input.int())` dynamic period fails | - |
-| **22** | **Codegen** | Unprefixed `pow` function | VALID | `pow(x, y)` fails with "unhandled call expression: pow". Only `math.pow` is registered | emperor-ma.pine |
+| **22** | **Codegen** | Unprefixed `pow` function | RESOLVED | All unprefixed math functions (pow, asin, abs, sqrt, etc.) compile via registry-based MathHandler. 45 integration tests pass. emperor-ma.pine now blocked by recursive UDF `getPoles`, not math | emperor-ma.pine |

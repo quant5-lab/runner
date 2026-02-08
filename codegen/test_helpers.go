@@ -32,6 +32,7 @@ func newTestGenerator() *generator {
 		callRouter:                 NewCallExpressionRouter(),
 		funcSigRegistry:            NewFunctionSignatureRegistry(),
 		arrowContextLifecycle:      NewArrowContextLifecycleManager(),
+		mathHandler:                NewMathHandler(),
 	}
 	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
 	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})

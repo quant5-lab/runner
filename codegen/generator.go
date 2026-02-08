@@ -2345,7 +2345,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, nzCode), nil
 
 	default:
-		if strings.HasPrefix(funcName, "math.") && g.mathHandler != nil {
+		if g.mathHandler != nil && g.mathHandler.CanHandle(funcName) {
 			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
 			if err != nil {
 				return "", err

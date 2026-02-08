@@ -58,7 +58,7 @@ func (g *generator) extractMathFunction(call *ast.CallExpression) string {
 		return ""
 	}
 	funcName := g.extractFunctionName(call.Callee)
-	if !g.isMathFunction(funcName) {
+	if !g.mathHandler.CanHandle(funcName) {
 		return ""
 	}
 	code, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
@@ -66,13 +66,6 @@ func (g *generator) extractMathFunction(call *ast.CallExpression) string {
 		return code
 	}
 	return ""
-}
-
-func (g *generator) isMathFunction(funcName string) bool {
-	return strings.HasPrefix(funcName, "math.") ||
-		funcName == "max" || funcName == "min" || funcName == "abs" ||
-		funcName == "sqrt" || funcName == "floor" || funcName == "ceil" ||
-		funcName == "round" || funcName == "log" || funcName == "exp"
 }
 
 func (g *generator) extractUserDefinedFunction(call *ast.CallExpression) string {

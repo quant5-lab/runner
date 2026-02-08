@@ -96,7 +96,7 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 		return h.HandleTAFunction(call, funcName)
 	}
 
-	if h.isMathFunction(funcName) {
+	if h.mathHandler.CanHandle(funcName) {
 		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
 	}
 
@@ -172,8 +172,4 @@ func (h *PlotExpressionHandler) extractPeriod(arg *ast.Literal) (int, error) {
 	default:
 		return 0, fmt.Errorf("period must be numeric")
 	}
-}
-
-func (h *PlotExpressionHandler) isMathFunction(funcName string) bool {
-	return funcName == "math.abs" || funcName == "math.max" || funcName == "math.min"
 }

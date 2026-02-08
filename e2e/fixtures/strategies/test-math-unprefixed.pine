@@ -1,0 +1,30 @@
+//@version=5
+indicator("Math Unprefixed Functions", overlay=false)
+
+// Variable assignments - unprefixed unary
+a = abs(close - open)
+b = sqrt(close)
+c = floor(close)
+d = ceil(close)
+e = round(close)
+f = log(close)
+g = log10(close)
+h = exp(close)
+i = sign(close)
+
+// Variable assignments - unprefixed binary
+j = pow(close, 2.0)
+k = max(high, low)
+l = min(high, low)
+
+// Variable assignments - unprefixed trig
+m = sin(close)
+n = cos(close)
+o = tan(close)
+p = asin(close)
+q = acos(close)
+r = atan(close)
+
+plot(a, "abs")
+plot(j, "pow")
+plot(k, "max")

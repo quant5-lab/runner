@@ -1,0 +1,12 @@
+//@version=5
+indicator("Math in Plot Expressions", overlay=false)
+
+plot(abs(close - open), "abs")
+plot(sqrt(close), "sqrt")
+plot(pow(close, 2.0), "pow")
+plot(max(high, low), "max")
+plot(min(high, low), "min")
+plot(log(close), "log")
+plot(floor(close), "floor")
+plot(ceil(close), "ceil")
+plot(sign(close), "sign")

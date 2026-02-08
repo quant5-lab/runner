@@ -16,18 +16,18 @@ import (
 //	max(change(close), 0) →
 //	Step 1: ta_changeSeries.Set(change(close))
 //	Step 2: maxSeries.Set(math.Max(ta_changeSeries.GetCurrent(), 0))
-type MathFunctionHandler struct{}
-
-func NewMathFunctionHandler() *MathFunctionHandler {
-	return &MathFunctionHandler{}
+type MathFunctionHandler struct {
+	mathHandler *MathHandler
 }
 
-// CanHandle checks if this is a math function that might need Series storage
+func NewMathFunctionHandler() *MathFunctionHandler {
+	return &MathFunctionHandler{
+		mathHandler: NewMathHandler(),
+	}
+}
+
 func (h *MathFunctionHandler) CanHandle(funcName string) bool {
-	return funcName == "max" || funcName == "min" ||
-		funcName == "abs" || funcName == "sqrt" ||
-		funcName == "floor" || funcName == "ceil" ||
-		funcName == "round" || funcName == "log" || funcName == "exp"
+	return h.mathHandler.CanHandle(funcName)
 }
 
 // GenerateCode generates Series.Set() code for math function
@@ -43,9 +43,7 @@ func (h *MathFunctionHandler) GenerateCode(g *generator, varName string, call *a
 		return "", fmt.Errorf("failed to generate math expression for %s: %w", funcName, err)
 	}
 
-	// Wrap in Series.Set() for bar-to-bar storage
-	code := g.ind() + fmt.Sprintf("/* Inline %s() with TA dependencies */\n", funcName)
-	code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathExpr)
+	code := g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathExpr)
 
 	return code, nil
 }

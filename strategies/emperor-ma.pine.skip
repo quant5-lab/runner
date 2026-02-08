@@ -1,6 +1,6 @@
-Codegen limitation: missing math functions asin, pow in arrow context (#16)
+Codegen limitation: recursive user-defined function getPoles not supported in arrow context
 
 Parse: ✅
-Generate: ❌ (unhandled call expression: asin)
+Generate: ❌ (unhandled call expression: getPoles)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

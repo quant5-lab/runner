@@ -248,8 +248,8 @@ func TestExtractDefaultSeries_NilCall(t *testing.T) {
 	}
 }
 
-func TestIsMathFunction_ValidMathFunctions(t *testing.T) {
-	g := newTestGenerator()
+func TestMathHandler_CanHandle_ValidMathFunctions(t *testing.T) {
+	mh := NewMathHandler()
 
 	tests := []struct {
 		name     string
@@ -259,9 +259,11 @@ func TestIsMathFunction_ValidMathFunctions(t *testing.T) {
 		{"math.max", "math.max", true},
 		{"math.min", "math.min", true},
 		{"math.abs", "math.abs", true},
+		{"math.pow", "math.pow", true},
 		{"max builtin", "max", true},
 		{"min builtin", "min", true},
 		{"abs builtin", "abs", true},
+		{"pow builtin", "pow", true},
 		{"sqrt builtin", "sqrt", true},
 		{"floor builtin", "floor", true},
 		{"ceil builtin", "ceil", true},
@@ -274,9 +276,9 @@ func TestIsMathFunction_ValidMathFunctions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := g.isMathFunction(tt.funcName)
+			result := mh.CanHandle(tt.funcName)
 			if result != tt.expected {
-				t.Errorf("isMathFunction(%q) = %v, want %v", tt.funcName, result, tt.expected)
+				t.Errorf("MathHandler.CanHandle(%q) = %v, want %v", tt.funcName, result, tt.expected)
 			}
 		})
 	}

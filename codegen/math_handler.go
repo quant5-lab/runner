@@ -7,98 +7,61 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-type MathHandler struct{}
+type MathHandler struct {
+	registry *MathFunctionRegistry
+}
 
 func NewMathHandler() *MathHandler {
-	return &MathHandler{}
+	return &MathHandler{
+		registry: NewMathFunctionRegistry(),
+	}
 }
 
 func (mh *MathHandler) normalizeToGoMathFunc(pineFuncName string) string {
-	if strings.HasPrefix(pineFuncName, "math.") {
-		shortName := pineFuncName[5:]
+	normalized := strings.ToLower(pineFuncName)
+	if strings.HasPrefix(normalized, "math.") {
+		shortName := normalized[5:]
 		return "math." + strings.ToUpper(shortName[:1]) + shortName[1:]
 	}
-	return "math." + strings.ToUpper(pineFuncName[:1]) + pineFuncName[1:]
+	return "math." + strings.ToUpper(normalized[:1]) + normalized[1:]
 }
 
-/* CanHandle checks if this is an inline math function */
 func (mh *MathHandler) CanHandle(funcName string) bool {
-	funcName = strings.ToLower(funcName)
-	switch funcName {
-	case "math.pow",
-		"math.abs", "abs",
-		"math.sqrt", "sqrt",
-		"math.floor", "floor",
-		"math.ceil", "ceil",
-		"math.round", "round",
-		"math.log", "log",
-		"math.log10", "log10",
-		"math.exp", "exp",
-		"math.max", "max",
-		"math.min", "min",
-		"math.sin", "sin",
-		"math.cos", "cos",
-		"math.tan", "tan",
-		"math.asin", "asin",
-		"math.acos", "acos",
-		"math.atan", "atan",
-		"math.sign", "sign",
-		"math.todegrees", "todegrees",
-		"math.toradians", "toradians",
-		"math.avg", "avg",
-		"math.random", "random",
-		"math.round_to_mintick", "round_to_mintick":
-		return true
-	default:
-		return false
-	}
+	_, ok := mh.registry.Lookup(funcName)
+	return ok
 }
 
-/* GenerateInline implements InlineConditionHandler interface */
 func (mh *MathHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
 	funcName := g.extractFunctionName(expr.Callee)
 	return mh.GenerateMathCall(funcName, expr.Arguments, g)
 }
 
 func (mh *MathHandler) GenerateMathCall(funcName string, args []ast.Expression, g *generator) (string, error) {
-	funcName = strings.ToLower(funcName)
-
-	switch funcName {
-	case "math.pow":
-		return mh.generatePow(args, g)
-	case "math.abs", "abs", "math.sqrt", "sqrt", "math.floor", "floor", "math.ceil", "ceil",
-		"math.round", "round", "math.log", "log", "math.log10", "log10", "math.exp", "exp",
-		"math.sin", "sin", "math.cos", "cos", "math.tan", "tan",
-		"math.asin", "asin", "math.acos", "acos", "math.atan", "atan":
-		return mh.generateUnaryMath(funcName, args, g)
-	case "math.max", "max", "math.min", "min":
-		return mh.generateBinaryMath(funcName, args, g)
-	case "math.sign", "sign":
-		return mh.generateSign(args, g)
-	case "math.todegrees", "todegrees":
-		return mh.generateToDegrees(args, g)
-	case "math.toradians", "toradians":
-		return mh.generateToRadians(args, g)
-	case "math.avg", "avg":
-		return mh.generateAvg(args, g)
-	case "math.random", "random":
-		return mh.generateRandom(args, g)
-	case "math.round_to_mintick", "round_to_mintick":
-		return mh.generateRoundToMintick(args, g)
-	default:
+	spec, ok := mh.registry.Lookup(funcName)
+	if !ok {
 		return "", fmt.Errorf("unsupported math function: %s", funcName)
 	}
-}
 
-func (mh *MathHandler) generatePow(args []ast.Expression, g *generator) (string, error) {
-	if len(args) != 2 {
-		return "", fmt.Errorf("math.pow requires exactly 2 arguments")
+	switch spec.GeneratorMethod {
+	case "unary":
+		return mh.generateUnaryMath(funcName, args, g)
+	case "binary":
+		return mh.generateBinaryMath(funcName, args, g)
+	case "sign":
+		return mh.generateSign(args, g)
+	case "todegrees":
+		return mh.generateToDegrees(args, g)
+	case "toradians":
+		return mh.generateToRadians(args, g)
+	case "avg":
+		return mh.generateAvg(args, g)
+	case "random":
+		return mh.generateRandom(args, g)
+	case "round_to_mintick":
+		return mh.generateRoundToMintick(args, g)
+	default:
+		return "", fmt.Errorf("no generation strategy for %s", funcName)
 	}
-
-	base := g.extractSeriesExpression(args[0])
-	exponent := g.extractSeriesExpression(args[1])
-
-	return fmt.Sprintf("math.Pow(%s, %s)", base, exponent), nil
 }
 
 func (mh *MathHandler) generateUnaryMath(funcName string, args []ast.Expression, g *generator) (string, error) {
@@ -129,7 +92,6 @@ func (mh *MathHandler) generateSign(args []ast.Expression, g *generator) (string
 		return "", fmt.Errorf("sign requires exactly 1 argument")
 	}
 	arg := g.extractSeriesExpression(args[0])
-	/* Sign returns -1, 0, or 1 */
 	return fmt.Sprintf("func() float64 { v := %s; if v > 0 { return 1 } else if v < 0 { return -1 } else { return 0 } }()", arg), nil
 }
 
@@ -166,15 +128,12 @@ func (mh *MathHandler) generateRandom(args []ast.Expression, g *generator) (stri
 	case 0:
 		return "rand.Float64()", nil
 	case 1:
-		/* random(seed) - use seed but return [0,1) */
 		return "rand.Float64()", nil
 	case 2:
-		/* random(min, max) */
 		minArg := g.extractSeriesExpression(args[0])
 		maxArg := g.extractSeriesExpression(args[1])
 		return fmt.Sprintf("(%s + rand.Float64()*(%s - %s))", minArg, maxArg, minArg), nil
 	case 3:
-		/* random(min, max, seed) */
 		minArg := g.extractSeriesExpression(args[0])
 		maxArg := g.extractSeriesExpression(args[1])
 		return fmt.Sprintf("(%s + rand.Float64()*(%s - %s))", minArg, maxArg, minArg), nil
@@ -188,6 +147,5 @@ func (mh *MathHandler) generateRoundToMintick(args []ast.Expression, g *generato
 		return "", fmt.Errorf("round_to_mintick requires exactly 1 argument")
 	}
 	arg := g.extractSeriesExpression(args[0])
-	/* Round to mintick precision using ctx.Mintick */
 	return fmt.Sprintf("math.Round(%s/ctx.Mintick)*ctx.Mintick", arg), nil
 }
