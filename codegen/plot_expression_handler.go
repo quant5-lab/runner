@@ -86,6 +86,11 @@ func (h *PlotExpressionHandler) handleConditional(expr *ast.ConditionalExpressio
 }
 
 func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (string, error) {
+	/* Check if call was hoisted by InlineExpressionScanner */
+	if hoistedVarName := h.generator.tempVarMgr.GetVarNameForCall(call); hoistedVarName != "" {
+		return fmt.Sprintf("%sSeries.Get(0)", hoistedVarName), nil
+	}
+
 	funcName := h.generator.extractFunctionName(call.Callee)
 
 	if funcName == "ta.atr" || funcName == "atr" {
@@ -98,6 +103,11 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 
 	if h.mathHandler.CanHandle(funcName) {
 		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
+	}
+
+	/* Check ValueHandler for nz, fixnan, etc. */
+	if h.generator.valueHandler.CanHandle(funcName) {
+		return h.generator.valueHandler.GenerateInlineCall(funcName, call.Arguments, h.generator)
 	}
 
 	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {

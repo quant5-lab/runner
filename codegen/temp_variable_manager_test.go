@@ -84,8 +84,8 @@ func TestTempVariableManager_Deduplication(t *testing.T) {
 	}
 
 	// Should only be declared once
-	if len(mgr.declaredVars) != 1 {
-		t.Errorf("Expected 1 declared var, got %d", len(mgr.declaredVars))
+	if len(mgr.orderedVars) != 1 {
+		t.Errorf("Expected 1 declared var, got %d", len(mgr.orderedVars))
 	}
 }
 
@@ -131,8 +131,8 @@ func TestTempVariableManager_DifferentCalls(t *testing.T) {
 	}
 
 	// Should have 2 declared vars
-	if len(mgr.declaredVars) != 2 {
-		t.Errorf("Expected 2 declared vars, got %d", len(mgr.declaredVars))
+	if len(mgr.orderedVars) != 2 {
+		t.Errorf("Expected 2 declared vars, got %d", len(mgr.orderedVars))
 	}
 }
 
@@ -322,15 +322,15 @@ func TestTempVariableManager_Reset(t *testing.T) {
 	info := CallInfo{Call: call, FuncName: "ta.sma", ArgHash: "reset123"}
 	mgr.GetOrCreate(info)
 
-	if len(mgr.declaredVars) == 0 {
+	if len(mgr.orderedVars) == 0 {
 		t.Fatal("Expected declared vars before reset")
 	}
 
 	// Reset
 	mgr.Reset()
 
-	if len(mgr.declaredVars) != 0 {
-		t.Errorf("Expected 0 declared vars after reset, got %d", len(mgr.declaredVars))
+	if len(mgr.orderedVars) != 0 {
+		t.Errorf("Expected 0 declared vars after reset, got %d", len(mgr.orderedVars))
 	}
 	if len(mgr.callToVar) != 0 {
 		t.Errorf("Expected 0 call mappings after reset, got %d", len(mgr.callToVar))

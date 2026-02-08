@@ -17,7 +17,7 @@ func TestValueHandlerCanHandle(t *testing.T) {
 	}{
 		{"na function", "na", true},
 		{"nz function", "nz", true},
-		{"fixnan function", "fixnan", true},
+		{"fixnan function", "fixnan", false}, /* fixnan requires cross-bar state → always hoisted, not inlined */
 		{"ta.sma function", "sma", false},
 		{"close builtin", "close", false},
 		{"math.abs function", "math.abs", false},

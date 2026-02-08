@@ -24,10 +24,14 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	var period int
 
 	if condExpr, ok := sourceArg.(*ast.ConditionalExpression); ok {
+		/* Use content-based hash for stable temp var naming across runs */
+		hasher := &ExpressionHasher{}
+		argHash := hasher.Hash(condExpr)
+
 		tempVarName := g.tempVarMgr.GetOrCreate(CallInfo{
 			FuncName: "ternary",
 			Call:     call,
-			ArgHash:  fmt.Sprintf("%p", condExpr),
+			ArgHash:  argHash,
 		})
 
 		condCode, err := g.generateConditionExpression(condExpr.Test)
