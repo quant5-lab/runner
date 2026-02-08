@@ -1,0 +1,35 @@
+//@version=5
+strategy("Value Functions Arrow Args", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+safeSpread(a, b) =>
+    denominator = nz(b, 1.0)
+    na(b) ? 0.0 : a / denominator
+
+clampedDiff(a, b, bound) =>
+    diff = nz(a, 0.0) - nz(b, 0.0)
+    diff > bound ? bound : diff
+
+prev = close[1]
+spread = safeSpread(close, prev)
+diff = clampedDiff(close, prev, 10.0)
+
+fastMA = ta.ema(close, 8)
+slowMA = ta.ema(close, 21)
+
+longCondition = spread > 1.0 and diff > 0 and fastMA > slowMA
+shortCondition = spread < 1.0 and diff < 0 and fastMA < slowMA
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0 and fastMA < slowMA
+    strategy.close("Long")
+
+if strategy.position_size < 0 and fastMA > slowMA
+    strategy.close("Short")
+
+plot(spread, "Spread")
+plot(diff, "Diff")

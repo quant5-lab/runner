@@ -1,43 +1,16 @@
-Codegen limitation: Value functions as UDF arguments in arrow body — dual dispatch gap (#23)
+Codegen limitation: TA functions without IIFE generators fail in arrow bodies (#24)
 
 Parse: ✅
-Generate: ❌ (getPoles(nz(Price), Poles, alfa) → "unhandled call expression: getPoles")
+Generate: ❌ (variant_trima → "TA function sum requires IIFE generator implementation")
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
---- BLOCKER #23 DETAILS ---
+Missing from InlineTAIIFERegistry: sum, valuewhen, atr, swma, supertrend, and any ta.* not registered.
+Registered: sma, ema, rma, wma, stdev, highest, lowest, change, linreg, rsi, pivothigh, pivotlow.
+crossover/crossunder handled separately by inline_cross_handler.
 
-Scope:
-  nz(), na(), unprefixed crossover(), unprefixed crossunder(),
-  and any expression containing them (e.g. nz(x)+1) fail when
-  passed as UDF arguments in arrow bodies.
-  fixnan() is NOT affected (explicitly handled in ArrowFunctionTACallGenerator).
-  Math-wrapped value functions like abs(nz(x)) are NOT affected
-  (math handler uses extractSeriesExpression chain).
+--- BLOCKER #23 RESOLVED ---
 
-Root cause — TWO bugs:
-  1. TAIndicatorCallHandler.GenerateCode doesn't guard arrow branch
-     with CanHandle() — hijacks ALL calls in arrow context, sends
-     non-TA functions to ArrowFunctionTACallGenerator which errors.
-  2. ArrowExpressionGeneratorImpl.generateCallExpression lines 107-111
-     silently discards RouteCall errors, masking the real error as
-     "unhandled call expression".
-
-Dispatch gap:
-  ArgumentExpressionGenerator.Generate(CallExpr) delegates to
-  generator.generateCallExpression → callRouter.RouteCall, which has
-  NO handler for value functions (nz/na). The parallel chain
-  extractCallExpression → extractValueFunction DOES handle them via
-  ValueHandler, but ArgumentExpressionGenerator doesn't use that chain.
-
-Verified bisection:
-  nz(pre)              ❌
-  na(pre)              ❌
-  nz(pre, 0)           ❌
-  nz(pre) + 1          ❌
-  crossover(pre,0)?1:0 ❌
-  fixnan(pre)          ✅
-  abs(pre)             ✅
-  sqrt(pre)            ✅
-  sma(pre, 14)         ✅
-  abs(nz(pre))         ✅
+ValueCallHandler routes nz/na through ValueHandler before TAIndicatorCallHandler
+in the callRouter chain. getPoles(nz(Price), Poles, alfa) now compiles.
+Error propagation fix in ArrowExpressionGeneratorImpl prevents silent error masking.
