@@ -9,7 +9,7 @@
 | **7** | Methods (`method`) | No grammar, AST, or codegen for Pine v5 `method` declarations | 0 hits |
 | **8** | Library `import`/`export` | No grammar, AST, or codegen for Pine library system | 0 hits |
 | **9** | Arrow function delegation bypasses `ArrowSeriesAccessResolver` | Non-TA calls delegate to `callRouter.RouteCall` → `extractSeriesExpression()` → unconditional `%sSeries.GetCurrent()`. Resolver correct but bypassed via 50+ call sites. | `arrow_expression_generator_impl.go:125` → `generator.go:2843` |
-| **10** | Dual identifier resolution paths | `generateConditionExpression` omits hl2/hlc3/ohlc4/hlcc4. `extractSeriesExpression` handles them via `TryResolveIdentifier`. Two inconsistent paths. | `generator.go:1414` vs `builtin_identifier_registry.go` |
+| **10** | ~~Dual identifier resolution paths~~ | ~~`generateConditionExpression` omits hl2/hlc3/ohlc4/hlcc4. `extractSeriesExpression` handles them via `TryResolveIdentifier`. Two inconsistent paths.~~ | FIXED: `generator.go:1404` delegates to `TryResolveIdentifier` |
 | **11** | `security()` unavailable in arrow functions | Main-body-only construct, not in `sharedTASignatures`, not reachable from arrow call routing | 0 hits in `shared_ta_signatures.go` |
 | **12** | ~~Input type inference fails for named-arg-only calls~~ | ~~`inferInputTypeFromLiteral` checks `Arguments[0]` as Literal/Identifier only. Named-arg calls have ObjectExpression → fails.~~ | FIXED: `input_type_resolver.go` |
 | **13** | String functions (`str.*`) | Zero handlers. `str.tostring()`, `str.tonumber()`, `str.format()`, etc. not implemented | 0 hits in codegen |

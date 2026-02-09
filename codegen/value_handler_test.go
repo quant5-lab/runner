@@ -38,8 +38,9 @@ func TestValueHandlerCanHandle(t *testing.T) {
 func TestValueHandlerGenerateNa(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {
@@ -102,8 +103,9 @@ func TestValueHandlerGenerateNa(t *testing.T) {
 func TestValueHandlerGenerateNz(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {
@@ -195,8 +197,9 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 func TestValueHandlerGenerateInlineCall(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {

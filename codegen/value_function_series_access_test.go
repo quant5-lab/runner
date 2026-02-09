@@ -10,12 +10,13 @@ import (
 /* Validates inline value functions (nz, na, fixnan) in extractSeriesExpression */
 func TestValueFunctionsInSeriesExpressions(t *testing.T) {
 	gen := &generator{
-		variables:    make(map[string]string),
-		varInits:     make(map[string]ast.Expression),
-		constants:    make(map[string]interface{}),
-		valueHandler: NewValueHandler(),
-		tempVarMgr:   NewTempVariableManager(&generator{}),
-		mathHandler:  NewMathHandler(),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		constants:      make(map[string]interface{}),
+		valueHandler:   NewValueHandler(),
+		tempVarMgr:     NewTempVariableManager(&generator{}),
+		mathHandler:    NewMathHandler(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 	gen.tempVarMgr = NewTempVariableManager(gen)
 

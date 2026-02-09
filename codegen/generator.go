@@ -1404,27 +1404,11 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Identifier:
-		// Special built-in identifiers
-		if e.Name == "na" {
-			return "math.NaN()", nil
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+			return code, nil
 		}
-		varName := e.Name
 
-		// Check if it's a Pine built-in series variable
-		switch varName {
-		case "close":
-			return "bar.Close", nil
-		case "open":
-			return "bar.Open", nil
-		case "high":
-			return "bar.High", nil
-		case "low":
-			return "bar.Low", nil
-		case "volume":
-			return "bar.Volume", nil
-		case "bar_index":
-			return "float64(i)", nil
-		}
+		varName := e.Name
 
 		if constVal, isConstant := g.constants[varName]; isConstant {
 			if constVal == "input.source" {

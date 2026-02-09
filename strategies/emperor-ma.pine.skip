@@ -19,6 +19,7 @@ Execute: ❌ Not reached
 
 Note: input() bool type inference is FIXED (#12) — onOff1-onOff9 now emit as const bool
 Note: input() string type inference is FIXED (#12) — type_ now emits as const string
+Note: hl2/hlc3/ohlc4/hlcc4 in condition expressions is FIXED (#10) — TryResolveIdentifier delegation
 
 Arrow functions with complex local variables and parameters fail to emit
 series declarations and parameter-to-series promotion for nested scopes.
