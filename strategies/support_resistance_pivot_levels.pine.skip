@@ -1,7 +1,7 @@
-Remaining blockers: input.color (#11), drawing objects line.*/label.* (#8)
+Remaining blockers: switch with string cases, input.color (#11), drawing objects line.*/label.* (#8)
 
-Parse: ✅ (switch expression #5 FIXED — lowered to nested IfStatement)
-Generate: ❌ Blocked by #8 (line.*/label.*)
+Parse: ❌ (switch with string literal cases: line 30:17 unexpected token "'1'" — lexer splits '1m' incorrectly)
+Generate: ❌ Not reached (also blocked by #8 line.*/label.*)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 

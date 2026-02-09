@@ -1,8 +1,19 @@
-Codegen limitation: arrow function variable/parameter scoping incomplete
+32 undefined symbols across 3 categories:
 
 Parse: ✅
-Generate: ✅ (linreg 3-arg now supported)
-Compile: ❌ (undefined: len_Series, src, n, PolesSeries, nSeries, rSeries, alfaSeries)
+Generate: ✅
+Compile: ❌ (32 undefined symbols)
+
+Arrow function identifier resolver bugs (root cause: no scalar/series distinction):
+  - Scalar params emitted as series: len_Series, LagSeries, PolesSeries, alfaSeries, p1Series, perSeries, priceSeries, lengthSeries
+  - Source params back-referenced as bare name: src, pr (should be srcSeries.GetCurrent(), prSeries.GetCurrent())
+  - For-loop iterators as series: iSeries, rSeries (should be bare i, r)
+  - Built-in `n` (bar_index v3) not mapped in arrow bodies
+
+Main body codegen gaps:
+  - input() string options not implemented: type_ never set, 14 MA constants emitted as Go identifiers instead of strings
+  - input() bool default not implemented: onOff1-onOff9 never set
+  - Built-in composite series hl2, hlc3, ohlc4 not created
 Execute: ❌ Not reached
 
 Arrow functions with complex local variables and parameters fail to emit
