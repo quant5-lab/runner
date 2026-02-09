@@ -25,6 +25,7 @@ type StatementCore struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
 	If              *IfStatement     `parser:"| @@"`
 	For             *ForStatement    `parser:"| @@"`
+	Switch          *SwitchExpr      `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
 	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
@@ -101,9 +102,24 @@ type IfExpr struct {
 	Dedent    *string      `parser:"@Dedent"`
 }
 
+type SwitchExpr struct {
+	Subject *OrExpr       `parser:"'switch' @@?"`
+	Indent  *string       `parser:"@Indent"`
+	Cases   []*SwitchCase `parser:"@@*"`
+	Dedent  *string       `parser:"@Dedent"`
+}
+
+type SwitchCase struct {
+	Condition *OrExpr      `parser:"@@? '=>'"`
+	Indent    *string      `parser:"@Indent"`
+	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent"`
+}
+
 type Expression struct {
 	ForExpr      *ForExpr      `parser:"@@"`
 	IfExpr       *IfExpr       `parser:"| @@"`
+	SwitchExpr   *SwitchExpr   `parser:"| @@"`
 	Ternary      *TernaryExpr  `parser:"| @@"`
 	Array        *ArrayLiteral `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
@@ -234,7 +250,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
 	{Name: "Newline", Pattern: `\r?\n`},
 	{Name: "Whitespace", Pattern: `[ \t]+`},
-	{Name: "Keyword", Pattern: `\b(if|for|to|by|while|and|or|not|true|false)\b`},
+	{Name: "Keyword", Pattern: `\b(if|for|to|by|while|switch|and|or|not|true|false)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
 	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},

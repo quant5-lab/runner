@@ -7,6 +7,9 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+/* PineScript na: returned when no branch executes in expression context */
+const pineNaExpression = "math.NaN()"
+
 type ControlFlowExpressionGenerator struct {
 	baseGenerator *generator
 }
@@ -102,64 +105,8 @@ func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsIIFE(ifStmt *ast.
 	builder.WriteString("(func() float64 {\n")
 	c.baseGenerator.indent++
 
-	condCode, err := c.baseGenerator.generateConditionExpression(ifStmt.Test)
-	if err != nil {
-		return "", fmt.Errorf("generating if-expression condition: %w", err)
-	}
-
-	builder.WriteString(c.baseGenerator.ind())
-	builder.WriteString(fmt.Sprintf("if %s {\n", condCode))
-
-	c.baseGenerator.indent++
-
-	lastExprCode, err := c.extractLastExpressionFromBlock(ifStmt.Consequent)
-	if err != nil {
-		return "", fmt.Errorf("extracting if-expression consequent value: %w", err)
-	}
-
-	for _, node := range ifStmt.Consequent {
-		code, err := c.baseGenerator.generateStatement(node)
-		if err != nil {
-			return "", fmt.Errorf("generating if-expression consequent node: %w", err)
-		}
-		builder.WriteString(code)
-	}
-
-	builder.WriteString(c.baseGenerator.ind())
-	builder.WriteString(fmt.Sprintf("return %s\n", lastExprCode))
-
-	c.baseGenerator.indent--
-	builder.WriteString(c.baseGenerator.ind())
-	builder.WriteString("}\n")
-
-	if len(ifStmt.Alternate) > 0 {
-		builder.WriteString(c.baseGenerator.ind())
-		builder.WriteString("else {\n")
-
-		c.baseGenerator.indent++
-
-		altLastExprCode, err := c.extractLastExpressionFromBlock(ifStmt.Alternate)
-		if err != nil {
-			return "", fmt.Errorf("extracting if-expression alternate value: %w", err)
-		}
-
-		for _, node := range ifStmt.Alternate {
-			code, err := c.baseGenerator.generateStatement(node)
-			if err != nil {
-				return "", fmt.Errorf("generating if-expression alternate node: %w", err)
-			}
-			builder.WriteString(code)
-		}
-
-		builder.WriteString(c.baseGenerator.ind())
-		builder.WriteString(fmt.Sprintf("return %s\n", altLastExprCode))
-
-		c.baseGenerator.indent--
-		builder.WriteString(c.baseGenerator.ind())
-		builder.WriteString("}\n")
-	} else {
-		builder.WriteString(c.baseGenerator.ind())
-		builder.WriteString("return 0.0\n")
+	if err := c.generateIfBranchWithReturn(&builder, ifStmt, c.baseGenerator.ind()); err != nil {
+		return "", err
 	}
 
 	c.baseGenerator.indent--
@@ -169,9 +116,87 @@ func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsIIFE(ifStmt *ast.
 	return builder.String(), nil
 }
 
+func (c *ControlFlowExpressionGenerator) generateIfBranchWithReturn(builder *strings.Builder, ifStmt *ast.IfStatement, prefix string) error {
+	condCode, err := c.baseGenerator.generateConditionExpression(ifStmt.Test)
+	if err != nil {
+		return fmt.Errorf("generating if-expression condition: %w", err)
+	}
+
+	builder.WriteString(prefix)
+	builder.WriteString(fmt.Sprintf("if %s {\n", condCode))
+	c.baseGenerator.indent++
+
+	if err := c.generateBodyWithReturn(builder, ifStmt.Consequent); err != nil {
+		return err
+	}
+
+	c.baseGenerator.indent--
+
+	return c.generateIIFEAlternate(builder, ifStmt.Alternate)
+}
+
+func (c *ControlFlowExpressionGenerator) generateIIFEAlternate(builder *strings.Builder, alternate []ast.Node) error {
+	if len(alternate) == 0 {
+		builder.WriteString(c.baseGenerator.ind())
+		builder.WriteString("}\n")
+		builder.WriteString(c.baseGenerator.ind())
+		builder.WriteString("return " + pineNaExpression + "\n")
+		return nil
+	}
+
+	if nestedIf, isChain := extractElseIfChain(alternate); isChain {
+		prefix := c.baseGenerator.ind() + "} else "
+		return c.generateIfBranchWithReturn(builder, nestedIf, prefix)
+	}
+
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString("} else {\n")
+	c.baseGenerator.indent++
+
+	if err := c.generateBodyWithReturn(builder, alternate); err != nil {
+		return err
+	}
+
+	c.baseGenerator.indent--
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString("}\n")
+	return nil
+}
+
+func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings.Builder, body []ast.Node) error {
+	/* IIFE bodies need arrow-function-style expression handling (e.g. binary expressions as values) */
+	wasInArrow := c.baseGenerator.inArrowFunctionBody
+	c.baseGenerator.inArrowFunctionBody = true
+	defer func() { c.baseGenerator.inArrowFunctionBody = wasInArrow }()
+
+	/* Emit all body nodes except the last ExpressionStatement which becomes the return value */
+	lastIdx := len(body) - 1
+	for i, node := range body {
+		if i == lastIdx {
+			if _, isExpr := node.(*ast.ExpressionStatement); isExpr {
+				break
+			}
+		}
+		code, err := c.baseGenerator.generateStatement(node)
+		if err != nil {
+			return fmt.Errorf("generating expression body node: %w", err)
+		}
+		builder.WriteString(code)
+	}
+
+	lastExprCode, err := c.extractLastExpressionFromBlock(body)
+	if err != nil {
+		return fmt.Errorf("extracting return value: %w", err)
+	}
+
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString(fmt.Sprintf("return %s\n", lastExprCode))
+	return nil
+}
+
 func (c *ControlFlowExpressionGenerator) extractLastExpressionFromBlock(body []ast.Node) (string, error) {
 	if len(body) == 0 {
-		return "0.0", nil
+		return pineNaExpression, nil
 	}
 
 	lastNode := body[len(body)-1]
@@ -188,5 +213,5 @@ func (c *ControlFlowExpressionGenerator) extractLastExpressionFromBlock(body []a
 		}
 	}
 
-	return "0.0", nil
+	return pineNaExpression, nil
 }

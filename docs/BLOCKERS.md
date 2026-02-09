@@ -4,7 +4,7 @@
 | **2** | **Parser** | `while` loops | VALID | Not implemented in grammar/codegen | - |
 | **3** | **Parser** | `varip` declarations | VALID | Not implemented. No matches in codegen/*.go | - |
 | **4** | **Parser** | `map.new<K,V>()` generics | VALID | Parse error: "unexpected token ," on generic syntax | - |
-| **5** | **Parser** | `switch` expression | VALID | Parse error: "unexpected token =>" at line 31 | pivot-reversal.pine |
+| **5** | **Parser** | `switch` expression | FIXED | Lowered to nested IfStatement chain in converter. Form 1 (with subject) and Form 2 (no subject) supported. 17 tests (6 parser + 5 alternate + 6 codegen). | pivot-reversal.pine |
 | **7** | **Codegen** | Array/map functions | VALID | `array.new_float()`, `array.push()`, `array.get()`, `map.*` not implemented | pivot-reversal.pine |
 | **8** | **Codegen** | Drawing objects (`line.*`, `label.*`) | VALID | Not implemented | pivot-reversal.pine |
 | **9** | **Codegen** | `alert()` function | VALID | Not implemented | - |

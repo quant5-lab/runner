@@ -234,3 +234,87 @@ func TestControlFlowExpression_BodyComplexity(t *testing.T) {
 		})
 	}
 }
+
+/* If-expression na semantics: missing else returns math.NaN() per PineScript spec */
+func TestControlFlowExpression_IfAlternateBehavior(t *testing.T) {
+	tests := []struct {
+		name         string
+		source       string
+		mustHaveNaN  bool
+		mustHaveElse bool
+	}{
+		{
+			name: "no else returns na",
+			source: `x = if condition
+    10`,
+			mustHaveNaN:  true,
+			mustHaveElse: false,
+		},
+		{
+			name: "with else returns value",
+			source: `x = if condition
+    10
+else
+    20`,
+			mustHaveNaN:  false,
+			mustHaveElse: true,
+		},
+		{
+			name: "else-if chain with final else",
+			source: `x = if a
+    1
+else if b
+    2
+else
+    3`,
+			mustHaveNaN:  false,
+			mustHaveElse: true,
+		},
+		{
+			name: "else-if chain without final else returns na",
+			source: `x = if a
+    1
+else if b
+    2`,
+			mustHaveNaN:  true,
+			mustHaveElse: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := parser.NewParser()
+			if err != nil {
+				t.Fatalf("Parser creation failed: %v", err)
+			}
+
+			script, err := p.ParseString("", tt.source)
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+
+			converter := parser.NewConverter()
+			program, err := converter.ToESTree(script)
+			if err != nil {
+				t.Fatalf("Conversion failed: %v", err)
+			}
+
+			gen := newTestGenerator()
+			code, err := gen.generateProgram(program)
+			if err != nil {
+				t.Fatalf("Generate failed: %v", err)
+			}
+
+			verifier := NewCodeVerifier(code, t)
+			verifier.MustContain("func() float64")
+
+			if tt.mustHaveNaN {
+				verifier.MustContain("return math.NaN()")
+			}
+
+			if tt.mustHaveElse {
+				verifier.MustContain("else")
+			}
+		})
+	}
+}

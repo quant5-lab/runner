@@ -153,5 +153,5 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 }
 
 func (l *IndentationLexer) isControlFlowKeyword(value string) bool {
-	return value == "=>" || value == "if" || value == "for" || value == "while"
+	return value == "=>" || value == "if" || value == "for" || value == "while" || value == "switch"
 }

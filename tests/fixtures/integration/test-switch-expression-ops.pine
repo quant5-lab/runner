@@ -1,0 +1,11 @@
+//@version=5
+indicator("Switch Expr Ops", overlay=false)
+a = 5.0
+b = 10.0
+val = 2
+result = switch val
+    1 =>
+        a + b
+    2 =>
+        a * b
+plot(result, "Result")

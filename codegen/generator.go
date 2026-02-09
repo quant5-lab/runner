@@ -986,54 +986,29 @@ func (g *generator) generateCallExpression(call *ast.CallExpression) (string, er
 }
 
 func (g *generator) generateIfStatement(ifStmt *ast.IfStatement) (string, error) {
-	// Generate condition expression
 	condition, err := g.generateConditionExpression(ifStmt.Test)
 	if err != nil {
 		return "", err
 	}
 
-	// If the condition accesses a bool Series variable, add != 0 conversion
 	condition = g.addBoolConversionIfNeeded(ifStmt.Test, condition)
 
 	code := g.ind() + fmt.Sprintf("if %s {\n", condition)
 	g.indent++
 
-	// Generate consequent (body) statements
-	hasValidBody := false
-	for _, stmt := range ifStmt.Consequent {
-		// Parser limitation: indented blocks sometimes parsed incorrectly
-		// Skip expression-only statements in if body (likely parsing artifacts)
-		if exprStmt, ok := stmt.(*ast.ExpressionStatement); ok {
-			// Check if expression is non-call (BinaryExpression, LogicalExpression, etc.)
-			switch exprStmt.Expression.(type) {
-			case *ast.CallExpression:
-				// Valid call statement - generate
-			case *ast.Identifier, *ast.Literal:
-				// Simple expression - skip (parsing artifact)
-				continue
-			case *ast.BinaryExpression, *ast.LogicalExpression, *ast.ConditionalExpression:
-				// Condition expression in body - skip (parsing artifact)
-				continue
-			}
-		}
-
-		stmtCode, err := g.generateStatement(stmt)
-		if err != nil {
-			return "", err
-		}
-		if stmtCode != "" {
-			code += stmtCode
-			hasValidBody = true
-		}
+	bodyCode, err := g.generateIfBody(ifStmt.Consequent)
+	if err != nil {
+		return "", err
 	}
-
-	// If no valid body statements, add comment
-	if !hasValidBody {
-		code += g.ind() + "// TODO: if body statements\n"
-	}
+	code += bodyCode
 
 	g.indent--
-	code += g.ind() + "}\n"
+
+	alternateCode, err := g.generateIfAlternate(ifStmt.Alternate)
+	if err != nil {
+		return "", err
+	}
+	code += alternateCode
 
 	return code, nil
 }
@@ -2110,6 +2085,20 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			return "", err
 		}
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return 1.0 } else { return 0.0 } }())\n", varName, logicalCode), nil
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		iifeCode, err := cfGenerator.GenerateIfExpressionAsIIFE(expr)
+		if err != nil {
+			return "", err
+		}
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		iifeCode, err := cfGenerator.GenerateForExpressionAsIIFE(expr)
+		if err != nil {
+			return "", err
+		}
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
 	default:
 		return "", fmt.Errorf("unsupported init expression: %T", initExpr)
 	}

@@ -1,8 +1,9 @@
-Parser limitation: switch expression (#5), input.color (#11), drawing objects line.*/label.* (#8)
+Remaining blockers: input.color (#11), drawing objects line.*/label.* (#8)
 
-Parse: ❌ (switch expression at line 30)
-Generate: ❌ Not reached
+Parse: ✅ (switch expression #5 FIXED — lowered to nested IfStatement)
+Generate: ❌ Blocked by #8 (line.*/label.*)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
 Note: Tuple destructuring with security() (#19) is FIXED
+Note: Switch expression (#5) is FIXED

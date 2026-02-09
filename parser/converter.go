@@ -75,6 +75,9 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 	if expr.IfExpr != nil {
 		return c.convertIfExprToStatement(expr.IfExpr)
 	}
+	if expr.SwitchExpr != nil {
+		return c.convertSwitchExprToStatement(expr.SwitchExpr)
+	}
 	if expr.Array != nil {
 		elements := []ast.Expression{}
 		for _, elem := range expr.Array.Elements {
@@ -757,6 +760,11 @@ func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, er
 		Test:       test,
 		Consequent: body,
 	}, nil
+}
+
+func (c *Converter) convertSwitchExprToStatement(switchExpr *SwitchExpr) (ast.Expression, error) {
+	lowering := NewSwitchLowering(c.convertOrExpr, c.convertStatement)
+	return lowering.Lower(switchExpr)
 }
 
 func (c *Converter) ToJSON(program *ast.Program) ([]byte, error) {
