@@ -418,16 +418,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
 					funcName := g.extractFunctionName(callExpr.Callee)
 
-					/* Generate input constants immediately (if handler exists) */
 					if g.inputHandler != nil {
-						/* Handle Pine v4 generic input() - infer type from arguments */
 						if funcName == "input" && len(callExpr.Arguments) > 0 {
-							/* Check for type=input.* ObjectExpression (v4 syntax) */
-							if detectedType := detectV4InputType(callExpr); detectedType != "" {
-								funcName = detectedType
-							} else if inferredType := inferInputTypeFromLiteral(callExpr); inferredType != "" {
-								/* Infer from first literal arg if not already determined */
-								funcName = inferredType
+							if resolved := resolveInputFuncName(callExpr); resolved != "" {
+								funcName = resolved
 							}
 						}
 
