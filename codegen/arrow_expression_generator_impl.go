@@ -118,18 +118,7 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 }
 
 func isTAFunction(funcName string) bool {
-	if len(funcName) > 3 && funcName[:3] == "ta." {
-		return true
-	}
-	switch funcName {
-	case "sma", "ema", "rma", "wma", "stdev",
-		"highest", "lowest", "change",
-		"crossover", "crossunder",
-		"rsi":
-		return true
-	default:
-		return false
-	}
+	return sharedTASignatures.Contains(funcName)
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (string, error) {

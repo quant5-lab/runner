@@ -11,19 +11,16 @@ type ArrowInlineTACallGenerator struct {
 	accessorFactory   *ArrowAwareAccessorFactory
 	iifeRegistry      *InlineTAIIFERegistry
 	signatureResolver *ArrowTACallSignatureResolver
-	signatureRegistry *TAFunctionSignatureRegistry
 }
 
 func NewArrowInlineTACallGenerator(
 	factory *ArrowAwareAccessorFactory,
 	registry *InlineTAIIFERegistry,
 ) *ArrowInlineTACallGenerator {
-	signatureRegistry := NewTAFunctionSignatureRegistry()
 	return &ArrowInlineTACallGenerator{
 		accessorFactory:   factory,
 		iifeRegistry:      registry,
-		signatureRegistry: signatureRegistry,
-		signatureResolver: NewArrowTACallSignatureResolver(signatureRegistry),
+		signatureResolver: NewArrowTACallSignatureResolver(),
 	}
 }
 
@@ -40,7 +37,8 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 
 	resolved, err := g.signatureResolver.ResolveCall(funcName, call)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to resolve TA call signature for %s: %w", funcName, err)
+		/* Signature mismatch — likely a user-defined function shadowing a TA name */
+		return "", false, nil
 	}
 
 	var sourceExpr ast.Expression

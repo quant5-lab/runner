@@ -93,6 +93,11 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 
 	funcName := h.generator.extractFunctionName(call.Callee)
 
+	/* User-defined functions take precedence over built-in TA names */
+	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {
+		return h.generator.callRouter.RouteCall(h.generator, call)
+	}
+
 	if funcName == "ta.atr" || funcName == "atr" {
 		return h.HandleATRFunction(call, funcName)
 	}
@@ -108,10 +113,6 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 	/* Check ValueHandler for nz, fixnan, etc. */
 	if h.generator.valueHandler.CanHandle(funcName) {
 		return h.generator.valueHandler.GenerateInlineCall(funcName, call.Arguments, h.generator)
-	}
-
-	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {
-		return h.generator.callRouter.RouteCall(h.generator, call)
 	}
 
 	return "", fmt.Errorf("unsupported inline function in plot: %s", funcName)

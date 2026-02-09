@@ -7,8 +7,7 @@ import (
 )
 
 func TestTA_ArgumentCountBoundaries(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name      string
@@ -79,8 +78,7 @@ func TestTA_ArgumentCountBoundaries(t *testing.T) {
 }
 
 func TestTA_ExpressionTypePreservation(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name       string
@@ -183,8 +181,7 @@ func TestTA_ExpressionTypePreservation(t *testing.T) {
 }
 
 func TestTA_DefaultSourceApplication(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name              string
@@ -268,8 +265,7 @@ func TestTA_DefaultSourceApplication(t *testing.T) {
 }
 
 func TestTA_FallbackBehavior(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("unknown functions with two args use fallback", func(t *testing.T) {
 		unknownFunctions := []string{
@@ -361,8 +357,7 @@ func TestTA_FallbackBehavior(t *testing.T) {
 }
 
 func TestTA_NamespaceConsistency(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	functionPairs := []struct {
 		bare       string
@@ -407,8 +402,7 @@ func TestTA_NamespaceConsistency(t *testing.T) {
 }
 
 func TestTA_ErrorMessageClarity(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name            string
@@ -465,8 +459,7 @@ func TestTA_ErrorMessageClarity(t *testing.T) {
 }
 
 func TestTA_NilAndEmptyHandling(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("nil arguments array", func(t *testing.T) {
 		call := &ast.CallExpression{Arguments: nil}

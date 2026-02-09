@@ -3,40 +3,39 @@ package codegen
 func RegisterVolatilitySignatures() []TAFunctionMetadata {
 	signatures := make([]TAFunctionMetadata, 0)
 
-	signatures = append(signatures, NewTAFunctionMetadata(
-		"ta.atr",
-		"",
-		[]TAOverloadRule{
-			NewSingleOverloadRule(1, []TAArgumentSpec{
-				NewImplicitOHLCArgument(),
-				NewScalarIntArgument(0),
-			}),
-		},
-	))
+	atrOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(1, []TAArgumentSpec{
+			NewImplicitOHLCArgument(),
+			NewScalarIntArgument(0),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.atr", "", atrOverloads)
 
-	signatures = append(signatures, NewTAFunctionMetadata(
-		"ta.tr",
-		"",
-		[]TAOverloadRule{
-			NewSingleOverloadRule(0, []TAArgumentSpec{
-				NewImplicitOHLCArgument(),
-			}),
-		},
-	))
+	trOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(0, []TAArgumentSpec{
+			NewImplicitOHLCArgument(),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.tr", "", trOverloads)
 
-	signatures = append(signatures, NewTAFunctionMetadata(
-		"ta.stdev",
-		"close",
-		[]TAOverloadRule{
-			NewSingleOverloadRule(1, []TAArgumentSpec{
-				NewScalarIntArgument(0),
-			}),
-			NewSingleOverloadRule(2, []TAArgumentSpec{
-				NewSeriesArgument(0, ""),
-				NewScalarIntArgument(1),
-			}),
-		},
-	))
+	stdevOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(1, []TAArgumentSpec{
+			NewScalarIntArgument(0),
+		}),
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.stdev", "close", stdevOverloads)
+
+	devOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.dev", "", devOverloads)
 
 	return signatures
 }

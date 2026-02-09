@@ -310,7 +310,7 @@ func TestParameterUsageAnalyzer_AnalyzeArrowFunction(t *testing.T) {
 	}
 }
 
-/* TestParameterUsageAnalyzer_TAFunctionRecognition validates TA function detection */
+/* TestParameterUsageAnalyzer_TAFunctionRecognition validates TA function detection via registry */
 func TestParameterUsageAnalyzer_TAFunctionRecognition(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -339,9 +339,9 @@ func TestParameterUsageAnalyzer_TAFunctionRecognition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isTAIndicatorFunction(tt.funcName)
+			result := sharedTASignatures.Contains(tt.funcName)
 			if result != tt.isTAFunc {
-				t.Errorf("isTAIndicatorFunction(%q) = %v, want %v", tt.funcName, result, tt.isTAFunc)
+				t.Errorf("sharedTASignatures.Contains(%q) = %v, want %v", tt.funcName, result, tt.isTAFunc)
 			}
 		})
 	}

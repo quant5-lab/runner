@@ -17,13 +17,6 @@ func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
 func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	if g.inArrowFunctionBody {
-		if h.isUnprefixedTAFunction(funcName) {
-			taHandler := &TAIndicatorCallHandler{}
-			return taHandler.generateArrowFunctionTACall(g, call)
-		}
-	}
-
 	detector := NewUserDefinedFunctionDetector(g.variables)
 	if !detector.IsUserDefinedFunction(funcName) {
 		return "", nil
@@ -56,13 +49,4 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 	}
 
 	return strings.Join(argStrings, ", "), nil
-}
-
-func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) bool {
-	switch funcName {
-	case "sma", "ema", "stdev", "rma", "wma":
-		return true
-	default:
-		return false
-	}
 }

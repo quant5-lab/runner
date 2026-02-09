@@ -176,13 +176,21 @@ func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpr
 }
 
 func (f *ArrowAwareAccessorFactory) createCallAccessor(call *ast.CallExpression) (AccessGenerator, error) {
-	tempVarName := "call_source_temp"
-
 	callCode, err := f.exprGenerator.Generate(call)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate call expression for accessor: %w", err)
 	}
 
+	/* TA calls used as sources need series-backed storage for historical lookback */
+	funcName := extractCallFunctionName(call)
+	if isTAFunction(funcName) {
+		hasher := &ExpressionHasher{}
+		hash := hasher.Hash(call)
+		seriesName := fmt.Sprintf("_ta_src_%s", hash)
+		return NewArrowCtxSeriesAccessor(seriesName, callCode), nil
+	}
+
+	tempVarName := "call_source_temp"
 	return &FixnanCallExpressionAccessor{
 		tempVarName: tempVarName,
 		tempVarCode: fmt.Sprintf("%s := %s", tempVarName, callCode),

@@ -12,7 +12,7 @@ type TupleIndicatorHandler struct {
 
 func NewTupleIndicatorHandler() *TupleIndicatorHandler {
 	return &TupleIndicatorHandler{
-		registry:  NewTupleIndicatorRegistry(),
+		registry:  sharedTupleIndicatorRegistry,
 		generator: NewTupleIndicatorCodeGenerator(),
 	}
 }

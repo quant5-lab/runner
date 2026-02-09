@@ -4,79 +4,6 @@ import (
 	"testing"
 )
 
-func TestTupleIndicatorRegistry_MACDRegistration(t *testing.T) {
-	registry := NewTupleIndicatorRegistry()
-
-	spec := registry.Lookup("ta.macd")
-	if spec == nil {
-		t.Fatal("ta.macd not registered")
-	}
-
-	if spec.OutputCount != 3 {
-		t.Errorf("Expected 3 outputs, got %d", spec.OutputCount)
-	}
-
-	if spec.RuntimeFunction != "ta.Macd" {
-		t.Errorf("Expected runtime function ta.Macd, got %s", spec.RuntimeFunction)
-	}
-}
-
-func TestTupleIndicatorRegistry_BBRegistration(t *testing.T) {
-	registry := NewTupleIndicatorRegistry()
-
-	spec := registry.Lookup("ta.bb")
-	if spec == nil {
-		t.Fatal("ta.bb not registered")
-	}
-
-	if spec.OutputCount != 3 {
-		t.Errorf("Expected 3 outputs, got %d", spec.OutputCount)
-	}
-
-	if spec.RuntimeFunction != "ta.BBands" {
-		t.Errorf("Expected runtime function ta.BBands, got %s", spec.RuntimeFunction)
-	}
-}
-
-func TestTupleIndicatorRegistry_StochRegistration(t *testing.T) {
-	registry := NewTupleIndicatorRegistry()
-
-	spec := registry.Lookup("ta.stoch")
-	if spec == nil {
-		t.Fatal("ta.stoch not registered")
-	}
-
-	if spec.OutputCount != 2 {
-		t.Errorf("Expected 2 outputs, got %d", spec.OutputCount)
-	}
-}
-
-func TestTupleIndicatorRegistry_UnregisteredFunction(t *testing.T) {
-	registry := NewTupleIndicatorRegistry()
-
-	spec := registry.Lookup("ta.nonexistent")
-	if spec != nil {
-		t.Error("Expected nil for unregistered function")
-	}
-
-	if registry.IsRegistered("ta.nonexistent") {
-		t.Error("IsRegistered should return false for unregistered function")
-	}
-}
-
-func TestTupleIndicatorRegistry_PineV4Syntax(t *testing.T) {
-	registry := NewTupleIndicatorRegistry()
-
-	spec := registry.Lookup("macd")
-	if spec == nil {
-		t.Fatal("macd (Pine v4 syntax) not registered")
-	}
-
-	if spec.RuntimeFunction != "ta.Macd" {
-		t.Errorf("Expected runtime function ta.Macd, got %s", spec.RuntimeFunction)
-	}
-}
-
 func TestTupleIndicatorRegistry_ComprehensiveRegistration(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -115,8 +42,24 @@ func TestTupleIndicatorRegistry_ComprehensiveRegistration(t *testing.T) {
 			functionName:    "ta.stoch",
 			outputCount:     2,
 			runtimeFunction: "ta.Stoch",
-			sourceArgIndex:  -1, // Stoch uses multiple sources
-			periodArgCount:  2,  // Actual period count in registry
+			sourceArgIndex:  -1,
+			periodArgCount:  2,
+		},
+		{
+			name:            "bb (v4)",
+			functionName:    "bb",
+			outputCount:     3,
+			runtimeFunction: "ta.BBands",
+			sourceArgIndex:  0,
+			periodArgCount:  2,
+		},
+		{
+			name:            "stoch (v4)",
+			functionName:    "stoch",
+			outputCount:     2,
+			runtimeFunction: "ta.Stoch",
+			sourceArgIndex:  -1,
+			periodArgCount:  2,
 		},
 	}
 
@@ -158,15 +101,33 @@ func TestTupleIndicatorRegistry_IsRegistered(t *testing.T) {
 		functionName string
 		registered   bool
 	}{
+		/* Implemented tuple indicators — namespaced */
 		{"ta.macd registered", "ta.macd", true},
-		{"macd v4 registered", "macd", true},
 		{"ta.bb registered", "ta.bb", true},
 		{"ta.stoch registered", "ta.stoch", true},
-		{"bb v4 not registered", "bb", false},
-		{"stoch v4 not registered", "stoch", false},
+
+		/* Implemented tuple indicators — bare v4 aliases */
+		{"macd v4 registered", "macd", true},
+		{"bb v4 registered", "bb", true},
+		{"stoch v4 registered", "stoch", true},
+
+		/* Unregistered tuple signatures (no runtime implementation) */
+		{"ta.dmi unregistered", "ta.dmi", false},
+		{"dmi unregistered", "dmi", false},
+		{"ta.kc unregistered", "ta.kc", false},
+		{"kc unregistered", "kc", false},
+		{"ta.supertrend unregistered", "ta.supertrend", false},
+		{"supertrend unregistered", "supertrend", false},
+
+		/* Non-tuple functions */
 		{"ta.nonexistent not registered", "ta.nonexistent", false},
 		{"random not registered", "randomIndicator", false},
 		{"empty string not registered", "", false},
+
+		/* Single-output TA functions must not be in tuple registry */
+		{"ta.sma not tuple", "ta.sma", false},
+		{"ta.ema not tuple", "ta.ema", false},
+		{"ta.rsi not tuple", "ta.rsi", false},
 	}
 
 	registry := NewTupleIndicatorRegistry()
@@ -212,7 +173,7 @@ func TestTupleIndicatorRegistry_EdgeCases(t *testing.T) {
 func TestTupleIndicatorRegistry_SpecValidation(t *testing.T) {
 	registry := NewTupleIndicatorRegistry()
 
-	indicators := []string{"ta.macd", "macd", "ta.bb", "ta.stoch"}
+	indicators := []string{"ta.macd", "macd", "ta.bb", "bb", "ta.stoch", "stoch"}
 
 	for _, name := range indicators {
 		t.Run(name, func(t *testing.T) {
@@ -245,5 +206,37 @@ func TestTupleIndicatorRegistry_Immutability(t *testing.T) {
 
 	if spec1.OutputCount != spec2.OutputCount {
 		t.Error("Registry returned inconsistent specs")
+	}
+}
+
+func TestTupleIndicatorRegistry_BareAliasSymmetry(t *testing.T) {
+	registry := NewTupleIndicatorRegistry()
+
+	pairs := []struct{ namespaced, bare string }{
+		{"ta.macd", "macd"},
+		{"ta.bb", "bb"},
+		{"ta.stoch", "stoch"},
+	}
+
+	for _, pair := range pairs {
+		t.Run(pair.namespaced, func(t *testing.T) {
+			ns := registry.Lookup(pair.namespaced)
+			bare := registry.Lookup(pair.bare)
+			if ns == nil || bare == nil {
+				t.Fatalf("Missing spec: namespaced=%v bare=%v", ns != nil, bare != nil)
+			}
+			if ns.OutputCount != bare.OutputCount {
+				t.Errorf("OutputCount mismatch: %d vs %d", ns.OutputCount, bare.OutputCount)
+			}
+			if ns.RuntimeFunction != bare.RuntimeFunction {
+				t.Errorf("RuntimeFunction mismatch: %s vs %s", ns.RuntimeFunction, bare.RuntimeFunction)
+			}
+			if ns.SourceArgIndex != bare.SourceArgIndex {
+				t.Errorf("SourceArgIndex mismatch: %d vs %d", ns.SourceArgIndex, bare.SourceArgIndex)
+			}
+			if ns.PeriodArgCount != bare.PeriodArgCount {
+				t.Errorf("PeriodArgCount mismatch: %d vs %d", ns.PeriodArgCount, bare.PeriodArgCount)
+			}
+		})
 	}
 }

@@ -13,15 +13,7 @@ Arrow context: delegated to ArrowFunctionTACallGenerator for IIFE/inline pattern
 type TAIndicatorCallHandler struct{}
 
 func (h *TAIndicatorCallHandler) CanHandle(funcName string) bool {
-	switch funcName {
-	case "ta.sma", "ta.ema", "ta.stdev", "ta.rma", "ta.wma",
-		"ta.crossover", "ta.crossunder",
-		"ta.change", "ta.pivothigh", "ta.pivotlow",
-		"fixnan", "valuewhen":
-		return true
-	default:
-		return false
-	}
+	return sharedTASignatures.Contains(funcName) && !sharedTASignatures.IsTupleFunction(funcName)
 }
 
 func (h *TAIndicatorCallHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {

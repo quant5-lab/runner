@@ -35,11 +35,27 @@ func TestTAIndicatorCallHandler_CanHandle(t *testing.T) {
 		{"valuewhen", true},
 
 		// Should not handle
-		{"ta.highest", false}, // Not in list
-		{"sma", false},        // Without ta. prefix
 		{"strategy.entry", false},
 		{"plot", false},
 		{"", false},
+
+		// Now handled via unified registry
+		{"ta.highest", true},
+		{"sma", true},
+
+		/* Tuple indicators excluded — owned by TupleIndicatorHandler */
+		{"ta.macd", false},
+		{"macd", false},
+		{"ta.dmi", false},
+		{"dmi", false},
+		{"ta.bb", false},
+		{"bb", false},
+		{"ta.stoch", false},
+		{"stoch", false},
+		{"ta.supertrend", false},
+		{"supertrend", false},
+		{"ta.kc", false},
+		{"kc", false},
 	}
 
 	for _, tt := range tests {
@@ -124,27 +140,6 @@ func TestTAIndicatorCallHandler_GenerateCode(t *testing.T) {
 	}
 }
 
-// TestTAIndicatorCallHandler_ComprehensiveCoverage verifies all declared functions
-func TestTAIndicatorCallHandler_ComprehensiveCoverage(t *testing.T) {
-	handler := &TAIndicatorCallHandler{}
-
-	// All functions declared in switch statement
-	taFunctions := []string{
-		"ta.sma", "ta.ema", "ta.stdev", "ta.rma", "ta.wma",
-		"ta.crossover", "ta.crossunder",
-		"ta.change", "ta.pivothigh", "ta.pivotlow",
-		"fixnan", "valuewhen",
-	}
-
-	for _, funcName := range taFunctions {
-		t.Run(funcName, func(t *testing.T) {
-			if !handler.CanHandle(funcName) {
-				t.Errorf("Handler should recognize %q", funcName)
-			}
-		})
-	}
-}
-
 // TestTAIndicatorCallHandler_EdgeCases tests boundary conditions
 func TestTAIndicatorCallHandler_EdgeCases(t *testing.T) {
 	handler := &TAIndicatorCallHandler{}
@@ -154,7 +149,6 @@ func TestTAIndicatorCallHandler_EdgeCases(t *testing.T) {
 		funcName string
 		want     bool
 	}{
-		{"empty string", "", false},
 		{"only ta.", "ta.", false},
 		{"ta with space", "ta. sma", false},
 		{"uppercase", "TA.SMA", false},

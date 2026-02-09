@@ -81,23 +81,3 @@ func (r *TAFunctionRegistry) GenerateInlineTA(g *generator, varName string, func
 	}
 	return handler.GenerateCode(g, varName, call)
 }
-
-// normalizeFunctionName converts Pine v4 syntax to v5 (e.g., "sma" -> "ta.sma").
-// This ensures consistent function naming across different Pine versions.
-func normalizeFunctionName(funcName string) string {
-	if len(funcName) > 3 && funcName[:3] == "ta." {
-		return funcName
-	}
-
-	v4Functions := map[string]bool{
-		"sma": true, "ema": true, "rma": true, "rsi": true,
-		"atr": true, "stdev": true, "change": true,
-		"pivothigh": true, "pivotlow": true,
-	}
-
-	if v4Functions[funcName] {
-		return "ta." + funcName
-	}
-
-	return funcName
-}

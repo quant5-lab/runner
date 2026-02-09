@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/quant5-lab/runner/codegen/series_naming"
 )
@@ -32,38 +33,48 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	windowNamer := series_naming.NewWindowBasedNamer()
 	statefulNamer := series_naming.NewStatefulIndicatorNamer()
 
-	r.Register("ta.sma", &SMAIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("sma", &SMAIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.wma", &WMAIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("wma", &WMAIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.stdev", &STDEVIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("stdev", &STDEVIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.highest", &HighestIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("highest", &HighestIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.lowest", &LowestIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("lowest", &LowestIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.change", &ChangeIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("change", &ChangeIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("ta.linreg", &LinregIIFEGenerator{namingStrategy: windowNamer})
-	r.Register("linreg", &LinregIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.sma", &SMAIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.wma", &WMAIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.stdev", &STDEVIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.highest", &HighestIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.lowest", &LowestIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.change", &ChangeIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.linreg", &LinregIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.swma", &SWMAIIFEGenerator{namingStrategy: windowNamer})
 
-	r.Register("ta.ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
-	r.Register("ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
-	r.Register("ta.rma", &RMAIIFEGenerator{namingStrategy: statefulNamer})
-	r.Register("rma", &RMAIIFEGenerator{namingStrategy: statefulNamer})
-	r.Register("ta.rsi", &RSIIIFEGenerator{namingStrategy: statefulNamer})
-	r.Register("rsi", &RSIIIFEGenerator{namingStrategy: statefulNamer})
+	r.RegisterWithBareAlias("ta.ema", &EMAIIFEGenerator{namingStrategy: statefulNamer})
+	r.RegisterWithBareAlias("ta.rma", &RMAIIFEGenerator{namingStrategy: statefulNamer})
+	r.RegisterWithBareAlias("ta.rsi", &RSIIIFEGenerator{namingStrategy: statefulNamer})
+	r.RegisterWithBareAlias("ta.atr", &ATRIIFEGenerator{namingStrategy: statefulNamer})
 
-	r.RegisterDualPeriod("ta.pivothigh", &PivotHighIIFEGenerator{namingStrategy: windowNamer})
-	r.RegisterDualPeriod("ta.pivotlow", &PivotLowIIFEGenerator{namingStrategy: windowNamer})
+	sumGen := &SumIIFEGenerator{namingStrategy: windowNamer}
+	r.RegisterWithBareAlias("ta.sum", sumGen)
+	r.Register("math.sum", sumGen)
+
+	r.RegisterDualPeriodWithBareAlias("ta.pivothigh", &PivotHighIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterDualPeriodWithBareAlias("ta.pivotlow", &PivotLowIIFEGenerator{namingStrategy: windowNamer})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {
 	r.generators[name] = generator
 }
 
+func (r *InlineTAIIFERegistry) RegisterWithBareAlias(namespacedName string, generator InlineTAIIFEGenerator) {
+	r.Register(namespacedName, generator)
+	if i := strings.LastIndex(namespacedName, "."); i >= 0 {
+		r.Register(namespacedName[i+1:], generator)
+	}
+}
+
 func (r *InlineTAIIFERegistry) RegisterDualPeriod(name string, generator InlineTADualPeriodGenerator) {
 	r.dualPeriodGenerators[name] = generator
+}
+
+func (r *InlineTAIIFERegistry) RegisterDualPeriodWithBareAlias(namespacedName string, generator InlineTADualPeriodGenerator) {
+	r.RegisterDualPeriod(namespacedName, generator)
+	if i := strings.LastIndex(namespacedName, "."); i >= 0 {
+		r.RegisterDualPeriod(namespacedName[i+1:], generator)
+	}
 }
 
 func (r *InlineTAIIFERegistry) IsSupported(funcName string) bool {
@@ -122,6 +133,12 @@ type ChangeIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type LinregIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
+type SumIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
+type SWMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
+type ATRIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
 func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
 	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += fmt.Sprintf("return sum / %s", period.AsFloat64Cast())
@@ -130,6 +147,44 @@ func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
 		WithBody(body).
 		Build()
+}
+
+func (g *SumIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	body := fmt.Sprintf("sum := 0.0; for j := 0; j < %s; j++ { sum += %s }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
+	body += "return sum"
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
+}
+
+func (g *SWMAIIFEGenerator) Generate(accessor AccessGenerator, _ PeriodExpression, sourceHash string) string {
+	/* Fixed period=4, weights [1/6, 2/6, 2/6, 1/6] */
+	fixedPeriod := NewConstantPeriod(4)
+	body := fmt.Sprintf("return %s*(1.0/6.0) + %s*(2.0/6.0) + %s*(2.0/6.0) + %s*(1.0/6.0)",
+		accessor.GenerateLoopValueAccess("3"),
+		accessor.GenerateLoopValueAccess("2"),
+		accessor.GenerateLoopValueAccess("1"),
+		accessor.GenerateLoopValueAccess("0"))
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(fixedPeriod, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
+}
+
+func (g *ATRIIFEGenerator) Generate(_ AccessGenerator, period PeriodExpression, sourceHash string) string {
+	/* RMA(TrueRange, period) — ignores passed accessor, uses OHLC directly */
+	context := NewArrowFunctionIndicatorContext()
+	varName := g.namingStrategy.GenerateName("atr", period.AsSeriesNamePart(), sourceHash)
+	trAccessor := NewTrueRangeAccessGenerator()
+
+	builder := NewStatefulIndicatorBuilder("ta.atr", varName, period, trAccessor, false, context)
+	statefulCode := builder.BuildRMA()
+	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
+
+	return fmt.Sprintf("func() float64 {\n\t%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
 func (g *EMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {

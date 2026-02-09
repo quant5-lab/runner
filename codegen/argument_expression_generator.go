@@ -65,6 +65,13 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 		return g.resolveBuiltinToValue(id.Name, code)
 	}
 
+	if g.signatureRegistry != nil {
+		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+		if hasSignature && paramType == ParamTypeSeries {
+			return fmt.Sprintf("%sSeries", id.Name), nil
+		}
+	}
+
 	return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
 }
 

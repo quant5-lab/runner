@@ -1,16 +1,9 @@
-Codegen limitation: TA functions without IIFE generators fail in arrow bodies (#24)
+Codegen limitation: arrow function variable/parameter scoping incomplete
 
 Parse: ✅
-Generate: ❌ (variant_trima → "TA function sum requires IIFE generator implementation")
-Compile: ❌ Not reached
+Generate: ✅ (linreg 3-arg now supported)
+Compile: ❌ (undefined: len_Series, src, n, PolesSeries, nSeries, rSeries, alfaSeries)
 Execute: ❌ Not reached
 
-Missing from InlineTAIIFERegistry: sum, valuewhen, atr, swma, supertrend, and any ta.* not registered.
-Registered: sma, ema, rma, wma, stdev, highest, lowest, change, linreg, rsi, pivothigh, pivotlow.
-crossover/crossunder handled separately by inline_cross_handler.
-
---- BLOCKER #23 RESOLVED ---
-
-ValueCallHandler routes nz/na through ValueHandler before TAIndicatorCallHandler
-in the callRouter chain. getPoles(nz(Price), Poles, alfa) now compiles.
-Error propagation fix in ArrowExpressionGeneratorImpl prevents silent error masking.
+Arrow functions with complex local variables and parameters fail to emit
+series declarations and parameter-to-series promotion for nested scopes.

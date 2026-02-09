@@ -7,8 +7,7 @@ import (
 )
 
 func TestTA_ImplicitOHLCPattern(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name     string
@@ -55,8 +54,7 @@ func TestTA_ImplicitOHLCPattern(t *testing.T) {
 }
 
 func TestTA_MultiArgumentPatterns(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name              string

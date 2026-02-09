@@ -27,7 +27,6 @@ func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGene
 
 	identifierResolver := NewArrowIdentifierResolver(accessResolver)
 	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
-	signatureRegistry := NewTAFunctionSignatureRegistry()
 
 	return &ArrowFunctionTACallGenerator{
 		gen:               gen,
@@ -35,7 +34,7 @@ func NewArrowFunctionTACallGenerator(gen *generator, exprGen ArrowExpressionGene
 		iifeRegistry:      NewInlineTAIIFERegistry(),
 		tupleRegistry:     NewTupleIndicatorRegistry(),
 		accessorFactory:   accessorFactory,
-		signatureResolver: NewArrowTACallSignatureResolver(signatureRegistry),
+		signatureResolver: NewArrowTACallSignatureResolver(),
 	}
 }
 
@@ -50,6 +49,10 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 
 	if funcName == "fixnan" || funcName == "ta.fixnan" {
 		return a.generateFixnanIIFE(call)
+	}
+
+	if funcName == "valuewhen" || funcName == "ta.valuewhen" {
+		return a.generateValuewhenIIFE(call)
 	}
 
 	pivotResolver := NewPivotSignatureResolver()
@@ -77,13 +80,17 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return "", fmt.Errorf("TA function %s requires IIFE generator implementation", funcName)
 	}
 
+	/* Wrap with preamble when accessor needs per-bar series storage for TA-as-source chaining */
+	if preambleAccessor, ok := accessor.(interface{ GetPreamble() string }); ok {
+		preamble := preambleAccessor.GetPreamble()
+		if preamble != "" {
+			return fmt.Sprintf("func() float64 { %s\nreturn %s }()", preamble, code), nil
+		}
+	}
+
 	return code, nil
 }
 
-/*
-generateFixnanIIFE creates inline code for fixnan(source).
-Returns: func() float64 { val := source; if math.IsNaN(val) { return 0.0 }; return val }()
-*/
 func (a *ArrowFunctionTACallGenerator) generateFixnanIIFE(call *ast.CallExpression) (string, error) {
 	if len(call.Arguments) < 1 {
 		return "", fmt.Errorf("fixnan requires 1 argument")
@@ -96,6 +103,53 @@ func (a *ArrowFunctionTACallGenerator) generateFixnanIIFE(call *ast.CallExpressi
 	}
 
 	return fmt.Sprintf("func() float64 { val := %s; if math.IsNaN(val) { return 0.0 }; return val }()", sourceCode), nil
+}
+
+/* Scans backward through bars for the Nth true condition, returns source at that bar */
+func (a *ArrowFunctionTACallGenerator) generateValuewhenIIFE(call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 3 {
+		return "", fmt.Errorf("valuewhen requires 3 arguments (condition, source, occurrence)")
+	}
+
+	condAccessor, err := a.accessorFactory.CreateAccessorForExpression(call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for valuewhen condition: %w", err)
+	}
+
+	srcAccessor, err := a.accessorFactory.CreateAccessorForExpression(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for valuewhen source: %w", err)
+	}
+
+	occurrenceExpr, err := a.extractPeriodExpression(call.Arguments[2])
+	if err != nil {
+		return "", fmt.Errorf("failed to extract valuewhen occurrence: %w", err)
+	}
+
+	preamble := ""
+	if pa, ok := condAccessor.(interface{ GetPreamble() string }); ok {
+		if p := pa.GetPreamble(); p != "" {
+			preamble += p + "; "
+		}
+	}
+	if pa, ok := srcAccessor.(interface{ GetPreamble() string }); ok {
+		if p := pa.GetPreamble(); p != "" {
+			preamble += p + "; "
+		}
+	}
+
+	body := fmt.Sprintf("occurrence := %s; count := 0; ", occurrenceExpr.AsIntCast())
+	body += "for j := 0; j <= ctx.BarIndex; j++ { "
+	body += fmt.Sprintf("condVal := %s; ", condAccessor.GenerateLoopValueAccess("j"))
+	body += "if !math.IsNaN(condVal) && condVal != 0 { "
+	body += "if count == occurrence { "
+	body += fmt.Sprintf("return %s", srcAccessor.GenerateLoopValueAccess("j"))
+	body += " }; count++ } }; return math.NaN()"
+
+	if preamble != "" {
+		return fmt.Sprintf("func() float64 { %s%s }()", preamble, body), nil
+	}
+	return fmt.Sprintf("func() float64 { %s }()", body), nil
 }
 
 func (a *ArrowFunctionTACallGenerator) generatePivotCall(funcName string, call *ast.CallExpression) (string, error) {
@@ -148,9 +202,13 @@ func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call 
 		sourceArg = resolved.SourceExpr
 	}
 
-	accessor, err := a.accessorFactory.CreateAccessorForExpression(sourceArg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create accessor: %w", err)
+	/* OHLC-only functions (atr, tr) have no explicit source — generator handles OHLC directly */
+	var accessor AccessGenerator
+	if sourceArg != nil {
+		accessor, err = a.accessorFactory.CreateAccessorForExpression(sourceArg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create accessor: %w", err)
+		}
 	}
 
 	periodExpr, err := a.extractPeriodExpression(resolved.LengthExpr)
@@ -203,7 +261,6 @@ func (a *ArrowFunctionTACallGenerator) extractPeriodExpression(expr ast.Expressi
 		return nil, fmt.Errorf("period literal is not numeric: %v", e.Value)
 
 	case *ast.Identifier:
-		/* Check if identifier is a known variable (arrow function parameter) */
 		if _, exists := a.gen.variables[e.Name]; !exists {
 			return nil, fmt.Errorf("unknown period identifier: %s (not an arrow function parameter)", e.Name)
 		}

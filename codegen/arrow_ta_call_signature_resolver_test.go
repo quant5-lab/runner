@@ -7,8 +7,7 @@ import (
 )
 
 func TestArrowTACallSignatureResolver_SingleArgIsLengthPattern(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	functions := []struct {
 		name          string
@@ -164,8 +163,7 @@ func TestArrowTACallSignatureResolver_SingleArgIsLengthPattern(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_SingleArgIsSourcePattern(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	functions := []string{"change", "ta.change"}
 
@@ -308,8 +306,7 @@ func TestArrowTACallSignatureResolver_SingleArgIsSourcePattern(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_TwoArgumentPattern(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	tests := []struct {
 		name                 string
@@ -455,8 +452,7 @@ func TestArrowTACallSignatureResolver_TwoArgumentPattern(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_UnknownFunctionHandling(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	unknownFunctions := []string{
 		"unknown_function",
@@ -493,8 +489,7 @@ func TestArrowTACallSignatureResolver_UnknownFunctionHandling(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_ExpressionTypeVariety(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("literal length expressions", func(t *testing.T) {
 		literalTypes := []interface{}{
@@ -574,18 +569,15 @@ func TestArrowTACallSignatureResolver_ExpressionTypeVariety(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_UnknownFunctionFallback(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("truly unknown functions with two args use fallback", func(t *testing.T) {
 		unknownFunctions := []string{
 			"ta.cmo",
 			"ta.cog",
-			"ta.dmi",
 			"ta.mom",
 			"ta.roc",
-			"ta.tsi",
-			"ta.vwap",
+			"ta.xyz_unknown",
 			"custom_indicator",
 			"my_ta_function",
 		}
@@ -783,8 +775,7 @@ func TestArrowTACallSignatureResolver_UnknownFunctionFallback(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_ArgumentCountBoundaries(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("zero arguments across all patterns", func(t *testing.T) {
 		testFunctions := []string{
@@ -842,8 +833,7 @@ func TestArrowTACallSignatureResolver_ArgumentCountBoundaries(t *testing.T) {
 }
 
 func TestArrowTACallSignatureResolver_EdgeCases(t *testing.T) {
-	registry := NewTAFunctionSignatureRegistry()
-	resolver := NewArrowTACallSignatureResolver(registry)
+	resolver := NewArrowTACallSignatureResolver()
 
 	t.Run("empty function name", func(t *testing.T) {
 		call := &ast.CallExpression{

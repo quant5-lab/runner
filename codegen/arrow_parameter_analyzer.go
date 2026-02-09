@@ -89,14 +89,22 @@ func (a *ParameterUsageAnalyzer) analyzeExpression(expr ast.Expression) {
 
 func (a *ParameterUsageAnalyzer) analyzeCallExpression(call *ast.CallExpression) {
 	funcName := extractCallFunctionName(call)
+	argCount := len(call.Arguments)
 
-	isTAFunction := isTAIndicatorFunction(funcName)
-
-	if isTAFunction && len(call.Arguments) >= 2 {
-		sourceArg := call.Arguments[0]
-		if ident, ok := sourceArg.(*ast.Identifier); ok {
-			if _, isParam := a.parameterTypes[ident.Name]; isParam {
-				a.parameterTypes[ident.Name] = ParameterUsageSeries
+	/* Promote first arg to series when TA function needs historical lookback on its source */
+	if sharedTASignatures.Contains(funcName) && argCount >= 1 {
+		promoteFirstArg := false
+		if argCount >= 2 && sharedTASignatures.NeedsSourcePromotion(funcName, argCount) {
+			promoteFirstArg = true
+		} else if argCount == 1 && sharedTASignatures.IsSourceOnlyLookback(funcName) {
+			promoteFirstArg = true
+		}
+		if promoteFirstArg {
+			sourceArg := call.Arguments[0]
+			if ident, ok := sourceArg.(*ast.Identifier); ok {
+				if _, isParam := a.parameterTypes[ident.Name]; isParam {
+					a.parameterTypes[ident.Name] = ParameterUsageSeries
+				}
 			}
 		}
 	}
@@ -104,18 +112,4 @@ func (a *ParameterUsageAnalyzer) analyzeCallExpression(call *ast.CallExpression)
 	for _, arg := range call.Arguments {
 		a.analyzeExpression(arg)
 	}
-}
-
-func isTAIndicatorFunction(funcName string) bool {
-	taFunctions := map[string]bool{
-		"sma": true, "ta.sma": true,
-		"ema": true, "ta.ema": true,
-		"rma": true, "ta.rma": true,
-		"wma": true, "ta.wma": true,
-		"stdev": true, "ta.stdev": true,
-		"highest": true, "ta.highest": true,
-		"lowest": true, "ta.lowest": true,
-		"rsi": true, "ta.rsi": true,
-	}
-	return taFunctions[funcName]
 }

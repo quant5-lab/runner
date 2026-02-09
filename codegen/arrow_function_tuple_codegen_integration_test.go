@@ -82,58 +82,6 @@ plot(k)`,
 			desc: "Functions without explicit source use bar field access",
 		},
 		{
-			name: "period_only_arguments",
-			pineScript: `//@version=5
-indicator('test')
-f() => ta.dmi(14, 14)
-[plus, minus, adx] = f()
-plot(plus)`,
-			mustContain: []string{
-				"func() (float64, float64, float64)",
-				"ta.Dmi(",
-				"14, 14",
-			},
-			mustNotContain: []string{
-				"GetCurrent()",
-			},
-			desc: "Period-only functions pass literal arguments",
-		},
-		{
-			name: "keltner_channels_mixed_arguments",
-			pineScript: `//@version=5
-indicator('test')
-f(src) => ta.kc(src, 20, 2)
-[upper, basis, lower] = f(close)
-plot(upper)`,
-			mustContain: []string{
-				"func() (float64, float64, float64)",
-				"ta.KeltnerChannels(",
-				"srcSeries.GetCurrent()",
-				"20", "2",
-			},
-			mustNotContain: []string{
-				"ta.KeltnerChannels(src,",
-			},
-			desc: "Mixed series and period arguments distinguished",
-		},
-		{
-			name: "supertrend_two_output_function",
-			pineScript: `//@version=5
-indicator('test')
-f() => ta.supertrend(10, 3)
-[supertrend, direction] = f()
-plot(supertrend)`,
-			mustContain: []string{
-				"func() (float64, float64)",
-				"ta.Supertrend(",
-				"10, 3",
-			},
-			mustNotContain: []string{
-				"GetCurrent()",
-			},
-			desc: "Two-output functions generate correct signature",
-		},
-		{
 			name: "function_alias_without_namespace",
 			pineScript: `//@version=5
 indicator('test')

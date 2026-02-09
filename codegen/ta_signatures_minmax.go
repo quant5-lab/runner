@@ -3,7 +3,7 @@ package codegen
 func RegisterMinMaxSignatures() []TAFunctionMetadata {
 	signatures := make([]TAFunctionMetadata, 0)
 
-	highestOverloads := []TAOverloadRule{
+	sourceAndLengthOverloads := []TAOverloadRule{
 		NewSingleOverloadRule(1, []TAArgumentSpec{
 			NewScalarIntArgument(0),
 		}),
@@ -12,44 +12,11 @@ func RegisterMinMaxSignatures() []TAFunctionMetadata {
 			NewScalarIntArgument(1),
 		}),
 	}
-	signatures = append(signatures, NewTAFunctionMetadata("ta.highest", "high", highestOverloads))
-	signatures = append(signatures, NewTAFunctionMetadata("highest", "high", highestOverloads))
 
-	lowestOverloads := []TAOverloadRule{
-		NewSingleOverloadRule(1, []TAArgumentSpec{
-			NewScalarIntArgument(0),
-		}),
-		NewSingleOverloadRule(2, []TAArgumentSpec{
-			NewSeriesArgument(0, ""),
-			NewScalarIntArgument(1),
-		}),
-	}
-	signatures = append(signatures, NewTAFunctionMetadata("ta.lowest", "low", lowestOverloads))
-	signatures = append(signatures, NewTAFunctionMetadata("lowest", "low", lowestOverloads))
-
-	highestbarsOverloads := []TAOverloadRule{
-		NewSingleOverloadRule(1, []TAArgumentSpec{
-			NewScalarIntArgument(0),
-		}),
-		NewSingleOverloadRule(2, []TAArgumentSpec{
-			NewSeriesArgument(0, ""),
-			NewScalarIntArgument(1),
-		}),
-	}
-	signatures = append(signatures, NewTAFunctionMetadata("ta.highestbars", "high", highestbarsOverloads))
-	signatures = append(signatures, NewTAFunctionMetadata("highestbars", "high", highestbarsOverloads))
-
-	lowestbarsOverloads := []TAOverloadRule{
-		NewSingleOverloadRule(1, []TAArgumentSpec{
-			NewScalarIntArgument(0),
-		}),
-		NewSingleOverloadRule(2, []TAArgumentSpec{
-			NewSeriesArgument(0, ""),
-			NewScalarIntArgument(1),
-		}),
-	}
-	signatures = append(signatures, NewTAFunctionMetadata("ta.lowestbars", "low", lowestbarsOverloads))
-	signatures = append(signatures, NewTAFunctionMetadata("lowestbars", "low", lowestbarsOverloads))
+	signatures = appendWithBareAlias(signatures, "ta.highest", "high", sourceAndLengthOverloads)
+	signatures = appendWithBareAlias(signatures, "ta.lowest", "low", sourceAndLengthOverloads)
+	signatures = appendWithBareAlias(signatures, "ta.highestbars", "high", sourceAndLengthOverloads)
+	signatures = appendWithBareAlias(signatures, "ta.lowestbars", "low", sourceAndLengthOverloads)
 
 	return signatures
 }

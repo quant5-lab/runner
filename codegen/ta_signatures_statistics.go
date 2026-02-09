@@ -12,8 +12,7 @@ func RegisterStatisticsSignatures() []TAFunctionMetadata {
 			NewScalarIntArgument(1),
 		}),
 	}
-	signatures = append(signatures, NewTAFunctionMetadata("ta.change", "", changeOverloads))
-	signatures = append(signatures, NewTAFunctionMetadata("change", "", changeOverloads))
+	signatures = appendWithBareAlias(signatures, "ta.change", "", changeOverloads)
 
 	signatures = append(signatures, NewTAFunctionMetadata(
 		"ta.correlation",
@@ -54,6 +53,28 @@ func RegisterStatisticsSignatures() []TAFunctionMetadata {
 			}),
 		},
 	))
+
+	sumOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.sum", "close", sumOverloads)
+	signatures = append(signatures, NewTAFunctionMetadata("math.sum", "close", sumOverloads))
+
+	linregOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+		NewSingleOverloadRule(3, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarIntArgument(2),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.linreg", "", linregOverloads)
 
 	return signatures
 }

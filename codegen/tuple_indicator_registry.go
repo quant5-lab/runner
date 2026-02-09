@@ -1,5 +1,10 @@
 package codegen
 
+import "strings"
+
+/* Immutable singleton — safe for concurrent reads, no writes after init */
+var sharedTupleIndicatorRegistry = NewTupleIndicatorRegistry()
+
 /* TupleIndicatorRegistry maps PineScript tuple functions to code generation specs */
 type TupleIndicatorRegistry struct {
 	specs map[string]*TupleIndicatorSpec
@@ -14,7 +19,7 @@ func NewTupleIndicatorRegistry() *TupleIndicatorRegistry {
 }
 
 func (r *TupleIndicatorRegistry) registerBuiltinIndicators() {
-	r.register(&TupleIndicatorSpec{
+	r.registerWithBareAlias(&TupleIndicatorSpec{
 		FunctionName:    "ta.macd",
 		OutputCount:     3,
 		RuntimeFunction: "ta.Macd",
@@ -22,15 +27,7 @@ func (r *TupleIndicatorRegistry) registerBuiltinIndicators() {
 		PeriodArgCount:  3,
 	})
 
-	r.register(&TupleIndicatorSpec{
-		FunctionName:    "macd",
-		OutputCount:     3,
-		RuntimeFunction: "ta.Macd",
-		SourceArgIndex:  0,
-		PeriodArgCount:  3,
-	})
-
-	r.register(&TupleIndicatorSpec{
+	r.registerWithBareAlias(&TupleIndicatorSpec{
 		FunctionName:    "ta.bb",
 		OutputCount:     3,
 		RuntimeFunction: "ta.BBands",
@@ -38,41 +35,28 @@ func (r *TupleIndicatorRegistry) registerBuiltinIndicators() {
 		PeriodArgCount:  2,
 	})
 
-	r.register(&TupleIndicatorSpec{
+	r.registerWithBareAlias(&TupleIndicatorSpec{
 		FunctionName:    "ta.stoch",
 		OutputCount:     2,
 		RuntimeFunction: "ta.Stoch",
 		SourceArgIndex:  -1,
 		PeriodArgCount:  2,
 	})
-
-	r.register(&TupleIndicatorSpec{
-		FunctionName:    "ta.dmi",
-		OutputCount:     3,
-		RuntimeFunction: "ta.Dmi",
-		SourceArgIndex:  -1,
-		PeriodArgCount:  2,
-	})
-
-	r.register(&TupleIndicatorSpec{
-		FunctionName:    "ta.kc",
-		OutputCount:     3,
-		RuntimeFunction: "ta.KeltnerChannels",
-		SourceArgIndex:  0,
-		PeriodArgCount:  2,
-	})
-
-	r.register(&TupleIndicatorSpec{
-		FunctionName:    "ta.supertrend",
-		OutputCount:     2,
-		RuntimeFunction: "ta.Supertrend",
-		SourceArgIndex:  -1,
-		PeriodArgCount:  2,
-	})
 }
 
-func (r *TupleIndicatorRegistry) register(spec *TupleIndicatorSpec) {
+/* registerWithBareAlias registers ta.X and automatically derives bare X alias */
+func (r *TupleIndicatorRegistry) registerWithBareAlias(spec *TupleIndicatorSpec) {
 	r.specs[spec.FunctionName] = spec
+	if i := strings.LastIndex(spec.FunctionName, "."); i >= 0 {
+		bare := spec.FunctionName[i+1:]
+		r.specs[bare] = &TupleIndicatorSpec{
+			FunctionName:    bare,
+			OutputCount:     spec.OutputCount,
+			RuntimeFunction: spec.RuntimeFunction,
+			SourceArgIndex:  spec.SourceArgIndex,
+			PeriodArgCount:  spec.PeriodArgCount,
+		}
+	}
 }
 
 func (r *TupleIndicatorRegistry) Lookup(funcName string) *TupleIndicatorSpec {

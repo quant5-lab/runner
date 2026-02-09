@@ -12,17 +12,14 @@ type ResolvedTACall struct {
 }
 
 type ArrowTACallSignatureResolver struct {
-	legacyRegistry    *TAFunctionSignatureRegistry
 	signatureRegistry *TASignatureRegistry
 	callResolver      *TACallResolver
 }
 
-func NewArrowTACallSignatureResolver(registry *TAFunctionSignatureRegistry) *ArrowTACallSignatureResolver {
-	signatureRegistry := NewTASignatureRegistry()
+func NewArrowTACallSignatureResolver() *ArrowTACallSignatureResolver {
 	return &ArrowTACallSignatureResolver{
-		legacyRegistry:    registry,
-		signatureRegistry: signatureRegistry,
-		callResolver:      NewTACallResolver(signatureRegistry),
+		signatureRegistry: sharedTASignatures,
+		callResolver:      NewTACallResolver(sharedTASignatures),
 	}
 }
 

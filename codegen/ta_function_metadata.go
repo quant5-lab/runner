@@ -1,9 +1,13 @@
 package codegen
 
+import "strings"
+
 type TAFunctionMetadata struct {
-	FunctionName  string
-	Overloads     []TAOverloadRule
-	DefaultSource string
+	FunctionName       string
+	Overloads          []TAOverloadRule
+	DefaultSource      string
+	SourceOnlyLookback bool
+	IsTuple            bool
 }
 
 func NewTAFunctionMetadata(name string, defaultSource string, overloads []TAOverloadRule) TAFunctionMetadata {
@@ -12,6 +16,28 @@ func NewTAFunctionMetadata(name string, defaultSource string, overloads []TAOver
 		DefaultSource: defaultSource,
 		Overloads:     overloads,
 	}
+}
+
+/* Registers both namespaced ("ta.sma") and bare ("sma") forms from a single declaration */
+func appendWithBareAlias(signatures []TAFunctionMetadata, namespacedName, defaultSource string, overloads []TAOverloadRule) []TAFunctionMetadata {
+	signatures = append(signatures, NewTAFunctionMetadata(namespacedName, defaultSource, overloads))
+	if i := strings.LastIndex(namespacedName, "."); i >= 0 {
+		signatures = append(signatures, NewTAFunctionMetadata(namespacedName[i+1:], defaultSource, overloads))
+	}
+	return signatures
+}
+
+/* Registers tuple function in both namespaced and bare forms with IsTuple flag set */
+func appendTupleWithBareAlias(signatures []TAFunctionMetadata, namespacedName, defaultSource string, overloads []TAOverloadRule) []TAFunctionMetadata {
+	meta := NewTAFunctionMetadata(namespacedName, defaultSource, overloads)
+	meta.IsTuple = true
+	signatures = append(signatures, meta)
+	if i := strings.LastIndex(namespacedName, "."); i >= 0 {
+		bare := NewTAFunctionMetadata(namespacedName[i+1:], defaultSource, overloads)
+		bare.IsTuple = true
+		signatures = append(signatures, bare)
+	}
+	return signatures
 }
 
 func (m TAFunctionMetadata) FindOverload(argCount int) (TAOverloadRule, bool) {
