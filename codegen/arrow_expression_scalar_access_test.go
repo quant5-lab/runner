@@ -174,9 +174,9 @@ check(threshold) =>
 plot(check(100))
 `,
 			mustContainAll: []string{
-				"above_threshold := (bar.Close > threshold)",
-				"below_high := (bar.Close < bar.High)",
-				"(above_threshold && below_high)", // Logical AND uses scalars
+				"above_threshold := func() float64 { if (bar.Close > threshold) { return 1.0 } else { return 0.0 } }()",
+				"below_high := func() float64 { if (bar.Close < bar.High) { return 1.0 } else { return 0.0 } }()",
+				"((above_threshold != 0) && (below_high != 0))",
 			},
 			forbiddenPattern: []string{
 				"above_thresholdSeries.GetCurrent()",
@@ -199,9 +199,9 @@ plot(validate(10, 100))
 `,
 			mustContainAll: []string{
 				"current := (bar.Close + bar.Open)",
-				"too_low := (current < min_val)",
-				"too_high := (current > max_val)",
-				"invalid := (too_low || too_high)", // Logical OR uses scalars
+				"too_low := func() float64 { if (current < min_val) { return 1.0 } else { return 0.0 } }()",
+				"too_high := func() float64 { if (current > max_val) { return 1.0 } else { return 0.0 } }()",
+				"((too_low != 0) || (too_high != 0))",
 			},
 			forbiddenPattern: []string{
 				"currentSeries.GetCurrent()",
@@ -226,9 +226,9 @@ plot(select_value(5))
 			mustContainAll: []string{
 				"up_move := (bar.High - bar.Low)",
 				"down_move := (bar.Low - bar.Open)",
-				"condition := ((up_move > down_move) && (up_move > threshold))",
-				"if condition",   // Ternary test uses scalar boolean
-				"return up_move", // Scalar return
+				"((up_move > down_move) && (up_move > threshold))",
+				"(condition != 0)", // Ternary test converts float64 to bool
+				"return up_move",
 			},
 			forbiddenPattern: []string{
 				"up_moveSeries.GetCurrent()",
@@ -564,10 +564,10 @@ complex_condition(threshold) =>
 plot(complex_condition(100))
 `,
 			mustContainAll: []string{
-				"a := (bar.Close > threshold)",
-				"b := (bar.High > bar.Open)",
-				"c := (bar.Low < bar.Close)",
-				"((a && b) || c)", // Chained logical with scalars
+				"a := func() float64 { if (bar.Close > threshold) { return 1.0 } else { return 0.0 } }()",
+				"b := func() float64 { if (bar.High > bar.Open) { return 1.0 } else { return 0.0 } }()",
+				"c := func() float64 { if (bar.Low < bar.Close) { return 1.0 } else { return 0.0 } }()",
+				"(((a != 0) && (b != 0)) || (c != 0))",
 			},
 			forbiddenPattern: []string{
 				"aSeries.GetCurrent()",

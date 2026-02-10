@@ -594,6 +594,46 @@ func TestBooleanConverter_EdgeCases(t *testing.T) {
 		}
 	})
 
+	t.Run("bool literal true is already boolean", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		result := converter.IsAlreadyBoolean(&ast.Literal{Value: true})
+		if !result {
+			t.Error("expected true for bool literal true")
+		}
+	})
+
+	t.Run("bool literal false is already boolean", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		result := converter.IsAlreadyBoolean(&ast.Literal{Value: false})
+		if !result {
+			t.Error("expected true for bool literal false")
+		}
+	})
+
+	t.Run("numeric literal not already boolean", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		result := converter.IsAlreadyBoolean(&ast.Literal{Value: 42.0})
+		if result {
+			t.Error("expected false for numeric literal")
+		}
+	})
+
+	t.Run("string literal not already boolean", func(t *testing.T) {
+		typeSystem := NewTypeInferenceEngine()
+		converter := NewBooleanConverter(typeSystem)
+
+		result := converter.IsAlreadyBoolean(&ast.Literal{Value: "hello"})
+		if result {
+			t.Error("expected false for string literal")
+		}
+	})
+
 	t.Run("empty code string handled", func(t *testing.T) {
 		typeSystem := NewTypeInferenceEngine()
 		converter := NewBooleanConverter(typeSystem)

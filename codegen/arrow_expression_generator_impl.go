@@ -18,6 +18,7 @@ type ArrowExpressionGeneratorImpl struct {
 	accessorFactory    *ArrowAwareAccessorFactory
 	inlineTAGenerator  *ArrowInlineTACallGenerator
 	valueGenerator     *ArrowValueFunctionGenerator
+	coercer            *NumericExpressionCoercer
 }
 
 func NewArrowExpressionGeneratorImpl(gen *generator, resolver *ArrowSeriesAccessResolver) *ArrowExpressionGeneratorImpl {
@@ -27,6 +28,7 @@ func NewArrowExpressionGeneratorImpl(gen *generator, resolver *ArrowSeriesAccess
 		gen:                gen,
 		accessResolver:     resolver,
 		identifierResolver: identifierResolver,
+		coercer:            NewNumericExpressionCoercer(gen.boolConverter),
 	}
 
 	accessorFactory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
@@ -151,16 +153,23 @@ func (e *ArrowExpressionGeneratorImpl) generateLiteral(lit *ast.Literal) (string
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateNumericExpression(expr ast.Expression) (string, error) {
-	if lit, ok := expr.(*ast.Literal); ok {
-		if boolVal, ok := lit.Value.(bool); ok {
-			if boolVal {
-				return "1.0", nil
-			}
-			return "0.0", nil
-		}
+	code, err := e.generateExpression(expr)
+	if err != nil {
+		return "", err
 	}
+	return e.coercer.CoerceToFloat64(expr, code), nil
+}
 
-	return e.generateExpression(expr)
+/*
+	ensureBooleanOperand converts float64 arrow values to bool via != 0 (PineScript truthiness).
+
+All arrow locals and parameters are float64, so all identifiers need conversion.
+*/
+func (e *ArrowExpressionGeneratorImpl) ensureBooleanOperand(expr ast.Expression, code string) string {
+	if e.gen.boolConverter.IsAlreadyBoolean(expr) {
+		return code
+	}
+	return fmt.Sprintf("(%s != 0)", code)
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
@@ -186,6 +195,7 @@ func (e *ArrowExpressionGeneratorImpl) generateUnaryExpression(unaryExpr *ast.Un
 	op := unaryExpr.Operator
 	if op == "not" {
 		op = "!"
+		operand = e.ensureBooleanOperand(unaryExpr.Argument, operand)
 	}
 
 	return fmt.Sprintf("%s%s", op, operand), nil
@@ -201,6 +211,9 @@ func (e *ArrowExpressionGeneratorImpl) generateLogicalExpression(logExpr *ast.Lo
 	if err != nil {
 		return "", err
 	}
+
+	left = e.ensureBooleanOperand(logExpr.Left, left)
+	right = e.ensureBooleanOperand(logExpr.Right, right)
 
 	goOp := logExpr.Operator
 	if goOp == "and" {
@@ -218,7 +231,7 @@ func (e *ArrowExpressionGeneratorImpl) generateConditionalExpression(condExpr *a
 		return "", err
 	}
 
-	test = e.gen.addBoolConversionIfNeeded(condExpr.Test, test)
+	test = e.ensureBooleanOperand(condExpr.Test, test)
 
 	consequent, err := e.generateNumericExpression(condExpr.Consequent)
 	if err != nil {

@@ -1,6 +1,9 @@
-Codegen limitation: UnaryExpression not handled in ArgumentExpressionGenerator
+Neural network strategy (v2) with exp() activation functions
 
-Parse: ✅ (v5)
-Generate: ❌ (failed to generate argument 0: unsupported argument expression type: *ast.UnaryExpression)
-Compile: ❌ Not reached
+Parse: ✅ (v2 → v5 preprocessing)
+Generate: ✅ (AEG UnaryExpression fix unblocked negated coefficients)
+Compile: ❌ (undefined: bar — ohlc4 expansion inside arrow function references main-scope bar variable)
 Execute: ❌ Not reached
+
+Remaining blocker: ohlc4 built-in expands to (bar.Open+bar.High+bar.Low+bar.Close)/4
+but `bar` is only available in the main strategy scope, not inside UDF bodies.

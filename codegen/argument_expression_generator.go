@@ -14,6 +14,7 @@ type ArgumentExpressionGenerator struct {
 	signatureRegistry *FunctionSignatureRegistry
 	builtinHandler    *BuiltinIdentifierHandler
 	inSecurityContext bool
+	coercer           *NumericExpressionCoercer
 }
 
 func NewArgumentExpressionGenerator(
@@ -28,10 +29,21 @@ func NewArgumentExpressionGenerator(
 		signatureRegistry: gen.funcSigRegistry,
 		builtinHandler:    gen.builtinHandler,
 		inSecurityContext: gen.inSecurityContext,
+		coercer:           NewNumericExpressionCoercer(gen.boolConverter),
 	}
 }
 
+/* Generate produces a float64-typed Go expression for use as a function argument */
 func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, error) {
+	code, err := g.generate(expr)
+	if err != nil {
+		return "", err
+	}
+	return g.ensureFloat64(expr, code), nil
+}
+
+/* generate produces a raw Go expression preserving its native Go type (bool stays bool) */
+func (g *ArgumentExpressionGenerator) generate(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return g.generateIdentifier(e)
@@ -43,9 +55,25 @@ func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, err
 		return g.generateBinaryExpression(e)
 	case *ast.MemberExpression:
 		return g.generator.generateMemberExpression(e)
+	case *ast.UnaryExpression:
+		return g.generateUnaryExpression(e)
+	case *ast.LogicalExpression:
+		return g.generateLogicalExpression(e)
+	case *ast.ConditionalExpression:
+		return g.generateConditionalExpression(e)
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateIfExpressionAsIIFE(e)
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateForExpressionAsIIFE(e)
 	default:
 		return "", fmt.Errorf("unsupported argument expression type: %T", expr)
 	}
+}
+
+func (g *ArgumentExpressionGenerator) ensureFloat64(expr ast.Expression, code string) string {
+	return g.coercer.CoerceToFloat64(expr, code)
 }
 
 func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
@@ -121,17 +149,78 @@ func (g *ArgumentExpressionGenerator) generateLiteral(lit *ast.Literal) (string,
 }
 
 func (g *ArgumentExpressionGenerator) generateBinaryExpression(bin *ast.BinaryExpression) (string, error) {
-	leftGen := NewArgumentExpressionGenerator(g.generator, g.functionName, g.parameterIndex)
-	left, err := leftGen.Generate(bin.Left)
+	left, err := g.generate(bin.Left)
 	if err != nil {
 		return "", err
 	}
 
-	rightGen := NewArgumentExpressionGenerator(g.generator, g.functionName, g.parameterIndex)
-	right, err := rightGen.Generate(bin.Right)
+	right, err := g.generate(bin.Right)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("(%s %s %s)", left, bin.Operator, right), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateUnaryExpression(unary *ast.UnaryExpression) (string, error) {
+	operandCode, err := g.generate(unary.Argument)
+	if err != nil {
+		return "", err
+	}
+
+	op := unary.Operator
+	if op == "not" {
+		op = "!"
+		operandCode = g.generator.ensureBooleanOperand(unary.Argument, operandCode)
+	}
+
+	return fmt.Sprintf("%s%s", op, operandCode), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateLogicalExpression(logical *ast.LogicalExpression) (string, error) {
+	leftCode, err := g.generate(logical.Left)
+	if err != nil {
+		return "", err
+	}
+
+	rightCode, err := g.generate(logical.Right)
+	if err != nil {
+		return "", err
+	}
+
+	leftCode = g.generator.ensureBooleanOperand(logical.Left, leftCode)
+	rightCode = g.generator.ensureBooleanOperand(logical.Right, rightCode)
+
+	op := logical.Operator
+	switch op {
+	case "and":
+		op = "&&"
+	case "or":
+		op = "||"
+	}
+
+	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateConditionalExpression(cond *ast.ConditionalExpression) (string, error) {
+	testCode, err := g.generate(cond.Test)
+	if err != nil {
+		return "", err
+	}
+	testCode = g.generator.addBoolConversionIfNeeded(cond.Test, testCode)
+
+	consequentCode, err := g.generate(cond.Consequent)
+	if err != nil {
+		return "", err
+	}
+	consequentCode = g.coercer.CoerceToFloat64(cond.Consequent, consequentCode)
+
+	alternateCode, err := g.generate(cond.Alternate)
+	if err != nil {
+		return "", err
+	}
+	alternateCode = g.coercer.CoerceToFloat64(cond.Alternate, alternateCode)
+
+	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
+		testCode, consequentCode, alternateCode), nil
 }

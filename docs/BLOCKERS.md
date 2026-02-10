@@ -17,4 +17,4 @@
 | **15** | `input.*` missing type handlers | `input.color`, `input.time`, `input.timeframe`, `input.symbol` not implemented | `input_handler.go` switch cases |
 | **16** | `ticker.*` semantically incomplete | `ticker.modify()` returns `ctx.Symbol` (no-op), `ticker.new()`/`ticker.inherit()` do string concat only | `call_handler_ticker.go:186` |
 | **17** | Non-HA chart type transformers return identity | Renko, Kagi, LineBreak, PointFigure → `IdentityTransformer` (passthrough). Only HeikinAshi has real transform. | `bar_transformer.go:52` |
-| **18** | `ArgumentExpressionGenerator` incomplete | Handles 5 of 9+ expression types; missing `Unary`, `Conditional`, `Logical`, `Object` | `argument_expression_generator.go:47` |
+| **18** | ~~`ArgumentExpressionGenerator` incomplete~~ | ✅ Resolved: Added `Unary`, `Logical`, `Conditional` with AEG-recursive pattern and boolean safety | `argument_expression_generator.go` |

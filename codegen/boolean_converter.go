@@ -77,6 +77,9 @@ func (bc *BooleanConverter) IsAlreadyBoolean(expr ast.Expression) bool {
 		return e.Operator == "not" || e.Operator == "!"
 	case *ast.CallExpression:
 		return bc.IsBooleanFunction(e)
+	case *ast.Literal:
+		_, isBool := e.Value.(bool)
+		return isBool
 	default:
 		return false
 	}

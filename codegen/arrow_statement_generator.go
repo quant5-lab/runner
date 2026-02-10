@@ -12,6 +12,7 @@ type ArrowStatementGenerator struct {
 	localStorage  *ArrowLocalVariableStorage
 	exprGenerator *ArrowExpressionGeneratorImpl
 	symbolTable   SymbolTable
+	coercer       *NumericExpressionCoercer
 }
 
 func NewArrowStatementGenerator(
@@ -25,6 +26,7 @@ func NewArrowStatementGenerator(
 		localStorage:  localStorage,
 		exprGenerator: exprGen,
 		symbolTable:   symbolTable,
+		coercer:       NewNumericExpressionCoercer(gen.boolConverter),
 	}
 }
 
@@ -74,6 +76,8 @@ func (s *ArrowStatementGenerator) generateSingleVariableDeclaration(
 	if err != nil {
 		return "", fmt.Errorf("failed to generate init expression for '%s': %w", varName, err)
 	}
+
+	exprCode = s.coercer.CoerceToFloat64(initExpr, exprCode)
 
 	return s.localStorage.GenerateScalarAndSeriesStorage(varName, exprCode, operationType), nil
 }

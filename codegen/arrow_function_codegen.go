@@ -437,6 +437,11 @@ func (a *ArrowFunctionCodegen) generateExpressionReturnStatement(exprStmt *ast.E
 		return "", err
 	}
 
+	/* Arrow functions return float64 — coerce bool expressions at return point */
+	if a.gen.boolConverter.IsAlreadyBoolean(exprStmt.Expression) {
+		return a.gen.ind() + fmt.Sprintf("if %s { return 1.0 }\nreturn 0.0\n", exprCode), nil
+	}
+
 	return a.gen.ind() + "return " + exprCode + "\n", nil
 }
 

@@ -199,5 +199,5 @@ func (s *ArrowCallSiteScanner) isUserDefinedFunction(funcName string) bool {
 }
 
 func formatContextVariableName(funcName string, callIndex int) string {
-	return "arrowCtx_" + funcName + "_" + string(rune('0'+callIndex))
+	return fmt.Sprintf("arrowCtx_%s_%d", funcName, callIndex)
 }
