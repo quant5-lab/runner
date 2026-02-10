@@ -1,6 +1,6 @@
-Codegen limitation: Arrow function security() call not supported
+Codegen limitation: UnaryExpression not handled in ArgumentExpressionGenerator
 
 Parse: ✅ (v5)
-Generate: ❌ (unhandled call expression: security in arrow function)
+Generate: ❌ (failed to generate argument 0: unsupported argument expression type: *ast.UnaryExpression)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

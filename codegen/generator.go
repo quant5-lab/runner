@@ -756,6 +756,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	scanner := NewArrowCallSiteScanner(g.variables)
 	callSites := scanner.ScanForArrowFunctionCalls(program)
+
+	secDetector := NewArrowSecurityDetector()
+	for i := range callSites {
+		callSites[i].NeedsSecurity = secDetector.FunctionContainsSecurityCall(callSites[i].FunctionName, program)
+	}
+
 	g.hoistedArrowContexts = callSites
 
 	if len(callSites) > 0 {

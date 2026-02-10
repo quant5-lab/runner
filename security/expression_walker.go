@@ -31,6 +31,8 @@ func (w *ExpressionSecurityWalker) Walk(expr ast.Expression) {
 		w.Walk(e.Object)
 	case *ast.LogicalExpression:
 		w.walkLogicalExpression(e)
+	case *ast.ArrowFunctionExpression:
+		w.walkArrowFunctionBody(e)
 	}
 }
 
@@ -62,4 +64,11 @@ func (w *ExpressionSecurityWalker) walkBinaryExpression(bin *ast.BinaryExpressio
 func (w *ExpressionSecurityWalker) walkLogicalExpression(logical *ast.LogicalExpression) {
 	w.Walk(logical.Left)
 	w.Walk(logical.Right)
+}
+
+func (w *ExpressionSecurityWalker) walkArrowFunctionBody(arrow *ast.ArrowFunctionExpression) {
+	stmtWalker := NewStatementSecurityWalker(w)
+	for _, stmt := range arrow.Body {
+		stmtWalker.Walk(stmt)
+	}
 }

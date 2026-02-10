@@ -91,6 +91,11 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 		return e.valueGenerator.Generate(call)
 	}
 
+	securityGen := NewArrowSecurityCallGenerator(e.gen)
+	if securityGen.CanHandle(call) {
+		return securityGen.Generate(call)
+	}
+
 	code, handled, err := e.inlineTAGenerator.GenerateInlineTACall(call)
 	if err != nil {
 		return "", err

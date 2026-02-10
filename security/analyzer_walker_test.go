@@ -347,6 +347,57 @@ func TestExpressionSecurityWalker_AllExpressionTypes(t *testing.T) {
 			},
 			hasCalls: false,
 		},
+		{
+			name: "ArrowFunctionExpression_with_security",
+			expr: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "src"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "request"},
+								Property: &ast.Identifier{Name: "security"},
+							},
+							Arguments: []ast.Expression{
+								&ast.Literal{Value: "BTCUSDT"},
+								&ast.Literal{Value: "1D"},
+								&ast.Identifier{Name: "close"},
+							},
+						},
+					},
+				},
+			},
+			hasCalls: true,
+		},
+		{
+			name: "ArrowFunctionExpression_without_security",
+			expr: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "src"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "ta"},
+								Property: &ast.Identifier{Name: "sma"},
+							},
+							Arguments: []ast.Expression{
+								&ast.Identifier{Name: "src"},
+								&ast.Literal{Value: 20.0},
+							},
+						},
+					},
+				},
+			},
+			hasCalls: false,
+		},
+		{
+			name: "ArrowFunctionExpression_empty_body",
+			expr: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{},
+				Body:   []ast.Node{},
+			},
+			hasCalls: false,
+		},
 	}
 
 	for _, tt := range tests {

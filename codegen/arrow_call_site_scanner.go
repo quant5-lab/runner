@@ -8,9 +8,10 @@ import (
 )
 
 type ArrowCallSite struct {
-	FunctionName string
-	CallIndex    int
-	ContextVar   string
+	FunctionName  string
+	CallIndex     int
+	ContextVar    string
+	NeedsSecurity bool
 }
 
 /*
