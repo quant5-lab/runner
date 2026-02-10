@@ -45,6 +45,10 @@ func (a *ParameterUsageAnalyzer) analyzeStatement(stmt ast.Node) {
 		for _, bodyStmt := range s.Body {
 			a.analyzeStatement(bodyStmt)
 		}
+	case *ast.ForInStatement:
+		for _, bodyStmt := range s.Body {
+			a.analyzeStatement(bodyStmt)
+		}
 	case *ast.IfStatement:
 		a.analyzeExpression(s.Test)
 		for _, conseq := range s.Consequent {

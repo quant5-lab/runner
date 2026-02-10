@@ -57,24 +57,70 @@ func (c *ControlFlowExpressionGenerator) GenerateForExpressionAsIIFE(forStmt *as
 
 	c.baseGenerator.indent++
 
+	if err := c.generateLoopBodyWithResult(&builder, forStmt.Body); err != nil {
+		return "", err
+	}
+
+	return builder.String(), nil
+}
+
+func (c *ControlFlowExpressionGenerator) GenerateForInExpressionAsIIFE(forIn *ast.ForInStatement) (string, error) {
+	var builder strings.Builder
+
+	builder.WriteString("(func() float64 {\n")
+	c.baseGenerator.indent++
+
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString("var __result float64\n")
+
+	collCode, err := c.baseGenerator.generateExpression(forIn.Collection)
+	if err != nil {
+		return "", fmt.Errorf("generating for-in collection expression: %w", err)
+	}
+	collCode = strings.TrimSpace(collCode)
+
+	indexVar := "_"
+	if forIn.IndexVar != "" {
+		indexVar = forIn.IndexVar
+	}
+
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString(fmt.Sprintf("for %s, %s := range %s {\n", indexVar, forIn.ElementVar, collCode))
+	c.baseGenerator.indent++
+
+	if err := c.generateLoopBodyWithResult(&builder, forIn.Body); err != nil {
+		return "", err
+	}
+
+	return builder.String(), nil
+}
+
+/* Shared by for and for-in IIFE: last ExpressionStatement becomes __result assignment */
+func (c *ControlFlowExpressionGenerator) generateLoopBodyWithResult(builder *strings.Builder, body []ast.Node) error {
 	lastStatementIsAssignment := false
-	for i, bodyNode := range forStmt.Body {
-		isLastStatement := i == len(forStmt.Body)-1
+	for i, bodyNode := range body {
+		isLastStatement := i == len(body)-1
 
 		if isLastStatement {
 			if exprStmt, ok := bodyNode.(*ast.ExpressionStatement); ok {
-				if ident, ok := exprStmt.Expression.(*ast.Identifier); ok {
-					builder.WriteString(c.baseGenerator.ind())
-					builder.WriteString(fmt.Sprintf("__result = float64(%s)\n", ident.Name))
-					lastStatementIsAssignment = true
-					continue
+				wasInArrow := c.baseGenerator.inArrowFunctionBody
+				c.baseGenerator.inArrowFunctionBody = true
+				exprCode, err := c.baseGenerator.generateExpression(exprStmt.Expression)
+				c.baseGenerator.inArrowFunctionBody = wasInArrow
+				if err != nil {
+					return fmt.Errorf("generating loop result expression: %w", err)
 				}
+				exprCode = strings.TrimSpace(exprCode)
+				builder.WriteString(c.baseGenerator.ind())
+				builder.WriteString(fmt.Sprintf("__result = float64(%s)\n", exprCode))
+				lastStatementIsAssignment = true
+				continue
 			}
 		}
 
 		code, err := c.baseGenerator.generateStatement(bodyNode)
 		if err != nil {
-			return "", fmt.Errorf("generating for-expression body node: %w", err)
+			return fmt.Errorf("generating loop expression body: %w", err)
 		}
 
 		builder.WriteString(code)
@@ -96,7 +142,7 @@ func (c *ControlFlowExpressionGenerator) GenerateForExpressionAsIIFE(forStmt *as
 	builder.WriteString(c.baseGenerator.ind())
 	builder.WriteString("}())")
 
-	return builder.String(), nil
+	return nil
 }
 
 func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsIIFE(ifStmt *ast.IfStatement) (string, error) {
@@ -169,7 +215,7 @@ func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings
 	c.baseGenerator.inArrowFunctionBody = true
 	defer func() { c.baseGenerator.inArrowFunctionBody = wasInArrow }()
 
-	/* Emit all body nodes except the last ExpressionStatement which becomes the return value */
+	/* Last ExpressionStatement = return value; all preceding nodes emit normally */
 	lastIdx := len(body) - 1
 	for i, node := range body {
 		if i == lastIdx {

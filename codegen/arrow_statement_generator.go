@@ -39,6 +39,9 @@ func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, erro
 	case *ast.ForStatement:
 		return s.generateForStatement(st)
 
+	case *ast.ForInStatement:
+		return s.generateForInStatement(st)
+
 	default:
 		return s.gen.generateStatement(stmt)
 	}
@@ -86,7 +89,6 @@ func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.Arr
 	varNames := make([]string, len(arrayPattern.Elements))
 	for i, elem := range arrayPattern.Elements {
 		varNames[i] = elem.Name
-		// Register each tuple element in symbol table as series
 		if s.symbolTable != nil {
 			s.symbolTable.Register(varNames[i], VariableTypeSeries)
 		}
@@ -139,10 +141,9 @@ func (s *ArrowStatementGenerator) generateForStatement(forStmt *ast.ForStatement
 	code += s.gen.ind() + "}\n"
 
 	code += s.gen.ind() + "_ascending := _step > 0\n"
-	code += s.gen.ind() + fmt.Sprintf("for (_ascending && %s <= _to) || (!_ascending && %s >= _to) {\n", counterVar, counterVar)
+	code += s.gen.ind() + fmt.Sprintf("for ; (_ascending && %s <= _to) || (!_ascending && %s >= _to); %s += _step {\n", counterVar, counterVar, counterVar)
 	s.gen.indent++
 
-	/* Generate loop body using arrow-aware statement generator (recursive) */
 	for _, stmt := range forStmt.Body {
 		stmtCode, err := s.GenerateStatement(stmt)
 		if err != nil {
@@ -153,10 +154,39 @@ func (s *ArrowStatementGenerator) generateForStatement(forStmt *ast.ForStatement
 		}
 	}
 
-	code += s.gen.ind() + fmt.Sprintf("%s += _step\n", counterVar)
-
 	s.gen.indent--
 	code += s.gen.ind() + "}\n"
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
+
+	return code, nil
+}
+
+func (s *ArrowStatementGenerator) generateForInStatement(forIn *ast.ForInStatement) (string, error) {
+	collCode, err := s.exprGenerator.Generate(forIn.Collection)
+	if err != nil {
+		return "", fmt.Errorf("for-in collection expression failed: %w", err)
+	}
+
+	indexVar := "_"
+	if forIn.IndexVar != "" {
+		indexVar = forIn.IndexVar
+	}
+	elementVar := forIn.ElementVar
+
+	code := s.gen.ind() + fmt.Sprintf("for %s, %s := range %s {\n", indexVar, elementVar, collCode)
+	s.gen.indent++
+
+	for _, stmt := range forIn.Body {
+		stmtCode, err := s.GenerateStatement(stmt)
+		if err != nil {
+			return "", fmt.Errorf("for-in body statement failed: %w", err)
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
 	s.gen.indent--
 	code += s.gen.ind() + "}\n"
 

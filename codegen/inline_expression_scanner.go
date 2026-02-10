@@ -61,6 +61,11 @@ func (s *InlineExpressionScanner) scanStatement(stmt ast.Node, registry map[*ast
 		for _, bodyStmt := range node.Body {
 			s.scanStatement(bodyStmt, registry, hoistable)
 		}
+
+	case *ast.ForInStatement:
+		for _, bodyStmt := range node.Body {
+			s.scanStatement(bodyStmt, registry, hoistable)
+		}
 	}
 }
 

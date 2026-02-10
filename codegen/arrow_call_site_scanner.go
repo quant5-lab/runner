@@ -101,6 +101,11 @@ func (s *ArrowCallSiteScanner) scanStatement(stmt ast.Node, callCounts map[strin
 		for _, bodyStmt := range node.Body {
 			s.scanStatement(bodyStmt, callCounts, callSites)
 		}
+
+	case *ast.ForInStatement:
+		for _, bodyStmt := range node.Body {
+			s.scanStatement(bodyStmt, callCounts, callSites)
+		}
 	}
 }
 

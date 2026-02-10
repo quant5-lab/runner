@@ -634,6 +634,13 @@ func TestNormalizeIfBlocks_BodyStatementClassification(t *testing.T) {
 			expectedIfCount:     1,
 			expectedBodyStmtMin: 2,
 		},
+		{
+			name: "control flow keywords",
+			input: `if done
+    break`,
+			expectedIfCount:     1,
+			expectedBodyStmtMin: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -710,6 +717,48 @@ z = 3`,
 
 			if !strings.Contains(result, "x := 1") || !strings.Contains(result, "y := 2") {
 				t.Errorf("Statements not preserved\nResult:\n%s", result)
+			}
+		})
+	}
+}
+
+/* break/continue inside if-body are preserved, not absorbed into condition */
+func TestNormalizeIfBlocks_ControlFlowKeywordsPreserved(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "break preserved in if body",
+			input: `if i > 5
+    break`,
+			expected: `if i > 5
+    break`,
+		},
+		{
+			name: "continue preserved in if body",
+			input: `if i == 3
+    continue`,
+			expected: `if i == 3
+    continue`,
+		},
+		{
+			name: "break with assignment in same body",
+			input: `if done
+    x := 1
+    break`,
+			expected: `if done
+    x := 1
+    break`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NormalizeIfBlocks(tt.input)
+			if result != tt.expected {
+				t.Errorf("Expected:\n%s\nGot:\n%s", tt.expected, result)
 			}
 		})
 	}

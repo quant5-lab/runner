@@ -28,8 +28,11 @@ func NewStatementConverterFactory(
 			NewAssignmentConverter(expressionConverter),
 			NewReassignmentConverter(expressionConverter),
 			NewIfStatementConverter(orExprConverter, statementConverter),
+			NewForInStatementConverter(arithExprConverter, statementConverter),
 			NewForStatementConverter(arithExprConverter, statementConverter),
 			NewSwitchStatementConverter(orExprConverter, statementConverter),
+			NewBreakStatementConverter(),
+			NewContinueStatementConverter(),
 			NewExpressionStatementConverter(expressionConverter),
 		},
 	}

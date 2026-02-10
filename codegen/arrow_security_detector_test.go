@@ -178,6 +178,19 @@ func TestArrowSecurityDetector_ContainsSecurityCall(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "for_in_loop_body",
+			body: []ast.Node{
+				&ast.ForInStatement{
+					ElementVar: "val",
+					Collection: &ast.Identifier{Name: "arr"},
+					Body: []ast.Node{
+						&ast.ExpressionStatement{Expression: makeSecurityCall("BTCUSDT", "1D", "close")},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
 			name: "multiple_security_calls",
 			body: []ast.Node{
 				&ast.VariableDeclaration{

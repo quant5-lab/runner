@@ -122,7 +122,11 @@ func getIndentation(line string) int {
 }
 
 func looksLikeBodyStatement(trimmed string) bool {
-	// Body statements typically start with: strategy., plot(, identifiers with assignment/calls
+	switch trimmed {
+	case "break", "continue":
+		return true
+	}
+
 	return strings.HasPrefix(trimmed, "strategy.") ||
 		strings.HasPrefix(trimmed, "plot(") ||
 		regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*\s*[:=]`).MatchString(trimmed) ||

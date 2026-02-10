@@ -53,6 +53,10 @@ func (e *ArrowExpressionGeneratorImpl) generateExpression(expr ast.Expression) (
 		cfGenerator := NewControlFlowExpressionGenerator(e.gen)
 		return cfGenerator.GenerateForExpressionAsIIFE(ex)
 
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(e.gen)
+		return cfGenerator.GenerateForInExpressionAsIIFE(ex)
+
 	case *ast.IfStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(e.gen)
 		return cfGenerator.GenerateIfExpressionAsIIFE(ex)

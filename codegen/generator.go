@@ -83,6 +83,10 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
 	gen.hasBarIndexUsage = detectBarIndexUsage(program)
 
+	if err := NewLoopNestingValidator().Validate(program); err != nil {
+		return nil, err
+	}
+
 	body, err := gen.generateProgram(program)
 	if err != nil {
 		return nil, err
@@ -924,6 +928,12 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateIfStatement(n)
 	case *ast.ForStatement:
 		return g.generateForStatement(n)
+	case *ast.ForInStatement:
+		return g.generateForInStatement(n)
+	case *ast.BreakStatement:
+		return g.ind() + "break\n", nil
+	case *ast.ContinueStatement:
+		return g.ind() + "continue\n", nil
 	default:
 		return "", fmt.Errorf("unsupported statement type: %T", node)
 	}
@@ -934,6 +944,9 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 	case *ast.ForStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		return cfGenerator.GenerateForExpressionAsIIFE(e)
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateForInExpressionAsIIFE(e)
 	case *ast.IfStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		return cfGenerator.GenerateIfExpressionAsIIFE(e)
@@ -1053,7 +1066,7 @@ func (g *generator) generateForStatement(forStmt *ast.ForStatement) (string, err
 	code += g.ind() + fmt.Sprintf("}\n")
 
 	code += g.ind() + fmt.Sprintf("_ascending := _step > 0\n")
-	code += g.ind() + fmt.Sprintf("for (_ascending && %s <= _to) || (!_ascending && %s >= _to) {\n", counterVar, counterVar)
+	code += g.ind() + fmt.Sprintf("for ; (_ascending && %s <= _to) || (!_ascending && %s >= _to); %s += _step {\n", counterVar, counterVar, counterVar)
 	g.indent++
 
 	for _, stmt := range forStmt.Body {
@@ -1067,14 +1080,50 @@ func (g *generator) generateForStatement(forStmt *ast.ForStatement) (string, err
 		}
 	}
 
-	code += g.ind() + fmt.Sprintf("%s += _step\n", counterVar)
-
 	g.indent--
 	code += g.ind() + "}\n"
 	g.indent--
 	code += g.ind() + "}\n"
 
 	g.loopContextStack.Pop()
+
+	return code, nil
+}
+
+func (g *generator) generateForInStatement(forIn *ast.ForInStatement) (string, error) {
+	/* Index var enables float64() wrapping in binary expressions; empty string still gates IsInLoop */
+	counterVar := ""
+	if forIn.IndexVar != "" {
+		counterVar = forIn.IndexVar
+	}
+	g.loopContextStack.Push(counterVar)
+	defer g.loopContextStack.Pop()
+
+	collCode, err := g.generateArrowFunctionExpression(forIn.Collection)
+	if err != nil {
+		return "", fmt.Errorf("for-in collection: %w", err)
+	}
+
+	indexVar := "_"
+	if forIn.IndexVar != "" {
+		indexVar = forIn.IndexVar
+	}
+
+	code := g.ind() + fmt.Sprintf("for %s, %s := range %s {\n", indexVar, forIn.ElementVar, collCode)
+	g.indent++
+
+	for _, stmt := range forIn.Body {
+		stmtCode, err := g.generateStatement(stmt)
+		if err != nil {
+			return "", fmt.Errorf("for-in body: %w", err)
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
+	g.indent--
+	code += g.ind() + "}\n"
 
 	return code, nil
 }
@@ -1416,6 +1465,11 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		}
 
 		varName := e.Name
+
+		/* Loop counter resolves to float64(counterVar) inside for-loop conditions */
+		if g.loopContextStack != nil && g.loopContextStack.IsInLoop() && g.loopContextStack.IsLoopCounter(varName) {
+			return fmt.Sprintf("float64(%s)", varName), nil
+		}
 
 		if constVal, isConstant := g.constants[varName]; isConstant {
 			if constVal == "input.source" {
@@ -2080,6 +2134,13 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.ForStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		iifeCode, err := cfGenerator.GenerateForExpressionAsIIFE(expr)
+		if err != nil {
+			return "", err
+		}
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		iifeCode, err := cfGenerator.GenerateForInExpressionAsIIFE(expr)
 		if err != nil {
 			return "", err
 		}
@@ -3701,6 +3762,17 @@ func hasBarIndexInNode(node ast.Node) bool {
 				return true
 			}
 		}
+	case *ast.ForInStatement:
+		if hasBarIndexInExpression(n.Collection) {
+			return true
+		}
+		for _, stmt := range n.Body {
+			if hasBarIndexInNode(stmt) {
+				return true
+			}
+		}
+	case *ast.BreakStatement, *ast.ContinueStatement:
+		return false
 	}
 	return false
 }

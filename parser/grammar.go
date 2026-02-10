@@ -24,12 +24,15 @@ type Statement struct {
 type StatementCore struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
 	If              *IfStatement     `parser:"| @@"`
+	ForIn           *ForInStatement  `parser:"| @@"`
 	For             *ForStatement    `parser:"| @@"`
 	Switch          *SwitchExpr      `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
 	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
+	Break           *BreakStmt       `parser:"| @@"`
+	Continue        *ContinueStmt    `parser:"| @@"`
 	Expression      *ExpressionStmt  `parser:"| @@"`
 }
 
@@ -48,6 +51,20 @@ type ForStatement struct {
 	Indent  *string      `parser:"@Indent"`
 	Body    []*Statement `parser:"@@+"`
 	Dedent  *string      `parser:"@Dedent"`
+}
+
+type ForInVars struct {
+	TupleIndex    *string `parser:"'[' @Ident ','"`
+	TupleElement  *string `parser:"@Ident ']'"`
+	SingleElement *string `parser:"| @Ident"`
+}
+
+type ForInStatement struct {
+	Vars       *ForInVars   `parser:"'for' @@"`
+	Collection *ArithExpr   `parser:"'in' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
 }
 
 type FunctionDecl struct {
@@ -81,6 +98,14 @@ type ExpressionStmt struct {
 	Expr *Expression `parser:"@@"`
 }
 
+type BreakStmt struct {
+	Keyword string `parser:"@'break'"`
+}
+
+type ContinueStmt struct {
+	Keyword string `parser:"@'continue'"`
+}
+
 type ArrayLiteral struct {
 	Elements []*TernaryExpr `parser:"'[' ( @@ ( ',' @@ )* )? ']'"`
 }
@@ -93,6 +118,14 @@ type ForExpr struct {
 	Indent  *string      `parser:"@Indent"`
 	Body    []*Statement `parser:"@@+"`
 	Dedent  *string      `parser:"@Dedent"`
+}
+
+type ForInExpr struct {
+	Vars       *ForInVars   `parser:"'for' @@"`
+	Collection *ArithExpr   `parser:"'in' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
 }
 
 type IfExpr struct {
@@ -117,7 +150,8 @@ type SwitchCase struct {
 }
 
 type Expression struct {
-	ForExpr      *ForExpr      `parser:"@@"`
+	ForInExpr    *ForInExpr    `parser:"@@"`
+	ForExpr      *ForExpr      `parser:"| @@"`
 	IfExpr       *IfExpr       `parser:"| @@"`
 	SwitchExpr   *SwitchExpr   `parser:"| @@"`
 	Ternary      *TernaryExpr  `parser:"| @@"`
@@ -250,7 +284,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
 	{Name: "Newline", Pattern: `\r?\n`},
 	{Name: "Whitespace", Pattern: `[ \t]+`},
-	{Name: "Keyword", Pattern: `\b(if|for|to|by|while|switch|and|or|not|true|false)\b`},
+	{Name: "Keyword", Pattern: `\b(if|for|in|to|by|while|switch|and|or|not|true|false|break|continue)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
 	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},

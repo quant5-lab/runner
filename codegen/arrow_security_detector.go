@@ -78,6 +78,12 @@ func (d *ArrowSecurityDetector) scanStatement(stmt ast.Node) bool {
 				return true
 			}
 		}
+	case *ast.ForInStatement:
+		for _, b := range s.Body {
+			if d.scanStatement(b) {
+				return true
+			}
+		}
 	}
 	return false
 }

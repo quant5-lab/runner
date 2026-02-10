@@ -69,6 +69,9 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
+	if expr.ForInExpr != nil {
+		return c.convertForInExprToStatement(expr.ForInExpr)
+	}
 	if expr.ForExpr != nil {
 		return c.convertForExprToStatement(expr.ForExpr)
 	}
@@ -736,6 +739,13 @@ func (c *Converter) convertForExprToStatement(forExpr *ForExpr) (ast.Expression,
 		Step:     stepExpr,
 		Body:     body,
 	}, nil
+}
+
+func (c *Converter) convertForInExprToStatement(forInExpr *ForInExpr) (ast.Expression, error) {
+	return convertForInToAST(
+		forInExpr.Vars, forInExpr.Collection, forInExpr.Body,
+		c.convertArithExpr, c.convertStatement,
+	)
 }
 
 func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, error) {

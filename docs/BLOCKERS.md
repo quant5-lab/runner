@@ -4,7 +4,7 @@
 | **2** | `varip` declarations | Absent from all layers — lexer, parser, AST, codegen, runtime | 0 hits for `varip` anywhere |
 | **3** | `map.new<K,V>()` generics | `<`/`>` lexed as comparison operators, no generic type syntax in grammar | Parse error: `unexpected token ","` on `map.new<string, float>()` |
 | **4** | Switch inline case results | `SwitchCase` requires `Indent Body+ Dedent`, no inline `cond => expr` form | `grammar.go` SwitchCase; all tests use multi-line form only |
-| **5** | `for...in` iteration | Only `for i = from to end` form exists, no `for element in array` syntax | `grammar.go` ForStatement has no `in` alternative |
+| **5** | ~~`for...in` iteration~~ | ✅ Resolved: AST ForInStatement, grammar ForInStmt, parser converter, codegen (statement + IIFE + arrow), `break`/`continue` support for all loop types | `for_in_statement_converter.go`, `break_continue_converter.go`, `control_flow_expression_generator.go` |
 | **6** | User-defined types (`type`) | No grammar, AST, or codegen for Pine v5 `type` declarations / UDTs | 0 hits |
 | **7** | Methods (`method`) | No grammar, AST, or codegen for Pine v5 `method` declarations | 0 hits |
 | **8** | Library `import`/`export` | No grammar, AST, or codegen for Pine library system | 0 hits |

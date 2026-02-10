@@ -16,11 +16,14 @@ const (
 	TypeBinaryExpression        NodeType = "BinaryExpression"
 	TypeIfStatement             NodeType = "IfStatement"
 	TypeForStatement            NodeType = "ForStatement"
+	TypeForInStatement          NodeType = "ForInStatement"
 	TypeConditionalExpression   NodeType = "ConditionalExpression"
 	TypeLogicalExpression       NodeType = "LogicalExpression"
 	TypeUnaryExpression         NodeType = "UnaryExpression"
 	TypeArrayPattern            NodeType = "ArrayPattern"
 	TypeArrowFunctionExpression NodeType = "ArrowFunctionExpression"
+	TypeBreakStatement          NodeType = "BreakStatement"
+	TypeContinueStatement       NodeType = "ContinueStatement"
 )
 
 type Node interface {
@@ -165,6 +168,17 @@ type ForStatement struct {
 func (f *ForStatement) Type() NodeType  { return TypeForStatement }
 func (f *ForStatement) expressionNode() {}
 
+type ForInStatement struct {
+	NodeType   NodeType   `json:"type"`
+	IndexVar   string     `json:"indexVar,omitempty"`
+	ElementVar string     `json:"elementVar"`
+	Collection Expression `json:"collection"`
+	Body       []Node     `json:"body"`
+}
+
+func (f *ForInStatement) Type() NodeType  { return TypeForInStatement }
+func (f *ForInStatement) expressionNode() {}
+
 type ConditionalExpression struct {
 	NodeType   NodeType   `json:"type"`
 	Test       Expression `json:"test"`
@@ -203,3 +217,15 @@ type ArrowFunctionExpression struct {
 
 func (a *ArrowFunctionExpression) Type() NodeType  { return TypeArrowFunctionExpression }
 func (a *ArrowFunctionExpression) expressionNode() {}
+
+type BreakStatement struct {
+	NodeType NodeType `json:"type"`
+}
+
+func (b *BreakStatement) Type() NodeType { return TypeBreakStatement }
+
+type ContinueStatement struct {
+	NodeType NodeType `json:"type"`
+}
+
+func (c *ContinueStatement) Type() NodeType { return TypeContinueStatement }

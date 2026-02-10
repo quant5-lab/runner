@@ -40,7 +40,6 @@ func NewArrowLoopModificationAnalyzer() *ArrowLoopModificationAnalyzer {
 func (a *ArrowLoopModificationAnalyzer) FindLoopModifiedVariables(body []ast.Node) map[string]bool {
 	result := make(map[string]bool)
 
-	// Track all variables and where they're declared
 	a.analyzeWithScope(body, make(map[string]bool), result)
 
 	return result
@@ -52,7 +51,6 @@ func (a *ArrowLoopModificationAnalyzer) FindLoopModifiedVariables(body []ast.Nod
  * modified: output set of loop-modified variables
  */
 func (a *ArrowLoopModificationAnalyzer) analyzeWithScope(statements []ast.Node, declaredBefore map[string]bool, modified map[string]bool) {
-	// Track variables declared at this scope level
 	currentScope := make(map[string]bool)
 	for k, v := range declaredBefore {
 		currentScope[k] = v
@@ -61,7 +59,6 @@ func (a *ArrowLoopModificationAnalyzer) analyzeWithScope(statements []ast.Node, 
 	for _, stmt := range statements {
 		switch s := stmt.(type) {
 		case *ast.VariableDeclaration:
-			// Add new declarations to current scope
 			for _, declarator := range s.Declarations {
 				if id, ok := declarator.ID.(*ast.Identifier); ok {
 					currentScope[id.Name] = true
@@ -73,11 +70,12 @@ func (a *ArrowLoopModificationAnalyzer) analyzeWithScope(statements []ast.Node, 
 			}
 
 		case *ast.ForStatement:
-			// Analyze loop body with current scope as "declared before"
+			a.analyzeForLoopWithScope(s.Body, currentScope, modified)
+
+		case *ast.ForInStatement:
 			a.analyzeForLoopWithScope(s.Body, currentScope, modified)
 
 		case *ast.IfStatement:
-			// Recurse into if-statement branches
 			a.analyzeWithScope(s.Consequent, currentScope, modified)
 			a.analyzeWithScope(s.Alternate, currentScope, modified)
 		}
@@ -89,7 +87,6 @@ func (a *ArrowLoopModificationAnalyzer) analyzeForLoopWithScope(body []ast.Node,
 	for _, stmt := range body {
 		switch s := stmt.(type) {
 		case *ast.VariableDeclaration:
-			// Check if this is a reassignment (variable existed before loop)
 			for _, declarator := range s.Declarations {
 				if id, ok := declarator.ID.(*ast.Identifier); ok {
 					if declaredBefore[id.Name] {
@@ -99,37 +96,41 @@ func (a *ArrowLoopModificationAnalyzer) analyzeForLoopWithScope(body []ast.Node,
 			}
 
 		case *ast.IfStatement:
-			// Recurse into if-statements inside loop
 			a.analyzeForLoopWithScope(s.Consequent, declaredBefore, modified)
 			a.analyzeForLoopWithScope(s.Alternate, declaredBefore, modified)
 
 		case *ast.ForStatement:
-			// Nested loop: build scope including variables declared in outer loop
-			nestedScope := make(map[string]bool)
-			for k, v := range declaredBefore {
-				nestedScope[k] = v
-			}
+			a.analyzeNestedLoop(s.Body, body, s, declaredBefore, modified)
 
-			// Add variables declared in current loop body (before nested loop)
-			for _, preStmt := range body {
-				if preStmt == s {
-					break // Stop before nested loop
-				}
-				if varDecl, ok := preStmt.(*ast.VariableDeclaration); ok {
-					for _, declarator := range varDecl.Declarations {
-						if id, ok := declarator.ID.(*ast.Identifier); ok {
-							nestedScope[id.Name] = true
-						} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
-							for _, elem := range arrayPattern.Elements {
-								nestedScope[elem.Name] = true
-							}
-						}
+		case *ast.ForInStatement:
+			a.analyzeNestedLoop(s.Body, body, s, declaredBefore, modified)
+		}
+	}
+}
+
+/* analyzeNestedLoop builds extended scope from outer body declarations and recurses into nested loop */
+func (a *ArrowLoopModificationAnalyzer) analyzeNestedLoop(nestedBody []ast.Node, outerBody []ast.Node, sentinel ast.Node, declaredBefore map[string]bool, modified map[string]bool) {
+	nestedScope := make(map[string]bool)
+	for k, v := range declaredBefore {
+		nestedScope[k] = v
+	}
+
+	for _, preStmt := range outerBody {
+		if preStmt == sentinel {
+			break
+		}
+		if varDecl, ok := preStmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				if id, ok := declarator.ID.(*ast.Identifier); ok {
+					nestedScope[id.Name] = true
+				} else if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					for _, elem := range arrayPattern.Elements {
+						nestedScope[elem.Name] = true
 					}
 				}
 			}
-
-			// Analyze nested loop with extended scope
-			a.analyzeForLoopWithScope(s.Body, nestedScope, modified)
 		}
 	}
+
+	a.analyzeForLoopWithScope(nestedBody, nestedScope, modified)
 }

@@ -516,3 +516,118 @@ func TestArrowCallSiteScanner_LargeProgramStressTest(t *testing.T) {
 		t.Errorf("Stress test: expected 100 call sites, got %d", len(sites))
 	}
 }
+
+func TestArrowCallSiteScanner_NestedStatementBodies(t *testing.T) {
+	callDecl := func(varName, funcName string) *ast.VariableDeclaration {
+		return &ast.VariableDeclaration{
+			Declarations: []ast.VariableDeclarator{
+				{
+					ID:   &ast.Identifier{Name: varName},
+					Init: &ast.CallExpression{Callee: &ast.Identifier{Name: funcName}},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		body          []ast.Node
+		expectedCount int
+		expectedFunc  string
+	}{
+		{
+			name: "ForStatement body",
+			body: []ast.Node{
+				&ast.ForStatement{
+					Counter: "i",
+					From:    &ast.Literal{Value: 0.0},
+					To:      &ast.Literal{Value: 10.0},
+					Body:    []ast.Node{callDecl("r", "myFunc")},
+				},
+			},
+			expectedCount: 1,
+			expectedFunc:  "myFunc",
+		},
+		{
+			name: "ForInStatement body",
+			body: []ast.Node{
+				&ast.ForInStatement{
+					ElementVar: "val",
+					Collection: &ast.Identifier{Name: "arr"},
+					Body:       []ast.Node{callDecl("r", "myFunc")},
+				},
+			},
+			expectedCount: 1,
+			expectedFunc:  "myFunc",
+		},
+		{
+			name: "IfStatement consequent",
+			body: []ast.Node{
+				&ast.IfStatement{
+					Test:       &ast.Literal{Value: true},
+					Consequent: []ast.Node{callDecl("r", "myFunc")},
+				},
+			},
+			expectedCount: 1,
+			expectedFunc:  "myFunc",
+		},
+		{
+			name: "IfStatement alternate",
+			body: []ast.Node{
+				&ast.IfStatement{
+					Test:      &ast.Literal{Value: true},
+					Alternate: []ast.Node{callDecl("r", "myFunc")},
+				},
+			},
+			expectedCount: 1,
+			expectedFunc:  "myFunc",
+		},
+		{
+			name: "nested for-in inside for",
+			body: []ast.Node{
+				&ast.ForStatement{
+					Counter: "i",
+					From:    &ast.Literal{Value: 0.0},
+					To:      &ast.Literal{Value: 5.0},
+					Body: []ast.Node{
+						&ast.ForInStatement{
+							ElementVar: "v",
+							Collection: &ast.Identifier{Name: "data"},
+							Body:       []ast.Node{callDecl("r", "myFunc")},
+						},
+					},
+				},
+			},
+			expectedCount: 1,
+			expectedFunc:  "myFunc",
+		},
+		{
+			name: "empty loop body",
+			body: []ast.Node{
+				&ast.ForInStatement{
+					ElementVar: "val",
+					Collection: &ast.Identifier{Name: "arr"},
+					Body:       []ast.Node{},
+				},
+			},
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			variables := map[string]string{"myFunc": "function"}
+			scanner := NewArrowCallSiteScanner(variables)
+			program := &ast.Program{Body: tt.body}
+
+			sites := scanner.ScanForArrowFunctionCalls(program)
+
+			if len(sites) != tt.expectedCount {
+				t.Fatalf("Expected %d call sites, got %d", tt.expectedCount, len(sites))
+			}
+			if tt.expectedCount > 0 && sites[0].FunctionName != tt.expectedFunc {
+				t.Errorf("Expected function %q, got %q", tt.expectedFunc, sites[0].FunctionName)
+			}
+		})
+	}
+}

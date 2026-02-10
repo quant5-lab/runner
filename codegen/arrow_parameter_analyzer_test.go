@@ -270,6 +270,36 @@ func TestParameterUsageAnalyzer_AnalyzeArrowFunction(t *testing.T) {
 			},
 		},
 		{
+			name: "for-in loop with TA call inside body",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{
+					{Name: "src"},
+					{Name: "len"},
+				},
+				Body: []ast.Node{
+					&ast.ForInStatement{
+						ElementVar: "val",
+						Collection: &ast.Identifier{Name: "src"},
+						Body: []ast.Node{
+							&ast.ExpressionStatement{
+								Expression: &ast.CallExpression{
+									Callee: &ast.Identifier{Name: "sma"},
+									Arguments: []ast.Expression{
+										&ast.Identifier{Name: "src"},
+										&ast.Identifier{Name: "len"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"src": ParameterUsageSeries,
+				"len": ParameterUsageScalar,
+			},
+		},
+		{
 			name: "parameter unused in body",
 			arrowFunc: &ast.ArrowFunctionExpression{
 				Params: []ast.Identifier{

@@ -425,47 +425,91 @@ func TestInlineExpressionScanner_TAInIfStatement(t *testing.T) {
 	}
 }
 
-func TestInlineExpressionScanner_TAInForLoop(t *testing.T) {
-	program := &ast.Program{
-		Body: []ast.Node{
-			&ast.ForStatement{
-				Counter: "i",
-				From:    &ast.Literal{Value: float64(0)},
-				To:      &ast.Literal{Value: float64(10)},
-				Body: []ast.Node{
-					&ast.ExpressionStatement{
-						Expression: &ast.CallExpression{
-							Callee: &ast.Identifier{Name: "plot"},
-							Arguments: []ast.Expression{
-								&ast.CallExpression{
-									Callee: &ast.MemberExpression{
-										Object:   &ast.Identifier{Name: "ta"},
-										Property: &ast.Identifier{Name: "ema"},
-									},
-									Arguments: []ast.Expression{
-										&ast.Identifier{Name: "high"},
-										&ast.Literal{Value: float64(9)},
-									},
-								},
-							},
+/* TestInlineExpressionScanner_TAInLoopBodies validates TA call detection inside all loop container types */
+func TestInlineExpressionScanner_TAInLoopBodies(t *testing.T) {
+	taCallInPlot := func(taObj, taMethod, source string, period float64) *ast.ExpressionStatement {
+		return &ast.ExpressionStatement{
+			Expression: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "plot"},
+				Arguments: []ast.Expression{
+					&ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: taObj},
+							Property: &ast.Identifier{Name: taMethod},
+						},
+						Arguments: []ast.Expression{
+							&ast.Identifier{Name: source},
+							&ast.Literal{Value: period},
 						},
 					},
 				},
 			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		body         []ast.Node
+		expectedFunc string
+	}{
+		{
+			name: "ForStatement body",
+			body: []ast.Node{
+				&ast.ForStatement{
+					Counter: "i",
+					From:    &ast.Literal{Value: float64(0)},
+					To:      &ast.Literal{Value: float64(10)},
+					Body:    []ast.Node{taCallInPlot("ta", "ema", "high", 9)},
+				},
+			},
+			expectedFunc: "ta.ema",
+		},
+		{
+			name: "ForInStatement body",
+			body: []ast.Node{
+				&ast.ForInStatement{
+					ElementVar: "val",
+					Collection: &ast.Identifier{Name: "arr"},
+					Body:       []ast.Node{taCallInPlot("ta", "sma", "close", 14)},
+				},
+			},
+			expectedFunc: "ta.sma",
+		},
+		{
+			name: "nested for-in inside for",
+			body: []ast.Node{
+				&ast.ForStatement{
+					Counter: "i",
+					From:    &ast.Literal{Value: float64(0)},
+					To:      &ast.Literal{Value: float64(5)},
+					Body: []ast.Node{
+						&ast.ForInStatement{
+							ElementVar: "v",
+							Collection: &ast.Identifier{Name: "data"},
+							Body:       []ast.Node{taCallInPlot("ta", "rsi", "close", 14)},
+						},
+					},
+				},
+			},
+			expectedFunc: "ta.rsi",
 		},
 	}
 
-	gen := newTestGenerator()
-	scanner := NewInlineExpressionScanner(gen)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+			scanner := NewInlineExpressionScanner(gen)
+			program := &ast.Program{Body: tt.body}
 
-	hoistable := scanner.ScanProgram(program)
+			hoistable := scanner.ScanProgram(program)
 
-	if len(hoistable) != 1 {
-		t.Fatalf("Expected 1 hoistable call (ta.ema in for loop body), got %d", len(hoistable))
-	}
-
-	if hoistable[0].FuncName != "ta.ema" {
-		t.Errorf("Expected ta.ema, got %s", hoistable[0].FuncName)
+			if len(hoistable) != 1 {
+				t.Fatalf("Expected 1 hoistable call, got %d", len(hoistable))
+			}
+			if hoistable[0].FuncName != tt.expectedFunc {
+				t.Errorf("Expected %s, got %s", tt.expectedFunc, hoistable[0].FuncName)
+			}
+		})
 	}
 }
 
