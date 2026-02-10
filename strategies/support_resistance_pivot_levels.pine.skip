@@ -4,6 +4,3 @@ Parse: ❌ (switch with string literal cases: line 30:17 unexpected token "'1'" 
 Generate: ❌ Not reached (also blocked by #8 line.*/label.*)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
-
-Note: Tuple destructuring with security() (#19) is FIXED
-Note: Switch expression (#5) is FIXED

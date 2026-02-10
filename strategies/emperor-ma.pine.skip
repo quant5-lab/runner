@@ -1,25 +1,14 @@
-32 undefined symbols across 3 categories:
-10 undefined symbols remaining (arrow function scope only):
+5 undefined symbols remaining (arrow function scope only):
 
 Parse: ✅
 Generate: ✅
-Compile: ❌ (10 undefined symbols)
+Compile: ❌ (5 undefined symbols)
 
-Arrow function identifier resolver bugs (root cause: no scalar/series distinction):
-  - Scalar params emitted as series: len_Series, LagSeries, PolesSeries, alfaSeries, p1Series, perSeries, priceSeries, lengthSeries
-  - Source params back-referenced as bare name: src, pr (should be srcSeries.GetCurrent(), prSeries.GetCurrent())
+Arrow function identifier resolver bugs:
+  - Source params back-referenced as bare name: src (should be srcSeries.GetCurrent())
   - For-loop iterators as series: iSeries, rSeries (should be bare i, r)
-  - Built-in `n` (bar_index v3) not mapped in arrow bodies
-
-Main body codegen gaps:
-  - input() string options not implemented: type_ never set, 14 MA constants emitted as Go identifiers instead of strings
-  - input() bool default not implemented: onOff1-onOff9 never set
-  - Built-in composite series hl2, hlc3, ohlc4 not created
+  - Built-in `n` (bar_index v3) not mapped in arrow bodies: n, nSeries
 Execute: ❌ Not reached
-
-Note: input() bool type inference is FIXED (#12) — onOff1-onOff9 now emit as const bool
-Note: input() string type inference is FIXED (#12) — type_ now emits as const string
-Note: hl2/hlc3/ohlc4/hlcc4 in condition expressions is FIXED (#10) — TryResolveIdentifier delegation
 
 Arrow functions with complex local variables and parameters fail to emit
 series declarations and parameter-to-series promotion for nested scopes.

@@ -72,7 +72,7 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 		}
 	}
 
-	return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
+	return g.generator.resolveUserIdentifierAccess(id.Name), nil
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback string) (string, error) {

@@ -156,6 +156,7 @@ type generator struct {
 	signatureRegistrar         *SignatureRegistrar
 	arrowContextLifecycle      *ArrowContextLifecycleManager
 	returnValueStorage         *ReturnValueSeriesStorageHandler
+	arrowAccessResolver        *ArrowSeriesAccessResolver
 	symbolTable                SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
@@ -2815,8 +2816,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return code
 		}
 
-		// User-defined variables use Series storage (ForwardSeriesBuffer paradigm)
-		return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
+		return g.resolveUserIdentifierAccess(e.Name)
 	case *ast.Literal:
 		/* Numeric literal - always use float64 for consistency */
 		switch v := e.Value.(type) {

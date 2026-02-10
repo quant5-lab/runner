@@ -1,0 +1,39 @@
+//@version=5
+strategy("Arrow Delegated Math", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+normRange(h, l, c) =>
+    span = math.abs(h - l)
+    span > 0 ? (c - l) / span : 0.5
+
+clampedVol(h, l, floor_val) =>
+    raw = math.max(h - l, floor_val)
+    math.sqrt(raw)
+
+weightedMid(a, b, w) =>
+    math.min(a, b) + math.abs(a - b) * w
+
+pos = normRange(high, low, close)
+vol = clampedVol(high, low, 0.01)
+mid = weightedMid(high, low, 0.5)
+
+fastMA = ta.ema(close, 8)
+slowMA = ta.ema(close, 21)
+
+longCond = pos > 0.7 and vol > 0.5 and fastMA > slowMA
+shortCond = pos < 0.3 and vol > 0.5 and fastMA < slowMA
+
+if longCond
+    strategy.entry("Long", strategy.long)
+
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0 and fastMA < slowMA
+    strategy.close("Long")
+
+if strategy.position_size < 0 and fastMA > slowMA
+    strategy.close("Short")
+
+plot(pos, "Position")
+plot(vol, "Volatility")
+plot(mid, "WeightedMid")
