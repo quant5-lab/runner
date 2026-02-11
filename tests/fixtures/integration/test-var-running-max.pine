@@ -1,0 +1,8 @@
+//@version=5
+indicator("Var Running Max", overlay=false)
+
+var maxClose = 0.0
+if close > maxClose
+    maxClose := close
+
+plot(maxClose, "Running Max")

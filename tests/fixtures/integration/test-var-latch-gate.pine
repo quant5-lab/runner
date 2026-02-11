@@ -1,0 +1,8 @@
+//@version=5
+indicator("Var Latch Gate", overlay=false)
+
+var latch = 0.0
+if close > open
+    latch := 1.0
+
+plot(latch, "Latch")
