@@ -5,6 +5,7 @@ import (
 )
 
 func TestRollingCAGR_AAPL_Monthly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestRollingCAGR_AAPL_Monthly(t *testing.T) {
 }
 
 func TestRollingCAGR_BTCUSDT_Monthly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestRollingCAGR_BTCUSDT_Monthly(t *testing.T) {
 }
 
 func TestRollingCAGR_SBERP_Monthly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

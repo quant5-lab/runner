@@ -8,6 +8,7 @@ import (
 )
 
 func TestValuewhen_BasicCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Valuewhen Basic", overlay=true)
 
@@ -42,6 +43,7 @@ plot(prevBullishClose, "Prev Bullish", color=color.blue)
 }
 
 func TestValuewhen_WithSeriesSources(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Valuewhen Series", overlay=true)
 
@@ -71,6 +73,7 @@ plot(crossLevel, "Cross Level", color=color.orange)
 }
 
 func TestValuewhen_MultipleOccurrences(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Valuewhen Multiple", overlay=true)
 
@@ -110,6 +113,7 @@ plot(val2, "Occurrence 2", color=color.yellow)
 }
 
 func TestValuewhen_InStrategyContext(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Valuewhen Strategy", overlay=true)
 
@@ -133,6 +137,7 @@ plot(buyPrice, "Buy Price", color=color.green)
 }
 
 func TestValuewhen_ComplexConditions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Valuewhen Complex", overlay=true)
 
@@ -160,6 +165,7 @@ plot(lastTriggerPrice, "Trigger Price", color=color.purple)
 }
 
 func TestValuewhen_RegressionStability(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		script string
@@ -199,6 +205,7 @@ plot(v1, "Chained")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			exec := util.NewPineExecutor(t)
 			generatedCode, _ := exec.GenerateCode(t, "valuewhen-regression", tt.script)
 

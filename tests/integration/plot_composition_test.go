@@ -9,6 +9,7 @@ import (
 
 /* TestPlotComposition validates inline TA composition patterns in plot() expressions */
 func TestPlotComposition_NzWithTA(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Plot nz(ta.sma())")
 plot(nz(ta.sma(close, 14), 0))
@@ -34,6 +35,7 @@ plot(nz(ta.sma(close, 14), 0))
 
 /* TestPlotComposition_FixnanWithTA tests inline fixnan with TA in plot() */
 func TestPlotComposition_FixnanWithTA(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Plot fixnan(ta.sma())")
 plot(fixnan(ta.sma(close, 14)))
@@ -58,6 +60,7 @@ plot(fixnan(ta.sma(close, 14)))
 }
 
 func TestPlotComposition_BinaryTAExpression(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Plot ta.sma() + ta.ema()")
 plot(ta.sma(close, 14) + ta.ema(close, 14))
@@ -79,6 +82,7 @@ plot(ta.sma(close, 14) + ta.ema(close, 14))
 }
 
 func TestPlotComposition_TernaryWithTA(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Plot ternary with TA branches")
 plot(close > open ? ta.sma(close, 20) : ta.ema(close, 20))
@@ -98,6 +102,7 @@ plot(close > open ? ta.sma(close, 20) : ta.ema(close, 20))
 
 /* TestPlotComposition_NestedValueFunctions tests nz(fixnan(ta.sma())) */
 func TestPlotComposition_NestedValueFunctions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Plot nz(fixnan(ta.sma()))")
 plot(nz(fixnan(ta.sma(close, 14)), 0))
@@ -123,6 +128,7 @@ plot(nz(fixnan(ta.sma(close, 14)), 0))
 
 /* TestPlotComposition_Execution validates runtime behavior with actual data */
 func TestPlotComposition_Execution_NzWithTA(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Execution: nz(ta.sma())")
 plot(nz(ta.sma(close, 5), 0), title="SMA or Zero")
@@ -165,6 +171,7 @@ plot(nz(ta.sma(close, 5), 0), title="SMA or Zero")
 }
 
 func TestPlotComposition_Execution_BinaryTA(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Execution: sma + ema")
 plot(ta.sma(close, 3) + ta.ema(close, 3), title="SMA+EMA")

@@ -7,6 +7,7 @@ import (
 )
 
 func TestForLoopBasic(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Basic", overlay=false)
 
@@ -41,6 +42,7 @@ plot(sum, "Sum 1-10")
 }
 
 func TestForLoopDescending(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Descending", overlay=false)
 
@@ -69,6 +71,7 @@ plot(product, "Product 5-1")
 }
 
 func TestForLoopWithStep(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Step", overlay=false)
 
@@ -108,6 +111,7 @@ plot(oddSum, "Odd Sum")
 }
 
 func TestForLoopNested(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Nested", overlay=false)
 
@@ -137,6 +141,7 @@ plot(result, "Nested Sum")
 }
 
 func TestForLoopWithBarData(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Bar Data", overlay=false)
 
@@ -167,6 +172,7 @@ plot(highCount, "High Count")
 }
 
 func TestForLoopSingleIteration(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Single", overlay=false)
 

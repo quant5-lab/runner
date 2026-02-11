@@ -9,6 +9,7 @@ import (
 )
 
 func TestNestedControlFlowIntegration(t *testing.T) {
+	t.Parallel()
 	fixturePath := filepath.Join("..", "fixtures", "blockers", "test-nested-control-flow.pine")
 
 	content, err := os.ReadFile(fixturePath)

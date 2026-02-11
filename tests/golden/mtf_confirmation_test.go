@@ -5,6 +5,7 @@ import (
 )
 
 func TestMTF_AAPL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestMTF_AAPL_Hourly(t *testing.T) {
 }
 
 func TestMTF_BTCUSDT_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestMTF_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestMTF_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -44,6 +47,7 @@ func TestMTF_SBERP_Hourly(t *testing.T) {
 }
 
 func TestMTF_NVDA_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

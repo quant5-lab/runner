@@ -20,6 +20,7 @@ type inlineStatementListTestCase struct {
 }
 
 func TestInlineStatementList_RealWorldPatterns(t *testing.T) {
+	t.Parallel()
 	testCases := []inlineStatementListTestCase{
 		{
 			name:                   "variable initialization chain",
@@ -67,6 +68,7 @@ func TestInlineStatementList_RealWorldPatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fixturePath := filepath.Join("../fixtures/inline_statement_list", tc.fixture)
 			content, err := os.ReadFile(fixturePath)
 			if err != nil {
@@ -110,6 +112,7 @@ func TestInlineStatementList_RealWorldPatterns(t *testing.T) {
 }
 
 func TestInlineStatementList_AllFixturesParseCleanly(t *testing.T) {
+	t.Parallel()
 	fixturesDir := "../fixtures/inline_statement_list"
 
 	entries, err := os.ReadDir(fixturesDir)
@@ -157,6 +160,7 @@ func TestInlineStatementList_AllFixturesParseCleanly(t *testing.T) {
 }
 
 func TestInlineStatementList_JSONSerializationStability(t *testing.T) {
+	t.Parallel()
 	fixturePath := "../fixtures/inline_statement_list/02_intermediate_calculations.pine"
 	content, err := os.ReadFile(fixturePath)
 	if err != nil {

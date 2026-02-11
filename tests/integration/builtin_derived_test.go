@@ -7,6 +7,7 @@ import (
 )
 
 func TestBuiltinDerivedPrices(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Price Builtins", overlay=false)
 plot(hl2, "hl2")
@@ -60,6 +61,7 @@ plot(close, "close")
 }
 
 func TestBuiltinDerivedInTAFunctions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Prices in TA Functions", overlay=false)
 hl2_sma = ta.sma(hl2, 10)
@@ -100,6 +102,7 @@ plot(hlcc4_sma, "hlcc4_sma")
 }
 
 func TestBuiltinDerivedWithSubscript(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Prices with Subscript", overlay=false)
 hl2_prev = hl2[1]
@@ -135,6 +138,7 @@ plot(hl2_prev_sma, "hl2_prev_sma")
 }
 
 func TestBuiltinDerivedEdgeCases(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Prices Edge Cases", overlay=false)
 cond = ta.ema(hl2 > close ? hl2 : close, 10)

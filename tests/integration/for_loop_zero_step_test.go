@@ -9,6 +9,7 @@ import (
 
 /* Zero step causes runtime panic to prevent infinite loop */
 func TestForLoopZeroStep(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Zero Step", overlay=false)
 

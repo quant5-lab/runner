@@ -9,6 +9,7 @@ import (
 )
 
 func TestSwitchFixtures(t *testing.T) {
+	t.Parallel()
 	fixturesDir := "../fixtures/integration"
 
 	entries, err := os.ReadDir(fixturesDir)
@@ -29,6 +30,7 @@ func TestSwitchFixtures(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			content, err := os.ReadFile(filepath.Join(fixturesDir, name))
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)
@@ -43,6 +45,7 @@ func TestSwitchFixtures(t *testing.T) {
 }
 
 func TestSwitchFixtures_ExpectedValues(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		fixture  string
 		plot     string
@@ -70,6 +73,7 @@ func TestSwitchFixtures_ExpectedValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {
+			t.Parallel()
 			content, err := os.ReadFile(filepath.Join("../fixtures/integration", tt.fixture))
 			if err != nil {
 				t.Fatalf("read fixture: %v", err)

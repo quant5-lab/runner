@@ -10,6 +10,7 @@ import (
 
 /* Named-arg-only input(defval=bool) resolves to input.bool, not float64 */
 func TestInputTypeResolution_NamedBoolDefval(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Named Bool Input", overlay=true)
 
@@ -36,6 +37,7 @@ if enableLong and close > sma20
 
 /* Named-arg-only input(defval=string) resolves to input.string */
 func TestInputTypeResolution_NamedStringDefval(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Named String Input")
 
@@ -59,6 +61,7 @@ plot(ta.sma(close, 14))
 
 /* Named-arg-only input(defval=int) resolves to input.int */
 func TestInputTypeResolution_NamedIntDefval(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Named Int Input")
 
@@ -82,6 +85,7 @@ plot(ta.sma(close, length))
 
 /* v4 type=input.source resolves via explicit type parameter */
 func TestInputTypeResolution_V4ExplicitSource(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=4
 study("V4 Source Input")
 
@@ -102,6 +106,7 @@ plot(ta.sma(src, 14))
 
 /* v4 type=input.integer resolves to input.int */
 func TestInputTypeResolution_V4ExplicitInteger(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=4
 study("V4 Integer Input")
 
@@ -122,6 +127,7 @@ plot(ta.sma(close, length))
 
 /* Multiple named-arg bool inputs in same strategy resolve independently */
 func TestInputTypeResolution_MultipleBoolInputs(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Multi Bool Inputs", overlay=true)
 
@@ -152,6 +158,7 @@ if enableShort and close < sma20
 
 /* Bool input gates strategy entry — end-to-end execution */
 func TestInputTypeResolution_BoolGatedExecution(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Bool Gated Strategy", overlay=true)
 

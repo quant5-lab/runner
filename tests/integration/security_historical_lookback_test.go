@@ -25,6 +25,7 @@ ALIGNMENT: Tests are generalized to validate algorithm behavior, not specific bu
 
 // TestSecurityHistoricalLookback_SimplePrevious validates basic [1] access on security variables
 func TestSecurityHistoricalLookback_SimplePrevious(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Simple Previous", overlay=false)
 
@@ -62,6 +63,7 @@ plot(prev_sma_1d, "previous")
 
 // TestSecurityHistoricalLookback_ComparisonPattern validates != comparison with [1]
 func TestSecurityHistoricalLookback_ComparisonPattern(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Comparison Pattern", overlay=false)
 
@@ -101,6 +103,7 @@ plot(changed ? 1 : 0, "changed")
 
 // TestSecurityHistoricalLookback_ValuewhenChain validates valuewhen with security [1]
 func TestSecurityHistoricalLookback_ValuewhenChain(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Valuewhen Chain", overlay=false)
 
@@ -154,6 +157,7 @@ plot(captured, "captured")
 
 // TestSecurityHistoricalLookback_MultipleOffsets validates [1] [2] [3] offsets simultaneously
 func TestSecurityHistoricalLookback_MultipleOffsets(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Multiple Offsets", overlay=false)
 
@@ -209,6 +213,7 @@ plot(prev3, "prev3")
 
 // TestSecurityHistoricalLookback_WithStrategyLogic validates strategy with security [1]
 func TestSecurityHistoricalLookback_WithStrategyLogic(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Security Strategy", overlay=false)
 

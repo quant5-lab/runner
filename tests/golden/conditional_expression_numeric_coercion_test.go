@@ -5,6 +5,7 @@ import (
 )
 
 func TestConditionalNumericCoercion_MainContext_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestConditionalNumericCoercion_MainContext_AAPL_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_MainContext_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestConditionalNumericCoercion_MainContext_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_ArrowFunction_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -44,6 +47,7 @@ func TestConditionalNumericCoercion_ArrowFunction_AAPL_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_ArrowFunction_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -57,6 +61,7 @@ func TestConditionalNumericCoercion_ArrowFunction_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_ForLoop_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -70,6 +75,7 @@ func TestConditionalNumericCoercion_ForLoop_AAPL_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_ForLoop_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -83,6 +89,7 @@ func TestConditionalNumericCoercion_ForLoop_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_MixedTypes_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -96,6 +103,7 @@ func TestConditionalNumericCoercion_MixedTypes_AAPL_1h(t *testing.T) {
 }
 
 func TestConditionalNumericCoercion_MixedTypes_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{

@@ -7,6 +7,7 @@ import (
 )
 
 func TestUnaryBooleanInPlot(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Unary Boolean Plot", overlay=false)
 
@@ -58,6 +59,7 @@ plot(has_signal ? 1 : 0, title="Has Signal", color=color.blue)
 }
 
 func TestUnaryBooleanInConditional(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Unary Conditional Test", overlay=true)
 

@@ -11,6 +11,7 @@ import (
 )
 
 func TestCrossoverCodegen(t *testing.T) {
+	t.Parallel()
 	input := `
 //@version=5
 strategy("Crossover Test", overlay=true)

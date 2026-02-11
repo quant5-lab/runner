@@ -7,6 +7,7 @@ import (
 /* Regression: math.abs/max/min/sqrt in arrow function bodies resolve scalar params via RouteCall delegation */
 
 func TestArrowDelegatedMath_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -20,6 +21,7 @@ func TestArrowDelegatedMath_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestArrowDelegatedMath_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{

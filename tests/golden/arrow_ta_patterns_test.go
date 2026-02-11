@@ -6,6 +6,7 @@ import (
 
 /* Pattern: ta.atr, ta.tr - functions with implicit OHLC sources */
 func TestArrow_ImplicitOHLC_BTCUSDT(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -20,6 +21,7 @@ func TestArrow_ImplicitOHLC_BTCUSDT(t *testing.T) {
 
 /* Pattern: ta.pivothigh, ta.pivotlow - 2-arg vs 3-arg overloads */
 func TestArrow_MultiargOverload_BTCUSDT(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

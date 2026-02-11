@@ -13,6 +13,7 @@ const securityTupleFixturePrefix = "test-security-tuple-"
 
 /* Auto-discover and execute all security tuple .pine fixtures */
 func TestSecurityTupleFixtures(t *testing.T) {
+	t.Parallel()
 	fixturesDir := "../fixtures/integration"
 
 	entries, err := os.ReadDir(fixturesDir)
@@ -32,6 +33,7 @@ func TestSecurityTupleFixtures(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			content, err := os.ReadFile(filepath.Join(fixturesDir, name))
 			if err != nil {
 				t.Fatalf("read fixture %s: %v", name, err)
@@ -50,6 +52,7 @@ func TestSecurityTupleFixtures(t *testing.T) {
 
 /* OHLCV tuple values must be finite market data */
 func TestSecurityTupleFixture_OHLCV(t *testing.T) {
+	t.Parallel()
 	content := readFixture(t, "test-security-tuple-ohlcv.pine")
 	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "security-tuple-ohlcv", string(content))
@@ -69,6 +72,7 @@ func TestSecurityTupleFixture_OHLCV(t *testing.T) {
 
 /* TA tuple values must be finite after indicator warmup */
 func TestSecurityTupleFixture_TA(t *testing.T) {
+	t.Parallel()
 	content := readFixture(t, "test-security-tuple-ta.pine")
 	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "security-tuple-ta", string(content))
@@ -85,6 +89,7 @@ func TestSecurityTupleFixture_TA(t *testing.T) {
 
 /* Mixed tuple: OHLCV elements finite everywhere, TA finite after warmup */
 func TestSecurityTupleFixture_Mixed(t *testing.T) {
+	t.Parallel()
 	content := readFixture(t, "test-security-tuple-mixed.pine")
 	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "security-tuple-mixed", string(content))
@@ -107,6 +112,7 @@ func TestSecurityTupleFixture_Mixed(t *testing.T) {
 
 /* Multiple independent tuple calls must all produce data */
 func TestSecurityTupleFixture_Multi(t *testing.T) {
+	t.Parallel()
 	content := readFixture(t, "test-security-tuple-multi.pine")
 	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "security-tuple-multi", string(content))
@@ -129,6 +135,7 @@ func TestSecurityTupleFixture_Multi(t *testing.T) {
 
 /* Tuple and single-var security calls coexisting in same script */
 func TestSecurityTupleFixture_Coexist(t *testing.T) {
+	t.Parallel()
 	content := readFixture(t, "test-security-tuple-coexist.pine")
 	exec := util.NewPineExecutor(t)
 	output := exec.ExecuteScript(t, "security-tuple-coexist", string(content))

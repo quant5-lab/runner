@@ -9,6 +9,7 @@ import (
 
 /* break exits loop early — sum 1..10 stops at i>5, yielding 1+2+3+4+5 = 15 */
 func TestBreakEarlyExit(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Break Early Exit", overlay=false)
 
@@ -44,6 +45,7 @@ plot(sum, "Break Sum")
 
 /* continue skips one iteration — sum 1..10 skipping i==5 yields 50 */
 func TestContinueSkipIteration(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Continue Skip", overlay=false)
 
@@ -72,6 +74,7 @@ plot(sum, "Continue Sum")
 
 /* break in nested loop only exits inner loop */
 func TestBreakNestedLoop(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Break Nested", overlay=false)
 
@@ -101,6 +104,7 @@ plot(total, "Nested Break Total")
 
 /* continue in nested loop only skips inner iteration */
 func TestContinueNestedLoop(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Continue Nested", overlay=false)
 
@@ -131,6 +135,7 @@ plot(sum, "Nested Continue Sum")
 
 /* break with descending loop and step */
 func TestBreakDescendingStep(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Break Descending Step", overlay=false)
 
@@ -160,6 +165,7 @@ plot(sum, "Descending Break Sum")
 
 /* continue with multiple skip conditions */
 func TestContinueMultipleConditions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Continue Multi", overlay=false)
 
@@ -191,6 +197,7 @@ plot(sum, "Multi Continue Sum")
 
 /* break and continue codegen produces valid Go with correct loop counter resolution */
 func TestBreakContinueCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Break Continue Codegen", overlay=false)
 

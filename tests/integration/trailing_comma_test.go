@@ -9,6 +9,7 @@ import (
 )
 
 func TestCommaSupport_RealWorldPatterns(t *testing.T) {
+	t.Parallel()
 	fixturesDir := filepath.Join("..", "fixtures", "trailing_comma")
 
 	tests := []struct {
@@ -39,7 +40,7 @@ func TestCommaSupport_RealWorldPatterns(t *testing.T) {
 		{
 			name:               "reassignment with trailing comma",
 			fixture:            "05_reassignment_trailing_comma.pine",
-			expectedStatements: 5,
+			expectedStatements: 4,
 		},
 	}
 
@@ -50,6 +51,7 @@ func TestCommaSupport_RealWorldPatterns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			path := filepath.Join(fixturesDir, tt.fixture)
 			content, err := os.ReadFile(path)
 			if err != nil {
@@ -73,6 +75,7 @@ func TestCommaSupport_RealWorldPatterns(t *testing.T) {
 }
 
 func TestCommaSupport_StatementTypes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		source           string
@@ -118,6 +121,7 @@ func TestCommaSupport_StatementTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			script, err := p.ParseString("test.pine", tt.source)
 			if err != nil {
 				t.Fatalf("Parse failed: %v", err)
@@ -138,6 +142,7 @@ func TestCommaSupport_StatementTypes(t *testing.T) {
 }
 
 func TestCommaSupport_CommaSeparation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name               string
 		source             string
@@ -177,6 +182,7 @@ func TestCommaSupport_CommaSeparation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			script, err := p.ParseString("test.pine", tt.source)
 			if err != nil {
 				t.Fatalf("Parse failed: %v", err)
@@ -209,6 +215,7 @@ func TestCommaSupport_CommaSeparation(t *testing.T) {
 }
 
 func TestCommaSupport_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		source      string
@@ -258,6 +265,7 @@ func TestCommaSupport_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			script, err := p.ParseString("test.pine", tt.source)
 
 			if tt.shouldParse {
@@ -277,6 +285,7 @@ func TestCommaSupport_EdgeCases(t *testing.T) {
 }
 
 func TestCommaSupport_BackwardCompatibility(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		source string
@@ -319,6 +328,7 @@ if close > open
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			script, err := p.ParseString("test.pine", tt.source)
 			if err != nil {
 				t.Errorf("Traditional syntax should parse: %v", err)

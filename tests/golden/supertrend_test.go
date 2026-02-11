@@ -5,6 +5,7 @@ import (
 )
 
 func TestSupertrend_AAPL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestSupertrend_AAPL_Hourly(t *testing.T) {
 }
 
 func TestSupertrend_BTCUSDT_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestSupertrend_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestSupertrend_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

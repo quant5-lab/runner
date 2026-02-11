@@ -9,6 +9,7 @@ import (
 
 /* TestSecurityArrowFunction_OHLCV validates security() OHLCV field access inside arrow functions */
 func TestSecurityArrowFunction_OHLCV(t *testing.T) {
+	t.Parallel()
 	fields := []struct {
 		name  string
 		field string
@@ -23,6 +24,7 @@ func TestSecurityArrowFunction_OHLCV(t *testing.T) {
 	exec := util.NewPineExecutor(t)
 	for _, tc := range fields {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			script := `//@version=5
 indicator("Arrow OHLCV ` + tc.name + `", overlay=true)
 
@@ -51,6 +53,7 @@ plot(result, "Daily ` + tc.name + `")
 
 /* TestSecurityArrowFunction_TACall validates security() with TA indicators inside arrow functions */
 func TestSecurityArrowFunction_TACall(t *testing.T) {
+	t.Parallel()
 	patterns := []struct {
 		name   string
 		script string
@@ -84,6 +87,7 @@ plot(result, "Daily EMA")
 	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, "arrow_ta_"+tc.name, tc.script)
 
 			if !strings.Contains(generatedCode, "arrowCtx.SecurityContexts") {
@@ -107,6 +111,7 @@ plot(result, "Daily EMA")
 
 /* TestSecurityArrowFunction_V4Syntax validates v4 security() (no request. prefix) in arrow functions */
 func TestSecurityArrowFunction_V4Syntax(t *testing.T) {
+	t.Parallel()
 	script := `//@version=4
 strategy("Arrow v4 Security", overlay=true)
 
@@ -142,6 +147,7 @@ plot(dsma, "Daily SMA")
 
 /* TestSecurityArrowFunction_MultipleCallSites validates multiple arrow functions with security() */
 func TestSecurityArrowFunction_MultipleCallSites(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Arrow Multi Security", overlay=true)
 
@@ -182,6 +188,7 @@ plot(dsma, "Daily SMA")
 
 /* TestSecurityArrowFunction_MixedWithMainBody validates arrow security coexists with main-body security */
 func TestSecurityArrowFunction_MixedWithMainBody(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Arrow Mixed Security", overlay=true)
 
@@ -208,6 +215,7 @@ plot(arrowSecurity, "Arrow Function")
 
 /* TestSecurityArrowFunction_NaNGuards validates fallback to NaN for missing security data */
 func TestSecurityArrowFunction_NaNGuards(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Arrow NaN Guards", overlay=true)
 
@@ -232,6 +240,7 @@ plot(result, "Daily Close")
 
 /* TestSecurityArrowFunction_SecurityBridge validates ArrowContext receives security bridge wiring */
 func TestSecurityArrowFunction_SecurityBridge(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Arrow Bridge", overlay=true)
 

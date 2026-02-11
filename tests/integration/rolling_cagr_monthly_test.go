@@ -11,6 +11,7 @@ import (
 )
 
 func TestRollingCAGR_MonthlyTimeframe(t *testing.T) {
+	t.Parallel()
 	// Test that rolling-cagr.pine works with monthly data
 	// Verifies timeframe.ismonthly detection produces non-zero CAGR values
 

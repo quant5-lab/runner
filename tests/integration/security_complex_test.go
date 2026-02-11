@@ -9,6 +9,7 @@ import (
 
 /* TestSecurityTACombination tests inline TA combination inside security() */
 func TestSecurityTACombination(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("TA Combo Security", overlay=true)
 combined = request.security(syminfo.tickerid, "1D", ta.sma(close, 20) + ta.ema(close, 10))
@@ -35,6 +36,7 @@ plot(combined, "Combined", color=color.blue)
 
 /* TestSecurityArithmeticExpression tests arithmetic expressions inside security() */
 func TestSecurityArithmeticExpression(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Arithmetic Security", overlay=true)
 volatility = request.security(syminfo.tickerid, "1D", (high - low) / close * 100)
@@ -65,6 +67,7 @@ plot(volatility, "Volatility %", color=color.red)
 
 /* TestSecurityBBStrategy7Patterns tests real-world patterns from bb-strategy-7-rus.pine */
 func TestSecurityBBStrategy7Patterns(t *testing.T) {
+	t.Parallel()
 	patterns := []struct {
 		name   string
 		script string
@@ -95,6 +98,7 @@ plot(open_1d)`,
 	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("Pattern '%s' failed: %v", tc.name, err)
@@ -106,6 +110,7 @@ plot(open_1d)`,
 
 /* TestSecurityBBStrategy8Patterns tests real-world patterns from bb-strategy-8-rus.pine */
 func TestSecurityBBStrategy8Patterns(t *testing.T) {
+	t.Parallel()
 	patterns := []struct {
 		name   string
 		script string
@@ -129,6 +134,7 @@ plot(bb_1d_dev)`,
 	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("Pattern '%s' failed: %v", tc.name, err)
@@ -140,6 +146,7 @@ plot(bb_1d_dev)`,
 
 /* TestSecurityStability_RegressionSuite comprehensive regression test suite */
 func TestSecurityStability_RegressionSuite(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		script      string
@@ -198,6 +205,7 @@ plot(dev)`,
 	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("'%s' failed: %s - %v", tc.name, tc.description, err)
@@ -211,6 +219,7 @@ plot(dev)`,
 
 /* TestSecurityNaN_Handling ensures NaN values are handled correctly */
 func TestSecurityNaN_Handling(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("NaN Test", overlay=true)
 sma20 = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))

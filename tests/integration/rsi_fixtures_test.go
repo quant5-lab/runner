@@ -3,6 +3,7 @@ package integration
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/quant5-lab/runner/tests/util"
@@ -10,6 +11,7 @@ import (
 
 // TestRSIFixtures validates all RSI test fixtures compile and execute
 func TestRSIFixtures(t *testing.T) {
+	t.Parallel()
 	fixturesDir := "../fixtures/integration"
 
 	entries, err := os.ReadDir(fixturesDir)
@@ -18,8 +20,8 @@ func TestRSIFixtures(t *testing.T) {
 	}
 
 	exec := util.NewPineExecutor(t)
-	successCount := 0
-	failCount := 0
+	var successCount atomic.Int32
+	var failCount atomic.Int32
 
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".pine" {
@@ -33,6 +35,7 @@ func TestRSIFixtures(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			filePath := filepath.Join(fixturesDir, name)
 			content, err := os.ReadFile(filePath)
 			if err != nil {
@@ -44,20 +47,21 @@ func TestRSIFixtures(t *testing.T) {
 
 			if output == nil {
 				t.Errorf("Execution produced no output for %s", name)
-				failCount++
+				failCount.Add(1)
 				return
 			}
 
-			successCount++
+			successCount.Add(1)
 			t.Logf("✅ %s compiled and executed", name)
 		})
 	}
 
-	t.Logf("RSI Fixtures: %d passed, %d failed", successCount, failCount)
+	t.Logf("RSI Fixtures: %d passed, %d failed", successCount.Load(), failCount.Load())
 }
 
 // TestRSIBasicFixture validates basic RSI period variations
 func TestRSIBasicFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-basic.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-basic.pine not found: %v", err)
@@ -93,6 +97,7 @@ func TestRSIBasicFixture(t *testing.T) {
 
 // TestRSISourcesFixture validates RSI on different data sources
 func TestRSISourcesFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-sources.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-sources.pine not found: %v", err)
@@ -120,6 +125,7 @@ func TestRSISourcesFixture(t *testing.T) {
 
 // TestRSIMultipleFixture validates multiple RSI instances compile correctly
 func TestRSIMultipleFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-multiple.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-multiple.pine not found: %v", err)
@@ -146,6 +152,7 @@ func TestRSIMultipleFixture(t *testing.T) {
 
 // TestRSIStrategyFixture validates RSI in strategy context
 func TestRSIStrategyFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-strategy.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-strategy.pine not found: %v", err)
@@ -171,6 +178,7 @@ func TestRSIStrategyFixture(t *testing.T) {
 
 // TestRSIWarmupFixture validates RSI warmup behavior
 func TestRSIWarmupFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-warmup.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-warmup.pine not found: %v", err)
@@ -197,6 +205,7 @@ func TestRSIWarmupFixture(t *testing.T) {
 
 // TestRSIExtremeFixture validates RSI extreme behavior
 func TestRSIExtremeFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-extreme.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-extreme.pine not found: %v", err)
@@ -222,6 +231,7 @@ func TestRSIExtremeFixture(t *testing.T) {
 
 // TestRSIComplexFixture validates RSI with complex expressions
 func TestRSIComplexFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-complex.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-complex.pine not found: %v", err)
@@ -248,6 +258,7 @@ func TestRSIComplexFixture(t *testing.T) {
 
 // TestRSIPeriodsFixture validates RSI with different period types
 func TestRSIPeriodsFixture(t *testing.T) {
+	t.Parallel()
 	content, err := os.ReadFile("../fixtures/integration/test-rsi-periods.pine")
 	if err != nil {
 		t.Fatalf("test-rsi-periods.pine not found: %v", err)

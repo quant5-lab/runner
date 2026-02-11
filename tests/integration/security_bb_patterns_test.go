@@ -9,6 +9,7 @@ import (
 
 /* TestSecurityBBRealWorldPatterns tests actual security() patterns from production BB strategies */
 func TestSecurityBBRealWorldPatterns(t *testing.T) {
+	t.Parallel()
 	patterns := []struct {
 		name        string
 		script      string
@@ -86,6 +87,7 @@ plot(ema_1d_10, "EMA10 1D")
 	exec := util.NewPineExecutor(t)
 	for _, tc := range patterns {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("'%s' failed: %s - %v", tc.name, tc.description, err)
@@ -99,6 +101,7 @@ plot(ema_1d_10, "EMA10 1D")
 
 /* TestSecurityStdevWorkaround tests BB strategy pattern with stdev */
 func TestSecurityStdevWorkaround(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		script string
@@ -130,6 +133,7 @@ plot(bb_dev, "BB Dev")
 	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("Test failed: %s - %v", tc.status, err)
@@ -141,6 +145,7 @@ plot(bb_dev, "BB Dev")
 
 /* TestSecurityLongTermStability tests patterns for regression safety */
 func TestSecurityLongTermStability(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		script      string
@@ -182,6 +187,7 @@ plot(sma_1d, "SMA")
 	exec := util.NewPineExecutor(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tc.name, tc.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("REGRESSION: %s failed - critical for: %s - %v", tc.name, tc.criticalFor, err)
@@ -193,6 +199,7 @@ plot(sma_1d, "SMA")
 
 /* TestSecurityInlineTA_Validation validates inline TA code generation */
 func TestSecurityInlineTA_Validation(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Inline TA Check", overlay=true)
 sma20_1d = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))

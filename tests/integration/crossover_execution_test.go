@@ -8,6 +8,7 @@ import (
 )
 
 func TestCrossoverExecution(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("Simple Crossover", overlay=true, pyramiding=1)
 

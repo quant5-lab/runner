@@ -10,6 +10,7 @@ import (
 /* Switch expression full pipeline: Pine→Go→Binary→Execute→JSON */
 
 func TestSwitchExecution_Form1Expression(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		script   string
@@ -91,6 +92,7 @@ plot(result, "Result")
 	exec := util.NewPineExecutor(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			output := exec.ExecuteScript(t, "switch-form1", tt.script)
 			vals := exec.ExtractPlotValues(t, output, tt.plotName)
 			if len(vals) < 1 {
@@ -104,6 +106,7 @@ plot(result, "Result")
 }
 
 func TestSwitchExecution_Form2Expression(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		script   string
@@ -149,6 +152,7 @@ plot(result, "Result")
 	exec := util.NewPineExecutor(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			output := exec.ExecuteScript(t, "switch-form2", tt.script)
 			vals := exec.ExtractPlotValues(t, output, tt.plotName)
 			if len(vals) < 1 {
@@ -162,6 +166,7 @@ plot(result, "Result")
 }
 
 func TestSwitchExecution_NoDefaultNaSemantics(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Switch Na", overlay=false)
 val = 99
@@ -186,6 +191,7 @@ plot(result, "Result")
 }
 
 func TestSwitchExecution_MultiStatementBody(t *testing.T) {
+	t.Parallel()
 	/* Multi-statement case bodies with outer-scope variables (local-var-in-IIFE is a known limitation) */
 	script := `//@version=5
 indicator("Switch Multi", overlay=false)
@@ -213,6 +219,7 @@ plot(result, "Result")
 }
 
 func TestSwitchExecution_WithBarData(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Switch Bar", overlay=false)
 direction = switch
@@ -250,6 +257,7 @@ plot(direction, "Direction")
 }
 
 func TestSwitchExecution_NestedInIf(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Switch Nested If", overlay=false)
 x = 2
@@ -278,6 +286,7 @@ plot(result, "Result")
 }
 
 func TestSwitchExecution_InlineWithBarData(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Switch Inline Bar", overlay=false)
 direction = switch
@@ -312,6 +321,7 @@ plot(direction, "Direction")
 }
 
 func TestSwitchExecution_MixedInlineAndMultiLine(t *testing.T) {
+	t.Parallel()
 	script := `//@version=5
 indicator("Switch Mixed", overlay=false)
 a = 5.0

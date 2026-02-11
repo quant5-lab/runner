@@ -11,6 +11,7 @@ import (
  * hl2/hlc3/ohlc4/hlcc4/tr (generated non-existent xxxSeries variables).
  */
 func TestBuiltinDerivedInTernaryConditions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Builtins in Ternary Conditions", overlay=false)
 hl2_cond   = hl2   > close ? 1.0 : 0.0
@@ -47,6 +48,7 @@ plot(tr_cond,    "tr_cond")
  * via `and`/`or` operators in a single ternary expression.
  */
 func TestBuiltinDerivedInCompoundConditions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Builtins in Compound Conditions", overlay=false)
 compound = close > ohlc4 and hlc3 > hlcc4 ? 1.0 : 0.0
@@ -76,6 +78,7 @@ plot(mixed,    "mixed")
  * and the result branches exercise the identifier resolution path.
  */
 func TestBuiltinDerivedAsTernaryBranchValues(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Derived Builtins as Ternary Branch Values", overlay=false)
 pick_hl2   = close > open ? hl2   : close

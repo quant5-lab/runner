@@ -12,6 +12,7 @@ import (
 
 /* TestSyminfoTickeridInSecurity validates syminfo.tickerid resolves to ctx.Symbol in security() context */
 func TestSyminfoTickeridInSecurity(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Syminfo Security", overlay=true)
 daily_close = request.security(syminfo.tickerid, "1D", close)
@@ -41,6 +42,7 @@ plot(daily_close, "Daily Close", color=color.blue)
 
 /* TestSyminfoTickeridWithTAFunction validates syminfo.tickerid with TA function in security() */
 func TestSyminfoTickeridWithTAFunction(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Syminfo TA Security", overlay=true)
 daily_sma = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
@@ -75,6 +77,7 @@ plot(daily_sma, "Daily SMA", color=color.green)
 
 /* TestSyminfoTickeridStandalone validates direct syminfo.tickerid reference */
 func TestSyminfoTickeridStandalone(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Syminfo Standalone")
 current_symbol = syminfo.tickerid
@@ -113,6 +116,7 @@ current_symbol = syminfo.tickerid
 
 /* TestSyminfoTickeridMultipleSecurityCalls validates reusability across multiple security() calls */
 func TestSyminfoTickeridMultipleSecurityCalls(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Syminfo Multiple Security", overlay=true)
 daily_close = request.security(syminfo.tickerid, "1D", close)
@@ -142,6 +146,7 @@ plot(weekly_close, "Weekly", color=color.red)
 
 /* TestSyminfoTickeridWithComplexExpression validates syminfo.tickerid in complex expression context */
 func TestSyminfoTickeridWithComplexExpression(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Syminfo Complex Expression", overlay=true)
 daily_change_pct = request.security(syminfo.tickerid, "1D", (close - open) / open * 100)
@@ -171,6 +176,7 @@ plot(daily_change_pct, "Daily % Change", color=color.orange)
 
 /* TestSyminfoTickeridRegressionNoSideEffects validates that syminfo.tickerid doesn't break existing code */
 func TestSyminfoTickeridRegressionNoSideEffects(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Regression Test", overlay=true)
 btc_close = request.security("BTCUSDT", "1D", close)

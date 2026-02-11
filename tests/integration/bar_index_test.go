@@ -7,6 +7,7 @@ import (
 )
 
 func TestBarIndexBasic(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("bar_index Basic", overlay=false)
 barIdx = bar_index
@@ -40,6 +41,7 @@ plot(barIdx, "Bar Index")
 }
 
 func TestBarIndexModulo(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("bar_index Modulo", overlay=false)
 mod5 = bar_index % 5
@@ -94,10 +96,12 @@ plot(mod20, "Mod 20")
 }
 
 func TestBarIndexSecurity(t *testing.T) {
+	t.Parallel()
 	t.Skip("Security function not implemented - see e2e/fixtures/strategies/test-bar-index-security.pine.skip")
 }
 
 func TestBarIndexConditional(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("bar_index Conditional", overlay=false)
 firstBar = bar_index == 0 ? 1 : 0
@@ -129,6 +133,7 @@ plot(every10th, "Every 10th")
 }
 
 func TestBarIndexComparisons(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("bar_index Comparisons", overlay=false)
 gtTen = bar_index > 10 ? 1 : 0
@@ -160,6 +165,7 @@ plot(eqTwenty, "Equals 20")
 }
 
 func TestBarIndexHistorical(t *testing.T) {
+	t.Parallel()
 	t.Skip("Requires bar_index historical access codegen - see e2e/fixtures/strategies/test-bar-index-historical.pine.skip")
 }
 

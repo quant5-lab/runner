@@ -5,6 +5,7 @@ import (
 )
 
 func TestKeltnerSqueeze_AAPL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestKeltnerSqueeze_AAPL_Hourly(t *testing.T) {
 }
 
 func TestKeltnerSqueeze_BTCUSDT_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestKeltnerSqueeze_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestKeltnerSqueeze_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -44,6 +47,7 @@ func TestKeltnerSqueeze_SBERP_Hourly(t *testing.T) {
 }
 
 func TestKeltnerSqueeze_PLZL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

@@ -7,6 +7,7 @@ import (
 )
 
 func TestPeriodExpression_InputInt(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: input.int()")
 plot(ta.sma(close, input.int(14, "Period")))`
@@ -21,6 +22,7 @@ plot(ta.sma(close, input.int(14, "Period")))`
 }
 
 func TestPeriodExpression_CustomFunction(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: getPeriod()")
 getPeriod() => 14
@@ -36,6 +38,7 @@ plot(ta.sma(close, getPeriod()))`
 }
 
 func TestPeriodExpression_Variable(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: varPeriod")
 varPeriod = 14
@@ -51,6 +54,7 @@ plot(ta.sma(close, varPeriod))`
 }
 
 func TestPeriodExpression_BinaryExpr(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: 7 * 2")
 plot(ta.sma(close, 7 * 2))`
@@ -65,6 +69,7 @@ plot(ta.sma(close, 7 * 2))`
 }
 
 func TestPeriodExpression_Highest(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: ta.highest with getPeriod()")
 getPeriod() => 14
@@ -80,6 +85,7 @@ plot(ta.highest(close, getPeriod()))`
 }
 
 func TestPeriodExpression_Stdev(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Period: ta.stdev with getPeriod()")
 getPeriod() => 14
@@ -95,6 +101,7 @@ plot(ta.stdev(close, getPeriod()))`
 }
 
 func TestPeriodExpression_ConstantFolding(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Constant folding: basePeriod + 6")
 basePeriod = 8

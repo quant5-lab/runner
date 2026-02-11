@@ -9,6 +9,7 @@ import (
 
 /* Full pipeline: Pine parse → AST → codegen → Go compile for tuple security */
 func TestSecurityTuple_Compilation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		script string
@@ -96,6 +97,7 @@ plot(daily_vol)`,
 	exec := util.NewPineExecutor(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			generatedCode, _ := exec.GenerateCode(t, tt.name, tt.script)
 			if err := exec.CompileCode(t, generatedCode); err != nil {
 				t.Fatalf("compilation failed: %v", err)
@@ -106,9 +108,11 @@ plot(daily_vol)`,
 
 /* Verify generated code structure for key patterns */
 func TestSecurityTuple_CodeStructure(t *testing.T) {
+	t.Parallel()
 	exec := util.NewPineExecutor(t)
 
 	t.Run("OHLCV uses direct field access", func(t *testing.T) {
+		t.Parallel()
 		script := `//@version=5
 indicator("Test", overlay=true)
 [c, v] = request.security(syminfo.tickerid, "D", [close, volume])
@@ -126,6 +130,7 @@ plot(v)`
 	})
 
 	t.Run("complex expressions use streaming evaluator", func(t *testing.T) {
+		t.Parallel()
 		script := `//@version=5
 indicator("Test", overlay=true)
 [ema_d, sma_d] = request.security(syminfo.tickerid, "D", [ta.ema(close, 10), ta.sma(close, 20)])
@@ -148,6 +153,7 @@ plot(sma_d)`
 	})
 
 	t.Run("NaN fallbacks for all variables", func(t *testing.T) {
+		t.Parallel()
 		script := `//@version=5
 indicator("Test", overlay=true)
 [o, h, l] = request.security(syminfo.tickerid, "D", [open, high, low])

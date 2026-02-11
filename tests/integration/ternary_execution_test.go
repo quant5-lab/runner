@@ -7,6 +7,7 @@ import (
 )
 
 func TestTernaryExecution(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Ternary Test", overlay=false)
 

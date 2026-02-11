@@ -5,6 +5,7 @@ import (
 )
 
 func TestSecurityUserVariable_BTCUSDT_Daily(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

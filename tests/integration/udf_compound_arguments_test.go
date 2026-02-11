@@ -8,6 +8,7 @@ import (
 )
 
 func TestUDFCompoundArguments(t *testing.T) {
+	t.Parallel()
 	baseTime := int64(1700000000)
 	testData := []map[string]interface{}{
 		{"time": baseTime, "open": 100.0, "high": 105.0, "low": 95.0, "close": 102.0, "volume": 1000.0},
@@ -116,6 +117,7 @@ plot(result, "Result")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := exec.ExecuteScriptWithCustomData(t, "udf-compound-args", tt.pine, testData)
 			values := exec.ExtractPlotValues(t, result, tt.plotName)
 

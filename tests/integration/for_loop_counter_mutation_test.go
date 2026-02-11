@@ -8,6 +8,7 @@ import (
 
 /* Loop counter mutations don't affect iteration count */
 func TestForLoopCounterImmutability(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("For Loop Counter Mutation", overlay=false)
 

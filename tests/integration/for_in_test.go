@@ -9,6 +9,7 @@ import (
 
 /* for-in single element generates `for _, elem := range collection` */
 func TestForInSingleElementCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("ForIn Single", overlay=false)
 
@@ -30,6 +31,7 @@ plot(sum, "ForIn Sum")
 
 /* for-in tuple destructuring generates `for idx, elem := range collection` */
 func TestForInTupleDestructuringCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("ForIn Tuple", overlay=false)
 
@@ -51,6 +53,7 @@ plot(total, "ForIn Tuple Sum")
 
 /* for-in with break generates break inside loop body */
 func TestForInWithBreakCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("ForIn Break", overlay=false)
 
@@ -77,6 +80,7 @@ plot(sum, "ForIn Break Sum")
 
 /* for-in with continue generates continue inside loop body */
 func TestForInWithContinueCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("ForIn Continue", overlay=false)
 
@@ -103,6 +107,7 @@ plot(sum, "ForIn Continue Sum")
 
 /* for-in tuple with index counter resolves index to float64() */
 func TestForInTupleIndexResolutionCodegen(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("ForIn Index Resolution", overlay=false)
 

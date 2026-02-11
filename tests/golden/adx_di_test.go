@@ -5,6 +5,7 @@ import (
 )
 
 func TestADXDI_AAPL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestADXDI_AAPL_Hourly(t *testing.T) {
 }
 
 func TestADXDI_BTCUSDT_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestADXDI_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestADXDI_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -44,6 +47,7 @@ func TestADXDI_SBERP_Hourly(t *testing.T) {
 }
 
 func TestADXDI_CNRU_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

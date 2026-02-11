@@ -5,6 +5,7 @@ import (
 )
 
 func TestMomentumCascade_RBLX_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestMomentumCascade_RBLX_1h(t *testing.T) {
 }
 
 func TestMomentumCascade_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestMomentumCascade_AAPL_1h(t *testing.T) {
 }
 
 func TestMomentumCascade_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -44,6 +47,7 @@ func TestMomentumCascade_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestMomentumCascade_BTCUSDT_1D(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{

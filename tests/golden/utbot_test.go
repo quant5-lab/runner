@@ -7,6 +7,7 @@ import (
 /* UT Bot Strategy - Pine v4 boolean direction syntax validation */
 
 func TestUTBot_BTCUSDT_Daily(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -20,6 +21,7 @@ func TestUTBot_BTCUSDT_Daily(t *testing.T) {
 }
 
 func TestUTBot_AAPL_Daily(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

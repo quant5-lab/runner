@@ -7,6 +7,7 @@ import (
 )
 
 func TestSeriesStrategyExecution(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 strategy("SMA Crossover with Series", overlay=true)
 

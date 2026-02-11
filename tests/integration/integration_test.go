@@ -15,6 +15,7 @@ import (
 
 /* Test parsing simple Pine strategy */
 func TestParseSimplePine(t *testing.T) {
+	t.Parallel()
 	strategyPath := "../../strategies/test-simple.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
@@ -63,6 +64,7 @@ func TestParseSimplePine(t *testing.T) {
 
 /* Test parsing e2e fixture strategy - validates parser handles known limitations */
 func TestParseFixtureStrategy(t *testing.T) {
+	t.Parallel()
 	strategyPath := "../../e2e/fixtures/strategies/test-strategy.pine"
 	content, err := os.ReadFile(strategyPath)
 	if err != nil {
@@ -115,6 +117,7 @@ func containsSubstr(s, substr string) bool {
 
 /* Test chart data generation with mock runtime */
 func TestChartDataGeneration(t *testing.T) {
+	t.Parallel()
 	// Create mock context
 	ctx := context.New("TEST", "1h", 100)
 
@@ -183,6 +186,7 @@ func TestChartDataGeneration(t *testing.T) {
 
 /* Test parsing all fixture strategies */
 func TestParseAllFixtures(t *testing.T) {
+	t.Parallel()
 	fixturesDir := "../../e2e/fixtures/strategies"
 
 	entries, err := os.ReadDir(fixturesDir)
@@ -244,6 +248,7 @@ func TestParseAllFixtures(t *testing.T) {
 
 /* Test runtime integration with simple strategy */
 func TestRuntimeIntegration(t *testing.T) {
+	t.Parallel()
 	// Create context
 	ctx := context.New("TEST", "1h", 100)
 

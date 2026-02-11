@@ -10,6 +10,7 @@ import (
 /* Number literal end-to-end value correctness - validates Parse→Codegen→Compile→Execute preserves exact numeric values */
 
 func TestNumberLiteralFormats(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Number Literal Formats", overlay=false)
 int_pos = 42
@@ -85,6 +86,7 @@ plot(sci_pos_sign, "sci_pos_sign")
 }
 
 func TestNumberLiteralExpressions(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Number Literal Expressions", overlay=false)
 mixed_add = 1e3 + .5 + 10.
@@ -130,6 +132,7 @@ plot(complex, "complex")
 }
 
 func TestNumberLiteralBoundaries(t *testing.T) {
+	t.Parallel()
 	pineScript := `//@version=5
 indicator("Number Literal Boundaries", overlay=false)
 very_large = 1e100

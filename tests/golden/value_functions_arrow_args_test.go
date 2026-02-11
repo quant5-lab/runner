@@ -7,6 +7,7 @@ import (
 /* Regression: nz/na as arguments inside arrow function bodies (BLOCKER #23) */
 
 func TestValueFunctionsArrowArgs_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -20,6 +21,7 @@ func TestValueFunctionsArrowArgs_BTCUSDT_1h(t *testing.T) {
 }
 
 func TestValueFunctionsArrowArgs_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{

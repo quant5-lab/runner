@@ -5,6 +5,7 @@ import (
 )
 
 func TestMathFunctions_AAPL_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestMathFunctions_AAPL_Hourly(t *testing.T) {
 }
 
 func TestMathFunctions_BTCUSDT_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestMathFunctions_BTCUSDT_Hourly(t *testing.T) {
 }
 
 func TestMathFunctions_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

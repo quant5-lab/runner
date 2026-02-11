@@ -7,6 +7,7 @@ import (
 )
 
 func TestPositionReversal_MACD_AlternatingDirections(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		symbol   string
@@ -35,6 +36,7 @@ func TestPositionReversal_MACD_AlternatingDirections(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			suite := NewTestSuite(t)
 
 			actual := suite.runner.Execute(t,
@@ -48,6 +50,7 @@ func TestPositionReversal_MACD_AlternatingDirections(t *testing.T) {
 }
 
 func TestPositionReversal_Supertrend_AlternatingDirections(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		symbol   string
@@ -76,6 +79,7 @@ func TestPositionReversal_Supertrend_AlternatingDirections(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			suite := NewTestSuite(t)
 
 			actual := suite.runner.Execute(t,
@@ -89,6 +93,7 @@ func TestPositionReversal_Supertrend_AlternatingDirections(t *testing.T) {
 }
 
 func TestPositionReversal_MTF_AlternatingDirections(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	actual := suite.runner.Execute(t,
@@ -147,6 +152,7 @@ func validateAlternatingDirections(t *testing.T, result *testutil.StrategyResult
 }
 
 func TestPositionReversal_EquityConsistency(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		strategyFile string
@@ -179,6 +185,7 @@ func TestPositionReversal_EquityConsistency(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if tt.skip {
 				t.Skip(tt.skipReason)
 			}

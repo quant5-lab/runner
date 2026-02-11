@@ -5,6 +5,7 @@ import (
 )
 
 func TestDailyLines_Hourly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -18,6 +19,7 @@ func TestDailyLines_Hourly(t *testing.T) {
 }
 
 func TestDailyLines_Daily(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{
@@ -31,6 +33,7 @@ func TestDailyLines_Daily(t *testing.T) {
 }
 
 func TestDailyLines_Weekly(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunAndValidate(t, TestConfig{

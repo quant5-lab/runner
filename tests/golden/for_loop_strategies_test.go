@@ -7,6 +7,7 @@ import (
 /* Simple Counter Strategy Tests */
 
 func TestForLoopSimpleCounter_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -20,6 +21,7 @@ func TestForLoopSimpleCounter_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopSimpleCounter_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -35,6 +37,7 @@ func TestForLoopSimpleCounter_BTCUSDT_1h(t *testing.T) {
 /* Moving Average Strategy Tests */
 
 func TestForLoopMovingAverage_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -48,6 +51,7 @@ func TestForLoopMovingAverage_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopMovingAverage_BTCUSDT_1D(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -63,6 +67,7 @@ func TestForLoopMovingAverage_BTCUSDT_1D(t *testing.T) {
 /* Conditional Accumulation Strategy Tests */
 
 func TestForLoopConditionalAccumulation_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -76,6 +81,7 @@ func TestForLoopConditionalAccumulation_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopConditionalAccumulation_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -91,6 +97,7 @@ func TestForLoopConditionalAccumulation_BTCUSDT_1h(t *testing.T) {
 /* Correlation Strategy Tests */
 
 func TestForLoopCorrelation_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -104,6 +111,7 @@ func TestForLoopCorrelation_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopCorrelation_BTCUSDT_1D(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -119,6 +127,7 @@ func TestForLoopCorrelation_BTCUSDT_1D(t *testing.T) {
 /* Volatility Bands Strategy Tests */
 
 func TestForLoopVolatilityBands_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -132,6 +141,7 @@ func TestForLoopVolatilityBands_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopVolatilityBands_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -147,6 +157,7 @@ func TestForLoopVolatilityBands_BTCUSDT_1h(t *testing.T) {
 /* Weighted Average Strategy Tests */
 
 func TestForLoopWeightedAverage_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -160,6 +171,7 @@ func TestForLoopWeightedAverage_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopWeightedAverage_BTCUSDT_1D(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -175,6 +187,7 @@ func TestForLoopWeightedAverage_BTCUSDT_1D(t *testing.T) {
 /* Step Variations Strategy Tests */
 
 func TestForLoopStepVariations_AAPL_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
@@ -188,6 +201,7 @@ func TestForLoopStepVariations_AAPL_1h(t *testing.T) {
 }
 
 func TestForLoopStepVariations_BTCUSDT_1h(t *testing.T) {
+	t.Parallel()
 	suite := NewTestSuite(t)
 
 	suite.RunTestFixtureAndValidate(t, TestConfig{
