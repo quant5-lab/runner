@@ -17,6 +17,7 @@ const (
 	TypeIfStatement             NodeType = "IfStatement"
 	TypeForStatement            NodeType = "ForStatement"
 	TypeForInStatement          NodeType = "ForInStatement"
+	TypeWhileStatement          NodeType = "WhileStatement"
 	TypeConditionalExpression   NodeType = "ConditionalExpression"
 	TypeLogicalExpression       NodeType = "LogicalExpression"
 	TypeUnaryExpression         NodeType = "UnaryExpression"
@@ -178,6 +179,15 @@ type ForInStatement struct {
 
 func (f *ForInStatement) Type() NodeType  { return TypeForInStatement }
 func (f *ForInStatement) expressionNode() {}
+
+type WhileStatement struct {
+	NodeType  NodeType   `json:"type"`
+	Condition Expression `json:"condition"`
+	Body      []Node     `json:"body"`
+}
+
+func (w *WhileStatement) Type() NodeType  { return TypeWhileStatement }
+func (w *WhileStatement) expressionNode() {}
 
 type ConditionalExpression struct {
 	NodeType   NodeType   `json:"type"`

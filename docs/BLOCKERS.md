@@ -1,6 +1,6 @@
 | # | Blocker | Scope | Evidence |
 |---|---------|-------|----------|
-| **1** | `while` loops | Keyword in lexer/grammar, but no parser rule, no AST node, no codegen | 0 hits for `WhileStatement` across parser/ast/codegen |
+| **1** | ~~`while` loops~~ | ✅ Resolved: AST WhileStatement, grammar WhileStmt, parser converter, codegen (statement + IIFE + arrow), iteration guard (100k cap) | `while_statement_converter.go`, `loop_iteration_guard.go`, `control_flow_expression_generator.go` |
 | **2** | `varip` declarations | Absent from all layers — lexer, parser, AST, codegen, runtime | 0 hits for `varip` anywhere |
 | **3** | `map.new<K,V>()` generics | `<`/`>` lexed as comparison operators, no generic type syntax in grammar | Parse error: `unexpected token ","` on `map.new<string, float>()` |
 | **4** | ~~Switch inline case results~~ | ✅ Resolved: grammar SwitchCase InlineBody alternation, SwitchCaseBodyResolver dispatch, parameterized lowering tests | `switch_case_body_resolver.go`, `grammar.go` SwitchCase |

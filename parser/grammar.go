@@ -26,6 +26,7 @@ type StatementCore struct {
 	If              *IfStatement     `parser:"| @@"`
 	ForIn           *ForInStatement  `parser:"| @@"`
 	For             *ForStatement    `parser:"| @@"`
+	While           *WhileStatement  `parser:"| @@"`
 	Switch          *SwitchExpr      `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
 	TypedAssignment *TypedAssignment `parser:"| @@"`
@@ -65,6 +66,13 @@ type ForInStatement struct {
 	Indent     *string      `parser:"@Indent"`
 	Body       []*Statement `parser:"@@+"`
 	Dedent     *string      `parser:"@Dedent"`
+}
+
+type WhileStatement struct {
+	Condition *OrExpr      `parser:"'while' @@"`
+	Indent    *string      `parser:"@Indent"`
+	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent"`
 }
 
 type FunctionDecl struct {
@@ -150,9 +158,17 @@ type SwitchCase struct {
 	InlineBody *Expression  `parser:"| @@ )"`
 }
 
+type WhileExpr struct {
+	Condition *OrExpr      `parser:"'while' @@"`
+	Indent    *string      `parser:"@Indent"`
+	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent"`
+}
+
 type Expression struct {
 	ForInExpr    *ForInExpr    `parser:"@@"`
 	ForExpr      *ForExpr      `parser:"| @@"`
+	WhileExpr    *WhileExpr    `parser:"| @@"`
 	IfExpr       *IfExpr       `parser:"| @@"`
 	SwitchExpr   *SwitchExpr   `parser:"| @@"`
 	Ternary      *TernaryExpr  `parser:"| @@"`

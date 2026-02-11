@@ -42,6 +42,9 @@ func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, erro
 	case *ast.ForInStatement:
 		return s.generateForInStatement(st)
 
+	case *ast.WhileStatement:
+		return s.generateWhileStatement(st)
+
 	default:
 		return s.gen.generateStatement(stmt)
 	}
@@ -187,6 +190,46 @@ func (s *ArrowStatementGenerator) generateForInStatement(forIn *ast.ForInStateme
 		}
 	}
 
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
+
+	return code, nil
+}
+
+func (s *ArrowStatementGenerator) generateWhileStatement(whileStmt *ast.WhileStatement) (string, error) {
+	s.gen.loopContextStack.Push("")
+	defer s.gen.loopContextStack.Pop()
+
+	condCode, err := s.exprGenerator.Generate(whileStmt.Condition)
+	if err != nil {
+		return "", fmt.Errorf("while-loop condition expression failed: %w", err)
+	}
+
+	condCode = s.gen.addBoolConversionIfNeeded(whileStmt.Condition, condCode)
+
+	guard := NewLoopIterationGuard()
+
+	code := s.gen.ind() + "{\n"
+	s.gen.indent++
+
+	code += guard.InitCode(s.gen.ind())
+	code += s.gen.ind() + fmt.Sprintf("for %s {\n", condCode)
+	s.gen.indent++
+
+	code += guard.CheckCode(s.gen.ind())
+
+	for _, stmt := range whileStmt.Body {
+		stmtCode, err := s.GenerateStatement(stmt)
+		if err != nil {
+			return "", fmt.Errorf("while-loop body statement failed: %w", err)
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
+	s.gen.indent--
+	code += s.gen.ind() + "}\n"
 	s.gen.indent--
 	code += s.gen.ind() + "}\n"
 

@@ -225,6 +225,9 @@ func (a *ArrowFunctionCodegen) collectAllVariableNames(statements []ast.Node) []
 			case *ast.ForInStatement:
 				recurse(s.Body)
 
+			case *ast.WhileStatement:
+				recurse(s.Body)
+
 			case *ast.IfStatement:
 				recurse(s.Consequent)
 				recurse(s.Alternate)

@@ -32,6 +32,7 @@ func NewStatementConverterFactory(
 			NewIfStatementConverter(orExprConverter, statementConverter),
 			NewForInStatementConverter(arithExprConverter, statementConverter),
 			NewForStatementConverter(arithExprConverter, statementConverter),
+			NewWhileStatementConverter(orExprConverter, statementConverter),
 			NewSwitchStatementConverter(orExprConverter, switchBodyResolver),
 			NewBreakStatementConverter(),
 			NewContinueStatementConverter(),

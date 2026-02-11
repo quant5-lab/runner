@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "While Expression",
+  "dataSource": "BTCUSDT-1h.json",
+  "generatedAt": "2026-02-11T17:56:10Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

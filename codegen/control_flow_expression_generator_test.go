@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
@@ -314,6 +315,104 @@ else if b
 
 			if tt.mustHaveElse {
 				verifier.MustContain("else")
+			}
+		})
+	}
+}
+
+/* TestIfExpressionResultResolution validates result expression types in if-expression IIFEs */
+func TestIfExpressionResultResolution(t *testing.T) {
+	tests := []struct {
+		name           string
+		pine           string
+		mustContainAll []string
+		forbidden      []string
+	}{
+		{
+			name: "bare identifier result",
+			pine: `
+//@version=5
+indicator("Test")
+val = 10.0
+x = if true
+    val
+else
+    0
+plot(x)
+`,
+			mustContainAll: []string{"func() float64", "return valSeries.GetCurrent()"},
+		},
+		{
+			name: "binary expression result",
+			pine: `
+//@version=5
+indicator("Test")
+val = 10.0
+x = if true
+    val + 1
+else
+    0
+plot(x)
+`,
+			mustContainAll: []string{"func() float64", "valSeries.GetCurrent()"},
+		},
+		{
+			name: "literal result",
+			pine: `
+//@version=5
+indicator("Test")
+x = if true
+    42
+else
+    0
+plot(x)
+`,
+			mustContainAll: []string{"func() float64", "return 42"},
+		},
+		{
+			name: "call expression result",
+			pine: `
+//@version=5
+indicator("Test")
+x = if true
+    math.abs(-5)
+else
+    0
+plot(x)
+`,
+			mustContainAll: []string{"func() float64", "return math.Abs("},
+		},
+		{
+			name: "no else returns NaN",
+			pine: `
+//@version=5
+indicator("Test")
+val = 10.0
+x = if true
+    val
+plot(x)
+`,
+			mustContainAll: []string{"func() float64", "return math.NaN()"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			goCode, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+
+			for _, pattern := range tt.mustContainAll {
+				if !strings.Contains(goCode, pattern) {
+					t.Errorf("Missing required pattern: %q\nGenerated code:\n%s", pattern, goCode)
+				}
+			}
+
+			for _, pattern := range tt.forbidden {
+				if strings.Contains(goCode, pattern) {
+					t.Errorf("Found forbidden pattern: %q\nGenerated code:\n%s", pattern, goCode)
+				}
 			}
 		})
 	}

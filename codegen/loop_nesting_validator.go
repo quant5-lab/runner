@@ -36,6 +36,8 @@ func (v *LoopNestingValidator) validateNode(node ast.Node, inLoop bool) error {
 		return v.validateBody(n.Body, true)
 	case *ast.ForInStatement:
 		return v.validateBody(n.Body, true)
+	case *ast.WhileStatement:
+		return v.validateBody(n.Body, true)
 	case *ast.IfStatement:
 		if err := v.validateBody(n.Consequent, inLoop); err != nil {
 			return err
@@ -62,6 +64,8 @@ func (v *LoopNestingValidator) validateExpression(expr ast.Expression, inLoop bo
 	case *ast.ForStatement:
 		return v.validateBody(e.Body, true)
 	case *ast.ForInStatement:
+		return v.validateBody(e.Body, true)
+	case *ast.WhileStatement:
 		return v.validateBody(e.Body, true)
 	case *ast.IfStatement:
 		if err := v.validateBody(e.Consequent, inLoop); err != nil {

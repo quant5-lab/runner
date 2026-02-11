@@ -27,6 +27,8 @@ func (w *StatementSecurityWalker) Walk(stmt ast.Node) {
 		w.walkIfStatement(s)
 	case *ast.ForStatement:
 		w.walkForStatement(s)
+	case *ast.WhileStatement:
+		w.walkWhileStatement(s)
 	}
 }
 
@@ -58,6 +60,14 @@ func (w *StatementSecurityWalker) walkForStatement(forStmt *ast.ForStatement) {
 	w.exprWalker.Walk(forStmt.Step)
 
 	for _, bodyStmt := range forStmt.Body {
+		w.Walk(bodyStmt)
+	}
+}
+
+func (w *StatementSecurityWalker) walkWhileStatement(whileStmt *ast.WhileStatement) {
+	w.exprWalker.Walk(whileStmt.Condition)
+
+	for _, bodyStmt := range whileStmt.Body {
 		w.Walk(bodyStmt)
 	}
 }

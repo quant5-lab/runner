@@ -1,0 +1,16 @@
+//@version=5
+strategy("While Loop Factorial", overlay=true)
+
+lookback = input.int(5, "Lookback")
+
+result = 1
+counter = 1
+while counter <= lookback
+    result := result * counter
+    counter := counter + 1
+
+if bar_index > 0 and close > open and result == 120
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0 and bar_index % 15 == 0
+    strategy.close("Long")

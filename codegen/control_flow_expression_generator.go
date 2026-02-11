@@ -95,7 +95,39 @@ func (c *ControlFlowExpressionGenerator) GenerateForInExpressionAsIIFE(forIn *as
 	return builder.String(), nil
 }
 
-/* Shared by for and for-in IIFE: last ExpressionStatement becomes __result assignment */
+func (c *ControlFlowExpressionGenerator) GenerateWhileExpressionAsIIFE(whileStmt *ast.WhileStatement) (string, error) {
+	var builder strings.Builder
+
+	builder.WriteString("(func() float64 {\n")
+	c.baseGenerator.indent++
+
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString("var __result float64\n")
+
+	condCode, err := c.baseGenerator.generateConditionExpression(whileStmt.Condition)
+	if err != nil {
+		return "", fmt.Errorf("generating while-expression condition: %w", err)
+	}
+	condCode = strings.TrimSpace(condCode)
+	condCode = c.baseGenerator.addBoolConversionIfNeeded(whileStmt.Condition, condCode)
+
+	guard := NewLoopIterationGuard()
+
+	builder.WriteString(guard.InitCode(c.baseGenerator.ind()))
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString(fmt.Sprintf("for %s {\n", condCode))
+	c.baseGenerator.indent++
+
+	builder.WriteString(guard.CheckCode(c.baseGenerator.ind()))
+
+	if err := c.generateLoopBodyWithResult(&builder, whileStmt.Body); err != nil {
+		return "", err
+	}
+
+	return builder.String(), nil
+}
+
+/* Shared by for, for-in, and while IIFE: last ExpressionStatement becomes __result assignment */
 func (c *ControlFlowExpressionGenerator) generateLoopBodyWithResult(builder *strings.Builder, body []ast.Node) error {
 	lastStatementIsAssignment := false
 	for i, bodyNode := range body {
@@ -103,10 +135,7 @@ func (c *ControlFlowExpressionGenerator) generateLoopBodyWithResult(builder *str
 
 		if isLastStatement {
 			if exprStmt, ok := bodyNode.(*ast.ExpressionStatement); ok {
-				wasInArrow := c.baseGenerator.inArrowFunctionBody
-				c.baseGenerator.inArrowFunctionBody = true
-				exprCode, err := c.baseGenerator.generateExpression(exprStmt.Expression)
-				c.baseGenerator.inArrowFunctionBody = wasInArrow
+				exprCode, err := c.baseGenerator.generateArrowFunctionExpression(exprStmt.Expression)
 				if err != nil {
 					return fmt.Errorf("generating loop result expression: %w", err)
 				}
@@ -248,7 +277,7 @@ func (c *ControlFlowExpressionGenerator) extractLastExpressionFromBlock(body []a
 	lastNode := body[len(body)-1]
 
 	if exprStmt, ok := lastNode.(*ast.ExpressionStatement); ok {
-		return c.baseGenerator.generateExpression(exprStmt.Expression)
+		return c.baseGenerator.generateArrowFunctionExpression(exprStmt.Expression)
 	}
 
 	if varDecl, ok := lastNode.(*ast.VariableDeclaration); ok {

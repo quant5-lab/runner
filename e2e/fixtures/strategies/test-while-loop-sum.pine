@@ -1,0 +1,16 @@
+//@version=5
+strategy("While Loop Sum", overlay=true)
+
+lookback = input.int(10, "Lookback")
+
+total = 0.0
+idx = 1
+while idx <= lookback
+    total := total + idx
+    idx := idx + 1
+
+if bar_index > 0 and total == 55
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0 and bar_index % 20 == 0
+    strategy.close("Long")

@@ -930,6 +930,8 @@ func (g *generator) generateStatement(node ast.Node) (string, error) {
 		return g.generateForStatement(n)
 	case *ast.ForInStatement:
 		return g.generateForInStatement(n)
+	case *ast.WhileStatement:
+		return g.generateWhileStatement(n)
 	case *ast.BreakStatement:
 		return g.ind() + "break\n", nil
 	case *ast.ContinueStatement:
@@ -947,6 +949,9 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 	case *ast.ForInStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		return cfGenerator.GenerateForInExpressionAsIIFE(e)
+	case *ast.WhileStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateWhileExpressionAsIIFE(e)
 	case *ast.IfStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		return cfGenerator.GenerateIfExpressionAsIIFE(e)
@@ -1128,6 +1133,45 @@ func (g *generator) generateForInStatement(forIn *ast.ForInStatement) (string, e
 	return code, nil
 }
 
+func (g *generator) generateWhileStatement(whileStmt *ast.WhileStatement) (string, error) {
+	g.loopContextStack.Push("")
+	defer g.loopContextStack.Pop()
+
+	condition, err := g.generateConditionExpression(whileStmt.Condition)
+	if err != nil {
+		return "", fmt.Errorf("while condition: %w", err)
+	}
+	condition = g.addBoolConversionIfNeeded(whileStmt.Condition, condition)
+
+	guard := NewLoopIterationGuard()
+
+	code := g.ind() + "{\n"
+	g.indent++
+
+	code += guard.InitCode(g.ind())
+	code += g.ind() + fmt.Sprintf("for %s {\n", condition)
+	g.indent++
+
+	code += guard.CheckCode(g.ind())
+
+	for _, stmt := range whileStmt.Body {
+		stmtCode, err := g.generateStatement(stmt)
+		if err != nil {
+			return "", fmt.Errorf("while body: %w", err)
+		}
+		if stmtCode != "" {
+			code += stmtCode
+		}
+	}
+
+	g.indent--
+	code += g.ind() + "}\n"
+	g.indent--
+	code += g.ind() + "}\n"
+
+	return code, nil
+}
+
 func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (string, error) {
 	isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
 	if g.inArrowFunctionBody || isInLoop {
@@ -1140,6 +1184,10 @@ func (g *generator) generateBinaryExpression(binExpr *ast.BinaryExpression) (str
 }
 
 func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string, error) {
+	wasInArrow := g.inArrowFunctionBody
+	g.inArrowFunctionBody = true
+	defer func() { g.inArrowFunctionBody = wasInArrow }()
+
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
@@ -1152,17 +1200,14 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			return "bar_indexSeries.GetCurrent()", nil
 		}
 
-		// Check if it's a builtin identifier
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
 			return code, nil
 		}
 
-		// Check if it's a local variable (needs Series access)
 		if varType, exists := g.variables[e.Name]; exists {
 			if varType == "float" || varType == "float64" || varType == "bool" {
 				return e.Name + "Series.GetCurrent()", nil
 			}
-			// Function type stays as-is (user-defined function call)
 			if varType == "function" {
 				return e.Name, nil
 			}
@@ -1175,7 +1220,6 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			return e.Name, nil
 		}
 
-		// Function parameter or unknown - direct access
 		return e.Name, nil
 
 	case *ast.Literal:
@@ -1186,6 +1230,9 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 
 	case *ast.BinaryExpression:
 		return g.generateBinaryExpression(e)
+
+	case *ast.LogicalExpression:
+		return g.generateLogicalExpression(e)
 
 	case *ast.MemberExpression:
 		if e.Computed && g.subscriptResolver != nil {
@@ -2141,6 +2188,13 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.ForInStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
 		iifeCode, err := cfGenerator.GenerateForInExpressionAsIIFE(expr)
+		if err != nil {
+			return "", err
+		}
+		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, iifeCode), nil
+	case *ast.WhileStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		iifeCode, err := cfGenerator.GenerateWhileExpressionAsIIFE(expr)
 		if err != nil {
 			return "", err
 		}
@@ -3764,6 +3818,15 @@ func hasBarIndexInNode(node ast.Node) bool {
 		}
 	case *ast.ForInStatement:
 		if hasBarIndexInExpression(n.Collection) {
+			return true
+		}
+		for _, stmt := range n.Body {
+			if hasBarIndexInNode(stmt) {
+				return true
+			}
+		}
+	case *ast.WhileStatement:
+		if hasBarIndexInExpression(n.Condition) {
 			return true
 		}
 		for _, stmt := range n.Body {

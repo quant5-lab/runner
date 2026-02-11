@@ -1,0 +1,18 @@
+//@version=5
+strategy("While Continue", overlay=true)
+
+lookback = input.int(10, "Lookback")
+
+sum = 0.0
+idx = 0
+while idx < lookback
+    idx := idx + 1
+    if idx > 5
+        continue
+    sum := sum + idx
+
+if bar_index > 0 and close > open and sum == 15
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0 and bar_index % 20 == 0
+    strategy.close("Long")

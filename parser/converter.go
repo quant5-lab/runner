@@ -75,6 +75,9 @@ func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) 
 	if expr.ForExpr != nil {
 		return c.convertForExprToStatement(expr.ForExpr)
 	}
+	if expr.WhileExpr != nil {
+		return c.convertWhileExprToStatement(expr.WhileExpr)
+	}
 	if expr.IfExpr != nil {
 		return c.convertIfExprToStatement(expr.IfExpr)
 	}
@@ -746,6 +749,30 @@ func (c *Converter) convertForInExprToStatement(forInExpr *ForInExpr) (ast.Expre
 		forInExpr.Vars, forInExpr.Collection, forInExpr.Body,
 		c.convertArithExpr, c.convertStatement,
 	)
+}
+
+func (c *Converter) convertWhileExprToStatement(whileExpr *WhileExpr) (ast.Expression, error) {
+	condition, err := c.convertOrExpr(whileExpr.Condition)
+	if err != nil {
+		return nil, fmt.Errorf("converting while-expression condition: %w", err)
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range whileExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting while-expression body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	return &ast.WhileStatement{
+		NodeType:  ast.TypeWhileStatement,
+		Condition: condition,
+		Body:      body,
+	}, nil
 }
 
 func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, error) {

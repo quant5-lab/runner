@@ -67,6 +67,12 @@ func (g *ArgumentExpressionGenerator) generate(expr ast.Expression) (string, err
 	case *ast.ForStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
 		return cfGenerator.GenerateForExpressionAsIIFE(e)
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateForInExpressionAsIIFE(e)
+	case *ast.WhileStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateWhileExpressionAsIIFE(e)
 	default:
 		return "", fmt.Errorf("unsupported argument expression type: %T", expr)
 	}

@@ -75,6 +75,9 @@ func (a *ArrowLoopModificationAnalyzer) analyzeWithScope(statements []ast.Node, 
 		case *ast.ForInStatement:
 			a.analyzeForLoopWithScope(s.Body, currentScope, modified)
 
+		case *ast.WhileStatement:
+			a.analyzeForLoopWithScope(s.Body, currentScope, modified)
+
 		case *ast.IfStatement:
 			a.analyzeWithScope(s.Consequent, currentScope, modified)
 			a.analyzeWithScope(s.Alternate, currentScope, modified)
@@ -103,6 +106,9 @@ func (a *ArrowLoopModificationAnalyzer) analyzeForLoopWithScope(body []ast.Node,
 			a.analyzeNestedLoop(s.Body, body, s, declaredBefore, modified)
 
 		case *ast.ForInStatement:
+			a.analyzeNestedLoop(s.Body, body, s, declaredBefore, modified)
+
+		case *ast.WhileStatement:
 			a.analyzeNestedLoop(s.Body, body, s, declaredBefore, modified)
 		}
 	}
