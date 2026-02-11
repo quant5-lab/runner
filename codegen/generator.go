@@ -29,20 +29,20 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	registryGuard := NewVariableRegistryGuard(variablesRegistry)
 
 	gen := &generator{
-		imports:          make(map[string]bool),
-		variables:        variablesRegistry,
-		varInits:         make(map[string]ast.Expression),
-		constants:        make(map[string]interface{}),
-		reassignedVars:   make(map[string]bool),
-		strategyConfig:   NewStrategyConfig(),
-		limits:           NewCodeGenerationLimits(),
-		safetyGuard:      NewRuntimeSafetyGuard(),
+		imports:            make(map[string]bool),
+		variables:          variablesRegistry,
+		varInits:           make(map[string]ast.Expression),
+		constants:          make(map[string]interface{}),
+		reassignedVars:     make(map[string]bool),
+		strategyConfig:     NewStrategyConfig(),
+		limits:             NewCodeGenerationLimits(),
+		safetyGuard:        NewRuntimeSafetyGuard(),
 		persistenceEmitter: NewVarPersistenceEmitter(NewRuntimeSafetyGuard()),
-		loopContextStack: NewLoopContextStack(),
-		constantRegistry: constantRegistry,
-		typeSystem:       typeSystem,
-		boolConverter:    boolConverter,
-		registryGuard:    registryGuard,
+		loopContextStack:   NewLoopContextStack(),
+		constantRegistry:   constantRegistry,
+		typeSystem:         typeSystem,
+		boolConverter:      boolConverter,
+		registryGuard:      registryGuard,
 	}
 
 	gen.inputHandler = NewInputHandler()
