@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-// TestSwitchStatement_NestedSwitch verifies switch statements nested inside switch statements
 func TestSwitchStatement_NestedSwitch(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -102,7 +101,6 @@ func TestSwitchStatement_NestedSwitch(t *testing.T) {
 	}
 }
 
-// TestSwitchStatement_NestedIf verifies if statements nested inside switch statements
 func TestSwitchStatement_NestedIf(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -184,7 +182,6 @@ func TestSwitchStatement_NestedIf(t *testing.T) {
 	}
 }
 
-// TestSwitchStatement_NestedFor verifies for loops nested inside switch statements
 func TestSwitchStatement_NestedFor(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -254,7 +251,6 @@ func TestSwitchStatement_NestedFor(t *testing.T) {
 	}
 }
 
-// TestIfStatement_NestedSwitch verifies switch statements nested inside if statements
 func TestIfStatement_NestedSwitch(t *testing.T) {
 	source := `if condition
     switch mode
@@ -291,7 +287,6 @@ func TestIfStatement_NestedSwitch(t *testing.T) {
 	}
 }
 
-// TestForStatement_NestedSwitch verifies switch statements nested inside for loops
 func TestForStatement_NestedSwitch(t *testing.T) {
 	source := `for i = 1 to 10
     switch i
@@ -328,7 +323,6 @@ func TestForStatement_NestedSwitch(t *testing.T) {
 	}
 }
 
-// TestSwitchStatement_ComplexNesting verifies complex nesting patterns with mixed control flow
 func TestSwitchStatement_ComplexNesting(t *testing.T) {
 	tests := []struct {
 		name   string

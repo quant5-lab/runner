@@ -143,10 +143,11 @@ type SwitchExpr struct {
 }
 
 type SwitchCase struct {
-	Condition *OrExpr      `parser:"@@? '=>'"`
-	Indent    *string      `parser:"@Indent"`
-	Body      []*Statement `parser:"@@+"`
-	Dedent    *string      `parser:"@Dedent"`
+	Condition  *OrExpr      `parser:"@@? '=>'"`
+	Indent     *string      `parser:"( @Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	InlineBody *Expression  `parser:"| @@ )"`
 }
 
 type Expression struct {

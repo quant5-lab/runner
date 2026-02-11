@@ -1,6 +1,6 @@
-Remaining blockers: switch with string cases, input.color (#11), drawing objects line.*/label.* (#8)
+Remaining blockers: while loops (#1), input.color (#15), drawing objects line.*/label.* (#13)
 
-Parse: ❌ (switch with string literal cases: line 30:17 unexpected token "'1'" — lexer splits '1m' incorrectly)
-Generate: ❌ Not reached (also blocked by #8 line.*/label.*)
+Parse: ❌ (while loop on line 111 — blocker #1)
+Generate: ❌ Not reached (also blocked by #13 line.*/label.*, #15 input.color)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

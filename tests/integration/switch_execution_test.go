@@ -276,3 +276,63 @@ plot(result, "Result")
 		t.Errorf("got %f, want 20.0", vals[0])
 	}
 }
+
+func TestSwitchExecution_InlineWithBarData(t *testing.T) {
+	script := `//@version=5
+indicator("Switch Inline Bar", overlay=false)
+direction = switch
+    close > open => 1.0
+    close < open => -1.0
+    => 0.0
+plot(direction, "Direction")
+`
+
+	testData := []map[string]interface{}{
+		{"time": 1700000000, "open": 100.0, "high": 110.0, "low": 95.0, "close": 105.0, "volume": 1000.0},
+		{"time": 1700003600, "open": 105.0, "high": 108.0, "low": 98.0, "close": 100.0, "volume": 1100.0},
+		{"time": 1700007200, "open": 100.0, "high": 105.0, "low": 95.0, "close": 100.0, "volume": 1200.0},
+	}
+
+	exec := util.NewPineExecutor(t)
+	output := exec.ExecuteScriptWithCustomData(t, "switch-inline-bar", script, testData)
+	vals := exec.ExtractPlotValues(t, output, "Direction")
+
+	if len(vals) < 3 {
+		t.Fatalf("expected 3 bars, got %d", len(vals))
+	}
+	if vals[0] != 1.0 {
+		t.Errorf("bar 0 (bullish): got %f, want 1.0", vals[0])
+	}
+	if vals[1] != -1.0 {
+		t.Errorf("bar 1 (bearish): got %f, want -1.0", vals[1])
+	}
+	if vals[2] != 0.0 {
+		t.Errorf("bar 2 (doji): got %f, want 0.0", vals[2])
+	}
+}
+
+func TestSwitchExecution_MixedInlineAndMultiLine(t *testing.T) {
+	script := `//@version=5
+indicator("Switch Mixed", overlay=false)
+a = 5.0
+b = 10.0
+val = 2
+result = switch val
+    1 => a + b
+    2 =>
+        a * b
+    => -1.0
+plot(result, "Result")
+`
+
+	exec := util.NewPineExecutor(t)
+	output := exec.ExecuteScript(t, "switch-mixed", script)
+	vals := exec.ExtractPlotValues(t, output, "Result")
+
+	if len(vals) < 1 {
+		t.Fatal("no data points")
+	}
+	if vals[0] != 50.0 {
+		t.Errorf("got %f, want 50.0", vals[0])
+	}
+}

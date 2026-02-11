@@ -7,131 +7,226 @@ import (
 )
 
 func TestSwitchLowering_Form1WithSubject(t *testing.T) {
-	source := `x = switch close
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `x = switch close
     1 =>
         val1
     2 =>
         val2
     =>
-        defaultVal`
-
-	program := parseSwitchSource(t, source)
-
-	varDecl, ok := program.Body[0].(*ast.VariableDeclaration)
-	if !ok {
-		t.Fatalf("expected VariableDeclaration, got %T", program.Body[0])
+        defaultVal`,
+		},
+		{
+			name: "inline body",
+			source: `x = switch close
+    1 => val1
+    2 => val2
+    => defaultVal`,
+		},
 	}
 
-	ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected IfStatement (lowered switch), got %T", varDecl.Declarations[0].Init)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
 
-	assertBinaryTest(t, ifStmt, "==", "first case")
+			varDecl, ok := program.Body[0].(*ast.VariableDeclaration)
+			if !ok {
+				t.Fatalf("expected VariableDeclaration, got %T", program.Body[0])
+			}
 
-	if len(ifStmt.Alternate) != 1 {
-		t.Fatalf("expected 1 alternate node (else-if chain), got %d", len(ifStmt.Alternate))
-	}
+			ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected IfStatement (lowered switch), got %T", varDecl.Declarations[0].Init)
+			}
 
-	nestedIf, ok := ifStmt.Alternate[0].(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected nested IfStatement in alternate, got %T", ifStmt.Alternate[0])
-	}
+			assertBinaryTest(t, ifStmt, "==", "first case")
 
-	assertBinaryTest(t, nestedIf, "==", "second case")
+			if len(ifStmt.Alternate) != 1 {
+				t.Fatalf("expected 1 alternate node (else-if chain), got %d", len(ifStmt.Alternate))
+			}
 
-	if len(nestedIf.Alternate) != 1 {
-		t.Fatalf("expected 1 default alternate node, got %d", len(nestedIf.Alternate))
+			nestedIf, ok := ifStmt.Alternate[0].(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected nested IfStatement in alternate, got %T", ifStmt.Alternate[0])
+			}
+
+			assertBinaryTest(t, nestedIf, "==", "second case")
+
+			if len(nestedIf.Alternate) != 1 {
+				t.Fatalf("expected 1 default alternate node, got %d", len(nestedIf.Alternate))
+			}
+		})
 	}
 }
 
 func TestSwitchLowering_Form2WithoutSubject(t *testing.T) {
-	source := `x = switch
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `x = switch
     close > open =>
         1
     close < open =>
-        2`
-
-	program := parseSwitchSource(t, source)
-
-	varDecl := program.Body[0].(*ast.VariableDeclaration)
-	ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected IfStatement (lowered switch), got %T", varDecl.Declarations[0].Init)
+        2`,
+		},
+		{
+			name: "inline body",
+			source: `x = switch
+    close > open => 1
+    close < open => 2`,
+		},
 	}
 
-	if _, isBinary := ifStmt.Test.(*ast.BinaryExpression); !isBinary {
-		t.Fatalf("form 2 should use condition directly as BinaryExpression, got %T", ifStmt.Test)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
 
-	if len(ifStmt.Alternate) != 1 {
-		t.Fatalf("expected 1 alternate (else-if), got %d", len(ifStmt.Alternate))
-	}
+			varDecl := program.Body[0].(*ast.VariableDeclaration)
+			ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected IfStatement (lowered switch), got %T", varDecl.Declarations[0].Init)
+			}
 
-	nestedIf := ifStmt.Alternate[0].(*ast.IfStatement)
-	if len(nestedIf.Alternate) != 0 {
-		t.Fatalf("expected 0 alternate (no default), got %d", len(nestedIf.Alternate))
+			if _, isBinary := ifStmt.Test.(*ast.BinaryExpression); !isBinary {
+				t.Fatalf("form 2 should use condition directly as BinaryExpression, got %T", ifStmt.Test)
+			}
+
+			if len(ifStmt.Alternate) != 1 {
+				t.Fatalf("expected 1 alternate (else-if), got %d", len(ifStmt.Alternate))
+			}
+
+			nestedIf := ifStmt.Alternate[0].(*ast.IfStatement)
+			if len(nestedIf.Alternate) != 0 {
+				t.Fatalf("expected 0 alternate (no default), got %d", len(nestedIf.Alternate))
+			}
+		})
 	}
 }
 
 func TestSwitchLowering_StatementLevel(t *testing.T) {
-	source := `switch action
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `switch action
     1 =>
         doSomething()
     2 =>
-        doOther()`
-
-	program := parseSwitchSource(t, source)
-
-	ifStmt, ok := program.Body[0].(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected IfStatement at statement level, got %T", program.Body[0])
+        doOther()`,
+		},
+		{
+			name: "inline body",
+			source: `switch action
+    1 => doSomething()
+    2 => doOther()`,
+		},
 	}
 
-	assertBinaryTest(t, ifStmt, "==", "statement-level switch")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
+
+			ifStmt, ok := program.Body[0].(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected IfStatement at statement level, got %T", program.Body[0])
+			}
+
+			assertBinaryTest(t, ifStmt, "==", "statement-level switch")
+		})
+	}
 }
 
 func TestSwitchLowering_DefaultOnly(t *testing.T) {
-	source := `x = switch
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `x = switch
     =>
-        42`
-
-	program := parseSwitchSource(t, source)
-
-	varDecl := program.Body[0].(*ast.VariableDeclaration)
-	ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected IfStatement, got %T", varDecl.Declarations[0].Init)
+        42`,
+		},
+		{
+			name: "inline body",
+			source: `x = switch
+    => 42`,
+		},
 	}
 
-	lit, ok := ifStmt.Test.(*ast.Literal)
-	if !ok || lit.Value != true {
-		t.Fatalf("default-only switch should have true test, got %v", ifStmt.Test)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
+
+			varDecl := program.Body[0].(*ast.VariableDeclaration)
+			ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected IfStatement, got %T", varDecl.Declarations[0].Init)
+			}
+
+			lit, ok := ifStmt.Test.(*ast.Literal)
+			if !ok || lit.Value != true {
+				t.Fatalf("default-only switch should have true test, got %v", ifStmt.Test)
+			}
+		})
 	}
 }
 
 func TestSwitchLowering_SingleCase(t *testing.T) {
-	source := `x = switch val
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `x = switch val
     1 =>
-        result`
-
-	program := parseSwitchSource(t, source)
-
-	varDecl := program.Body[0].(*ast.VariableDeclaration)
-	ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
-	if !ok {
-		t.Fatalf("expected IfStatement, got %T", varDecl.Declarations[0].Init)
+        result`,
+		},
+		{
+			name: "inline body",
+			source: `x = switch val
+    1 => result`,
+		},
 	}
 
-	assertBinaryTest(t, ifStmt, "==", "single case")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
 
-	if len(ifStmt.Alternate) != 0 {
-		t.Fatalf("single case without default should have empty alternate, got %d", len(ifStmt.Alternate))
+			varDecl := program.Body[0].(*ast.VariableDeclaration)
+			ifStmt, ok := varDecl.Declarations[0].Init.(*ast.IfStatement)
+			if !ok {
+				t.Fatalf("expected IfStatement, got %T", varDecl.Declarations[0].Init)
+			}
+
+			assertBinaryTest(t, ifStmt, "==", "single case")
+
+			if len(ifStmt.Alternate) != 0 {
+				t.Fatalf("single case without default should have empty alternate, got %d", len(ifStmt.Alternate))
+			}
+		})
 	}
 }
 
 func TestSwitchLowering_MultipleCasesWithDefault(t *testing.T) {
-	source := `x = switch mode
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "multi-line body",
+			source: `x = switch mode
     1 =>
         a
     2 =>
@@ -139,21 +234,35 @@ func TestSwitchLowering_MultipleCasesWithDefault(t *testing.T) {
     3 =>
         c
     =>
-        d`
-
-	program := parseSwitchSource(t, source)
-
-	varDecl := program.Body[0].(*ast.VariableDeclaration)
-	ifStmt := varDecl.Declarations[0].Init.(*ast.IfStatement)
-
-	depth := countIfChainDepth(ifStmt)
-	if depth != 3 {
-		t.Fatalf("expected if-chain depth 3 (3 cases), got %d", depth)
+        d`,
+		},
+		{
+			name: "inline body",
+			source: `x = switch mode
+    1 => a
+    2 => b
+    3 => c
+    => d`,
+		},
 	}
 
-	lastIf := getLastIfInChain(ifStmt)
-	if len(lastIf.Alternate) != 1 {
-		t.Fatalf("expected default body in last alternate, got %d nodes", len(lastIf.Alternate))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := parseSwitchSource(t, tt.source)
+
+			varDecl := program.Body[0].(*ast.VariableDeclaration)
+			ifStmt := varDecl.Declarations[0].Init.(*ast.IfStatement)
+
+			depth := countIfChainDepth(ifStmt)
+			if depth != 3 {
+				t.Fatalf("expected if-chain depth 3 (3 cases), got %d", depth)
+			}
+
+			lastIf := getLastIfInChain(ifStmt)
+			if len(lastIf.Alternate) != 1 {
+				t.Fatalf("expected default body in last alternate, got %d nodes", len(lastIf.Alternate))
+			}
+		})
 	}
 }
 

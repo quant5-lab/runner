@@ -7,17 +7,17 @@ import (
 )
 
 type SwitchLowering struct {
-	orExprConverter    func(*OrExpr) (ast.Expression, error)
-	statementConverter func(*Statement) (ast.Node, error)
+	orExprConverter func(*OrExpr) (ast.Expression, error)
+	bodyResolver    *SwitchCaseBodyResolver
 }
 
 func NewSwitchLowering(
 	orExprConverter func(*OrExpr) (ast.Expression, error),
-	statementConverter func(*Statement) (ast.Node, error),
+	bodyResolver *SwitchCaseBodyResolver,
 ) *SwitchLowering {
 	return &SwitchLowering{
-		orExprConverter:    orExprConverter,
-		statementConverter: statementConverter,
+		orExprConverter: orExprConverter,
+		bodyResolver:    bodyResolver,
 	}
 }
 
@@ -63,7 +63,7 @@ func (l *SwitchLowering) partitionCases(cases []*SwitchCase) ([]*SwitchCase, *Sw
 }
 
 func (l *SwitchLowering) lowerDefaultOnlySwitch(defaultCase *SwitchCase) (*ast.IfStatement, error) {
-	body, err := l.convertBody(defaultCase.Body)
+	body, err := l.bodyResolver.Resolve(defaultCase)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (l *SwitchLowering) buildTerminalCase(subject ast.Expression, switchCase *S
 		return nil, err
 	}
 
-	consequent, err := l.convertBody(switchCase.Body)
+	consequent, err := l.bodyResolver.Resolve(switchCase)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (l *SwitchLowering) wrapWithCase(subject ast.Expression, switchCase *Switch
 		return nil, err
 	}
 
-	consequent, err := l.convertBody(switchCase.Body)
+	consequent, err := l.bodyResolver.Resolve(switchCase)
 	if err != nil {
 		return nil, err
 	}
@@ -161,19 +161,5 @@ func (l *SwitchLowering) resolveDefaultAlternate(defaultCase *SwitchCase) ([]ast
 	if defaultCase == nil {
 		return []ast.Node{}, nil
 	}
-	return l.convertBody(defaultCase.Body)
-}
-
-func (l *SwitchLowering) convertBody(body []*Statement) ([]ast.Node, error) {
-	nodes := []ast.Node{}
-	for _, stmt := range body {
-		node, err := l.statementConverter(stmt)
-		if err != nil {
-			return nil, fmt.Errorf("lowering switch case body: %w", err)
-		}
-		if node != nil {
-			nodes = append(nodes, node)
-		}
-	}
-	return nodes, nil
+	return l.bodyResolver.Resolve(defaultCase)
 }

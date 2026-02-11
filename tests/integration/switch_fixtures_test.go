@@ -60,6 +60,10 @@ func TestSwitchFixtures_ExpectedValues(t *testing.T) {
 		{"test-switch-indent-2case-3body.pine", "Result", 20.0},
 		{"test-switch-indent-3case-7body.pine", "Result", 50.0},
 		{"test-switch-form2-indent-3space.pine", "Result", 2.0},
+		{"test-switch-inline-form1-basic.pine", "Result", 20.0},
+		{"test-switch-inline-form1-default.pine", "Result", -1.0},
+		{"test-switch-inline-form2-boolean.pine", "Result", 2.0},
+		{"test-switch-inline-expression-ops.pine", "Result", 50.0},
 	}
 
 	exec := util.NewPineExecutor(t)

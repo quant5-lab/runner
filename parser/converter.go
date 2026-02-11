@@ -773,7 +773,8 @@ func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, er
 }
 
 func (c *Converter) convertSwitchExprToStatement(switchExpr *SwitchExpr) (ast.Expression, error) {
-	lowering := NewSwitchLowering(c.convertOrExpr, c.convertStatement)
+	bodyResolver := NewSwitchCaseBodyResolver(c.convertStatement, c.convertExpression)
+	lowering := NewSwitchLowering(c.convertOrExpr, bodyResolver)
 	return lowering.Lower(switchExpr)
 }
 

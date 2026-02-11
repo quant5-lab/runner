@@ -20,6 +20,8 @@ func NewStatementConverterFactory(
 	funcDeclConverter := NewFunctionDeclarationConverter(statementConverter, expressionConverter)
 	funcDeclConverter.SetParentConverter(parentConverter)
 
+	switchBodyResolver := NewSwitchCaseBodyResolver(statementConverter, expressionConverter)
+
 	return &StatementConverterFactory{
 		converters: []StatementConverter{
 			NewTupleAssignmentConverter(expressionConverter),
@@ -30,7 +32,7 @@ func NewStatementConverterFactory(
 			NewIfStatementConverter(orExprConverter, statementConverter),
 			NewForInStatementConverter(arithExprConverter, statementConverter),
 			NewForStatementConverter(arithExprConverter, statementConverter),
-			NewSwitchStatementConverter(orExprConverter, statementConverter),
+			NewSwitchStatementConverter(orExprConverter, switchBodyResolver),
 			NewBreakStatementConverter(),
 			NewContinueStatementConverter(),
 			NewExpressionStatementConverter(expressionConverter),

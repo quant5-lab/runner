@@ -8,10 +8,10 @@ type SwitchStatementConverter struct {
 
 func NewSwitchStatementConverter(
 	orExprConverter func(*OrExpr) (ast.Expression, error),
-	statementConverter func(*Statement) (ast.Node, error),
+	bodyResolver *SwitchCaseBodyResolver,
 ) *SwitchStatementConverter {
 	return &SwitchStatementConverter{
-		lowering: NewSwitchLowering(orExprConverter, statementConverter),
+		lowering: NewSwitchLowering(orExprConverter, bodyResolver),
 	}
 }
 
