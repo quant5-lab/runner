@@ -1,7 +1,7 @@
 | # | Blocker | Scope | Evidence |
 |---|---------|-------|----------|
 | **1** | ~~`while` loops~~ | ✅ Resolved: AST WhileStatement, grammar WhileStmt, parser converter, codegen (statement + IIFE + arrow), iteration guard (100k cap) | `while_statement_converter.go`, `loop_iteration_guard.go`, `control_flow_expression_generator.go` |
-| **2** | `varip` declarations | Absent from all layers — lexer, parser, AST, codegen, runtime | 0 hits for `varip` anywhere |
+| **2** | ~~`var`/`varip` declarations~~ | ✅ Resolved: Keyword in lexer, `VarAssignment` grammar rule, `VarAssignmentConverter` parser, `VarPersistenceEmitter` codegen, AST `Persistence` field, `sync.Once` init guard | `var_assignment.go`, `var_assignment_converter.go`, `var_persistence_emitter.go`, `nodes.go:65` |
 | **3** | `map.new<K,V>()` generics | `<`/`>` lexed as comparison operators, no generic type syntax in grammar | Parse error: `unexpected token ","` on `map.new<string, float>()` |
 | **4** | ~~Switch inline case results~~ | ✅ Resolved: grammar SwitchCase InlineBody alternation, SwitchCaseBodyResolver dispatch, parameterized lowering tests | `switch_case_body_resolver.go`, `grammar.go` SwitchCase |
 | **5** | ~~`for...in` iteration~~ | ✅ Resolved: AST ForInStatement, grammar ForInStmt, parser converter, codegen (statement + IIFE + arrow), `break`/`continue` support for all loop types | `for_in_statement_converter.go`, `break_continue_converter.go`, `control_flow_expression_generator.go` |
