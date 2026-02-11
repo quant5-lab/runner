@@ -63,6 +63,7 @@ type VariableDeclaration struct {
 	NodeType     NodeType             `json:"type"`
 	Declarations []VariableDeclarator `json:"declarations"`
 	Kind         string               `json:"kind"`
+	Persistence  string               `json:"persistence,omitempty"` // "", "var", "varip"
 }
 
 func (v *VariableDeclaration) Type() NodeType { return TypeVariableDeclaration }

@@ -30,6 +30,10 @@ func (t *SimpleRenameTransformer) visitStatement(stmt *parser.Statement) {
 		t.visitExpression(stmt.Core.Assignment.Value)
 	}
 
+	if stmt.Core.VarAssignment != nil {
+		t.visitExpression(stmt.Core.VarAssignment.Value)
+	}
+
 	if stmt.Core.If != nil {
 		t.visitOrExpr(stmt.Core.If.Condition)
 		for _, bodyStmt := range stmt.Core.If.Body {

@@ -26,6 +26,7 @@ func NewStatementConverterFactory(
 		converters: []StatementConverter{
 			NewTupleAssignmentConverter(expressionConverter),
 			funcDeclConverter,
+			NewVarAssignmentConverter(expressionConverter),
 			NewTypedAssignmentConverter(expressionConverter),
 			NewAssignmentConverter(expressionConverter),
 			NewReassignmentConverter(expressionConverter),

@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"sync"
+
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
 
@@ -29,6 +31,7 @@ type StatementCore struct {
 	While           *WhileStatement  `parser:"| @@"`
 	Switch          *SwitchExpr      `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
+	VarAssignment   *VarAssignment   `parser:"| @@"`
 	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
@@ -301,7 +304,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
 	{Name: "Newline", Pattern: `\r?\n`},
 	{Name: "Whitespace", Pattern: `[ \t]+`},
-	{Name: "Keyword", Pattern: `\b(if|for|in|to|by|while|switch|and|or|not|true|false|break|continue)\b`},
+	{Name: "Keyword", Pattern: `\b(if|for|in|to|by|while|switch|and|or|not|true|false|break|continue|var|varip)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
 	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
 	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},
@@ -312,10 +315,20 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 
 var indentAwareLexer = indentlexer.NewIndentationDefinition(pineLexer)
 
+/* Singleton — grammar is static, concurrent Build() on shared lexer definition races */
+var (
+	cachedParser    *participle.Parser[Script]
+	cachedParserErr error
+	parserOnce      sync.Once
+)
+
 func NewParser() (*participle.Parser[Script], error) {
-	return participle.Build[Script](
-		participle.Lexer(indentAwareLexer),
-		participle.Elide("Comment", "Whitespace", "Newline"),
-		participle.UseLookahead(16),
-	)
+	parserOnce.Do(func() {
+		cachedParser, cachedParserErr = participle.Build[Script](
+			participle.Lexer(indentAwareLexer),
+			participle.Elide("Comment", "Whitespace", "Newline"),
+			participle.UseLookahead(16),
+		)
+	})
+	return cachedParser, cachedParserErr
 }

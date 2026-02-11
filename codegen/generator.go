@@ -37,6 +37,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		strategyConfig:   NewStrategyConfig(),
 		limits:           NewCodeGenerationLimits(),
 		safetyGuard:      NewRuntimeSafetyGuard(),
+		persistenceEmitter: NewVarPersistenceEmitter(NewRuntimeSafetyGuard()),
 		loopContextStack: NewLoopContextStack(),
 		constantRegistry: constantRegistry,
 		typeSystem:       typeSystem,
@@ -131,6 +132,7 @@ type generator struct {
 	hasTickerCalls           bool
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
+	persistenceEmitter       *VarPersistenceEmitter
 	hoistedArrowContexts     []ArrowCallSite
 
 	constantRegistry *ConstantRegistry
@@ -353,6 +355,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.limits.MaxStatementsPerPass == 0 {
 		g.limits = NewCodeGenerationLimits()
 		g.safetyGuard = NewRuntimeSafetyGuard()
+		g.persistenceEmitter = NewVarPersistenceEmitter(g.safetyGuard)
 	}
 
 	// PRE-PASS: Collect AST constants for expression evaluator
@@ -1581,12 +1584,33 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 	for _, declarator := range decl.Declarations {
 		id, ok := declarator.ID.(*ast.Identifier)
 		if !ok {
-			return g.generateTupleDestructuringDeclaration(declarator)
+			tupleCode, err := g.generateTupleDestructuringDeclaration(declarator)
+			if err != nil {
+				return "", err
+			}
+			if decl.Persistence != "" {
+				arrayPattern, isArray := declarator.ID.(*ast.ArrayPattern)
+				if isArray {
+					indentedInit := ""
+					for _, line := range strings.Split(tupleCode, "\n") {
+						if line != "" {
+							indentedInit += "\t" + line + "\n"
+						}
+					}
+					var elemNames []string
+					for _, elem := range arrayPattern.Elements {
+						elemNames = append(elemNames, elem.Name)
+					}
+					code += g.persistenceEmitter.EmitTupleGuard(g.ind(), elemNames, indentedInit)
+					return code, nil
+				}
+			}
+			return tupleCode, err
 		}
 		varName := id.Name
 
-		/* Skip zero-literal placeholders for reassigned variables */
-		if decl.Kind == "let" && g.reassignedVars[varName] {
+		/* Persisted declarations must keep their zero-literal init */
+		if decl.Kind == "let" && decl.Persistence == "" && g.reassignedVars[varName] {
 			if lit, isLiteral := declarator.Init.(*ast.Literal); isLiteral {
 				isZero := false
 				switch v := lit.Value.(type) {
@@ -1642,8 +1666,8 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			}
 		}
 
-		/* Skip constants EXCEPT input.source */
-		if g.constantRegistry.IsConstant(varName) {
+		/* Persisted declarations and input.source bypass constant folding */
+		if g.constantRegistry.IsConstant(varName) && decl.Persistence == "" {
 			if constValue, exists := g.constants[varName]; exists && constValue == "input.source" {
 				/* input.source needs initialization */
 			} else {
@@ -1666,18 +1690,38 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 		}
 
 		if varType == "string" {
-			stringCode, err := g.generateStringVariableInit(varName, declarator.Init)
-			if err != nil {
-				code += g.ind() + fmt.Sprintf("// %s = string variable (generation failed: %v)\n", varName, err)
+			if decl.Persistence != "" {
+				g.indent++
+				stringCode, err := g.generateStringVariableInit(varName, declarator.Init)
+				g.indent--
+				if err != nil {
+					code += g.ind() + fmt.Sprintf("// %s = var string (generation failed: %v)\n", varName, err)
+				} else {
+					code += g.persistenceEmitter.EmitStringGuard(g.ind(), stringCode)
+				}
 			} else {
-				code += stringCode
+				stringCode, err := g.generateStringVariableInit(varName, declarator.Init)
+				if err != nil {
+					code += g.ind() + fmt.Sprintf("// %s = string variable (generation failed: %v)\n", varName, err)
+				} else {
+					code += stringCode
+				}
 			}
 			continue
 		}
 
 		if declarator.Init != nil {
 			if isInLoop {
-				if _, existsOuter := g.variables[varName]; existsOuter {
+				if decl.Persistence != "" {
+					g.variables[varName] = varType
+					g.indent++
+					initCode, err := g.generateVariableInit(varName, declarator.Init)
+					g.indent--
+					if err != nil {
+						return "", err
+					}
+					code += g.persistenceEmitter.EmitSeriesGuard(g.ind(), varName, initCode)
+				} else if _, existsOuter := g.variables[varName]; existsOuter {
 					seriesCode, err := g.generateLoopSeriesReassignment(varName, declarator.Init)
 					if err != nil {
 						return "", err
@@ -1695,14 +1739,28 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 				if err != nil {
 					return "", err
 				}
-				code += seriesCode
+				if decl.Persistence != "" {
+					code += g.persistenceEmitter.EmitSeriesGuard(g.ind(), varName, "\t"+seriesCode)
+				} else {
+					code += seriesCode
+				}
 			} else {
 				// Series context: Use ForwardSeriesBuffer paradigm
-				initCode, err := g.generateVariableInit(varName, declarator.Init)
-				if err != nil {
-					return "", err
+				if decl.Persistence != "" {
+					g.indent++
+					initCode, err := g.generateVariableInit(varName, declarator.Init)
+					g.indent--
+					if err != nil {
+						return "", err
+					}
+					code += g.persistenceEmitter.EmitSeriesGuard(g.ind(), varName, initCode)
+				} else {
+					initCode, err := g.generateVariableInit(varName, declarator.Init)
+					if err != nil {
+						return "", err
+					}
+					code += initCode
 				}
-				code += initCode
 			}
 		}
 	}
@@ -1910,6 +1968,12 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 
 func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expression) (string, error) {
 	switch expr := initExpr.(type) {
+	case *ast.Literal:
+		if s, ok := expr.Value.(string); ok {
+			return g.ind() + fmt.Sprintf("%s = %q\n", varName, s), nil
+		}
+		return "", fmt.Errorf("unsupported literal type for string variable: %T", expr.Value)
+
 	case *ast.Identifier:
 		if hex, found := g.builtinHandler.ResolveColorHex(expr.Name); found {
 			return g.ind() + fmt.Sprintf("%s = %q\n", varName, hex), nil
@@ -1957,6 +2021,12 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 
 func (g *generator) generateStringExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
+	case *ast.Literal:
+		if s, ok := e.Value.(string); ok {
+			return fmt.Sprintf("%q", s), nil
+		}
+		return "", fmt.Errorf("unsupported literal type for string expression: %T", e.Value)
+
 	case *ast.Identifier:
 		if hex, found := g.builtinHandler.ResolveColorHex(e.Name); found {
 			return fmt.Sprintf("%q", hex), nil

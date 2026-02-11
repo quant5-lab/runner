@@ -2,12 +2,15 @@ package lexer
 
 import (
 	"io"
+	"sync"
 
 	"github.com/alecthomas/participle/v2/lexer"
 )
 
 type IndentationDefinition struct {
-	base lexer.Definition
+	base        lexer.Definition
+	symbolsOnce sync.Once
+	symbolsMap  map[string]lexer.TokenType
 }
 
 func NewIndentationDefinition(base lexer.Definition) *IndentationDefinition {
@@ -15,12 +18,15 @@ func NewIndentationDefinition(base lexer.Definition) *IndentationDefinition {
 }
 
 func (d *IndentationDefinition) Symbols() map[string]lexer.TokenType {
-	symbols := d.base.Symbols()
-	nextType := lexer.TokenType(len(symbols) + 1)
-	symbols["Indent"] = nextType
-	symbols["Dedent"] = nextType + 1
-	symbols["Newline"] = nextType + 2
-	return symbols
+	d.symbolsOnce.Do(func() {
+		/* Mutate base map in-place — StatefulLexer.Next() reads token types from it */
+		d.symbolsMap = d.base.Symbols()
+		nextType := lexer.TokenType(len(d.symbolsMap) + 1)
+		d.symbolsMap["Indent"] = nextType
+		d.symbolsMap["Dedent"] = nextType + 1
+		d.symbolsMap["Newline"] = nextType + 2
+	})
+	return d.symbolsMap
 }
 
 func (d *IndentationDefinition) Lex(filename string, r io.Reader) (lexer.Lexer, error) {

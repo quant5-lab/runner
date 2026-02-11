@@ -35,6 +35,10 @@ func (t *IffToTernaryTransformer) visitStatement(stmt *parser.Statement) error {
 		return t.visitExpression(stmt.Core.Assignment.Value)
 	}
 
+	if stmt.Core.VarAssignment != nil {
+		return t.visitExpression(stmt.Core.VarAssignment.Value)
+	}
+
 	if stmt.Core.TypedAssignment != nil {
 		return t.visitExpression(stmt.Core.TypedAssignment.Value)
 	}
