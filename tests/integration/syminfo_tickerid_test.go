@@ -90,13 +90,12 @@ current_symbol = syminfo.tickerid
 		t.Fatalf("Failed to write Pine file: %v", err)
 	}
 
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	projectRoot, _ := filepath.Abs("../..")
 
 	buildCmd := exec.Command("go", "run", "cmd/pine-gen/main.go",
 		"-input", pineFile,
 		"-output", outputBinary)
+	buildCmd.Dir = projectRoot
 
 	buildOutput, err := buildCmd.CombinedOutput()
 
