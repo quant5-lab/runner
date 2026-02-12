@@ -365,6 +365,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	// First pass: collect variables, analyze Series requirements, extract strategy name
 	statementCounter := NewStatementCounter(g.limits)
+	registrar := NewVariableDeclarationRegistrar(g)
+	nestedScanner := NewNestedVariableScanner(g)
 	for _, stmt := range program.Body {
 		if err := statementCounter.Increment(); err != nil {
 			return "", err
@@ -400,123 +402,15 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				if arrayPattern, ok := declarator.ID.(*ast.ArrayPattern); ok {
-					for _, elem := range arrayPattern.Elements {
-						varName := SanitizeGoIdentifier(elem.Name)
-						// Infer type from initialization
-						varType := g.inferVariableType(declarator.Init)
-						g.variables[varName] = varType
-						g.typeSystem.RegisterVariable(varName, varType)
-					}
+				if g.tryResolveInputConstant(declarator) {
 					continue
 				}
-
-				id, ok := declarator.ID.(*ast.Identifier)
-				if !ok {
-					continue
-				}
-				varName := SanitizeGoIdentifier(id.Name)
-
-				// Skip arrow function declarations (user-defined functions, not variables)
-				if _, ok := declarator.Init.(*ast.ArrowFunctionExpression); ok {
-					continue
-				}
-
-				// Check if this is an input.* function call
-				if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
-					funcName := g.extractFunctionName(callExpr.Callee)
-
-					if g.inputHandler != nil {
-						if funcName == "input" && len(callExpr.Arguments) > 0 {
-							if resolved := resolveInputFuncName(callExpr); resolved != "" {
-								funcName = resolved
-							}
-						}
-
-						if funcName == "input.float" {
-							code, _ := g.inputHandler.GenerateInputFloat(callExpr, varName)
-							if code != "" {
-								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
-									g.constants[varName] = val
-									g.constantRegistry.Register(varName, val)
-								}
-							}
-							continue
-						}
-						if funcName == "input.int" {
-							code, _ := g.inputHandler.GenerateInputInt(callExpr, varName)
-							if code != "" {
-								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
-									g.constants[varName] = val
-									g.constantRegistry.Register(varName, val)
-								}
-							}
-							continue
-						}
-						if funcName == "input.bool" {
-							code, _ := g.inputHandler.GenerateInputBool(callExpr, varName)
-							if code != "" {
-								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
-									g.constants[varName] = val
-									g.constantRegistry.Register(varName, val)
-								}
-							}
-							continue
-						}
-						if funcName == "input.string" {
-							code, _ := g.inputHandler.GenerateInputString(callExpr, varName)
-							if code != "" {
-								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
-									g.constants[varName] = val
-									g.constantRegistry.Register(varName, val)
-								}
-							}
-							continue
-						}
-						if funcName == "input.session" {
-							code, _ := g.inputHandler.GenerateInputSession(callExpr, varName)
-							if code != "" {
-								if val := g.constantRegistry.ExtractFromGeneratedCode(code); val != nil {
-									g.constants[varName] = val
-									g.constantRegistry.Register(varName, val)
-								}
-							}
-							continue
-						}
-					}
-					if funcName == "input.source" {
-						g.constants[varName] = funcName
-						g.variables[varName] = "float"
-						g.typeSystem.RegisterVariable(varName, "float")
-						continue
-					}
-
-					// Collect nested function variables (fixnan(pivothigh()[1]))
-					g.collectNestedVariables(varName, callExpr)
-				}
-
-				// Scan ALL initializers for subscripted function calls: pivothigh()[1]
-				g.scanForSubscriptedCalls(declarator.Init)
-
-				// Skip if already registered as constant (input.float/int/bool/string/session)
-				if g.constantRegistry.IsConstant(varName) {
-					continue
-				}
-
-				varType := g.inferVariableType(declarator.Init)
-				g.variables[varName] = varType
-				g.typeSystem.RegisterVariable(varName, varType)
-
-				/* Store string literal constants for security() resolution */
-				if varType == "string" {
-					if lit, ok := declarator.Init.(*ast.Literal); ok {
-						if strVal, ok := lit.Value.(string); ok {
-							g.constants[varName] = strVal
-							g.constantRegistry.Register(varName, strVal)
-						}
-					}
-				}
+				registrar.RegisterDeclarator(declarator)
 			}
+		}
+
+		if ifStmt, ok := stmt.(*ast.IfStatement); ok {
+			nestedScanner.ScanIfBlock(ifStmt)
 		}
 	}
 
@@ -542,6 +436,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				}
 			}
 		}
+		nestedScanner.ScanReassignments(stmt)
 	}
 
 	// Generate user-defined functions at module level
@@ -1582,6 +1477,22 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 
 		return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
 
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateIfExpressionAsIIFE(e)
+
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateForExpressionAsIIFE(e)
+
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateForInExpressionAsIIFE(e)
+
+	case *ast.WhileStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g)
+		return cfGenerator.GenerateWhileExpressionAsIIFE(e)
+
 	default:
 		return "", fmt.Errorf("unsupported condition expression: %T", expr)
 	}
@@ -1800,13 +1711,11 @@ Universal ForwardSeriesBuffer paradigm: ALL arrow function variables use Series 
 This replaces the old scalar assignment approach.
 */
 func (g *generator) generateArrowFunctionSeriesInit(varName string, initExpr ast.Expression) (string, error) {
-	// Generate the expression value
 	exprCode, err := g.generateArrowFunctionExpression(initExpr)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate expression for %s: %w", varName, err)
 	}
 
-	// Generate Series.Set() assignment
 	return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, exprCode), nil
 }
 
@@ -2149,29 +2058,22 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(func() float64 { if %s { return %s } else { return %s } }())\n",
 			varName, condCode, consequentCode, alternateCode), nil
 	case *ast.UnaryExpression:
-		// Handle unary expressions: not x, -x, +x
 		if expr.Operator == "not" || expr.Operator == "!" {
-			// Boolean negation: not na(x) → convert boolean to float (1.0 or 0.0)
 			operandCode, err := g.generateConditionExpression(expr.Argument)
 			if err != nil {
 				return "", err
 			}
-			// Convert boolean expression to float: true→1.0, false→0.0
 			boolToFloatExpr := fmt.Sprintf("func() float64 { if !(%s) { return 1.0 } else { return 0.0 } }()", operandCode)
 			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, boolToFloatExpr), nil
 		} else {
-			// Numeric unary: -x, +x (get numeric value, not condition)
-			operandCode, err := g.generateExpression(expr.Argument)
+			/* expression-level generator avoids statement decorations in init */
+			operandCode, err := g.generateConditionExpression(expr.Argument)
 			if err != nil {
 				return "", err
 			}
 			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s(%s))\n", varName, expr.Operator, operandCode), nil
 		}
 	case *ast.Literal:
-		// Simple literal assignment
-		// Note: Pine Script doesn't have true constants for non-input literals
-		// String literals assigned to variables are unusual and not typically used in series context
-		// For session strings, use input.session() instead
 		switch v := expr.Value.(type) {
 		case float64:
 			formatted := g.literalFormatter.FormatFloat(v)
@@ -2187,8 +2089,6 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			formatted := g.literalFormatter.FormatFloat(val)
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, formatted), nil
 		case string:
-			// String literals cannot be stored in numeric Series
-			// Generate const declaration instead
 			return g.ind() + fmt.Sprintf("// ERROR: string literal %q cannot be used in series context\n", v), nil
 		default:
 			return g.ind() + fmt.Sprintf("// ERROR: unsupported literal type\n"), nil
@@ -2196,24 +2096,20 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.Identifier:
 		refName := expr.Name
 
-		// Try builtin identifier resolution first
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(expr, g.inSecurityContext); resolved {
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, code), nil
 		}
 
-		// Check if it's an input constant
 		if _, isConstant := g.constants[refName]; isConstant {
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, refName), nil
 		}
 
-		// User-defined variable (ALL use Series)
 		accessCode := fmt.Sprintf("%sSeries.GetCurrent()", refName)
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, accessCode), nil
 	case *ast.MemberExpression:
-		// Member access like strategy.long or close[1] (use Series.Set())
 		memberCode := g.extractSeriesExpression(expr)
 
-		// Strategy constants (strategy.long, strategy.short) need numeric conversion for Series
+		/* strategy.long/short are string constants — map to numeric for Series storage */
 		if obj, ok := expr.Object.(*ast.Identifier); ok {
 			if obj.Name == "strategy" {
 				if prop, ok := expr.Property.(*ast.Identifier); ok {

@@ -2,7 +2,7 @@ Moon Phases Strategy (v4) — lunar cycle trading with valuewhen()
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅
-Compile: ❌ (syntax error: unexpected newline in unary negation)
+Compile: ❌ (undefined: timeSeries, undefined: valuewhen_*Series, non-boolean condition in if statement)
 Execute: ❌ Not reached
 
-Blocker: #1 (unary negation emits broken Go: `-(⏎1⏎)` instead of `-(1)`)
+Blocker: #2 (`time` built-in lacks series declaration — `undefined: timeSeries`), #5 (valuewhen codegen emits undefined series vars)
