@@ -2,7 +2,7 @@ Moon Phases Strategy (v4) — lunar cycle trading with valuewhen()
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅
-Compile: ❌ (undefined: timeSeries, undefined: valuewhen_*Series, non-boolean condition in if statement)
+Compile: ❌ (undefined: valuewhen_*Series, non-boolean condition in if statement)
 Execute: ❌ Not reached
 
-Blocker: #2 (`time` built-in lacks series declaration — `undefined: timeSeries`), #5 (valuewhen codegen emits undefined series vars)
+Blocker: ~~#2~~ resolved (`undefined: timeSeries` fixed by calendar builtins). #5 (valuewhen codegen emits undefined series vars, non-boolean conditions)

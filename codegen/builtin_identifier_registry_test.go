@@ -108,7 +108,8 @@ func TestBuiltinIdentifierRegistry_IsOHLCVField(t *testing.T) {
 func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
 
-	allBuiltins := []string{"close", "open", "high", "low", "volume", "tr", "bar_index", "hl2", "hlc3", "ohlc4", "hlcc4", "time"}
+	allBuiltins := []string{"close", "open", "high", "low", "volume", "tr", "bar_index", "hl2", "hlc3", "ohlc4", "hlcc4", "time",
+		"dayofweek", "dayofmonth", "hour", "minute", "month", "second", "year", "weekofyear"}
 
 	for _, builtin := range allBuiltins {
 		t.Run(builtin, func(t *testing.T) {
@@ -116,6 +117,7 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 			isDerived := registry.IsDerivedPrice(builtin)
 			isOHLCV := registry.IsOHLCVField(builtin)
 			isTimeSeries := registry.IsTimeSeriesBuiltin(builtin)
+			isCalendar := registry.IsCalendarBuiltin(builtin)
 
 			if !isBuiltin {
 				t.Errorf("%s should be recognized as builtin", builtin)
@@ -131,10 +133,13 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 			if isTimeSeries {
 				categories++
 			}
+			if isCalendar {
+				categories++
+			}
 
 			if categories != 1 {
-				t.Errorf("%s must belong to exactly one category (derived=%v, ohlcv=%v, timeSeries=%v)",
-					builtin, isDerived, isOHLCV, isTimeSeries)
+				t.Errorf("%s must belong to exactly one category (derived=%v, ohlcv=%v, timeSeries=%v, calendar=%v)",
+					builtin, isDerived, isOHLCV, isTimeSeries, isCalendar)
 			}
 		})
 	}
@@ -163,5 +168,105 @@ func TestBuiltinIdentifierRegistry_IsTimeSeriesBuiltin(t *testing.T) {
 				t.Errorf("IsTimeSeriesBuiltin(%s) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestBuiltinIdentifierRegistry_IsCalendarBuiltin(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	calendarNames := []string{"dayofweek", "dayofmonth", "hour", "minute", "month", "second", "year", "weekofyear"}
+	for _, name := range calendarNames {
+		t.Run(name+" is calendar", func(t *testing.T) {
+			if !registry.IsCalendarBuiltin(name) {
+				t.Errorf("IsCalendarBuiltin(%s) = false, want true", name)
+			}
+			if !registry.IsBuiltinSeriesIdentifier(name) {
+				t.Errorf("IsBuiltinSeriesIdentifier(%s) = false for calendar builtin", name)
+			}
+		})
+	}
+
+	nonCalendar := []string{"close", "time", "bar_index", "hl2", "na", "unknown", ""}
+	for _, name := range nonCalendar {
+		t.Run(name+" not calendar", func(t *testing.T) {
+			if registry.IsCalendarBuiltin(name) {
+				t.Errorf("IsCalendarBuiltin(%s) = true, want false", name)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierRegistry_CalendarInfo(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	tests := []struct {
+		name       string
+		pineName   string
+		wantFound  bool
+		wantSeries string
+		wantField  string
+	}{
+		{"dayofweek", "dayofweek", true, "dayofweekSeries", "DayOfWeek"},
+		{"dayofmonth", "dayofmonth", true, "dayofmonthSeries", "DayOfMonth"},
+		{"hour", "hour", true, "hourSeries", "Hour"},
+		{"minute", "minute", true, "minuteSeries", "Minute"},
+		{"month", "month", true, "monthSeries", "Month"},
+		{"second", "second", true, "secondSeries", "Second"},
+		{"year", "year", true, "yearSeries", "Year"},
+		{"weekofyear", "weekofyear", true, "weekofyearSeries", "WeekOfYear"},
+		{"close not calendar", "close", false, "", ""},
+		{"empty string", "", false, "", ""},
+		{"bar_index not calendar", "bar_index", false, "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, ok := registry.CalendarInfo(tt.pineName)
+			if ok != tt.wantFound {
+				t.Fatalf("CalendarInfo(%s) found = %v, want %v", tt.pineName, ok, tt.wantFound)
+			}
+			if !ok {
+				return
+			}
+			if info.SeriesName != tt.wantSeries {
+				t.Errorf("SeriesName = %s, want %s", info.SeriesName, tt.wantSeries)
+			}
+			if info.StructField != tt.wantField {
+				t.Errorf("StructField = %s, want %s", info.StructField, tt.wantField)
+			}
+			if info.PineName != tt.pineName {
+				t.Errorf("PineName = %s, want %s", info.PineName, tt.pineName)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierRegistry_IsConstantBuiltin(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"last_bar_index is constant", "last_bar_index", true},
+		{"close not constant", "close", false},
+		{"dayofweek not constant", "dayofweek", false},
+		{"bar_index not constant", "bar_index", false},
+		{"empty string", "", false},
+		{"unknown", "unknown", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if registry.IsConstantBuiltin(tt.input) != tt.expected {
+				t.Errorf("IsConstantBuiltin(%s) = %v, want %v", tt.input, !tt.expected, tt.expected)
+			}
+		})
+	}
+
+	/* constant builtins must NOT be series identifiers */
+	if registry.IsBuiltinSeriesIdentifier("last_bar_index") {
+		t.Error("last_bar_index should not be a series identifier")
 	}
 }

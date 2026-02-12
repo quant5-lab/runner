@@ -82,7 +82,17 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
-	gen.hasBarIndexUsage = detectBarIndexUsage(program)
+
+	usageDetector := NewBuiltinUsageDetector(append(
+		gen.builtinHandler.CalendarBuiltinNames(),
+		"bar_index", "last_bar_index",
+	))
+	detected := usageDetector.Detect(program)
+	gen.hasBarIndexUsage = detected["bar_index"]
+	gen.hasLastBarIndex = detected["last_bar_index"]
+	gen.calendarLifecycle = NewCalendarSeriesLifecycle(
+		gen.builtinHandler.ResolveCalendarBuiltins(detected),
+	)
 
 	if err := NewLoopNestingValidator().Validate(program); err != nil {
 		return nil, err
@@ -129,6 +139,7 @@ type generator struct {
 	hasSecurityExprEvals     bool
 	hasStrategyRuntimeAccess bool
 	hasBarIndexUsage         bool
+	hasLastBarIndex          bool
 	hasTickerCalls           bool
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
@@ -173,6 +184,7 @@ type generator struct {
 	securityAnalyzer       *SecurityCallAnalyzer
 	udfAnalyzer            *UDFTempVarAnalyzer
 	statementAnalyzer      *StatementConditionalAnalyzer
+	calendarLifecycle      *CalendarSeriesLifecycle
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -535,6 +547,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.symbolTable != nil {
 		g.symbolTable.Register("time", VariableTypeSeries)
 	}
+	code += g.calendarLifecycle.GenerateDeclarations(g.ind())
+	g.calendarLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -603,6 +617,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "bar_indexSeries = series.NewSeries(len(ctx.Data))\n"
 	}
 	code += g.ind() + "timeSeries = series.NewSeries(len(ctx.Data))\n"
+	code += g.calendarLifecycle.GenerateInitializations(g.ind())
 
 	/* Initialize internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
@@ -639,6 +654,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + `ctx.RegisterSeries("bar_indexSeries", bar_indexSeries)` + "\n"
 		}
 		code += g.ind() + `ctx.RegisterSeries("timeSeries", timeSeries)` + "\n"
+		code += g.calendarLifecycle.GenerateRegistrations(g.ind())
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
@@ -686,6 +702,11 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
+	code += g.calendarLifecycle.GenerateTimezoneSetup(g.ind())
+	if g.hasLastBarIndex {
+		code += g.ind() + "last_bar_index := float64(len(ctx.Data) - 1)\n"
+	}
+
 	// Bar loop for strategy execution
 	code += g.ind() + "const maxBars = 1000000\n"
 	code += g.ind() + "barCount := len(ctx.Data)\n"
@@ -711,6 +732,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("bar_indexSeries.Set(float64(%s))\n", iterVar)
 	}
 	code += g.ind() + "timeSeries.Set(float64(bar.Time * 1000))\n"
+	code += g.calendarLifecycle.GenerateBarPopulation(g.ind())
 	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
@@ -772,6 +794,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
+	code += g.calendarLifecycle.GenerateSuppressUnused(g.ind())
+	if g.hasLastBarIndex {
+		code += g.ind() + "_ = last_bar_index\n"
+	}
 
 	// Advance Series cursors at end of bar loop
 	code += "\n" + g.ind() + "// Advance Series cursors\n"
@@ -783,6 +809,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { bar_indexSeries.Next() }\n", iterVar)
 	}
 	code += g.ind() + fmt.Sprintf("if %s < barCount-1 { timeSeries.Next() }\n", iterVar)
+	code += g.calendarLifecycle.GenerateAdvancement(g.ind(), iterVar)
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {
@@ -3712,109 +3739,6 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
-	}
-	return false
-}
-
-func detectBarIndexUsage(program *ast.Program) bool {
-	if program == nil {
-		return false
-	}
-	for _, node := range program.Body {
-		if hasBarIndexInNode(node) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasBarIndexInNode(node ast.Node) bool {
-	switch n := node.(type) {
-	case *ast.VariableDeclaration:
-		for _, decl := range n.Declarations {
-			if hasBarIndexInExpression(decl.Init) {
-				return true
-			}
-		}
-	case *ast.ExpressionStatement:
-		return hasBarIndexInExpression(n.Expression)
-	case *ast.IfStatement:
-		if hasBarIndexInExpression(n.Test) {
-			return true
-		}
-		for _, consequent := range n.Consequent {
-			if hasBarIndexInNode(consequent) {
-				return true
-			}
-		}
-		for _, alternate := range n.Alternate {
-			if hasBarIndexInNode(alternate) {
-				return true
-			}
-		}
-	case *ast.ForStatement:
-		/* Check for loop bounds and body for bar_index usage */
-		if hasBarIndexInExpression(n.From) || hasBarIndexInExpression(n.To) || hasBarIndexInExpression(n.Step) {
-			return true
-		}
-		for _, stmt := range n.Body {
-			if hasBarIndexInNode(stmt) {
-				return true
-			}
-		}
-	case *ast.ForInStatement:
-		if hasBarIndexInExpression(n.Collection) {
-			return true
-		}
-		for _, stmt := range n.Body {
-			if hasBarIndexInNode(stmt) {
-				return true
-			}
-		}
-	case *ast.WhileStatement:
-		if hasBarIndexInExpression(n.Condition) {
-			return true
-		}
-		for _, stmt := range n.Body {
-			if hasBarIndexInNode(stmt) {
-				return true
-			}
-		}
-	case *ast.BreakStatement, *ast.ContinueStatement:
-		return false
-	}
-	return false
-}
-
-func hasBarIndexInExpression(expr ast.Expression) bool {
-	if expr == nil {
-		return false
-	}
-	switch e := expr.(type) {
-	case *ast.Identifier:
-		return e.Name == "bar_index"
-	case *ast.MemberExpression:
-		if ident, ok := e.Object.(*ast.Identifier); ok && ident.Name == "bar_index" {
-			return true
-		}
-		return hasBarIndexInExpression(e.Property)
-	case *ast.CallExpression:
-		if hasBarIndexInExpression(e.Callee) {
-			return true
-		}
-		for _, arg := range e.Arguments {
-			if hasBarIndexInExpression(arg) {
-				return true
-			}
-		}
-	case *ast.BinaryExpression:
-		return hasBarIndexInExpression(e.Left) || hasBarIndexInExpression(e.Right)
-	case *ast.LogicalExpression:
-		return hasBarIndexInExpression(e.Left) || hasBarIndexInExpression(e.Right)
-	case *ast.ConditionalExpression:
-		return hasBarIndexInExpression(e.Test) || hasBarIndexInExpression(e.Consequent) || hasBarIndexInExpression(e.Alternate)
-	case *ast.UnaryExpression:
-		return hasBarIndexInExpression(e.Argument)
 	}
 	return false
 }

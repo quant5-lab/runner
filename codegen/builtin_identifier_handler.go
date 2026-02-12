@@ -47,6 +47,10 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return h.formulaGen.Generate(name, "bar.High", "bar.Low", "bar.Close", "bar.Open")
 	}
 
+	if info, ok := h.registry.CalendarInfo(name); ok {
+		return info.SeriesName + ".GetCurrent()"
+	}
+
 	switch name {
 	case "close":
 		return "bar.Close"
@@ -64,6 +68,8 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return "float64(i)"
 	case "time":
 		return "float64(bar.Time * 1000)"
+	case "last_bar_index":
+		return "last_bar_index"
 	default:
 		return ""
 	}
@@ -76,6 +82,10 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 			"lowSeries.GetCurrent()",
 			"closeSeries.GetCurrent()",
 			"openSeries.GetCurrent()")
+	}
+
+	if info, ok := h.registry.CalendarInfo(name); ok {
+		return info.SeriesName + ".GetCurrent()"
 	}
 
 	switch name {
@@ -95,6 +105,8 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return "float64(ctx.BarIndex)"
 	case "time":
 		return "timeSeries.GetCurrent()"
+	case "last_bar_index":
+		return "last_bar_index"
 	default:
 		return ""
 	}
@@ -111,12 +123,20 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		return fmt.Sprintf("func() float64 { if i-%d >= 0 { return %s }; return math.NaN() }()", offset, formula)
 	}
 
+	if info, ok := h.registry.CalendarInfo(name); ok {
+		return fmt.Sprintf("%s.Get(%d)", info.SeriesName, offset)
+	}
+
 	if name == "bar_index" {
 		return fmt.Sprintf("bar_indexSeries.Get(%d)", offset)
 	}
 
 	if name == "time" {
 		return fmt.Sprintf("timeSeries.Get(%d)", offset)
+	}
+
+	if name == "last_bar_index" {
+		return "last_bar_index"
 	}
 
 	field := ""
@@ -179,6 +199,32 @@ func (h *BuiltinIdentifierHandler) ResolveMemberExpressionColorHex(expr *ast.Mem
 	return h.colorResolver.ResolveMemberExpressionToHex(expr)
 }
 
+func (h *BuiltinIdentifierHandler) CalendarBuiltinNames() []string {
+	return h.registry.CalendarBuiltinNames()
+}
+
+func (h *BuiltinIdentifierHandler) CalendarInfo(name string) (CalendarBuiltinInfo, bool) {
+	return h.registry.CalendarInfo(name)
+}
+
+func (h *BuiltinIdentifierHandler) IsDerivedPrice(name string) bool {
+	return h.registry.IsDerivedPrice(name)
+}
+
+func (h *BuiltinIdentifierHandler) GenerateDerivedPriceFormula(name, highAccess, lowAccess, closeAccess, openAccess string) string {
+	return h.formulaGen.Generate(name, highAccess, lowAccess, closeAccess, openAccess)
+}
+
+func (h *BuiltinIdentifierHandler) ResolveCalendarBuiltins(detectedNames map[string]bool) []CalendarBuiltinInfo {
+	var resolved []CalendarBuiltinInfo
+	for name := range detectedNames {
+		if info, ok := h.registry.CalendarInfo(name); ok {
+			resolved = append(resolved, info)
+		}
+	}
+	return resolved
+}
+
 func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, inSecurityContext bool) (string, bool) {
 	if h == nil || h.colorResolver == nil {
 		return "", false
@@ -193,6 +239,9 @@ func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, in
 	}
 
 	if !h.IsBuiltinSeriesIdentifier(expr.Name) {
+		if h.registry.IsConstantBuiltin(expr.Name) {
+			return h.GenerateCurrentBarAccess(expr.Name), true
+		}
 		return "", false
 	}
 

@@ -21,8 +21,23 @@ func TestBuiltinIdentifierHandler_IsBuiltinSeriesIdentifier(t *testing.T) {
 		{"volume builtin", "volume", true},
 		{"tr builtin", "tr", true},
 		{"time builtin", "time", true},
+		{"bar_index builtin", "bar_index", true},
+
+		/* calendar builtins are series identifiers */
+		{"dayofweek builtin", "dayofweek", true},
+		{"hour builtin", "hour", true},
+		{"year builtin", "year", true},
+		{"weekofyear builtin", "weekofyear", true},
+
+		/* derived prices are series identifiers */
+		{"hl2 builtin", "hl2", true},
+		{"hlc3 builtin", "hlc3", true},
+
+		/* non-series */
 		{"user variable", "my_var", false},
 		{"na builtin", "na", false},
+		{"last_bar_index not series", "last_bar_index", false},
+		{"empty string", "", false},
 	}
 
 	for _, tt := range tests {
@@ -76,6 +91,20 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess(t *testing.T) {
 		{"low", "low", "bar.Low"},
 		{"volume", "volume", "bar.Volume"},
 		{"time", "time", "float64(bar.Time * 1000)"},
+
+		/* calendar builtins */
+		{"dayofweek", "dayofweek", "dayofweekSeries.GetCurrent()"},
+		{"dayofmonth", "dayofmonth", "dayofmonthSeries.GetCurrent()"},
+		{"hour", "hour", "hourSeries.GetCurrent()"},
+		{"minute", "minute", "minuteSeries.GetCurrent()"},
+		{"month", "month", "monthSeries.GetCurrent()"},
+		{"second", "second", "secondSeries.GetCurrent()"},
+		{"year", "year", "yearSeries.GetCurrent()"},
+		{"weekofyear", "weekofyear", "weekofyearSeries.GetCurrent()"},
+
+		/* constant builtins */
+		{"last_bar_index", "last_bar_index", "last_bar_index"},
+
 		{"unknown", "unknown", ""},
 	}
 
@@ -126,6 +155,19 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 		{"low in security", "low", "lowSeries.GetCurrent()"},
 		{"volume in security", "volume", "volumeSeries.GetCurrent()"},
 		{"time in security", "time", "timeSeries.GetCurrent()"},
+
+		/* calendar builtins in security */
+		{"dayofweek in security", "dayofweek", "dayofweekSeries.GetCurrent()"},
+		{"dayofmonth in security", "dayofmonth", "dayofmonthSeries.GetCurrent()"},
+		{"hour in security", "hour", "hourSeries.GetCurrent()"},
+		{"minute in security", "minute", "minuteSeries.GetCurrent()"},
+		{"month in security", "month", "monthSeries.GetCurrent()"},
+		{"second in security", "second", "secondSeries.GetCurrent()"},
+		{"year in security", "year", "yearSeries.GetCurrent()"},
+		{"weekofyear in security", "weekofyear", "weekofyearSeries.GetCurrent()"},
+
+		/* constant builtins in security */
+		{"last_bar_index in security", "last_bar_index", "last_bar_index"},
 	}
 
 	for _, tt := range tests {
@@ -213,6 +255,19 @@ func TestBuiltinIdentifierHandler_GenerateHistoricalAccess(t *testing.T) {
 			5,
 			"timeSeries.Get(5)",
 		},
+
+		/* calendar builtins historical */
+		{"dayofweek[1]", "dayofweek", 1, "dayofweekSeries.Get(1)"},
+		{"dayofmonth[3]", "dayofmonth", 3, "dayofmonthSeries.Get(3)"},
+		{"hour[2]", "hour", 2, "hourSeries.Get(2)"},
+		{"minute[1]", "minute", 1, "minuteSeries.Get(1)"},
+		{"month[5]", "month", 5, "monthSeries.Get(5)"},
+		{"second[1]", "second", 1, "secondSeries.Get(1)"},
+		{"year[10]", "year", 10, "yearSeries.Get(10)"},
+		{"weekofyear[4]", "weekofyear", 4, "weekofyearSeries.Get(4)"},
+
+		/* constant builtins historical — returns constant regardless of offset */
+		{"last_bar_index[1]", "last_bar_index", 1, "last_bar_index"},
 	}
 
 	for _, tt := range tests {
@@ -297,6 +352,17 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier(t *testing.T) {
 		{"close in security", "close", true, "closeSeries.GetCurrent()", true},
 		{"time current bar", "time", false, "float64(bar.Time * 1000)", true},
 		{"time in security", "time", true, "timeSeries.GetCurrent()", true},
+
+		/* calendar builtins */
+		{"dayofweek current", "dayofweek", false, "dayofweekSeries.GetCurrent()", true},
+		{"dayofweek in security", "dayofweek", true, "dayofweekSeries.GetCurrent()", true},
+		{"hour current", "hour", false, "hourSeries.GetCurrent()", true},
+		{"year current", "year", false, "yearSeries.GetCurrent()", true},
+
+		/* constant builtins */
+		{"last_bar_index current", "last_bar_index", false, "last_bar_index", true},
+		{"last_bar_index in security", "last_bar_index", true, "last_bar_index", true},
+
 		{"user variable", "my_var", false, "", false},
 	}
 
@@ -467,6 +533,46 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"syminfo_tickerid",
 			true,
 		},
+		{
+			"namespace delegation - dayofweek.sunday",
+			"dayofweek",
+			"sunday",
+			false,
+			0,
+			false,
+			"1.0",
+			true,
+		},
+		{
+			"calendar dayofweek[0] current bar",
+			"dayofweek",
+			"0",
+			true,
+			0,
+			false,
+			"dayofweekSeries.GetCurrent()",
+			true,
+		},
+		{
+			"calendar dayofweek[1] historical",
+			"dayofweek",
+			"1",
+			true,
+			1,
+			false,
+			"dayofweekSeries.Get(1)",
+			true,
+		},
+		{
+			"calendar hour[3] historical",
+			"hour",
+			"3",
+			true,
+			3,
+			false,
+			"hourSeries.Get(3)",
+			true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -489,6 +595,142 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			if code != tt.expectedCode || resolved != tt.expectedResolved {
 				t.Errorf("TryResolveMemberExpression(%s.%s, %v) = (%s, %v), want (%s, %v)",
 					tt.obj, tt.prop, tt.inSecurityContext, code, resolved, tt.expectedCode, tt.expectedResolved)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_CalendarBuiltinNames(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+	names := handler.CalendarBuiltinNames()
+
+	expected := map[string]bool{
+		"dayofweek": true, "dayofmonth": true, "hour": true, "minute": true,
+		"month": true, "second": true, "year": true, "weekofyear": true,
+	}
+
+	if len(names) != len(expected) {
+		t.Fatalf("CalendarBuiltinNames() returned %d names, want %d", len(names), len(expected))
+	}
+	for _, name := range names {
+		if !expected[name] {
+			t.Errorf("unexpected calendar name: %s", name)
+		}
+	}
+}
+
+func TestBuiltinIdentifierHandler_CalendarInfo(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantFound bool
+	}{
+		{"dayofweek found", "dayofweek", true},
+		{"hour found", "hour", true},
+		{"close not calendar", "close", false},
+		{"empty string", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, found := handler.CalendarInfo(tt.input)
+			if found != tt.wantFound {
+				t.Fatalf("CalendarInfo(%s) found = %v, want %v", tt.input, found, tt.wantFound)
+			}
+			if found && info.PineName != tt.input {
+				t.Errorf("CalendarInfo(%s).PineName = %s", tt.input, info.PineName)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_IsDerivedPrice(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"hl2", "hl2", true},
+		{"hlc3", "hlc3", true},
+		{"ohlc4", "ohlc4", true},
+		{"hlcc4", "hlcc4", true},
+		{"close not derived", "close", false},
+		{"dayofweek not derived", "dayofweek", false},
+		{"empty string", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if handler.IsDerivedPrice(tt.input) != tt.expected {
+				t.Errorf("IsDerivedPrice(%s) = %v, want %v", tt.input, !tt.expected, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_GenerateDerivedPriceFormula(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name          string
+		price         string
+		wantAccessors []string
+	}{
+		{"hl2 uses high and low", "hl2", []string{"H", "L"}},
+		{"hlc3 uses high low close", "hlc3", []string{"H", "L", "C"}},
+		{"ohlc4 uses all four", "ohlc4", []string{"O", "H", "L", "C"}},
+		{"hlcc4 uses high low close", "hlcc4", []string{"H", "L", "C"}},
+		{"unknown produces empty", "unknown", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formula := handler.GenerateDerivedPriceFormula(tt.price, "H", "L", "C", "O")
+			if tt.wantAccessors != nil && formula == "" {
+				t.Errorf("GenerateDerivedPriceFormula(%s) returned empty", tt.price)
+			}
+			if tt.wantAccessors == nil && formula != "" {
+				t.Errorf("GenerateDerivedPriceFormula(%s) should be empty, got: %s", tt.price, formula)
+			}
+			for _, accessor := range tt.wantAccessors {
+				if !contains(formula, accessor) {
+					t.Errorf("formula %q missing accessor %q", formula, accessor)
+				}
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_ResolveCalendarBuiltins(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name     string
+		detected map[string]bool
+		wantLen  int
+	}{
+		{"nil map", nil, 0},
+		{"empty map", map[string]bool{}, 0},
+		{"single calendar", map[string]bool{"dayofweek": true}, 1},
+		{"multiple calendar", map[string]bool{"hour": true, "minute": true, "year": true}, 3},
+		{"non-calendar filtered out", map[string]bool{"close": true, "unknown": true}, 0},
+		{"mixed valid and invalid", map[string]bool{"close": true, "dayofweek": true, "unknown": true}, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved := handler.ResolveCalendarBuiltins(tt.detected)
+			if len(resolved) != tt.wantLen {
+				t.Errorf("ResolveCalendarBuiltins() returned %d, want %d", len(resolved), tt.wantLen)
+			}
+			for _, info := range resolved {
+				if info.PineName == "" || info.SeriesName == "" || info.StructField == "" {
+					t.Errorf("resolved entry has empty fields: %+v", info)
+				}
 			}
 		})
 	}

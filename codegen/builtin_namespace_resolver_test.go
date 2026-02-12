@@ -35,6 +35,15 @@ func TestBuiltinNamespaceResolver_Resolve(t *testing.T) {
 		{"syminfo.ticker", "syminfo", "ticker", "syminfo_tickerid", false, true},
 		{"syminfo.timezone", "syminfo", "timezone", "ctx.Timezone", false, true},
 
+		/* dayofweek constants */
+		{"dayofweek.sunday", "dayofweek", "sunday", "1.0", false, true},
+		{"dayofweek.monday", "dayofweek", "monday", "2.0", false, true},
+		{"dayofweek.tuesday", "dayofweek", "tuesday", "3.0", false, true},
+		{"dayofweek.wednesday", "dayofweek", "wednesday", "4.0", false, true},
+		{"dayofweek.thursday", "dayofweek", "thursday", "5.0", false, true},
+		{"dayofweek.friday", "dayofweek", "friday", "6.0", false, true},
+		{"dayofweek.saturday", "dayofweek", "saturday", "7.0", false, true},
+
 		/* unknown namespace */
 		{"unknown.prop", "unknown", "prop", "", false, false},
 		{"strategy.entry", "strategy", "entry", "", false, false},
@@ -44,6 +53,7 @@ func TestBuiltinNamespaceResolver_Resolve(t *testing.T) {
 		{"barstate.unknown", "barstate", "unknown_prop", "", false, false},
 		{"timeframe.unknown", "timeframe", "unknown_prop", "", false, false},
 		{"syminfo.unknown", "syminfo", "unknown_prop", "", false, false},
+		{"dayofweek.unknown", "dayofweek", "unknown_prop", "", false, false},
 
 		/* case sensitivity */
 		{"Barstate uppercase", "Barstate", "isfirst", "", false, false},
@@ -87,6 +97,7 @@ func TestBuiltinNamespaceResolver_IsNamespace(t *testing.T) {
 		{"barstate", true},
 		{"timeframe", true},
 		{"syminfo", true},
+		{"dayofweek", true},
 		{"unknown", false},
 		{"close", false},
 		{"strategy", false},
@@ -113,12 +124,14 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 		"barstate":  6,
 		"timeframe": 5,
 		"syminfo":   3,
+		"dayofweek": 7,
 	}
 
 	namespacePropSets := map[string][]string{
 		"barstate":  {"isfirst", "islast", "ishistory", "isrealtime", "isnew", "isconfirmed"},
 		"timeframe": {"ismonthly", "isdaily", "isweekly", "isintraday", "period"},
 		"syminfo":   {"tickerid", "ticker", "timezone"},
+		"dayofweek": {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"},
 	}
 
 	for ns, props := range namespacePropSets {
@@ -175,6 +188,13 @@ func TestBuiltinNamespaceResolver_BoolTypeConsistency(t *testing.T) {
 		{"syminfo", "tickerid"},
 		{"syminfo", "ticker"},
 		{"syminfo", "timezone"},
+		{"dayofweek", "sunday"},
+		{"dayofweek", "monday"},
+		{"dayofweek", "tuesday"},
+		{"dayofweek", "wednesday"},
+		{"dayofweek", "thursday"},
+		{"dayofweek", "friday"},
+		{"dayofweek", "saturday"},
 	}
 
 	for _, nbp := range nonBoolProperties {

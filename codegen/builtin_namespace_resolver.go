@@ -15,6 +15,7 @@ func NewBuiltinNamespaceResolver() *BuiltinNamespaceResolver {
 		"barstate":  r.resolveBarState,
 		"timeframe": r.resolveTimeframe,
 		"syminfo":   r.resolveSyminfo,
+		"dayofweek": r.resolveDayOfWeek,
 	}
 	return r
 }
@@ -73,6 +74,27 @@ func (r *BuiltinNamespaceResolver) resolveSyminfo(prop string) (NamespaceResolut
 		return NamespaceResolution{Code: "syminfo_tickerid"}, true
 	case "timezone":
 		return NamespaceResolution{Code: "ctx.Timezone"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveDayOfWeek(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "sunday":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "monday":
+		return NamespaceResolution{Code: "2.0"}, true
+	case "tuesday":
+		return NamespaceResolution{Code: "3.0"}, true
+	case "wednesday":
+		return NamespaceResolution{Code: "4.0"}, true
+	case "thursday":
+		return NamespaceResolution{Code: "5.0"}, true
+	case "friday":
+		return NamespaceResolution{Code: "6.0"}, true
+	case "saturday":
+		return NamespaceResolution{Code: "7.0"}, true
 	default:
 		return NamespaceResolution{}, false
 	}

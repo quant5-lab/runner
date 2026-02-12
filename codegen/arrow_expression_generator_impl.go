@@ -283,14 +283,10 @@ func (e *ArrowExpressionGeneratorImpl) generateMemberExpression(mem *ast.MemberE
 	return "", fmt.Errorf("unsupported member expression pattern")
 }
 
-/*
-resolveArrowSubscript generates Series.Get() or builtin bounds-checked access.
-
-Handles series parameters, local series variables, and builtin series (close/open/etc).
-*/
+/* Routes builtin vs parameter vs local series to their respective access patterns */
 func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, indexExpr ast.Expression) (string, error) {
 	isSeriesParam := e.accessResolver.IsParameter(seriesName)
-	isBuiltin := seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" || seriesName == "time"
+	isBuiltin := e.gen.builtinHandler.IsBuiltinSeriesIdentifier(seriesName)
 
 	indexCode, err := e.generateArrowIndexExpression(indexExpr)
 	if err != nil {
@@ -340,9 +336,31 @@ func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Exp
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, indexCode string) string {
-	if seriesName == "time" {
-		return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return float64(ctx.Data[barIdx].Time * 1000) }; return math.NaN() }()", indexCode)
+	handler := e.gen.builtinHandler
+
+	if info, ok := handler.CalendarInfo(seriesName); ok {
+		return fmt.Sprintf("%s.Get(int(%s))", info.SeriesName, indexCode)
 	}
+
+	if seriesName == "bar_index" || seriesName == "time" {
+		return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode)
+	}
+
+	if handler.IsDerivedPrice(seriesName) {
+		return e.generateDerivedPriceSubscript(seriesName, indexCode)
+	}
+
 	capitalName := capitalizeFirstLetter(seriesName)
 	return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return ctx.Data[barIdx].%s }; return math.NaN() }()", indexCode, capitalName)
+}
+
+func (e *ArrowExpressionGeneratorImpl) generateDerivedPriceSubscript(priceName, indexCode string) string {
+	formula := e.gen.builtinHandler.GenerateDerivedPriceFormula(priceName,
+		"ctx.Data[barIdx].High", "ctx.Data[barIdx].Low", "ctx.Data[barIdx].Close", "ctx.Data[barIdx].Open")
+	if formula == "" {
+		return "math.NaN()"
+	}
+	return fmt.Sprintf(
+		"func() float64 { barIdx := ctx.BarIndex-int(%s); if barIdx >= 0 && barIdx < len(ctx.Data) { return %s }; return math.NaN() }()",
+		indexCode, formula)
 }
