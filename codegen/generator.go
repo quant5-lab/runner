@@ -636,6 +636,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			g.symbolTable.Register("bar_index", VariableTypeSeries)
 		}
 	}
+	code += g.ind() + "var timeSeries *series.Series\n"
+	if g.symbolTable != nil {
+		g.symbolTable.Register("time", VariableTypeSeries)
+	}
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -703,6 +707,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.hasBarIndexUsage {
 		code += g.ind() + "bar_indexSeries = series.NewSeries(len(ctx.Data))\n"
 	}
+	code += g.ind() + "timeSeries = series.NewSeries(len(ctx.Data))\n"
 
 	/* Initialize internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
@@ -738,6 +743,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if g.hasBarIndexUsage {
 			code += g.ind() + `ctx.RegisterSeries("bar_indexSeries", bar_indexSeries)` + "\n"
 		}
+		code += g.ind() + `ctx.RegisterSeries("timeSeries", timeSeries)` + "\n"
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
@@ -809,6 +815,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.hasBarIndexUsage {
 		code += g.ind() + fmt.Sprintf("bar_indexSeries.Set(float64(%s))\n", iterVar)
 	}
+	code += g.ind() + "timeSeries.Set(float64(bar.Time * 1000))\n"
 	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
@@ -880,6 +887,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.hasBarIndexUsage {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { bar_indexSeries.Next() }\n", iterVar)
 	}
+	code += g.ind() + fmt.Sprintf("if %s < barCount-1 { timeSeries.Next() }\n", iterVar)
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {
@@ -2903,41 +2911,13 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}
 
-		// Try builtin member expression resolution (close[1], strategy.position_avg_price, etc.)
 		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
 			return code
 		}
 
-		// Check for built-in namespaces like timeframe.* and syminfo.*
 		if obj, ok := e.Object.(*ast.Identifier); ok {
 			varName := obj.Name
 
-			if varName == "syminfo" {
-				if prop, ok := e.Property.(*ast.Identifier); ok {
-					switch prop.Name {
-					case "tickerid":
-						return "syminfo_tickerid"
-					}
-				}
-			}
-
-			// Handle timeframe.* built-ins
-			if varName == "timeframe" {
-				if prop, ok := e.Property.(*ast.Identifier); ok {
-					switch prop.Name {
-					case "ismonthly":
-						return "ctx.IsMonthly"
-					case "isdaily":
-						return "ctx.IsDaily"
-					case "isweekly":
-						return "ctx.IsWeekly"
-					case "period":
-						return "ctx.Timeframe"
-					}
-				}
-			}
-
-			// Handle series subscript with variable offset
 			if e.Computed {
 				if _, ok := e.Property.(*ast.Literal); !ok {
 					// Variable offset like [nA], [length]

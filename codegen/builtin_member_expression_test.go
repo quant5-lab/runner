@@ -57,6 +57,7 @@ func TestBuiltinIdentifier_AllBuiltinsSupported(t *testing.T) {
 		{"low", "low", ".Low"},
 		{"volume", "volume", ".Volume"},
 		{"tr", "tr", "math.Max"},
+		{"time", "time", "bar.Time"},
 	}
 
 	for _, builtin := range builtins {
@@ -114,7 +115,6 @@ func TestBuiltinMemberExpression_TrNestedSubscript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Nested MemberExpression: ta.tr[offset]
 			nestedExpr := &ast.MemberExpression{
 				Object: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "ta"},
@@ -134,7 +134,6 @@ func TestBuiltinMemberExpression_TrNestedSubscript(t *testing.T) {
 				t.Errorf("%s should contain offset %q, got: %s", tt.name, tt.expectedOffset, code)
 			}
 
-			// Verify tr calculation is present
 			if !strings.Contains(code, "math.Max") {
 				t.Errorf("%s should generate true range calculation, got: %s", tt.name, code)
 			}
@@ -176,14 +175,109 @@ func TestBuiltinMemberExpression_ContextConsistency(t *testing.T) {
 				t.Fatalf("tr in %s returned empty code", ctx.name)
 			}
 
-			// All contexts should generate inline tr calculation
 			if !strings.Contains(code, "math.Max") {
 				t.Errorf("tr in %s should generate calculation, got: %s", ctx.name, code)
 			}
 
-			// Verify no Series.Get() pattern
 			if strings.Contains(code, "trSeries.Get(") || strings.Contains(code, ".Get(tr") {
 				t.Errorf("tr in %s should not use Series.Get(), got: %s", ctx.name, code)
+			}
+		})
+	}
+}
+
+/* TestBuiltinTime_ContextConsistency validates time works consistently across all access contexts */
+func TestBuiltinTime_ContextConsistency(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	t.Run("current bar uses milliseconds", func(t *testing.T) {
+		code := handler.GenerateCurrentBarAccess("time")
+		if code == "" {
+			t.Fatal("time current bar returned empty code")
+		}
+		if !strings.Contains(code, "1000") {
+			t.Errorf("time current bar should convert to milliseconds, got: %s", code)
+		}
+		if !strings.Contains(code, "bar.Time") {
+			t.Errorf("time current bar should access bar.Time, got: %s", code)
+		}
+	})
+
+	t.Run("security context uses FSB", func(t *testing.T) {
+		code := handler.GenerateSecurityContextAccess("time")
+		if code == "" {
+			t.Fatal("time security context returned empty code")
+		}
+		if !strings.Contains(code, "timeSeries") {
+			t.Errorf("time security context should use timeSeries, got: %s", code)
+		}
+		if !strings.Contains(code, "GetCurrent()") {
+			t.Errorf("time security context should use GetCurrent(), got: %s", code)
+		}
+	})
+
+	t.Run("historical uses FSB with offset", func(t *testing.T) {
+		offsets := []int{1, 2, 5, 10}
+		for _, offset := range offsets {
+			code := handler.GenerateHistoricalAccess("time", offset)
+			if code == "" {
+				t.Fatalf("time historical[%d] returned empty code", offset)
+			}
+			if !strings.Contains(code, "timeSeries") {
+				t.Errorf("time historical[%d] should use timeSeries, got: %s", offset, code)
+			}
+			if !strings.Contains(code, "Get(") {
+				t.Errorf("time historical[%d] should use Get(), got: %s", offset, code)
+			}
+		}
+	})
+}
+
+/* TestBuiltinTime_MillisecondConversion validates OHLCV.Time seconds → Pine milliseconds conversion */
+func TestBuiltinTime_MillisecondConversion(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	code := handler.GenerateCurrentBarAccess("time")
+
+	if !strings.Contains(code, "* 1000") {
+		t.Errorf("time must multiply by 1000 for seconds→ms conversion, got: %s", code)
+	}
+	if !strings.Contains(code, "float64(") {
+		t.Errorf("time must cast to float64, got: %s", code)
+	}
+}
+
+/* TestBuiltinNamespace_DelegationFromHandler validates handler delegates namespace resolution correctly */
+func TestBuiltinNamespace_DelegationFromHandler(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+	resolver := NewBuiltinNamespaceResolver()
+
+	namespaces := []string{"barstate", "timeframe", "syminfo"}
+	sampleProps := map[string]string{
+		"barstate":  "isfirst",
+		"timeframe": "period",
+		"syminfo":   "tickerid",
+	}
+
+	for _, ns := range namespaces {
+		t.Run(ns, func(t *testing.T) {
+			prop := sampleProps[ns]
+			expected, found := resolver.Resolve(ns, prop)
+			if !found {
+				t.Fatalf("resolver.Resolve(%s, %s) not found", ns, prop)
+			}
+
+			expr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: ns},
+				Property: &ast.Identifier{Name: prop},
+			}
+			handlerCode, handlerFound := handler.TryResolveMemberExpression(expr, false)
+			if !handlerFound {
+				t.Fatalf("handler.TryResolveMemberExpression(%s.%s) not found", ns, prop)
+			}
+
+			if handlerCode != expected.Code {
+				t.Errorf("handler returned %q, resolver returned %q — delegation inconsistency", handlerCode, expected.Code)
 			}
 		})
 	}

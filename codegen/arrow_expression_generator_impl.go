@@ -290,7 +290,7 @@ Handles series parameters, local series variables, and builtin series (close/ope
 */
 func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, indexExpr ast.Expression) (string, error) {
 	isSeriesParam := e.accessResolver.IsParameter(seriesName)
-	isBuiltin := seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume"
+	isBuiltin := seriesName == "close" || seriesName == "open" || seriesName == "high" || seriesName == "low" || seriesName == "volume" || seriesName == "time"
 
 	indexCode, err := e.generateArrowIndexExpression(indexExpr)
 	if err != nil {
@@ -340,6 +340,9 @@ func (e *ArrowExpressionGeneratorImpl) generateArrowIndexExpression(expr ast.Exp
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, indexCode string) string {
+	if seriesName == "time" {
+		return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return float64(ctx.Data[barIdx].Time * 1000) }; return math.NaN() }()", indexCode)
+	}
 	capitalName := capitalizeFirstLetter(seriesName)
 	return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return ctx.Data[barIdx].%s }; return math.NaN() }()", indexCode, capitalName)
 }

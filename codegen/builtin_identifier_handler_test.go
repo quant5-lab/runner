@@ -20,6 +20,7 @@ func TestBuiltinIdentifierHandler_IsBuiltinSeriesIdentifier(t *testing.T) {
 		{"low builtin", "low", true},
 		{"volume builtin", "volume", true},
 		{"tr builtin", "tr", true},
+		{"time builtin", "time", true},
 		{"user variable", "my_var", false},
 		{"na builtin", "na", false},
 	}
@@ -74,6 +75,7 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess(t *testing.T) {
 		{"high", "high", "bar.High"},
 		{"low", "low", "bar.Low"},
 		{"volume", "volume", "bar.Volume"},
+		{"time", "time", "float64(bar.Time * 1000)"},
 		{"unknown", "unknown", ""},
 	}
 
@@ -123,6 +125,7 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 		{"high in security", "high", "highSeries.GetCurrent()"},
 		{"low in security", "low", "lowSeries.GetCurrent()"},
 		{"volume in security", "volume", "volumeSeries.GetCurrent()"},
+		{"time in security", "time", "timeSeries.GetCurrent()"},
 	}
 
 	for _, tt := range tests {
@@ -197,6 +200,18 @@ func TestBuiltinIdentifierHandler_GenerateHistoricalAccess(t *testing.T) {
 			"bar_index",
 			5,
 			"bar_indexSeries.Get(5)",
+		},
+		{
+			"time[1]",
+			"time",
+			1,
+			"timeSeries.Get(1)",
+		},
+		{
+			"time[5]",
+			"time",
+			5,
+			"timeSeries.Get(5)",
 		},
 	}
 
@@ -280,6 +295,8 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier(t *testing.T) {
 		{"na identifier", "na", false, "math.NaN()", true},
 		{"close current bar", "close", false, "bar.Close", true},
 		{"close in security", "close", true, "closeSeries.GetCurrent()", true},
+		{"time current bar", "time", false, "float64(bar.Time * 1000)", true},
+		{"time in security", "time", true, "timeSeries.GetCurrent()", true},
 		{"user variable", "my_var", false, "", false},
 	}
 
@@ -399,6 +416,56 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			false,
 			"",
 			false,
+		},
+		{
+			"time[0] current bar",
+			"time",
+			"0",
+			true,
+			0,
+			false,
+			"float64(bar.Time * 1000)",
+			true,
+		},
+		{
+			"time[1] historical",
+			"time",
+			"1",
+			true,
+			1,
+			false,
+			"timeSeries.Get(1)",
+			true,
+		},
+		{
+			"namespace delegation - barstate.isfirst",
+			"barstate",
+			"isfirst",
+			false,
+			0,
+			false,
+			"(ctx.BarIndex == 0)",
+			true,
+		},
+		{
+			"namespace delegation - timeframe.period",
+			"timeframe",
+			"period",
+			false,
+			0,
+			false,
+			"ctx.Timeframe",
+			true,
+		},
+		{
+			"namespace delegation - syminfo.tickerid",
+			"syminfo",
+			"tickerid",
+			false,
+			0,
+			false,
+			"syminfo_tickerid",
+			true,
 		},
 	}
 

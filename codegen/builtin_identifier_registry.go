@@ -1,8 +1,9 @@
 package codegen
 
 type BuiltinIdentifierRegistry struct {
-	ohlcvFields   map[string]bool
-	derivedPrices map[string]bool
+	ohlcvFields        map[string]bool
+	derivedPrices      map[string]bool
+	timeSeriesBuiltins map[string]bool
 }
 
 func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
@@ -22,11 +23,14 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 			"ohlc4": true,
 			"hlcc4": true,
 		},
+		timeSeriesBuiltins: map[string]bool{
+			"time": true,
+		},
 	}
 }
 
 func (r *BuiltinIdentifierRegistry) IsBuiltinSeriesIdentifier(name string) bool {
-	return r.ohlcvFields[name] || r.derivedPrices[name]
+	return r.ohlcvFields[name] || r.derivedPrices[name] || r.timeSeriesBuiltins[name]
 }
 
 func (r *BuiltinIdentifierRegistry) IsDerivedPrice(name string) bool {
@@ -35,4 +39,8 @@ func (r *BuiltinIdentifierRegistry) IsDerivedPrice(name string) bool {
 
 func (r *BuiltinIdentifierRegistry) IsOHLCVField(name string) bool {
 	return r.ohlcvFields[name]
+}
+
+func (r *BuiltinIdentifierRegistry) IsTimeSeriesBuiltin(name string) bool {
+	return r.timeSeriesBuiltins[name]
 }

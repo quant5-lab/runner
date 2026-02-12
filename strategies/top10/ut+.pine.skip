@@ -2,7 +2,7 @@ UT Bot Strategy (v4) with backtesting date range
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ✅
-Compile: ❌ (undefined: timeSeries)
-Execute: ❌ Not reached
+Compile: ✅ (was: ❌ undefined: timeSeries — fixed by #2 time FSB)
+Execute: ✅ (0 trades — timestamp() date filter evaluates false for all bars)
 
-Blocker: #2 (`time` built-in lacks series declaration in codegen — emits `undefined: timeSeries`)
+Blocker: ~~#2~~ resolved. Remaining: timestamp() runtime correctness (0 trades produced)

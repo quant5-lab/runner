@@ -7,16 +7,18 @@ import (
 )
 
 type BuiltinIdentifierHandler struct {
-	registry      *BuiltinIdentifierRegistry
-	formulaGen    *DerivedPriceFormulaGenerator
-	colorResolver *ColorConstantResolver
+	registry          *BuiltinIdentifierRegistry
+	formulaGen        *DerivedPriceFormulaGenerator
+	colorResolver     *ColorConstantResolver
+	namespaceResolver *BuiltinNamespaceResolver
 }
 
 func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
 	return &BuiltinIdentifierHandler{
-		registry:      NewBuiltinIdentifierRegistry(),
-		formulaGen:    NewDerivedPriceFormulaGenerator(),
-		colorResolver: NewColorConstantResolver(),
+		registry:          NewBuiltinIdentifierRegistry(),
+		formulaGen:        NewDerivedPriceFormulaGenerator(),
+		colorResolver:     NewColorConstantResolver(),
+		namespaceResolver: NewBuiltinNamespaceResolver(),
 	}
 }
 
@@ -60,6 +62,8 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return h.generateTrueRangeCalculation("bar")
 	case "bar_index":
 		return "float64(i)"
+	case "time":
+		return "float64(bar.Time * 1000)"
 	default:
 		return ""
 	}
@@ -89,6 +93,8 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return h.generateTrueRangeCalculationSeries()
 	case "bar_index":
 		return "float64(ctx.BarIndex)"
+	case "time":
+		return "timeSeries.GetCurrent()"
 	default:
 		return ""
 	}
@@ -107,6 +113,10 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 
 	if name == "bar_index" {
 		return fmt.Sprintf("bar_indexSeries.Get(%d)", offset)
+	}
+
+	if name == "time" {
+		return fmt.Sprintf("timeSeries.Get(%d)", offset)
 	}
 
 	field := ""
@@ -223,6 +233,12 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 
 	if okProp && obj.Name == "strategy" && (prop.Name == "long" || prop.Name == "short") {
 		return "", false
+	}
+
+	if okProp && h.namespaceResolver != nil {
+		if resolution, found := h.namespaceResolver.Resolve(obj.Name, prop.Name); found {
+			return resolution.Code, true
+		}
 	}
 
 	if h.IsBuiltinSeriesIdentifier(obj.Name) && expr.Computed {
