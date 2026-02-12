@@ -1,0 +1,9 @@
+AlphaTrend Strategy (v5) — ATR-based trend follower with MFI/RSI filter
+
+Parse: ✅
+Generate: ❌ (unsupported inline function in condition: ta.mfi)
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Blocker: #5 (ta.mfi not in TAFunctionRegistry), #3 (ta.mfi in ternary expression)
+Secondary: ta.barssince() also unimplemented (#5)

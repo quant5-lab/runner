@@ -1,0 +1,8 @@
+ANN neural network strategy (v2) with exp() activation functions
+
+Parse: ✅ (v2→v5 preprocessing)
+Generate: ✅
+Compile: ❌ (undefined: bar)
+Execute: ❌ Not reached
+
+Blocker: #2 (ohlc4 in UDF body emits `undefined: bar` — arrow scope lacks derived price access)

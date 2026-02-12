@@ -1,0 +1,8 @@
+UT Bot Strategy (v4) with backtesting date range
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅
+Compile: ❌ (undefined: timeSeries)
+Execute: ❌ Not reached
+
+Blocker: #2 (`time` built-in lacks series declaration in codegen — emits `undefined: timeSeries`)

@@ -1,0 +1,8 @@
+Moon Phases Strategy (v4) — lunar cycle trading with valuewhen()
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅
+Compile: ❌ (syntax error: unexpected newline in unary negation)
+Execute: ❌ Not reached
+
+Blocker: #1 (unary negation emits broken Go: `-(⏎1⏎)` instead of `-(1)`)

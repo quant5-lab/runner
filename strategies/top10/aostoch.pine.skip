@@ -1,0 +1,8 @@
+AO+Stoch+RSI+ATR strategy (v4) — multi-indicator with stop/take-profit
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅
+Compile: ❌ (2 classes of errors)
+Execute: ❌ Not reached
+
+Blocker: #5 (ta.stoch case mismatch in non-tuple call path), #1 (if-scoped vars not promoted to outer series scope)

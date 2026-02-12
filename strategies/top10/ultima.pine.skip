@@ -1,0 +1,8 @@
+BEST Strategy Template (v4) — full risk management framework
+
+Parse: ❌ (unexpected token "," at line 297 — preprocessor artifact)
+Generate: ❌ Not reached (first 300 lines: codegen fails with time() IIFE gap)
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Blocker: #2 (time() in UDF body requires IIFE generator), #7 (strategy.risk.*), #14 (alert), #9 (tostring/str.*), #8 (input.session)

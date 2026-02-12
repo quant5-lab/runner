@@ -1,0 +1,8 @@
+PMax Explorer (v4) — multi-MA trend strategy with 20-symbol screener
+
+Parse: ❌ (unexpected token "00" at line 302 — 8-digit RGBA hex #00000000)
+Generate: ❌ Not reached
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Blocker: #6 (8-digit RGBA hex), #15 (label/line drawing objects), #8 (input.symbol)
