@@ -1,9 +1,10 @@
 package codegen
 
 type CalendarBuiltinInfo struct {
-	PineName    string
-	SeriesName  string
-	StructField string
+	PineName        string
+	SeriesName      string
+	StructField     string
+	ArrowExpression string
 }
 
 type BuiltinIdentifierRegistry struct {
@@ -35,14 +36,14 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 			"time": true,
 		},
 		calendarBuiltins: map[string]CalendarBuiltinInfo{
-			"dayofweek":  {PineName: "dayofweek", SeriesName: "dayofweekSeries", StructField: "DayOfWeek"},
-			"dayofmonth": {PineName: "dayofmonth", SeriesName: "dayofmonthSeries", StructField: "DayOfMonth"},
-			"hour":       {PineName: "hour", SeriesName: "hourSeries", StructField: "Hour"},
-			"minute":     {PineName: "minute", SeriesName: "minuteSeries", StructField: "Minute"},
-			"month":      {PineName: "month", SeriesName: "monthSeries", StructField: "Month"},
-			"second":     {PineName: "second", SeriesName: "secondSeries", StructField: "Second"},
-			"year":       {PineName: "year", SeriesName: "yearSeries", StructField: "Year"},
-			"weekofyear": {PineName: "weekofyear", SeriesName: "weekofyearSeries", StructField: "WeekOfYear"},
+			"dayofweek":  {PineName: "dayofweek", SeriesName: "dayofweekSeries", StructField: "DayOfWeek", ArrowExpression: "float64(barTime.Weekday() + 1)"},
+			"dayofmonth": {PineName: "dayofmonth", SeriesName: "dayofmonthSeries", StructField: "DayOfMonth", ArrowExpression: "float64(barTime.Day())"},
+			"hour":       {PineName: "hour", SeriesName: "hourSeries", StructField: "Hour", ArrowExpression: "float64(barTime.Hour())"},
+			"minute":     {PineName: "minute", SeriesName: "minuteSeries", StructField: "Minute", ArrowExpression: "float64(barTime.Minute())"},
+			"month":      {PineName: "month", SeriesName: "monthSeries", StructField: "Month", ArrowExpression: "float64(barTime.Month())"},
+			"second":     {PineName: "second", SeriesName: "secondSeries", StructField: "Second", ArrowExpression: "float64(barTime.Second())"},
+			"year":       {PineName: "year", SeriesName: "yearSeries", StructField: "Year", ArrowExpression: "float64(barTime.Year())"},
+			"weekofyear": {PineName: "weekofyear", SeriesName: "weekofyearSeries", StructField: "WeekOfYear", ArrowExpression: "func() float64 { _, w := barTime.ISOWeek(); return float64(w) }()"},
 		},
 		constantBuiltins: map[string]bool{
 			"last_bar_index": true,
@@ -90,4 +91,28 @@ func (r *BuiltinIdentifierRegistry) CalendarBuiltinNames() []string {
 
 func (r *BuiltinIdentifierRegistry) IsConstantBuiltin(name string) bool {
 	return r.constantBuiltins[name]
+}
+
+func (r *BuiltinIdentifierRegistry) OHLCVFieldNames() []string {
+	names := make([]string, 0, len(r.ohlcvFields))
+	for name := range r.ohlcvFields {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *BuiltinIdentifierRegistry) DerivedPriceNames() []string {
+	names := make([]string, 0, len(r.derivedPrices))
+	for name := range r.derivedPrices {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *BuiltinIdentifierRegistry) TimeSeriesBuiltinNames() []string {
+	names := make([]string, 0, len(r.timeSeriesBuiltins))
+	for name := range r.timeSeriesBuiltins {
+		names = append(names, name)
+	}
+	return names
 }

@@ -297,6 +297,11 @@ func (e *ArrowExpressionGeneratorImpl) resolveArrowSubscript(seriesName string, 
 		return e.generateBuiltinSubscript(seriesName, indexCode), nil
 	}
 
+	/* Constant builtins (last_bar_index) are time-invariant — subscript returns scalar */
+	if e.gen.builtinHandler.IsConstantBuiltin(seriesName) {
+		return seriesName, nil
+	}
+
 	if isSeriesParam {
 		return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode), nil
 	}
@@ -339,19 +344,22 @@ func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, inde
 	handler := e.gen.builtinHandler
 
 	if info, ok := handler.CalendarInfo(seriesName); ok {
-		return fmt.Sprintf("%s.Get(int(%s))", info.SeriesName, indexCode)
+		return CalendarFieldArrowIIFE(info.ArrowExpression, indexCode)
 	}
 
-	if seriesName == "bar_index" || seriesName == "time" {
-		return fmt.Sprintf("%sSeries.Get(int(%s))", seriesName, indexCode)
+	if seriesName == "time" {
+		return TimeArrowIIFE(indexCode)
+	}
+
+	if seriesName == "bar_index" {
+		return BarIndexArrowIIFE(indexCode)
 	}
 
 	if handler.IsDerivedPrice(seriesName) {
 		return e.generateDerivedPriceSubscript(seriesName, indexCode)
 	}
 
-	capitalName := capitalizeFirstLetter(seriesName)
-	return fmt.Sprintf("func() float64 { barIdx := ctx.BarIndex-%s; if barIdx >= 0 && barIdx < len(ctx.Data) { return ctx.Data[barIdx].%s }; return math.NaN() }()", indexCode, capitalName)
+	return OHLCVFieldArrowIIFE(capitalizeFirstLetter(seriesName), indexCode)
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateDerivedPriceSubscript(priceName, indexCode string) string {
@@ -360,7 +368,5 @@ func (e *ArrowExpressionGeneratorImpl) generateDerivedPriceSubscript(priceName, 
 	if formula == "" {
 		return "math.NaN()"
 	}
-	return fmt.Sprintf(
-		"func() float64 { barIdx := ctx.BarIndex-int(%s); if barIdx >= 0 && barIdx < len(ctx.Data) { return %s }; return math.NaN() }()",
-		indexCode, formula)
+	return boundsCheckedArrowIIFE(indexCode, "return "+formula)
 }

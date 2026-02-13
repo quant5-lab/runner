@@ -1,6 +1,9 @@
 package codegen
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBuiltinIdentifierRegistry_IsBuiltinSeriesIdentifier(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
@@ -237,7 +240,28 @@ func TestBuiltinIdentifierRegistry_CalendarInfo(t *testing.T) {
 			if info.PineName != tt.pineName {
 				t.Errorf("PineName = %s, want %s", info.PineName, tt.pineName)
 			}
+			if info.ArrowExpression == "" {
+				t.Errorf("ArrowExpression must not be empty for %s", tt.pineName)
+			}
+			if !strings.Contains(info.ArrowExpression, "float64(") {
+				t.Errorf("ArrowExpression for %s must return float64, got: %s", tt.pineName, info.ArrowExpression)
+			}
 		})
+	}
+}
+
+/* Pine convention: Sunday=1..Saturday=7. Go Weekday() returns Sunday=0. Offset by +1 */
+func TestBuiltinIdentifierRegistry_DayOfWeekPineConvention(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+	info, ok := registry.CalendarInfo("dayofweek")
+	if !ok {
+		t.Fatal("dayofweek not found in calendar registry")
+	}
+	if !strings.Contains(info.ArrowExpression, "Weekday()") {
+		t.Errorf("dayofweek must derive from Go Weekday(), got: %s", info.ArrowExpression)
+	}
+	if !strings.Contains(info.ArrowExpression, "+ 1") {
+		t.Errorf("dayofweek must add 1 for Pine Sunday=1 convention, got: %s", info.ArrowExpression)
 	}
 }
 

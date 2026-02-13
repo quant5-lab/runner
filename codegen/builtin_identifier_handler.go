@@ -29,6 +29,13 @@ func (h *BuiltinIdentifierHandler) IsBuiltinSeriesIdentifier(name string) bool {
 	return h.registry.IsBuiltinSeriesIdentifier(name)
 }
 
+func (h *BuiltinIdentifierHandler) IsConstantBuiltin(name string) bool {
+	if h == nil || h.registry == nil {
+		return false
+	}
+	return h.registry.IsConstantBuiltin(name)
+}
+
 func (h *BuiltinIdentifierHandler) IsStrategyRuntimeValue(obj, prop string) bool {
 	if obj != "strategy" {
 		return false

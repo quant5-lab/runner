@@ -7,7 +7,8 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-func TestArrowBuiltinSubscript(t *testing.T) {
+/* Builtins must generate ctx.Data IIFE patterns; user variables must use Series.Get() */
+func TestArrowBuiltinSubscript_RoutingCategories(t *testing.T) {
 	gen := &generator{
 		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
@@ -15,38 +16,36 @@ func TestArrowBuiltinSubscript(t *testing.T) {
 	exprGen := NewArrowExpressionGeneratorImpl(gen, resolver)
 
 	tests := []struct {
-		name        string
-		builtin     string
-		mustHave    []string
-		mustNotHave []string
+		name     string
+		builtin  string
+		category string
+		mustHave []string
+		mustNot  []string
 	}{
-		/* FSB-backed series: calendar builtins use Series.Get() */
-		{"dayofweek", "dayofweek", []string{"dayofweekSeries.Get("}, nil},
-		{"dayofmonth", "dayofmonth", []string{"dayofmonthSeries.Get("}, nil},
-		{"hour", "hour", []string{"hourSeries.Get("}, nil},
-		{"minute", "minute", []string{"minuteSeries.Get("}, nil},
-		{"month", "month", []string{"monthSeries.Get("}, nil},
-		{"second", "second", []string{"secondSeries.Get("}, nil},
-		{"year", "year", []string{"yearSeries.Get("}, nil},
-		{"weekofyear", "weekofyear", []string{"weekofyearSeries.Get("}, nil},
+		{"dayofweek", "dayofweek", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "Weekday()"}, []string{"dayofweekSeries.Get("}},
+		{"dayofmonth", "dayofmonth", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Day()"}, []string{"dayofmonthSeries.Get("}},
+		{"hour", "hour", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Hour()"}, []string{"hourSeries.Get("}},
+		{"minute", "minute", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Minute()"}, []string{"minuteSeries.Get("}},
+		{"month", "month", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Month()"}, []string{"monthSeries.Get("}},
+		{"second", "second", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Second()"}, []string{"secondSeries.Get("}},
+		{"year", "year", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "barTime.Year()"}, []string{"yearSeries.Get("}},
+		{"weekofyear", "weekofyear", "calendar", []string{"time.LoadLocation(ctx.Timezone)", "ISOWeek()"}, []string{"weekofyearSeries.Get("}},
 
-		/* FSB-backed series: bar_index and time */
-		{"bar_index", "bar_index", []string{"bar_indexSeries.Get("}, nil},
-		{"time", "time", []string{"timeSeries.Get("}, nil},
+		{"time", "time", "time", []string{"float64(ctx.Data[barIdx].Time * 1000)"}, []string{"timeSeries.Get("}},
 
-		/* Derived prices: formula generation at data offset */
-		{"hl2", "hl2", []string{"ctx.Data[barIdx].High", "ctx.Data[barIdx].Low"}, []string{"Series.Get("}},
-		{"hlc3", "hlc3", []string{"ctx.Data[barIdx].High", "ctx.Data[barIdx].Low", "ctx.Data[barIdx].Close"}, nil},
-		{"ohlc4", "ohlc4", []string{"ctx.Data[barIdx].Open", "ctx.Data[barIdx].High"}, nil},
-		{"hlcc4", "hlcc4", []string{"ctx.Data[barIdx].Close"}, nil},
+		{"bar_index", "bar_index", "bar_index", []string{"float64(barIdx)"}, []string{"bar_indexSeries.Get("}},
 
-		/* OHLCV: direct ctx.Data field access */
-		{"close", "close", []string{"ctx.Data[barIdx].Close"}, []string{"Series.Get("}},
-		{"open", "open", []string{"ctx.Data[barIdx].Open"}, nil},
-		{"high", "high", []string{"ctx.Data[barIdx].High"}, nil},
-		{"low", "low", []string{"ctx.Data[barIdx].Low"}, nil},
-		{"volume", "volume", []string{"ctx.Data[barIdx].Volume"}, nil},
-		{"tr", "tr", []string{"ctx.Data[barIdx].Tr"}, nil},
+		{"hl2", "hl2", "derived", []string{"ctx.Data[barIdx].High", "ctx.Data[barIdx].Low"}, []string{"Series.Get("}},
+		{"hlc3", "hlc3", "derived", []string{"ctx.Data[barIdx].High", "ctx.Data[barIdx].Low", "ctx.Data[barIdx].Close"}, nil},
+		{"ohlc4", "ohlc4", "derived", []string{"ctx.Data[barIdx].Open", "ctx.Data[barIdx].High"}, nil},
+		{"hlcc4", "hlcc4", "derived", []string{"ctx.Data[barIdx].Close"}, nil},
+
+		{"close", "close", "ohlcv", []string{"ctx.Data[barIdx].Close"}, []string{"closeSeries.Get("}},
+		{"open", "open", "ohlcv", []string{"ctx.Data[barIdx].Open"}, []string{"openSeries.Get("}},
+		{"high", "high", "ohlcv", []string{"ctx.Data[barIdx].High"}, []string{"highSeries.Get("}},
+		{"low", "low", "ohlcv", []string{"ctx.Data[barIdx].Low"}, []string{"lowSeries.Get("}},
+		{"volume", "volume", "ohlcv", []string{"ctx.Data[barIdx].Volume"}, []string{"volumeSeries.Get("}},
+		{"tr", "tr", "ohlcv", []string{"ctx.Data[barIdx].Tr"}, []string{"trSeries.Get("}},
 	}
 
 	for _, tt := range tests {
@@ -55,24 +54,119 @@ func TestArrowBuiltinSubscript(t *testing.T) {
 			if err != nil {
 				t.Fatalf("resolveArrowSubscript(%s) error: %v", tt.builtin, err)
 			}
+
+			if !strings.Contains(code, "func() float64 {") {
+				t.Errorf("builtin %q (%s) must generate IIFE, got: %s", tt.builtin, tt.category, code)
+			}
+
 			for _, must := range tt.mustHave {
 				if !strings.Contains(code, must) {
-					t.Errorf("resolveArrowSubscript(%s) missing %q\ngot: %s", tt.builtin, must, code)
+					t.Errorf("%q missing routing pattern %q\ngot: %s", tt.builtin, must, code)
 				}
 			}
-			for _, mustNot := range tt.mustNotHave {
+			for _, mustNot := range tt.mustNot {
 				if strings.Contains(code, mustNot) {
-					t.Errorf("resolveArrowSubscript(%s) should not contain %q\ngot: %s", tt.builtin, mustNot, code)
+					t.Errorf("%q should not contain %q\ngot: %s", tt.builtin, mustNot, code)
 				}
 			}
 		})
 	}
 }
 
-func TestArrowBuiltinSubscript_UserVariableUsesGenericSeriesGet(t *testing.T) {
-	gen := &generator{
-		builtinHandler: NewBuiltinIdentifierHandler(),
+/* Every series identifier in the registry must produce a bounds-checked IIFE */
+func TestArrowBuiltinSubscript_RegistryCompleteness(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	allSeriesBuiltins := make(map[string]bool)
+	for _, name := range registry.OHLCVFieldNames() {
+		allSeriesBuiltins[name] = true
 	}
+	for _, name := range registry.DerivedPriceNames() {
+		allSeriesBuiltins[name] = true
+	}
+	for _, name := range registry.TimeSeriesBuiltinNames() {
+		allSeriesBuiltins[name] = true
+	}
+	for _, name := range registry.CalendarBuiltinNames() {
+		allSeriesBuiltins[name] = true
+	}
+
+	if len(allSeriesBuiltins) == 0 {
+		t.Fatal("registry returned zero series builtins — enumeration methods broken")
+	}
+
+	gen := &generator{builtinHandler: NewBuiltinIdentifierHandler()}
+	resolver := NewArrowSeriesAccessResolver()
+	exprGen := NewArrowExpressionGeneratorImpl(gen, resolver)
+
+	for name := range allSeriesBuiltins {
+		t.Run(name, func(t *testing.T) {
+			if !registry.IsBuiltinSeriesIdentifier(name) {
+				t.Fatalf("%q returned by enumeration but IsBuiltinSeriesIdentifier=false", name)
+			}
+			code, err := exprGen.resolveArrowSubscript(name, &ast.Literal{Value: float64(1)})
+			if err != nil {
+				t.Fatalf("resolveArrowSubscript(%s) error: %v", name, err)
+			}
+			if !strings.Contains(code, "func() float64 {") {
+				t.Errorf("registered builtin %q must produce IIFE, got: %s", name, code)
+			}
+		})
+	}
+}
+
+/* Constant builtins (last_bar_index) are time-invariant — subscript returns scalar directly */
+func TestArrowBuiltinSubscript_ConstantBuiltinNotSeries(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+	if !registry.IsConstantBuiltin("last_bar_index") {
+		t.Fatal("last_bar_index should be a constant builtin")
+	}
+	if registry.IsBuiltinSeriesIdentifier("last_bar_index") {
+		t.Fatal("last_bar_index should NOT be a series identifier")
+	}
+
+	gen := &generator{builtinHandler: NewBuiltinIdentifierHandler()}
+	resolver := NewArrowSeriesAccessResolver()
+	exprGen := NewArrowExpressionGeneratorImpl(gen, resolver)
+
+	code, err := exprGen.resolveArrowSubscript("last_bar_index", &ast.Literal{Value: float64(1)})
+	if err != nil {
+		t.Fatalf("resolveArrowSubscript(last_bar_index) error: %v", err)
+	}
+	if code != "last_bar_index" {
+		t.Errorf("constant builtin should return scalar identifier, got: %s", code)
+	}
+	if strings.Contains(code, "Series.Get(") {
+		t.Errorf("constant builtin must NOT use Series.Get(), got: %s", code)
+	}
+	if strings.Contains(code, "func() float64 {") {
+		t.Errorf("constant builtin must NOT produce IIFE, got: %s", code)
+	}
+}
+
+func TestArrowBuiltinSubscript_CompoundIndexExpression(t *testing.T) {
+	gen := &generator{builtinHandler: NewBuiltinIdentifierHandler()}
+	resolver := NewArrowSeriesAccessResolver()
+	exprGen := NewArrowExpressionGeneratorImpl(gen, resolver)
+
+	code, err := exprGen.resolveArrowSubscript("close", &ast.BinaryExpression{
+		Left:     &ast.Identifier{Name: "a"},
+		Operator: "+",
+		Right:    &ast.Literal{Value: float64(1)},
+	})
+	if err != nil {
+		t.Fatalf("compound index error: %v", err)
+	}
+	if !strings.Contains(code, "ctx.BarIndex-int(") {
+		t.Errorf("compound index must use ctx.BarIndex arithmetic, got: %s", code)
+	}
+	if !strings.Contains(code, "ctx.Data[barIdx].Close") {
+		t.Errorf("compound index must access ctx.Data, got: %s", code)
+	}
+}
+
+func TestArrowBuiltinSubscript_UserVariableUsesSeriesGet(t *testing.T) {
+	gen := &generator{builtinHandler: NewBuiltinIdentifierHandler()}
 	resolver := NewArrowSeriesAccessResolver()
 	exprGen := NewArrowExpressionGeneratorImpl(gen, resolver)
 
@@ -84,10 +178,10 @@ func TestArrowBuiltinSubscript_UserVariableUsesGenericSeriesGet(t *testing.T) {
 				t.Fatalf("resolveArrowSubscript(%s) error: %v", name, err)
 			}
 			if !strings.Contains(code, name+"Series.Get(") {
-				t.Errorf("user variable %q should use generic Series.Get() path, got: %s", name, code)
+				t.Errorf("user variable %q should use Series.Get(), got: %s", name, code)
 			}
 			if strings.Contains(code, "ctx.Data[barIdx]") {
-				t.Errorf("user variable %q should not use builtin ctx.Data path, got: %s", name, code)
+				t.Errorf("user variable %q should not use ctx.Data path, got: %s", name, code)
 			}
 		})
 	}
