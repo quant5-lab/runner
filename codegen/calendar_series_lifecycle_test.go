@@ -81,8 +81,14 @@ func TestCalendarSeriesLifecycle_CodeContent(t *testing.T) {
 
 	t.Run("timezone setup", func(t *testing.T) {
 		code := lifecycle.GenerateTimezoneSetup("\t")
-		if !strings.Contains(code, "time.LoadLocation(ctx.Timezone)") {
-			t.Errorf("missing timezone load in:\n%s", code)
+		for _, required := range []string{
+			"exchangeLoc",
+			"time.LoadLocation(ctx.Timezone)",
+			"panic(",
+		} {
+			if !strings.Contains(code, required) {
+				t.Errorf("missing %q in:\n%s", required, code)
+			}
 		}
 	})
 

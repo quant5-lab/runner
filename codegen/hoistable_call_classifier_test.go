@@ -261,3 +261,183 @@ func TestHoistableCallClassifier_MemberExpressionCallee(t *testing.T) {
 		t.Error("Expected ta.sma with valid period to be hoistable")
 	}
 }
+
+/* Validates TA functions with registry handler but no IIFE generator */
+func TestHoistableCallClassifier_TAFunctionRegistryGate(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		expected bool
+	}{
+		{
+			name: "ta.dev with literal period",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "dev"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(20)},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "bare dev with literal period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "dev"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(14)},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "ta.crossover with identifier args",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "crossover"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Identifier{Name: "open"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "ta.valuewhen with literal second arg",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "valuewhen"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "condition"},
+					&ast.Literal{Value: float64(1)},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := classifier.IsHoistable(tt.call); result != tt.expected {
+				t.Errorf("IsHoistable() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestHoistableCallClassifier_UnimplementedFunctions(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	tests := []struct {
+		name string
+		call *ast.CallExpression
+	}{
+		{
+			name: "ta.macd",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "macd"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(12)},
+				},
+			},
+		},
+		{
+			name: "request.security",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "request"},
+					Property: &ast.Identifier{Name: "security"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if classifier.IsHoistable(tt.call) {
+				t.Error("Expected function without handler to NOT be hoistable")
+			}
+		})
+	}
+}
+
+/* Validates classifier degrades gracefully with nil TAFunctionRegistry */
+func TestHoistableCallClassifier_NilTAFunctionRegistry(t *testing.T) {
+	gen := newTestGenerator()
+
+	classifier := HoistableCallClassifier{
+		gen:                    gen,
+		inlineTARegistry:       NewInlineTAIIFERegistry(),
+		taFunctionRegistry:     nil,
+		statefulValueFunctions: defaultStatefulValueFunctions,
+	}
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		expected bool
+	}{
+		{
+			name: "IIFE-registered function still hoistable",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "sma"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(14)},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "stateful function still hoistable",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "fixnan"},
+			},
+			expected: true,
+		},
+		{
+			name: "registry-only function NOT hoistable when registry nil",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "dev"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(20)},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := classifier.IsHoistable(tt.call); result != tt.expected {
+				t.Errorf("IsHoistable() = %v, expected %v (nil TAFunctionRegistry)", result, tt.expected)
+			}
+		})
+	}
+}

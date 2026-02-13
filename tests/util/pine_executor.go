@@ -14,6 +14,7 @@ type PineExecutor struct {
 	ProjectRoot  string
 	DataFilePath string
 	Symbol       string
+	PineGenPath  string
 }
 
 // NewPineExecutor creates executor with project root auto-detection
@@ -23,10 +24,17 @@ func NewPineExecutor(t *testing.T) *PineExecutor {
 	projectRoot := findProjectRoot(t)
 	dataPath := FetchTestData(t, "SPY", "1D", 500)
 
+	/* Use pre-built binary to avoid go build cache contention in parallel tests */
+	pineGenPath := filepath.Join(projectRoot, "build", "pine-gen")
+	if _, err := os.Stat(pineGenPath); err != nil {
+		t.Fatalf("Pre-built pine-gen not found at %s (run 'make build' first): %v", pineGenPath, err)
+	}
+
 	return &PineExecutor{
 		ProjectRoot:  projectRoot,
 		DataFilePath: dataPath,
 		Symbol:       "SPY",
+		PineGenPath:  pineGenPath,
 	}
 }
 
@@ -54,21 +62,14 @@ func (e *PineExecutor) ExecuteScriptWithCustomDataRaw(t *testing.T, name, script
 	return e.executePipelineRaw(t, name, script, dataPath, "TEST")
 }
 
-// GenerateCode runs Parse→Generate step and returns generated Go code
-func (e *PineExecutor) GenerateCode(t *testing.T, name, script string) (string, string) {
+// runPineGen executes the pre-built pine-gen binary and returns the generated file path
+func (e *PineExecutor) runPineGen(t *testing.T, tmpDir, pineFile string) string {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-	pineFile := filepath.Join(tmpDir, name+".pine")
-	if err := os.WriteFile(pineFile, []byte(script), 0644); err != nil {
-		t.Fatalf("Write pine file: %v", err)
-	}
-
-	builderPath := filepath.Join(e.ProjectRoot, "cmd", "pine-gen", "main.go")
 	templatePath := filepath.Join(e.ProjectRoot, "template", "main.go.tmpl")
 	binaryPath := filepath.Join(tmpDir, "test_binary")
 
-	buildCmd := exec.Command("go", "run", builderPath, "-input", pineFile, "-output", binaryPath, "-template", templatePath)
+	buildCmd := exec.Command(e.PineGenPath, "-input", pineFile, "-output", binaryPath, "-template", templatePath)
 	buildOut, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Pine compilation failed: %v\n%s", err, buildOut)
@@ -84,6 +85,20 @@ func (e *PineExecutor) GenerateCode(t *testing.T, name, script string) (string, 
 	if generatedFile == "" {
 		t.Fatalf("Could not find generated file in output:\n%s", buildOut)
 	}
+	return generatedFile
+}
+
+// GenerateCode runs Parse→Generate step and returns generated Go code
+func (e *PineExecutor) GenerateCode(t *testing.T, name, script string) (string, string) {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	pineFile := filepath.Join(tmpDir, name+".pine")
+	if err := os.WriteFile(pineFile, []byte(script), 0644); err != nil {
+		t.Fatalf("Write pine file: %v", err)
+	}
+
+	generatedFile := e.runPineGen(t, tmpDir, pineFile)
 
 	generatedCode, err := os.ReadFile(generatedFile)
 	if err != nil {
@@ -123,26 +138,8 @@ func (e *PineExecutor) executePipeline(t *testing.T, name, script, dataFilePath,
 		t.Fatalf("Write pine file: %v", err)
 	}
 
-	builderPath := filepath.Join(e.ProjectRoot, "cmd", "pine-gen", "main.go")
-	templatePath := filepath.Join(e.ProjectRoot, "template", "main.go.tmpl")
+	generatedFile := e.runPineGen(t, tmpDir, pineFile)
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-
-	buildCmd := exec.Command("go", "run", builderPath, "-input", pineFile, "-output", binaryPath, "-template", templatePath)
-	buildOut, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Pine compilation failed: %v\n%s", err, buildOut)
-	}
-
-	var generatedFile string
-	for _, line := range strings.Split(string(buildOut), "\n") {
-		if strings.HasPrefix(line, "Generated:") {
-			generatedFile = strings.TrimSpace(strings.TrimPrefix(line, "Generated:"))
-			break
-		}
-	}
-	if generatedFile == "" {
-		t.Fatalf("Could not find generated file in output:\n%s", buildOut)
-	}
 
 	compileCmd := exec.Command("go", "build", "-o", binaryPath, generatedFile)
 	if compileOut, err := compileCmd.CombinedOutput(); err != nil {
@@ -212,26 +209,8 @@ func (e *PineExecutor) executePipelineRaw(t *testing.T, name, script, dataFilePa
 		t.Fatalf("Write pine file: %v", err)
 	}
 
-	builderPath := filepath.Join(e.ProjectRoot, "cmd", "pine-gen", "main.go")
-	templatePath := filepath.Join(e.ProjectRoot, "template", "main.go.tmpl")
+	generatedFile := e.runPineGen(t, tmpDir, pineFile)
 	binaryPath := filepath.Join(tmpDir, "test_binary")
-
-	buildCmd := exec.Command("go", "run", builderPath, "-input", pineFile, "-output", binaryPath, "-template", templatePath)
-	buildOut, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Pine compilation failed: %v\n%s", err, buildOut)
-	}
-
-	var generatedFile string
-	for _, line := range strings.Split(string(buildOut), "\n") {
-		if strings.HasPrefix(line, "Generated:") {
-			generatedFile = strings.TrimSpace(strings.TrimPrefix(line, "Generated:"))
-			break
-		}
-	}
-	if generatedFile == "" {
-		t.Fatalf("Could not find generated file in output:\n%s", buildOut)
-	}
 
 	compileCmd := exec.Command("go", "build", "-o", binaryPath, generatedFile)
 	if compileOut, err := compileCmd.CombinedOutput(); err != nil {
@@ -274,7 +253,7 @@ func (e *PineExecutor) ExtractPlotValues(t *testing.T, output *PineScriptOutput,
 	t.Helper()
 
 	for _, plot := range output.Plots {
-		if strings.Contains(plot.Title, plotTitle) {
+		if plot.Title == plotTitle {
 			values := make([]float64, len(plot.Data))
 			for i, point := range plot.Data {
 				values[i] = point.Value

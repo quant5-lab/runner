@@ -548,7 +548,7 @@ func TestInlineExpressionScanner_IgnoresUserDefinedFunctions(t *testing.T) {
 	}
 }
 
-func TestInlineExpressionScanner_IgnoresTADevFunction(t *testing.T) {
+func TestInlineExpressionScanner_HoistsTADevFunction(t *testing.T) {
 	program := &ast.Program{
 		Body: []ast.Node{
 			&ast.IfStatement{
@@ -572,8 +572,8 @@ func TestInlineExpressionScanner_IgnoresTADevFunction(t *testing.T) {
 
 	hoistable := scanner.ScanProgram(program)
 
-	if len(hoistable) != 0 {
-		t.Errorf("Expected 0 hoistable calls (ta.dev handled by InlineConditionRegistry), got %d", len(hoistable))
+	if len(hoistable) != 1 {
+		t.Errorf("Expected 1 hoistable call (ta.dev has TAFunctionRegistry handler), got %d", len(hoistable))
 	}
 }
 

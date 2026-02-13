@@ -61,7 +61,7 @@ plot(signal)`,
 			mustContain: []string{
 				"value.IsTrue",
 				"devSum := 0.0",
-				"if value.IsTrue((func() float64",
+				"GetCurrent()",
 			},
 			mustNotContain: []string{
 				"undefined:",

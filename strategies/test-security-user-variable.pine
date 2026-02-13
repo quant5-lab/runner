@@ -1,9 +1,9 @@
 //@version=5
 strategy("Security User Variable Test", overlay=true)
 
-mySymbol = "BTCUSDT"
-myTimeframe = "1D"
+mySymbol = "SBERP"
+myTimeframe = "1W"
 
-dailyClose = request.security(mySymbol, myTimeframe, close)
+weeklyClose = request.security(mySymbol, myTimeframe, close)
 
-plot(dailyClose, title="Daily Close", color=color.blue)
+plot(weeklyClose, title="Weekly Close", color=color.blue)

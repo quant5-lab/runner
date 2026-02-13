@@ -1,8 +1,8 @@
 ZigZag PA Strategy V4.1 (v4) — harmonic pattern recognition
 
 Parse: ✅ (v4→v5 preprocessing)
-Generate: ❌ (unsupported inline function in condition: heikenashi)
+Generate: ❌ (unsupported function in expression position: heikenashi)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
-Blocker: #3 (heikinashi() has no InlineConditionHandler — fails in ternary expression)
+Blocker: #10 (ticker.heikinashi not implemented)

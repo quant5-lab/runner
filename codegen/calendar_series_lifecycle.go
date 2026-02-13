@@ -48,7 +48,8 @@ func (l *CalendarSeriesLifecycle) GenerateTimezoneSetup(indent string) string {
 	if !l.HasCalendarUsage() {
 		return ""
 	}
-	return indent + "exchangeLoc, _ := time.LoadLocation(ctx.Timezone)\n"
+	return indent + "exchangeLoc, err := time.LoadLocation(ctx.Timezone)\n" +
+		indent + `if err != nil { panic("invalid timezone: " + ctx.Timezone) }` + "\n"
 }
 
 func (l *CalendarSeriesLifecycle) GenerateBarPopulation(indent string) string {

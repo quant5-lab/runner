@@ -1502,7 +1502,8 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return g.callRouter.RouteCall(g, e)
 		}
 
-		return "", fmt.Errorf("unsupported inline function in condition: %s", funcName)
+		dispatcher := NewExpressionPositionDispatcher(g.callRouter)
+		return dispatcher.Dispatch(g, e)
 
 	case *ast.IfStatement:
 		cfGenerator := NewControlFlowExpressionGenerator(g)
@@ -2437,7 +2438,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			}
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathCode), nil
 		}
-		return g.ind() + fmt.Sprintf("// %s = %s() - TODO: implement\n", varName, funcName), nil
+		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
 	}
 }
 
