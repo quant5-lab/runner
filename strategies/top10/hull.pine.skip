@@ -1,8 +1,8 @@
 Hull Suite Strategy (v4) — HMA/EHMA/THMA with mode switch
 
 Parse: ✅ (v4→v5 preprocessing)
-Generate: ❌ (unsupported period expression type: *ast.CallExpression)
-Compile: ❌ Not reached
+Generate: ✅ (ComputedPeriod handles arithmetic and call expressions)
+Compile: ❌ (strategy.direction.long/short/all, strategy.risk.allow_entry_in)
 Execute: ❌ Not reached
 
-Blocker: #4 (wma/ema period arg is round(sqrt(_length)) — a CallExpression, not literal/identifier)
+Blocker: #7 (strategy.direction.* constants, strategy.risk.allow_entry_in)

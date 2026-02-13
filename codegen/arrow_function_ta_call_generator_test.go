@@ -52,12 +52,14 @@ func TestArrowFunctionTACallGenerator_CanHandle(t *testing.T) {
 /* TestArrowFunctionTACallGenerator_ArgumentExtraction validates argument parsing */
 func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 	tests := []struct {
-		name                string
-		call                *ast.CallExpression
-		expectError         bool
-		expectedPeriod      int
-		expectRuntimePeriod bool
-		runtimeVariableName string
+		name                 string
+		call                 *ast.CallExpression
+		expectError          bool
+		expectedPeriod       int
+		expectRuntimePeriod  bool
+		runtimeVariableName  string
+		expectComputedPeriod bool
+		computedContains     string
 	}{
 		{
 			name: "literal arguments",
@@ -109,6 +111,39 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 			runtimeVariableName: "period",
 		},
 		{
+			name: "binary expression period - creates computed period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "period"},
+						Operator: "/",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			expectError:          false,
+			expectComputedPeriod: true,
+			computedContains:     "period",
+		},
+		{
+			name: "call expression period - creates computed period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.CallExpression{
+						Callee:    &ast.Identifier{Name: "math.round"},
+						Arguments: []ast.Expression{&ast.Identifier{Name: "period"}},
+					},
+				},
+			},
+			expectError:          false,
+			expectComputedPeriod: true,
+			computedContains:     "period",
+		},
+		{
 			name: "insufficient arguments",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "sma"},
@@ -152,8 +187,19 @@ func TestArrowFunctionTACallGenerator_ArgumentExtraction(t *testing.T) {
 				t.Error("Expected accessor, got nil")
 			}
 
-			/* Validate period type and value */
-			if tt.expectRuntimePeriod {
+			if tt.expectComputedPeriod {
+				computedPeriod, ok := period.(*ComputedPeriod)
+				if !ok {
+					t.Errorf("Expected ComputedPeriod, got %T", period)
+					return
+				}
+				if !strings.Contains(computedPeriod.AsGoExpr(), tt.computedContains) {
+					t.Errorf("ComputedPeriod expression %q should contain %q", computedPeriod.AsGoExpr(), tt.computedContains)
+				}
+				if computedPeriod.IsConstant() {
+					t.Error("ComputedPeriod must not be constant")
+				}
+			} else if tt.expectRuntimePeriod {
 				runtimePeriod, ok := period.(*RuntimePeriod)
 				if !ok {
 					t.Errorf("Expected RuntimePeriod, got %T", period)
@@ -493,13 +539,14 @@ func TestArrowFunctionTACallGenerator_IIFEGeneration(t *testing.T) {
 /* TestArrowFunctionTACallGenerator_PeriodExtraction validates period value parsing */
 func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 	tests := []struct {
-		name                string
-		expr                ast.Expression
-		variables           map[string]string
-		expected            int
-		expectRuntimePeriod bool
-		runtimeVariableName string
-		expectError         bool
+		name                 string
+		expr                 ast.Expression
+		variables            map[string]string
+		expected             int
+		expectRuntimePeriod  bool
+		runtimeVariableName  string
+		expectComputedPeriod bool
+		expectError          bool
 	}{
 		{
 			name:     "float literal",
@@ -540,7 +587,31 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "unsupported expression type",
+			name: "binary expression - creates computed period",
+			expr: &ast.BinaryExpression{
+				Left:     &ast.Identifier{Name: "len"},
+				Operator: "/",
+				Right:    &ast.Literal{Value: 2.0},
+			},
+			variables:            map[string]string{"len": "float"},
+			expectComputedPeriod: true,
+		},
+		{
+			name: "call expression - creates computed period",
+			expr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "math.round"},
+				Arguments: []ast.Expression{
+					&ast.CallExpression{
+						Callee:    &ast.Identifier{Name: "math.sqrt"},
+						Arguments: []ast.Expression{&ast.Identifier{Name: "len"}},
+					},
+				},
+			},
+			variables:            map[string]string{"len": "float"},
+			expectComputedPeriod: true,
+		},
+		{
+			name:        "malformed binary expression - nil operands",
 			expr:        &ast.BinaryExpression{Operator: "+"},
 			expectError: true,
 		},
@@ -570,7 +641,19 @@ func TestArrowFunctionTACallGenerator_PeriodExtraction(t *testing.T) {
 			}
 
 			/* Validate period type and value */
-			if tt.expectRuntimePeriod {
+			if tt.expectComputedPeriod {
+				computedPeriod, ok := period.(*ComputedPeriod)
+				if !ok {
+					t.Errorf("Expected ComputedPeriod, got %T", period)
+					return
+				}
+				if computedPeriod.IsConstant() {
+					t.Error("ComputedPeriod must not be constant")
+				}
+				if computedPeriod.AsInt() != -1 {
+					t.Errorf("ComputedPeriod.AsInt() = %d, want -1", computedPeriod.AsInt())
+				}
+			} else if tt.expectRuntimePeriod {
 				runtimePeriod, ok := period.(*RuntimePeriod)
 				if !ok {
 					t.Errorf("Expected RuntimePeriod, got %T", period)
@@ -815,6 +898,26 @@ plot(result)`,
 				"srcSeries.Get(",
 				"arrowCtx_smoothed_1 := context.NewArrowContext(ctx)",
 				"smoothed(arrowCtx_smoothed_1, closeSeries, 14.0)",
+			},
+		},
+		{
+			name: "arrow function with computed period (Hull MA pattern)",
+			script: `//@version=5
+indicator("Test")
+hull(src, n) =>
+    h = ta.wma(src, n / 2)
+    f = ta.wma(src, n)
+    d = 2 * h - f
+    ta.wma(d, math.round(math.sqrt(n)))
+result = hull(close, 16)
+plot(result)`,
+			mustContain: []string{
+				"func hull(arrowCtx *context.ArrowContext",
+				"(n / 2)",
+			},
+			mustNotContain: []string{
+				"_wma_20_",
+				"unsupported period",
 			},
 		},
 	}

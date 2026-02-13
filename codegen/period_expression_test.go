@@ -1,35 +1,8 @@
 package codegen
 
 import (
-	"strings"
 	"testing"
 )
-
-/* TestPeriodExpression_Interface ensures interface compliance */
-func TestPeriodExpression_Interface(t *testing.T) {
-	tests := []struct {
-		name       string
-		expression PeriodExpression
-	}{
-		{"ConstantPeriod implements interface", NewConstantPeriod(20)},
-		{"RuntimePeriod implements interface", NewRuntimePeriod("len")},
-		{"ConstantPeriod minimum period", NewConstantPeriod(1)},
-		{"ConstantPeriod large period", NewConstantPeriod(500)},
-		{"RuntimePeriod with simple name", NewRuntimePeriod("p")},
-		{"RuntimePeriod with complex name", NewRuntimePeriod("myPeriod")},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_ = tt.expression.IsConstant()
-			_ = tt.expression.AsInt()
-			_ = tt.expression.AsGoExpr()
-			_ = tt.expression.AsIntCast()
-			_ = tt.expression.AsFloat64Cast()
-			_ = tt.expression.AsSeriesNamePart()
-		})
-	}
-}
 
 /* TestConstantPeriod_BehaviorInvariants verifies deterministic code generation */
 func TestConstantPeriod_BehaviorInvariants(t *testing.T) {
@@ -73,23 +46,36 @@ func TestConstantPeriod_BehaviorInvariants(t *testing.T) {
 			expectedFloatCast: "float64(1)",
 			expectedSeriesKey: "1",
 		},
+		{
+			name:              "Zero period boundary",
+			period:            0,
+			expectedGoExpr:    "0",
+			expectedIntCast:   "0",
+			expectedFloatCast: "float64(0)",
+			expectedSeriesKey: "0",
+		},
+		{
+			name:              "Very large period",
+			period:            10000,
+			expectedGoExpr:    "10000",
+			expectedIntCast:   "10000",
+			expectedFloatCast: "float64(10000)",
+			expectedSeriesKey: "10000",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := NewConstantPeriod(tc.period)
 
-			/* Invariant: IsConstant() always true */
 			if !p.IsConstant() {
 				t.Error("ConstantPeriod must always be constant")
 			}
 
-			/* Invariant: AsInt() returns exact value */
 			if p.AsInt() != tc.period {
 				t.Errorf("AsInt() = %d, want %d", p.AsInt(), tc.period)
 			}
 
-			/* Invariant: Value() returns exact value */
 			if p.Value() != tc.period {
 				t.Errorf("Value() = %d, want %d", p.Value(), tc.period)
 			}
@@ -155,23 +141,28 @@ func TestRuntimePeriod_BehaviorInvariants(t *testing.T) {
 			expectedFloatCast: "float64(period_len)",
 			expectedSeriesKey: "runtime",
 		},
+		{
+			name:              "Empty variable name boundary",
+			variableName:      "",
+			expectedGoExpr:    "",
+			expectedIntCast:   "int()",
+			expectedFloatCast: "float64()",
+			expectedSeriesKey: "runtime",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := NewRuntimePeriod(tc.variableName)
 
-			/* Invariant: IsConstant() always false */
 			if p.IsConstant() {
 				t.Error("RuntimePeriod must never be constant")
 			}
 
-			/* Invariant: AsInt() returns -1 sentinel */
 			if p.AsInt() != -1 {
 				t.Errorf("AsInt() = %d, want -1 (runtime sentinel)", p.AsInt())
 			}
 
-			/* Validate code generation formats */
 			if p.AsGoExpr() != tc.expectedGoExpr {
 				t.Errorf("AsGoExpr() = %q, want %q", p.AsGoExpr(), tc.expectedGoExpr)
 			}
@@ -191,71 +182,84 @@ func TestRuntimePeriod_BehaviorInvariants(t *testing.T) {
 	}
 }
 
-/* TestPeriodExpression_CodeGenerationPatterns verifies loop bounds and type casts */
-func TestPeriodExpression_CodeGenerationPatterns(t *testing.T) {
-	tests := []struct {
-		name          string
-		expression    PeriodExpression
-		loopPattern   string
-		alphaRMA      string // Expected pattern in: alpha := 1.0 / PATTERN
-		alphaEMA      string // Expected pattern in: alpha := 2.0 / (PATTERN+1)
-		warmupPattern string // Expected pattern in: if ctx.BarIndex < PATTERN-1
+/* TestComputedPeriod_BehaviorInvariants verifies pre-rendered Go expression wrapping */
+func TestComputedPeriod_BehaviorInvariants(t *testing.T) {
+	testCases := []struct {
+		name              string
+		goExpression      string
+		expectedGoExpr    string
+		expectedIntCast   string
+		expectedFloatCast string
+		expectedSeriesKey string
 	}{
 		{
-			name:          "Constant period 20",
-			expression:    NewConstantPeriod(20),
-			loopPattern:   "20",
-			alphaRMA:      "float64(20)",
-			alphaEMA:      "float64(20+1)",
-			warmupPattern: "19",
+			name:              "Binary arithmetic expression",
+			goExpression:      "(lengthSeries.GetCurrent() / 2)",
+			expectedGoExpr:    "(lengthSeries.GetCurrent() / 2)",
+			expectedIntCast:   "int((lengthSeries.GetCurrent() / 2))",
+			expectedFloatCast: "float64((lengthSeries.GetCurrent() / 2))",
+			expectedSeriesKey: "computed",
 		},
 		{
-			name:          "Constant period 14",
-			expression:    NewConstantPeriod(14),
-			loopPattern:   "14",
-			alphaRMA:      "float64(14)",
-			alphaEMA:      "float64(14+1)",
-			warmupPattern: "13",
+			name:              "Nested function call",
+			goExpression:      "math.Round(math.Sqrt(nSeries.GetCurrent()))",
+			expectedGoExpr:    "math.Round(math.Sqrt(nSeries.GetCurrent()))",
+			expectedIntCast:   "int(math.Round(math.Sqrt(nSeries.GetCurrent())))",
+			expectedFloatCast: "float64(math.Round(math.Sqrt(nSeries.GetCurrent())))",
+			expectedSeriesKey: "computed",
 		},
 		{
-			name:          "Runtime period len",
-			expression:    NewRuntimePeriod("len"),
-			loopPattern:   "int(len)",
-			alphaRMA:      "float64(len)",
-			alphaEMA:      "float64(len)+1", // Note: Runtime uses expression
-			warmupPattern: "int(len)-1",
+			name:              "Simple series access",
+			goExpression:      "pSeries.GetCurrent()",
+			expectedGoExpr:    "pSeries.GetCurrent()",
+			expectedIntCast:   "int(pSeries.GetCurrent())",
+			expectedFloatCast: "float64(pSeries.GetCurrent())",
+			expectedSeriesKey: "computed",
 		},
 		{
-			name:          "Runtime period myPeriod",
-			expression:    NewRuntimePeriod("myPeriod"),
-			loopPattern:   "int(myPeriod)",
-			alphaRMA:      "float64(myPeriod)",
-			alphaEMA:      "float64(myPeriod)+1",
-			warmupPattern: "int(myPeriod)-1",
+			name:              "Compound arithmetic with multiple operators",
+			goExpression:      "(aSeries.GetCurrent() * 2 + 1)",
+			expectedGoExpr:    "(aSeries.GetCurrent() * 2 + 1)",
+			expectedIntCast:   "int((aSeries.GetCurrent() * 2 + 1))",
+			expectedFloatCast: "float64((aSeries.GetCurrent() * 2 + 1))",
+			expectedSeriesKey: "computed",
+		},
+		{
+			name:              "Empty expression boundary",
+			goExpression:      "",
+			expectedGoExpr:    "",
+			expectedIntCast:   "int()",
+			expectedFloatCast: "float64()",
+			expectedSeriesKey: "computed",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			/* Test loop pattern generation */
-			loopCode := tt.expression.AsIntCast()
-			if loopCode != tt.loopPattern {
-				t.Errorf("Loop pattern: got %q, want %q", loopCode, tt.loopPattern)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewComputedPeriod(tc.goExpression)
+
+			if p.IsConstant() {
+				t.Error("ComputedPeriod must never be constant")
 			}
 
-			/* Test RMA alpha generation */
-			alphaRMACode := tt.expression.AsFloat64Cast()
-			if alphaRMACode != tt.alphaRMA {
-				t.Errorf("RMA alpha: got %q, want %q", alphaRMACode, tt.alphaRMA)
+			if p.AsInt() != -1 {
+				t.Errorf("AsInt() = %d, want -1 (computed sentinel)", p.AsInt())
 			}
 
-			/* Test warmup pattern - constants optimize to literal */
-			if tt.expression.IsConstant() {
-				warmupCode := tt.expression.AsInt() - 1
-				expectedWarmup := tt.expression.AsInt() - 1
-				if warmupCode != expectedWarmup {
-					t.Errorf("Warmup calculation: got %d, want %d", warmupCode, expectedWarmup)
-				}
+			if p.AsGoExpr() != tc.expectedGoExpr {
+				t.Errorf("AsGoExpr() = %q, want %q", p.AsGoExpr(), tc.expectedGoExpr)
+			}
+
+			if p.AsIntCast() != tc.expectedIntCast {
+				t.Errorf("AsIntCast() = %q, want %q", p.AsIntCast(), tc.expectedIntCast)
+			}
+
+			if p.AsFloat64Cast() != tc.expectedFloatCast {
+				t.Errorf("AsFloat64Cast() = %q, want %q", p.AsFloat64Cast(), tc.expectedFloatCast)
+			}
+
+			if p.AsSeriesNamePart() != tc.expectedSeriesKey {
+				t.Errorf("AsSeriesNamePart() = %q, want %q", p.AsSeriesNamePart(), tc.expectedSeriesKey)
 			}
 		})
 	}
@@ -305,6 +309,33 @@ func TestPeriodExpression_SeriesNamingUniqueness(t *testing.T) {
 			expectUnique: true,
 			description:  "Constant vs runtime must be distinguishable in series naming",
 		},
+		{
+			name: "Computed periods share computed key",
+			expressions: []PeriodExpression{
+				NewComputedPeriod("(a / 2)"),
+				NewComputedPeriod("math.Sqrt(b)"),
+			},
+			expectUnique: false,
+			description:  "All computed periods share 'computed' key - uniqueness via hash",
+		},
+		{
+			name: "Constant and computed produce different keys",
+			expressions: []PeriodExpression{
+				NewConstantPeriod(20),
+				NewComputedPeriod("(n / 2)"),
+			},
+			expectUnique: true,
+			description:  "Constant vs computed must be distinguishable in series naming",
+		},
+		{
+			name: "Runtime and computed produce different keys",
+			expressions: []PeriodExpression{
+				NewRuntimePeriod("len"),
+				NewComputedPeriod("(len / 2)"),
+			},
+			expectUnique: true,
+			description:  "Runtime vs computed must be distinguishable in series naming",
+		},
 	}
 
 	for _, tt := range tests {
@@ -324,175 +355,4 @@ func TestPeriodExpression_SeriesNamingUniqueness(t *testing.T) {
 			}
 		})
 	}
-}
-
-/* TestPeriodExpression_TypeSafety verifies int/float64 conversions */
-func TestPeriodExpression_TypeSafety(t *testing.T) {
-	tests := []struct {
-		name       string
-		expression PeriodExpression
-		context    string
-		validate   func(t *testing.T, code string)
-	}{
-		{
-			name:       "Float division uses float64 cast",
-			expression: NewConstantPeriod(20),
-			context:    "RMA alpha calculation",
-			validate: func(t *testing.T, code string) {
-				if !strings.Contains(code, "float64") {
-					t.Error("Division must use float64 to avoid integer division")
-				}
-			},
-		},
-		{
-			name:       "Loop bounds use int cast for runtime",
-			expression: NewRuntimePeriod("len"),
-			context:    "For loop condition",
-			validate: func(t *testing.T, code string) {
-				if !strings.HasPrefix(code, "int(") {
-					t.Error("Loop bounds must explicitly cast to int")
-				}
-			},
-		},
-		{
-			name:       "Constant loop bounds optimize to literal",
-			expression: NewConstantPeriod(20),
-			context:    "For loop condition",
-			validate: func(t *testing.T, code string) {
-				if strings.Contains(code, "int(") {
-					t.Error("Constant loop bounds should optimize to literal, not int() cast")
-				}
-			},
-		},
-		{
-			name:       "Series key is string type",
-			expression: NewRuntimePeriod("len"),
-			context:    "Series naming",
-			validate: func(t *testing.T, code string) {
-				/* All series keys must be strings */
-				if code != "runtime" {
-					t.Errorf("Series key must be string literal, got %q", code)
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var code string
-			switch tt.context {
-			case "RMA alpha calculation":
-				code = tt.expression.AsFloat64Cast()
-			case "For loop condition":
-				code = tt.expression.AsIntCast()
-			case "Series naming":
-				code = tt.expression.AsSeriesNamePart()
-			default:
-				t.Fatalf("Unknown context: %s", tt.context)
-			}
-
-			tt.validate(t, code)
-		})
-	}
-}
-
-/* TestPeriodExpression_EdgeCaseValues tests boundary values */
-func TestPeriodExpression_EdgeCaseValues(t *testing.T) {
-	tests := []struct {
-		name       string
-		expression PeriodExpression
-		validate   func(t *testing.T, expr PeriodExpression)
-	}{
-		{
-			name:       "Minimum period 1",
-			expression: NewConstantPeriod(1),
-			validate: func(t *testing.T, expr PeriodExpression) {
-				if expr.AsInt() != 1 {
-					t.Error("Period 1 must be preserved exactly")
-				}
-				if expr.AsIntCast() != "1" {
-					t.Error("Period 1 must generate literal '1'")
-				}
-			},
-		},
-		{
-			name:       "Very large period",
-			expression: NewConstantPeriod(10000),
-			validate: func(t *testing.T, expr PeriodExpression) {
-				if expr.AsInt() != 10000 {
-					t.Error("Large period must be preserved exactly")
-				}
-				if !strings.Contains(expr.AsFloat64Cast(), "10000") {
-					t.Error("Large period must appear in float cast")
-				}
-			},
-		},
-		{
-			name:       "Empty variable name creates valid runtime period",
-			expression: NewRuntimePeriod(""),
-			validate: func(t *testing.T, expr PeriodExpression) {
-				if expr.IsConstant() {
-					t.Error("Empty string should still create RuntimePeriod")
-				}
-				if expr.AsInt() != -1 {
-					t.Error("Runtime period must return -1 sentinel")
-				}
-			},
-		},
-		{
-			name:       "Zero period constant",
-			expression: NewConstantPeriod(0),
-			validate: func(t *testing.T, expr PeriodExpression) {
-				if !expr.IsConstant() {
-					t.Error("Zero should still be a constant")
-				}
-				if expr.AsInt() != 0 {
-					t.Error("Zero must be preserved")
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.validate(t, tt.expression)
-		})
-	}
-}
-
-/* TestPeriodExpression_ConstructorInvariants verifies factory functions */
-func TestPeriodExpression_ConstructorInvariants(t *testing.T) {
-	t.Run("NewConstantPeriod never returns nil", func(t *testing.T) {
-		p := NewConstantPeriod(20)
-		if p == nil {
-			t.Error("NewConstantPeriod must never return nil")
-		}
-	})
-
-	t.Run("NewRuntimePeriod never returns nil", func(t *testing.T) {
-		p := NewRuntimePeriod("len")
-		if p == nil {
-			t.Error("NewRuntimePeriod must never return nil")
-		}
-	})
-
-	t.Run("NewConstantPeriod preserves value", func(t *testing.T) {
-		testValues := []int{1, 2, 10, 14, 20, 50, 100, 200, 500, 1000}
-		for _, val := range testValues {
-			p := NewConstantPeriod(val)
-			if p.Value() != val {
-				t.Errorf("NewConstantPeriod(%d).Value() = %d, want %d", val, p.Value(), val)
-			}
-		}
-	})
-
-	t.Run("NewRuntimePeriod preserves variable name", func(t *testing.T) {
-		testNames := []string{"len", "p", "period", "myPeriod", "period_len"}
-		for _, name := range testNames {
-			p := NewRuntimePeriod(name)
-			if p.AsGoExpr() != name {
-				t.Errorf("NewRuntimePeriod(%q).AsGoExpr() = %q, want %q", name, p.AsGoExpr(), name)
-			}
-		}
-	})
 }

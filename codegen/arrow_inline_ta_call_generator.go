@@ -98,9 +98,9 @@ func (g *ArrowInlineTACallGenerator) extractPeriod(expr ast.Expression) (int, er
 			return strconv.Atoi(strVal)
 		}
 	case *ast.Identifier:
-		// Period is runtime parameter - inline IIFE requires compile-time constant
-		// Signal NOT HANDLED so caller delegates to runtime TA generation
+		/* Inline IIFE requires compile-time constant — delegate to runtime TA generation */
 		return 0, nil
 	}
-	return 0, fmt.Errorf("unsupported period expression type: %T", expr)
+	/* Computed expressions (BinaryExpression, CallExpression) need runtime evaluation */
+	return 0, nil
 }

@@ -267,7 +267,11 @@ func (a *ArrowFunctionTACallGenerator) extractPeriodExpression(expr ast.Expressi
 		return NewRuntimePeriod(e.Name), nil
 
 	default:
-		return nil, fmt.Errorf("unsupported period expression type: %T", expr)
+		rendered, err := a.exprGen.Generate(expr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render period expression: %w", err)
+		}
+		return NewComputedPeriod(rendered), nil
 	}
 }
 

@@ -221,7 +221,7 @@ func (g *RSIIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 }
 
 func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
-	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := float64(%s - j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsGoExpr(), accessor.GenerateLoopValueAccess("j"))
+	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := %s - float64(j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsFloat64Cast(), accessor.GenerateLoopValueAccess("j"))
 	body += "return sum / weightSum"
 
 	return NewIIFECodeBuilder().
