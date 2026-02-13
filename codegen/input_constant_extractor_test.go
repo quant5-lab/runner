@@ -388,6 +388,142 @@ func TestInputConstantExtractor_ExtractInputConstant_String(t *testing.T) {
 	}
 }
 
+func TestInputConstantExtractor_ExtractInputConstant_Color(t *testing.T) {
+	extractor := NewInputConstantExtractor()
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		expected string
+	}{
+		{
+			name: "positional named color",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "red"},
+					},
+				},
+			},
+			expected: "\"#FF5252\"",
+		},
+		{
+			name: "positional hex literal",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "#00FF00"},
+				},
+			},
+			expected: "\"#00FF00\"",
+		},
+		{
+			name: "named defval with MemberExpression",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key: &ast.Identifier{Name: "defval"},
+								Value: &ast.MemberExpression{
+									Object:   &ast.Identifier{Name: "color"},
+									Property: &ast.Identifier{Name: "blue"},
+								},
+							},
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "Color"},
+							},
+						},
+					},
+				},
+			},
+			expected: "\"#2962FF\"",
+		},
+		{
+			name: "named defval with color.rgb",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key: &ast.Identifier{Name: "defval"},
+								Value: &ast.CallExpression{
+									Callee: &ast.MemberExpression{
+										Object:   &ast.Identifier{Name: "color"},
+										Property: &ast.Identifier{Name: "rgb"},
+									},
+									Arguments: []ast.Expression{
+										&ast.Literal{Value: float64(255)},
+										&ast.Literal{Value: float64(0)},
+										&ast.Literal{Value: float64(0)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "\"#FF0000\"",
+		},
+		{
+			name: "object without defval defaults to empty",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "Color"},
+							},
+						},
+					},
+				},
+			},
+			expected: "\"\"",
+		},
+		{
+			name: "unresolvable defval defaults to empty",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "defval"},
+								Value: &ast.Identifier{Name: "myColorVar"},
+							},
+						},
+					},
+				},
+			},
+			expected: "\"\"",
+		},
+		{
+			name: "no arguments defaults to empty",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{},
+			},
+			expected: "\"\"",
+		},
+		{
+			name: "nil arguments defaults to empty",
+			call: &ast.CallExpression{
+				Arguments: nil,
+			},
+			expected: "\"\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractor.ExtractInputConstant(tt.call, "input.color")
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestInputConstantExtractor_ExtractInputConstant_FallThrough(t *testing.T) {
 	extractor := NewInputConstantExtractor()
 
@@ -408,24 +544,27 @@ func TestInputConstantExtractor_ExtractInputConstant_FallThrough(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "input.color returns empty (not implemented)",
+			name:     "input.color routes to color extraction",
 			funcName: "input.color",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
-					&ast.Literal{Value: "red"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "red"},
+					},
 				},
 			},
-			expected: "",
+			expected: "\"#FF5252\"",
 		},
 		{
-			name:     "input.timeframe returns empty (not implemented)",
+			name:     "input.timeframe returns string value",
 			funcName: "input.timeframe",
 			call: &ast.CallExpression{
 				Arguments: []ast.Expression{
 					&ast.Literal{Value: "D"},
 				},
 			},
-			expected: "",
+			expected: "\"D\"",
 		},
 		{
 			name:     "ta.sma returns empty (not input function)",

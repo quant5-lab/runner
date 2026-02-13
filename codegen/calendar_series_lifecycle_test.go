@@ -28,14 +28,14 @@ func TestCalendarSeriesLifecycle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lifecycle := NewCalendarSeriesLifecycle(tt.builtins)
 
-			if lifecycle.HasCalendarUsage() != tt.hasUsage {
-				t.Errorf("HasCalendarUsage() = %v, want %v", lifecycle.HasCalendarUsage(), tt.hasUsage)
+			if lifecycle.HasUsage() != tt.hasUsage {
+				t.Errorf("HasUsage() = %v, want %v", lifecycle.HasUsage(), tt.hasUsage)
 			}
 
 			methods := map[string]string{
 				"declarations":    lifecycle.GenerateDeclarations("\t"),
 				"initializations": lifecycle.GenerateInitializations("\t"),
-				"bar population":  lifecycle.GenerateBarPopulation("\t"),
+				"bar population":  lifecycle.GenerateBarPopulation("\t", "i"),
 				"advancement":     lifecycle.GenerateAdvancement("\t", "i"),
 				"registrations":   lifecycle.GenerateRegistrations("\t"),
 				"suppress":        lifecycle.GenerateSuppressUnused("\t"),
@@ -79,7 +79,7 @@ func TestCalendarSeriesLifecycle_CodeContent(t *testing.T) {
 	})
 
 	t.Run("bar population single decompose call", func(t *testing.T) {
-		code := lifecycle.GenerateBarPopulation("\t")
+		code := lifecycle.GenerateBarPopulation("\t", "i")
 		if cnt := strings.Count(code, "DecomposeBarTime"); cnt != 1 {
 			t.Errorf("expected exactly 1 DecomposeBarTime call, got %d", cnt)
 		}
@@ -143,14 +143,14 @@ func TestCalendarSeriesLifecycle_DeterministicOrder(t *testing.T) {
 func TestCalendarSeriesLifecycle_NilReceiver(t *testing.T) {
 	var lifecycle *CalendarSeriesLifecycle
 
-	if lifecycle.HasCalendarUsage() {
+	if lifecycle.HasUsage() {
 		t.Error("nil receiver should report no usage")
 	}
 
 	nilSafeMethods := map[string]string{
 		"declarations":    lifecycle.GenerateDeclarations("\t"),
 		"initializations": lifecycle.GenerateInitializations("\t"),
-		"bar population":  lifecycle.GenerateBarPopulation("\t"),
+		"bar population":  lifecycle.GenerateBarPopulation("\t", "i"),
 		"advancement":     lifecycle.GenerateAdvancement("\t", "i"),
 		"registrations":   lifecycle.GenerateRegistrations("\t"),
 		"suppress":        lifecycle.GenerateSuppressUnused("\t"),

@@ -222,3 +222,141 @@ if enableShort and close < open
 		t.Fatal("Expected at least one long entry — enableLong=true should allow entries")
 	}
 }
+
+/* All const-producing input types: explicit v4 type param and v5 direct call → const → compile */
+func TestInputTypeResolution_ExplicitTypeToConst(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		pineScript    string
+		expectedConst string
+	}{
+		/* v4 explicit type param → const */
+		{
+			name: "v4_float",
+			pineScript: `//@version=4
+study("V4 Float")
+mult = input(1.5, title="Mult", type=input.float)
+plot(close)
+`,
+			expectedConst: "const mult = 1.50",
+		},
+		{
+			name: "v4_int",
+			pineScript: `//@version=4
+study("V4 Int")
+period = input(14, title="Length", type=input.integer)
+plot(ta.sma(close, period))
+`,
+			expectedConst: "const period = 14",
+		},
+		{
+			name: "v4_bool",
+			pineScript: `//@version=4
+study("V4 Bool")
+show = input(defval=true, title="Show", type=input.bool)
+plot(close)
+`,
+			expectedConst: "const show = true",
+		},
+		{
+			name: "v4_string",
+			pineScript: `//@version=4
+study("V4 String")
+maType = input(defval="EMA", title="MA", type=input.string)
+plot(close)
+`,
+			expectedConst: `const maType = "EMA"`,
+		},
+		{
+			name: "v4_session",
+			pineScript: `//@version=4
+study("V4 Session")
+sess = input(defval="0930-1600", title="Session", type=input.session)
+plot(close)
+`,
+			expectedConst: `const sess = "0930-1600"`,
+		},
+		{
+			name: "v4_symbol",
+			pineScript: `//@version=4
+study("V4 Symbol")
+sym = input("EURUSD", title="Symbol", type=input.symbol)
+plot(close)
+`,
+			expectedConst: `const sym = "EURUSD"`,
+		},
+		{
+			name: "v4_timeframe",
+			pineScript: `//@version=4
+study("V4 Timeframe")
+tf = input("D", title="Timeframe", type=input.timeframe)
+plot(close)
+`,
+			expectedConst: `const tf = "D"`,
+		},
+		{
+			name: "v4_price",
+			pineScript: `//@version=4
+study("V4 Price")
+targetPrice = input(99.5, title="Target", type=input.price)
+plot(close)
+`,
+			expectedConst: "const targetPrice = 99.50",
+		},
+		{
+			name: "v4_time",
+			pineScript: `//@version=4
+study("V4 Time")
+startTime = input(defval=0, title="Start", type=input.time)
+plot(close)
+`,
+			expectedConst: "const startTime = 0",
+		},
+		/* v5 direct call → const */
+		{
+			name: "v5_text_area",
+			pineScript: `//@version=5
+indicator("V5 Text Area")
+notes = input.text_area(defval="my notes", title="Notes")
+plot(close)
+`,
+			expectedConst: `const notes = "my notes"`,
+		},
+		{
+			name: "v5_color",
+			pineScript: `//@version=5
+indicator("V5 Color")
+lineColor = input.color(title="Line Color")
+plot(close)
+`,
+			expectedConst: `const lineColor = ""`,
+		},
+		{
+			name: "v5_color_with_defval",
+			pineScript: `//@version=5
+indicator("V5 Color Defval")
+lineColor = input.color(defval=color.red, title="Line Color")
+plot(close)
+`,
+			expectedConst: `const lineColor = "#FF5252"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			exec := util.NewPineExecutor(t)
+			code, _ := exec.GenerateCode(t, tt.name, tt.pineScript)
+
+			if !strings.Contains(code, tt.expectedConst) {
+				t.Fatalf("Expected %q in generated code:\n%s", tt.expectedConst, code)
+			}
+
+			if err := exec.CompileCode(t, code); err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+		})
+	}
+}

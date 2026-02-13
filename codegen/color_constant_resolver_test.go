@@ -142,6 +142,297 @@ func TestColorConstantResolver_IsColorIdentifier(t *testing.T) {
 	})
 }
 
+func TestColorConstantResolver_ResolveExpression(t *testing.T) {
+	resolver := NewColorConstantResolver()
+
+	t.Run("named color dispatch", func(t *testing.T) {
+		sample := map[string]string{
+			"red":   "#FF5252",
+			"blue":  "#2962FF",
+			"green": "#4CAF50",
+			"white": "#FFFFFF",
+			"black": "#363A45",
+		}
+		for name, expectedHex := range sample {
+			t.Run(name, func(t *testing.T) {
+				expr := &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: name},
+				}
+				hex, ok := resolver.ResolveExpression(expr)
+				if !ok || hex != expectedHex {
+					t.Errorf("expected %q, got %q (ok=%v)", expectedHex, hex, ok)
+				}
+			})
+		}
+	})
+
+	t.Run("color.rgb", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			args     []ast.Expression
+			expected string
+		}{
+			{
+				name: "pure red",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+				},
+				expected: "#FF0000",
+			},
+			{
+				name: "white",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(255)},
+				},
+				expected: "#FFFFFF",
+			},
+			{
+				name: "black",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+				},
+				expected: "#000000",
+			},
+			{
+				name: "integer literal args",
+				args: []ast.Expression{
+					&ast.Literal{Value: 128},
+					&ast.Literal{Value: 64},
+					&ast.Literal{Value: 32},
+				},
+				expected: "#804020",
+			},
+			{
+				name: "transparency arg ignored",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(128)},
+					&ast.Literal{Value: float64(64)},
+					&ast.Literal{Value: float64(32)},
+					&ast.Literal{Value: float64(50)},
+				},
+				expected: "#804020",
+			},
+			{
+				name: "clamps above 255",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(300)},
+					&ast.Literal{Value: float64(256)},
+					&ast.Literal{Value: float64(128)},
+				},
+				expected: "#FFFF80",
+			},
+			{
+				name: "clamps below 0",
+				args: []ast.Expression{
+					&ast.Literal{Value: float64(-10)},
+					&ast.Literal{Value: float64(-1)},
+					&ast.Literal{Value: float64(0)},
+				},
+				expected: "#000000",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				call := &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "rgb"},
+					},
+					Arguments: tt.args,
+				}
+				hex, ok := resolver.ResolveExpression(call)
+				if !ok || hex != tt.expected {
+					t.Errorf("expected %q, got %q (ok=%v)", tt.expected, hex, ok)
+				}
+			})
+		}
+	})
+
+	t.Run("color.new", func(t *testing.T) {
+		t.Run("named base with transparency", func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "red"},
+					},
+					&ast.Literal{Value: float64(50)},
+				},
+			}
+			hex, ok := resolver.ResolveExpression(call)
+			if !ok || hex != "#FF5252" {
+				t.Errorf("expected #FF5252, got %q (ok=%v)", hex, ok)
+			}
+		})
+
+		t.Run("rgb base nested", func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "color"},
+							Property: &ast.Identifier{Name: "rgb"},
+						},
+						Arguments: []ast.Expression{
+							&ast.Literal{Value: float64(100)},
+							&ast.Literal{Value: float64(200)},
+							&ast.Literal{Value: float64(50)},
+						},
+					},
+					&ast.Literal{Value: float64(80)},
+				},
+			}
+			hex, ok := resolver.ResolveExpression(call)
+			if !ok || hex != "#64C832" {
+				t.Errorf("expected #64C832, got %q (ok=%v)", hex, ok)
+			}
+		})
+
+		t.Run("unresolvable base rejected", func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+					&ast.Literal{Value: float64(50)},
+				},
+			}
+			if _, ok := resolver.ResolveExpression(call); ok {
+				t.Error("color.new with unresolvable base should not resolve")
+			}
+		})
+	})
+
+	t.Run("hex literal", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			value    interface{}
+			expected string
+			ok       bool
+		}{
+			{"6-digit hex", "#FF0000", "#FF0000", true},
+			{"8-digit hex with alpha", "#FF000080", "#FF000080", true},
+			{"lowercase hex", "#aabbcc", "#aabbcc", true},
+			{"mixed case hex", "#AaBbCc", "#AaBbCc", true},
+			{"8-digit lowercase", "#00ff0080", "#00ff0080", true},
+			{"too short 1 digit", "#F", "", false},
+			{"too short 3 digits", "#FFF", "", false},
+			{"too short 5 digits", "#12345", "", false},
+			{"too long 7 digits", "#1234567", "", false},
+			{"too long 10 digits", "#1234567890", "", false},
+			{"non-hex characters 6 chars", "#GGHHII", "", false},
+			{"non-hex characters 8 chars", "#NotAHex!", "", false},
+			{"hash only", "#", "", false},
+			{"non-hex string rejected", "red", "", false},
+			{"empty string rejected", "", "", false},
+			{"numeric rejected", float64(42), "", false},
+			{"bool rejected", true, "", false},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				hex, ok := resolver.ResolveExpression(&ast.Literal{Value: tt.value})
+				if ok != tt.ok {
+					t.Errorf("expected ok=%v, got ok=%v (hex=%q)", tt.ok, ok, hex)
+				}
+				if ok && hex != tt.expected {
+					t.Errorf("expected %q, got %q", tt.expected, hex)
+				}
+			})
+		}
+	})
+
+	t.Run("rejection", func(t *testing.T) {
+		cases := []struct {
+			name string
+			expr ast.Expression
+		}{
+			{"nil expression", nil},
+			{"bare identifier", &ast.Identifier{Name: "red"}},
+			{"non-color namespace call", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+				},
+			}},
+			{"unknown color function", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "from_gradient"},
+				},
+				Arguments: []ast.Expression{&ast.Literal{Value: float64(50)}},
+			}},
+			{"non-MemberExpression callee", &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "rgb"},
+				Arguments: []ast.Expression{&ast.Literal{Value: float64(255)}},
+			}},
+			{"color.rgb insufficient args", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(0)},
+				},
+			}},
+			{"color.rgb zero args", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{},
+			}},
+			{"color.rgb non-numeric arg", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+				},
+			}},
+			{"color.new empty args", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{},
+			}},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if hex, ok := resolver.ResolveExpression(tt.expr); ok {
+					t.Errorf("should not resolve, got %q", hex)
+				}
+			})
+		}
+	})
+}
+
 func TestColorConstantResolver_ConsistencyWithRegistry(t *testing.T) {
 	resolver := NewColorConstantResolver()
 	registry := NewPineConstantRegistry()

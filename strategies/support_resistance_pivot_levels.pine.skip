@@ -1,6 +1,6 @@
-Remaining blockers: while loops (#1), input.color (#15), drawing objects line.*/label.* (#13)
+Remaining blockers: while loops (#1), ~~input.color (#15)~~, drawing objects line.*/label.* (#13)
 
 Parse: ❌ (while loop on line 111 — blocker #1)
-Generate: ❌ Not reached (also blocked by #13 line.*/label.*, #15 input.color)
+Generate: ❌ Not reached (also blocked by #13 line.*/label.*, ~~#15 input.color~~)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

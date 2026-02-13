@@ -18,12 +18,16 @@ func NewCalendarSeriesLifecycle(usedBuiltins []CalendarBuiltinInfo) *CalendarSer
 	return &CalendarSeriesLifecycle{usedBuiltins: sorted}
 }
 
-func (l *CalendarSeriesLifecycle) HasCalendarUsage() bool {
+func (l *CalendarSeriesLifecycle) HasUsage() bool {
 	return l != nil && len(l.usedBuiltins) > 0
 }
 
+func (l *CalendarSeriesLifecycle) NeedsTimezone() bool {
+	return l.HasUsage()
+}
+
 func (l *CalendarSeriesLifecycle) GenerateDeclarations(indent string) string {
-	if !l.HasCalendarUsage() {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := ""
@@ -34,7 +38,7 @@ func (l *CalendarSeriesLifecycle) GenerateDeclarations(indent string) string {
 }
 
 func (l *CalendarSeriesLifecycle) GenerateInitializations(indent string) string {
-	if !l.HasCalendarUsage() {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := ""
@@ -44,8 +48,8 @@ func (l *CalendarSeriesLifecycle) GenerateInitializations(indent string) string 
 	return code
 }
 
-func (l *CalendarSeriesLifecycle) GenerateBarPopulation(indent string) string {
-	if !l.HasCalendarUsage() {
+func (l *CalendarSeriesLifecycle) GenerateBarPopulation(indent, _ string) string {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := indent + "barCal := context.DecomposeBarTime(bar.Time, exchangeLoc)\n"
@@ -56,7 +60,7 @@ func (l *CalendarSeriesLifecycle) GenerateBarPopulation(indent string) string {
 }
 
 func (l *CalendarSeriesLifecycle) GenerateAdvancement(indent, iterVar string) string {
-	if !l.HasCalendarUsage() {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := ""
@@ -67,7 +71,7 @@ func (l *CalendarSeriesLifecycle) GenerateAdvancement(indent, iterVar string) st
 }
 
 func (l *CalendarSeriesLifecycle) GenerateRegistrations(indent string) string {
-	if !l.HasCalendarUsage() {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := ""
@@ -78,7 +82,7 @@ func (l *CalendarSeriesLifecycle) GenerateRegistrations(indent string) string {
 }
 
 func (l *CalendarSeriesLifecycle) GenerateSuppressUnused(indent string) string {
-	if !l.HasCalendarUsage() {
+	if !l.HasUsage() {
 		return ""
 	}
 	code := ""

@@ -3,12 +3,18 @@ package codegen
 import "github.com/quant5-lab/runner/ast"
 
 var v4InputTypeMapping = map[string]string{
-	"session": "input.session",
-	"source":  "input.source",
-	"integer": "input.int",
-	"float":   "input.float",
-	"bool":    "input.bool",
-	"string":  "input.string",
+	"session":   "input.session",
+	"source":    "input.source",
+	"integer":   "input.int",
+	"float":     "input.float",
+	"bool":      "input.bool",
+	"string":    "input.string",
+	"symbol":    "input.symbol",
+	"time":      "input.time",
+	"timeframe": "input.timeframe",
+	"price":     "input.price",
+	"color":     "input.color",
+	"text_area": "input.text_area",
 }
 
 var sourceIdentifierNames = map[string]bool{

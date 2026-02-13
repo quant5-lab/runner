@@ -192,7 +192,13 @@ func TestResolveFromExplicitTypeParam(t *testing.T) {
 		{"string", "string", "input.string"},
 		{"session", "session", "input.session"},
 		{"source", "source", "input.source"},
-		{"unknown_type", "color", ""},
+		{"symbol", "symbol", "input.symbol"},
+		{"time", "time", "input.time"},
+		{"timeframe", "timeframe", "input.timeframe"},
+		{"price", "price", "input.price"},
+		{"color", "color", "input.color"},
+		{"text_area", "text_area", "input.text_area"},
+		{"unknown_type", "custom", ""},
 	}
 
 	for _, tt := range tests {
@@ -363,7 +369,7 @@ func TestResolveInputFuncName_Unresolvable(t *testing.T) {
 				&ast.ObjectExpression{Properties: []ast.Property{
 					{Key: &ast.Identifier{Name: "type"}, Value: &ast.MemberExpression{
 						Object:   &ast.Identifier{Name: "input"},
-						Property: &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "custom"},
 					}},
 				}},
 			},

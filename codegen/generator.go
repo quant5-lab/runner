@@ -98,18 +98,20 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.hasLastBarIndex = detected["last_bar_index"]
 	gen.hasLastBarTime = detected["last_bar_time"]
 	gen.hasTimenow = detected["timenow"]
-	gen.calendarLifecycle = NewCalendarSeriesLifecycle(
-		gen.builtinHandler.ResolveCalendarBuiltins(detected),
-	)
-	gen.timeSeriesLifecycle = NewTimeSeriesLifecycle(
-		detected["time_close"],
-		detected["time_tradingday"],
-	)
-	gen.sessionLifecycle = NewSessionSeriesLifecycle(
-		detected["session.isfirstbar"],
-		detected["session.islastbar"],
-		detected["session.isfirstbar_regular"],
-		detected["session.islastbar_regular"],
+	gen.builtinSeriesLifecycle = NewCompositeSeriesLifecycle(
+		NewCalendarSeriesLifecycle(
+			gen.builtinHandler.ResolveCalendarBuiltins(detected),
+		),
+		NewTimeSeriesLifecycle(
+			detected["time_close"],
+			detected["time_tradingday"],
+		),
+		NewSessionSeriesLifecycle(
+			detected["session.isfirstbar"],
+			detected["session.islastbar"],
+			detected["session.isfirstbar_regular"],
+			detected["session.islastbar_regular"],
+		),
 	)
 	gen.seriesInitCoercer = NewSeriesInitCoercer()
 
@@ -206,9 +208,7 @@ type generator struct {
 	securityAnalyzer       *SecurityCallAnalyzer
 	udfAnalyzer            *UDFTempVarAnalyzer
 	statementAnalyzer      *StatementConditionalAnalyzer
-	calendarLifecycle      *CalendarSeriesLifecycle
-	timeSeriesLifecycle    *TimeSeriesLifecycle
-	sessionLifecycle       *SessionSeriesLifecycle
+	builtinSeriesLifecycle *CompositeSeriesLifecycle
 	seriesInitCoercer      *SeriesInitCoercer
 }
 
@@ -582,12 +582,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.symbolTable != nil {
 		g.symbolTable.Register("time", VariableTypeSeries)
 	}
-	code += g.calendarLifecycle.GenerateDeclarations(g.ind())
-	g.calendarLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
-	code += g.timeSeriesLifecycle.GenerateDeclarations(g.ind())
-	g.timeSeriesLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
-	code += g.sessionLifecycle.GenerateDeclarations(g.ind())
-	g.sessionLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
+	code += g.builtinSeriesLifecycle.GenerateDeclarations(g.ind())
+	g.builtinSeriesLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -656,9 +652,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "bar_indexSeries = series.NewSeries(len(ctx.Data))\n"
 	}
 	code += g.ind() + "timeSeries = series.NewSeries(len(ctx.Data))\n"
-	code += g.calendarLifecycle.GenerateInitializations(g.ind())
-	code += g.timeSeriesLifecycle.GenerateInitializations(g.ind())
-	code += g.sessionLifecycle.GenerateInitializations(g.ind())
+	code += g.builtinSeriesLifecycle.GenerateInitializations(g.ind())
 
 	/* Initialize internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
@@ -695,9 +689,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + `ctx.RegisterSeries("bar_indexSeries", bar_indexSeries)` + "\n"
 		}
 		code += g.ind() + `ctx.RegisterSeries("timeSeries", timeSeries)` + "\n"
-		code += g.calendarLifecycle.GenerateRegistrations(g.ind())
-		code += g.timeSeriesLifecycle.GenerateRegistrations(g.ind())
-		code += g.sessionLifecycle.GenerateRegistrations(g.ind())
+		code += g.builtinSeriesLifecycle.GenerateRegistrations(g.ind())
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
@@ -745,11 +737,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
-	/* Timezone setup: shared across calendar, time series, and session lifecycles */
-	if g.calendarLifecycle.HasCalendarUsage() || g.timeSeriesLifecycle.NeedsTimezone() || g.sessionLifecycle.NeedsTimezone() {
-		code += g.ind() + "exchangeLoc, err := time.LoadLocation(ctx.Timezone)\n"
-		code += g.ind() + `if err != nil { panic("invalid timezone: " + ctx.Timezone) }` + "\n"
-	}
+	code += g.builtinSeriesLifecycle.GenerateTimezoneSetup(g.ind())
 	if g.hasLastBarIndex {
 		code += g.ind() + "last_bar_index := float64(len(ctx.Data) - 1)\n"
 	}
@@ -785,9 +773,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("bar_indexSeries.Set(float64(%s))\n", iterVar)
 	}
 	code += g.ind() + "timeSeries.Set(float64(bar.Time * 1000))\n"
-	code += g.calendarLifecycle.GenerateBarPopulation(g.ind())
-	code += g.timeSeriesLifecycle.GenerateBarPopulation(g.ind(), iterVar)
-	code += g.sessionLifecycle.GenerateBarPopulation(g.ind(), iterVar)
+	code += g.builtinSeriesLifecycle.GenerateBarPopulation(g.ind(), iterVar)
 	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
@@ -849,9 +835,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
-	code += g.calendarLifecycle.GenerateSuppressUnused(g.ind())
-	code += g.timeSeriesLifecycle.GenerateSuppressUnused(g.ind())
-	code += g.sessionLifecycle.GenerateSuppressUnused(g.ind())
+	code += g.builtinSeriesLifecycle.GenerateSuppressUnused(g.ind())
 	if g.hasLastBarIndex {
 		code += g.ind() + "_ = last_bar_index\n"
 	}
@@ -872,9 +856,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("if %s < barCount-1 { bar_indexSeries.Next() }\n", iterVar)
 	}
 	code += g.ind() + fmt.Sprintf("if %s < barCount-1 { timeSeries.Next() }\n", iterVar)
-	code += g.calendarLifecycle.GenerateAdvancement(g.ind(), iterVar)
-	code += g.timeSeriesLifecycle.GenerateAdvancement(g.ind(), iterVar)
-	code += g.sessionLifecycle.GenerateAdvancement(g.ind(), iterVar)
+	code += g.builtinSeriesLifecycle.GenerateAdvancement(g.ind(), iterVar)
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {

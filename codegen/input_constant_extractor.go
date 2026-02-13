@@ -7,38 +7,37 @@ import (
 )
 
 /*
-InputConstantExtractor inlines compile-time constant values from input.* functions.
-
-Pine type system: input.float/int/bool/string/price return "input" qualified constants (not series).
-Exception: input.source returns series float, must fall through to series handling.
+input.float/int/bool/string/price return compile-time constants.
+Exception: input.source returns series float, falls through to series handling.
 */
 type InputConstantExtractor struct {
-	argParser *ArgumentParser
+	argParser     *ArgumentParser
+	colorResolver *ColorConstantResolver
 }
 
 func NewInputConstantExtractor() *InputConstantExtractor {
 	return &InputConstantExtractor{
-		argParser: NewArgumentParser(),
+		argParser:     NewArgumentParser(),
+		colorResolver: NewColorConstantResolver(),
 	}
 }
 
-/* ExtractInputConstant returns constant value string or empty for non-input functions. */
 func (ice *InputConstantExtractor) ExtractInputConstant(call *ast.CallExpression, funcName string) string {
 	if call == nil {
 		return ""
 	}
 
 	switch funcName {
-	case "input.float":
+	case "input.float", "input.price":
 		return ice.extractInputFloatValue(call)
-	case "input.int":
+	case "input.int", "input.time":
 		return ice.extractInputIntValue(call)
 	case "input.bool":
 		return ice.extractInputBoolValue(call)
-	case "input.string":
+	case "input.string", "input.symbol", "input.timeframe", "input.text_area":
 		return ice.extractInputStringValue(call)
-	case "input.price":
-		return ice.extractInputFloatValue(call)
+	case "input.color":
+		return ice.extractInputColorValue(call)
 	default:
 		return ""
 	}
@@ -153,4 +152,30 @@ func (ice *InputConstantExtractor) extractStringFromObject(obj *ast.ObjectExpres
 		}
 	}
 	return defaultValue
+}
+
+func (ice *InputConstantExtractor) extractInputColorValue(call *ast.CallExpression) string {
+	if len(call.Arguments) == 0 {
+		return "\"\""
+	}
+
+	if resolved, ok := ice.colorResolver.ResolveExpression(call.Arguments[0]); ok {
+		return fmt.Sprintf("\"%s\"", resolved)
+	}
+
+	if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+		return ice.extractColorFromObject(obj, "defval")
+	}
+
+	return "\"\""
+}
+
+func (ice *InputConstantExtractor) extractColorFromObject(obj *ast.ObjectExpression, key string) string {
+	parser := NewPropertyParser()
+	if expr, ok := parser.ParseExpression(obj, key); ok {
+		if resolved, ok := ice.colorResolver.ResolveExpression(expr); ok {
+			return fmt.Sprintf("\"%s\"", resolved)
+		}
+	}
+	return "\"\""
 }

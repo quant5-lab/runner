@@ -48,6 +48,7 @@ func newTestGenerator() *generator {
 	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
 	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.builtinSeriesLifecycle = NewCompositeSeriesLifecycle()
 
 	return gen
 }
@@ -141,7 +142,6 @@ func generateMultiSecurityProgram(t *testing.T, vars map[string]ast.Expression) 
 	return generated.FunctionBody
 }
 
-/* compilePineScript parses PineScript source and generates Go code for integration testing */
 func compilePineScript(source string) (string, error) {
 	p, err := parser.NewParser()
 	if err != nil {
@@ -164,6 +164,5 @@ func compilePineScript(source string) (string, error) {
 		return "", err
 	}
 
-	// Return both user-defined functions and function body for comprehensive validation
 	return result.UserDefinedFunctions + "\n" + result.FunctionBody, nil
 }
