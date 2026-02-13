@@ -5,14 +5,12 @@ import (
 	"testing"
 )
 
-/* TestColorConstants_BareIdentifiers validates bare color identifier compilation */
 func TestColorConstants_BareIdentifiers(t *testing.T) {
 	tests := []struct {
 		name         string
 		pine         string
 		expectedHex  string
 		variableName string
-		description  string
 	}{
 		{
 			name: "blue bare identifier",
@@ -23,7 +21,6 @@ myColor = blue
 `,
 			expectedHex:  `"#2962FF"`,
 			variableName: "myColor",
-			description:  "bare blue identifier resolves to TradingView blue hex",
 		},
 		{
 			name: "red bare identifier",
@@ -34,7 +31,6 @@ alertColor = red
 `,
 			expectedHex:  `"#FF5252"`,
 			variableName: "alertColor",
-			description:  "bare red identifier resolves to TradingView red hex",
 		},
 		{
 			name: "silver bare identifier",
@@ -45,7 +41,6 @@ neutralColor = silver
 `,
 			expectedHex:  `"#B2B5BE"`,
 			variableName: "neutralColor",
-			description:  "bare silver identifier resolves to TradingView silver hex",
 		},
 		{
 			name: "multiple bare identifiers",
@@ -56,9 +51,8 @@ c1 = green
 c2 = lime
 c3 = maroon
 `,
-			expectedHex:  `"#4CAF50"`, // green
+			expectedHex:  `"#4CAF50"`,
 			variableName: "c1",
-			description:  "multiple bare identifiers all resolve correctly",
 		},
 	}
 
@@ -71,25 +65,23 @@ c3 = maroon
 
 			varDecl := "var " + tt.variableName + " string"
 			if !strings.Contains(code, varDecl) {
-				t.Errorf("%s: Expected string variable declaration\n  Looking for: %s", tt.description, varDecl)
+				t.Errorf("Expected %q in generated code", varDecl)
 			}
 
 			assignment := tt.variableName + " = " + tt.expectedHex
 			if !strings.Contains(code, assignment) {
-				t.Errorf("%s: Expected hex assignment\n  Looking for: %s", tt.description, assignment)
+				t.Errorf("Expected %q in generated code", assignment)
 			}
 		})
 	}
 }
 
-/* TestColorConstants_MemberExpressions validates color.* member expression compilation */
 func TestColorConstants_MemberExpressions(t *testing.T) {
 	tests := []struct {
 		name         string
 		pine         string
 		expectedHex  string
 		variableName string
-		description  string
 	}{
 		{
 			name: "color.blue member expression",
@@ -100,7 +92,6 @@ plotColor = color.blue
 `,
 			expectedHex:  `"#2962FF"`,
 			variableName: "plotColor",
-			description:  "color.blue member expression resolves to hex",
 		},
 		{
 			name: "color.red member expression",
@@ -111,7 +102,6 @@ trendColor = color.red
 `,
 			expectedHex:  `"#FF5252"`,
 			variableName: "trendColor",
-			description:  "color.red member expression resolves to hex",
 		},
 		{
 			name: "color.aqua member expression",
@@ -122,7 +112,6 @@ bgColor = color.aqua
 `,
 			expectedHex:  `"#00BCD4"`,
 			variableName: "bgColor",
-			description:  "color.aqua member expression resolves to hex",
 		},
 	}
 
@@ -135,18 +124,17 @@ bgColor = color.aqua
 
 			varDecl := "var " + tt.variableName + " string"
 			if !strings.Contains(code, varDecl) {
-				t.Errorf("%s: Expected string variable declaration\n  Looking for: %s", tt.description, varDecl)
+				t.Errorf("Expected %q in generated code", varDecl)
 			}
 
 			assignment := tt.variableName + " = " + tt.expectedHex
 			if !strings.Contains(code, assignment) {
-				t.Errorf("%s: Expected hex assignment\n  Looking for: %s", tt.description, assignment)
+				t.Errorf("Expected %q in generated code", assignment)
 			}
 		})
 	}
 }
 
-/* TestColorConstants_AllSupported validates all 17 TradingView colors compile */
 func TestColorConstants_AllSupported(t *testing.T) {
 	allColors := []struct {
 		name string
@@ -224,13 +212,11 @@ func TestColorConstants_AllSupported(t *testing.T) {
 	})
 }
 
-/* TestColorConstants_InPlotFunction validates color constants in plot() calls */
 func TestColorConstants_InPlotFunction(t *testing.T) {
 	tests := []struct {
 		name        string
 		pine        string
 		expectedHex string
-		description string
 	}{
 		{
 			name: "bare identifier in plot",
@@ -240,7 +226,6 @@ indicator("Test")
 plot(close, color=blue)
 `,
 			expectedHex: `"#2962FF"`,
-			description: "bare blue in plot color parameter",
 		},
 		{
 			name: "member expression in plot",
@@ -250,7 +235,6 @@ indicator("Test")
 plot(close, color=color.red)
 `,
 			expectedHex: `"#FF5252"`,
-			description: "color.red in plot color parameter",
 		},
 	}
 
@@ -262,13 +246,12 @@ plot(close, color=color.red)
 			}
 
 			if !strings.Contains(code, tt.expectedHex) {
-				t.Errorf("%s: Expected hex value %s in generated code", tt.description, tt.expectedHex)
+				t.Errorf("Expected %s in generated code", tt.expectedHex)
 			}
 		})
 	}
 }
 
-/* TestColorConstants_MixedUsage validates bare and member expressions in same script */
 func TestColorConstants_MixedUsage(t *testing.T) {
 	pine := `
 //@version=5
@@ -303,6 +286,115 @@ plot(low, color=conditionalColor)
 	for _, req := range requiredPatterns {
 		if !strings.Contains(code, req.pattern) {
 			t.Errorf("Missing required pattern: %s\n  Pattern: %s", req.description, req.pattern)
+		}
+	}
+}
+
+func TestColorFunctions_ColorNew(t *testing.T) {
+	tests := []struct {
+		name     string
+		pine     string
+		expected []string
+	}{
+		{
+			name: "color.new with member expression color",
+			pine: `
+//@version=5
+indicator("Test")
+myColor = color.new(color.red, 50)
+`,
+			expected: []string{
+				"var myColor string",
+				"visual.PineColorNew",
+				"#FF5252",
+			},
+		},
+		{
+			name: "color.new with bare color identifier",
+			pine: `
+//@version=5
+indicator("Test")
+c = color.new(blue, 30)
+`,
+			expected: []string{
+				"var c string",
+				"visual.PineColorNew",
+				"#2962FF",
+			},
+		},
+		{
+			name: "color.new with zero transparency",
+			pine: `
+//@version=5
+indicator("Test")
+solid = color.new(color.green, 0)
+`,
+			expected: []string{
+				"var solid string",
+				"visual.PineColorNew",
+				"#4CAF50",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+
+			for _, pattern := range tt.expected {
+				if !strings.Contains(code, pattern) {
+					t.Errorf("Missing pattern: %q\nGenerated code:\n%s", pattern, code)
+				}
+			}
+		})
+	}
+}
+
+func TestColorFunctions_ColorRGB(t *testing.T) {
+	pine := `
+//@version=5
+indicator("Test")
+custom = color.rgb(255, 128, 0, 20)
+`
+
+	code, err := compilePineScript(pine)
+	if err != nil {
+		t.Fatalf("Compilation failed: %v", err)
+	}
+
+	expected := []string{
+		"var custom string",
+		"visual.PineColorRGB",
+	}
+	for _, pattern := range expected {
+		if !strings.Contains(code, pattern) {
+			t.Errorf("Missing pattern: %q\nGenerated code:\n%s", pattern, code)
+		}
+	}
+}
+
+func TestColorFunctions_InPlot(t *testing.T) {
+	pine := `
+//@version=5
+indicator("Test")
+plot(close, color=color.new(color.blue, 50))
+`
+
+	code, err := compilePineScript(pine)
+	if err != nil {
+		t.Fatalf("Compilation failed: %v", err)
+	}
+
+	expected := []string{
+		"visual.PineColorNew",
+		"#2962FF",
+	}
+	for _, pattern := range expected {
+		if !strings.Contains(code, pattern) {
+			t.Errorf("Missing pattern: %q\nGenerated code:\n%s", pattern, code)
 		}
 	}
 }

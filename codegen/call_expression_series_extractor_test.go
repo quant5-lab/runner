@@ -173,6 +173,54 @@ func TestExtractMathFunction_NilCall(t *testing.T) {
 	}
 }
 
+func TestExtractColorFunction_ValidColorFunction(t *testing.T) {
+	g := newTestGenerator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "color"},
+			Property: &ast.Identifier{Name: "new"},
+		},
+		Arguments: []ast.Expression{
+			&ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "red"},
+			},
+			&ast.Literal{Value: 50.0},
+		},
+	}
+
+	result := g.extractColorFunction(call)
+
+	if result == "" {
+		t.Error("Expected non-empty result for color function")
+	}
+}
+
+func TestExtractColorFunction_NotColorFunction(t *testing.T) {
+	g := newTestGenerator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "customFunc"},
+	}
+
+	result := g.extractColorFunction(call)
+
+	if result != "" {
+		t.Errorf("Expected empty result for non-color function, got %q", result)
+	}
+}
+
+func TestExtractColorFunction_NilCall(t *testing.T) {
+	g := newTestGenerator()
+
+	result := g.extractColorFunction(nil)
+
+	if result != "" {
+		t.Errorf("Expected empty result for nil call, got %q", result)
+	}
+}
+
 func TestExtractUserDefinedFunction_ValidUserDefinedFunction(t *testing.T) {
 	g := newTestGenerator()
 	g.variables["customFunc"] = "function"

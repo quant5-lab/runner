@@ -172,6 +172,104 @@ func TestTypeInferenceEngine_InferType_CallExpression(t *testing.T) {
 			},
 			expected: "float64",
 		},
+		{
+			name: "color.new returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "red"},
+					&ast.Literal{Value: 50.0},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.rgb returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: 255.0},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: 0.0},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.from_gradient returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "from_gradient"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "rsi"},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: 100.0},
+					&ast.Identifier{Name: "red"},
+					&ast.Identifier{Name: "green"},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.r returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "r"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.g returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "g"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.b returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "b"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.t returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "t"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
 	}
 
 	for _, tt := range tests {

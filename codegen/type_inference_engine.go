@@ -114,6 +114,9 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	if funcName == "input.bool" {
 		return "bool"
 	}
+	if retType := ColorFunctionReturnType(funcName); retType != "" {
+		return retType
+	}
 
 	return "float64"
 }

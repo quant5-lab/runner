@@ -43,6 +43,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(NewValueCallHandler())
 	router.RegisterHandler(&TAIndicatorCallHandler{})
 	router.RegisterHandler(NewTickerFunctionHandler())
+	router.RegisterHandler(&ColorCallHandler{})
 	router.RegisterHandler(&UserDefinedFunctionHandler{})
 	router.RegisterHandler(&UnknownFunctionHandler{})
 

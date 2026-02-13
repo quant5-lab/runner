@@ -15,6 +15,7 @@ func (g *generator) extractCallExpression(call *ast.CallExpression) string {
 		g.extractTempVariable,
 		g.extractValueFunction,
 		g.extractMathFunction,
+		g.extractColorFunction,
 		g.extractUserDefinedFunction,
 		g.extractDefaultSeries,
 	}
@@ -66,6 +67,13 @@ func (g *generator) extractMathFunction(call *ast.CallExpression) string {
 		return code
 	}
 	return ""
+}
+
+func (g *generator) extractColorFunction(call *ast.CallExpression) string {
+	if call == nil {
+		return ""
+	}
+	return g.evaluateColorCallExpression(call)
 }
 
 func (g *generator) extractUserDefinedFunction(call *ast.CallExpression) string {

@@ -21,6 +21,7 @@ import (
 	"github.com/quant5-lab/runner/runtime/strategy"
 	"github.com/quant5-lab/runner/runtime/ta"
 	"github.com/quant5-lab/runner/runtime/value"
+	"github.com/quant5-lab/runner/runtime/visual"
 	"github.com/quant5-lab/runner/datafetcher"
 )
 
@@ -34,6 +35,7 @@ var (
 	_ = datafetcher.NewFileFetcher
 	_ = ta.Ema
 	_ = value.Nz
+	_ = visual.PineColorNew
 )
 
 /* CLI flags */

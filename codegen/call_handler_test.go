@@ -52,7 +52,14 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"ta.ema", 5, "TAIndicatorCallHandler"},
 		{"ta.crossover", 5, "TAIndicatorCallHandler"},
 		{"valuewhen", 5, "TAIndicatorCallHandler"},
-		{"unknown_function", 8, "UnknownFunctionHandler"},
+		{"color.new", 7, "ColorCallHandler"},
+		{"color.rgb", 7, "ColorCallHandler"},
+		{"color.from_gradient", 7, "ColorCallHandler"},
+		{"color.r", 7, "ColorCallHandler"},
+		{"color.g", 7, "ColorCallHandler"},
+		{"color.b", 7, "ColorCallHandler"},
+		{"color.t", 7, "ColorCallHandler"},
+		{"unknown_function", 9, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {

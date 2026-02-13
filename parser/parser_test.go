@@ -108,3 +108,30 @@ func TestParseNamedArguments(t *testing.T) {
 		t.Fatalf("Statements count = %d, want 1", len(script.Statements))
 	}
 }
+
+func TestParseHexColor8Digit(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"6-digit hex literal", `x = #FF5252`},
+		{"8-digit hex literal", `x = #FF525280`},
+		{"8-digit in function arg", `plot(close, color=#FF000080)`},
+		{"8-digit uppercase", `x = #AABBCCDD`},
+		{"8-digit lowercase", `x = #aabbccdd`},
+	}
+
+	p, err := NewParser()
+	if err != nil {
+		t.Fatalf("NewParser() error: %v", err)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := p.ParseString("test", tt.input)
+			if err != nil {
+				t.Errorf("Failed to parse %q: %v", tt.input, err)
+			}
+		})
+	}
+}

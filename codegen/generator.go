@@ -48,6 +48,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inputHandler = NewInputHandler()
 	gen.inputConstExtractor = NewInputConstantExtractor()
 	gen.mathHandler = NewMathHandler()
+	gen.colorHandler = NewColorHandler()
 	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
@@ -174,6 +175,7 @@ type generator struct {
 	inputHandler               *InputHandler
 	inputConstExtractor        *InputConstantExtractor
 	mathHandler                *MathHandler
+	colorHandler               *ColorHandler
 	valueHandler               *ValueHandler
 	subscriptResolver          *SubscriptResolver
 	builtinHandler             *BuiltinIdentifierHandler
@@ -220,6 +222,8 @@ func (g *generator) buildPlotOptions(opts PlotOptions) string {
 			if varType, exists := g.variables[ident.Name]; exists && varType == "string" {
 				optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %s", ident.Name))
 			}
+		} else if colorCode := g.evaluateColorCallExpression(opts.ColorExpr); colorCode != "" {
+			optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %s", colorCode))
 		}
 	}
 
@@ -305,10 +309,11 @@ func (g *generator) buildPlotOptionsWithNullColor(opts PlotOptions) string {
 	return "map[string]interface{}{\"color\": nil}"
 }
 
+/* color param must be a ready-to-embed Go expression (quoted literal or runtime call) */
 func (g *generator) buildPlotOptionsWithColor(opts PlotOptions, color string) string {
 	optionsMap := make([]string, 0)
 	if color != "" {
-		optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %q", color))
+		optionsMap = append(optionsMap, fmt.Sprintf("\"color\": %s", color))
 	}
 
 	if opts.OffsetExpr != nil {
@@ -350,15 +355,6 @@ func (g *generator) buildPlotOptionsWithColor(opts PlotOptions, color string) st
 	return "nil"
 }
 
-func (g *generator) extractColorLiteral(expr ast.Expression) string {
-	if lit, ok := expr.(*ast.Literal); ok {
-		if colorStr, ok := lit.Value.(string); ok {
-			return colorStr
-		}
-	}
-	return ""
-}
-
 func (g *generator) evaluateStringConstant(expr ast.Expression) string {
 	// Handle string literals
 	if lit, ok := expr.(*ast.Literal); ok {
@@ -372,6 +368,22 @@ func (g *generator) evaluateStringConstant(expr ast.Expression) string {
 		return strVal
 	}
 	return ""
+}
+
+func (g *generator) evaluateColorCallExpression(expr ast.Expression) string {
+	call, ok := expr.(*ast.CallExpression)
+	if !ok {
+		return ""
+	}
+	funcName := g.extractFunctionName(call.Callee)
+	if !g.colorHandler.CanHandle(funcName) {
+		return ""
+	}
+	code, err := g.colorHandler.GenerateColorCall(funcName, call.Arguments, g)
+	if err != nil {
+		return ""
+	}
+	return code
 }
 
 type taFunctionCall struct {
@@ -2012,6 +2024,17 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 		}
 		return "", fmt.Errorf("unsupported string member expression: %v", expr)
 
+	case *ast.CallExpression:
+		funcName := g.extractFunctionName(expr.Callee)
+		if g.colorHandler.CanHandle(funcName) {
+			colorCode, err := g.colorHandler.GenerateColorCall(funcName, expr.Arguments, g)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, colorCode), nil
+		}
+		return "", fmt.Errorf("unsupported call expression for string variable: %s", funcName)
+
 	default:
 		return "", fmt.Errorf("unsupported string variable init: %T", initExpr)
 	}
@@ -2069,6 +2092,13 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 			}
 		}
 		return "", fmt.Errorf("unsupported string member expression: %v", e)
+
+	case *ast.CallExpression:
+		funcName := g.extractFunctionName(e.Callee)
+		if g.colorHandler.CanHandle(funcName) {
+			return g.colorHandler.GenerateColorCall(funcName, e.Arguments, g)
+		}
+		return "", fmt.Errorf("unsupported call expression for string expression: %s", funcName)
 
 	default:
 		return "", fmt.Errorf("unsupported string expression: %T", expr)
@@ -2434,7 +2464,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 				if alternateIsNa {
 					code += g.ind() + fmt.Sprintf("if !(%s) {\n", testCode)
 					g.indent++
-					colorValue := g.extractColorLiteral(condExpr.Consequent)
+					colorValue := g.colorHandler.ResolveColorExpression(condExpr.Consequent, g)
 					optionsWithColor := g.buildPlotOptionsWithColor(opts, colorValue)
 					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, optionsWithColor)
 					g.indent--
@@ -2454,7 +2484,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 					g.indent--
 					code += g.ind() + "} else {\n"
 					g.indent++
-					colorValue := g.extractColorLiteral(condExpr.Alternate)
+					colorValue := g.colorHandler.ResolveColorExpression(condExpr.Alternate, g)
 					optionsWithColor := g.buildPlotOptionsWithColor(opts, colorValue)
 					code += g.ind() + fmt.Sprintf("collector.Add(%q, bar.Time, %s, %s)\n", opts.Title, plotExpr, optionsWithColor)
 					g.indent--
@@ -2489,7 +2519,14 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, nzCode), nil
 
 	default:
-		if g.mathHandler != nil && g.mathHandler.CanHandle(funcName) {
+		if g.colorHandler.CanHandle(funcName) {
+			colorCode, err := g.colorHandler.GenerateColorCall(funcName, call.Arguments, g)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, colorCode), nil
+		}
+		if g.mathHandler.CanHandle(funcName) {
 			mathCode, err := g.mathHandler.GenerateMathCall(funcName, call.Arguments, g)
 			if err != nil {
 				return "", err

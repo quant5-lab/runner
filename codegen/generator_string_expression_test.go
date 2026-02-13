@@ -263,6 +263,29 @@ func TestGenerateStringExpression_EdgeCases(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name: "color.new call expression succeeds",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "new"),
+				Arguments: []ast.Expression{
+					MemberExpr("color", "red"),
+					&ast.Literal{Value: float64(50)},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "color.rgb call expression succeeds",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "rgb"),
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(0)},
+				},
+			},
+			expectError: false,
+		},
+		{
 			name: "unsupported ta member expression",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "ta"},
@@ -288,6 +311,175 @@ func TestGenerateStringExpression_EdgeCases(t *testing.T) {
 	}
 }
 
+func TestGenerateStringExpression_ColorFunctionCalls(t *testing.T) {
+	tests := []struct {
+		name           string
+		expr           ast.Expression
+		expectContains []string
+	}{
+		{
+			name: "color.new produces runtime call",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "new"),
+				Arguments: []ast.Expression{
+					MemberExpr("color", "red"),
+					&ast.Literal{Value: float64(50)},
+				},
+			},
+			expectContains: []string{"visual.PineColorNew", "#FF5252"},
+		},
+		{
+			name: "color.rgb produces runtime call",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "rgb"),
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(255)},
+					&ast.Literal{Value: float64(128)},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(20)},
+				},
+			},
+			expectContains: []string{"visual.PineColorRGB", "255", "128", "20"},
+		},
+		{
+			name: "color.from_gradient produces runtime call",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "from_gradient"),
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "rsi"},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(100)},
+					MemberExpr("color", "red"),
+					MemberExpr("color", "green"),
+				},
+			},
+			expectContains: []string{"visual.PineColorFromGradient", "#FF5252", "#4CAF50"},
+		},
+		{
+			name: "color.new in ternary branches",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Identifier{Name: "open"},
+				},
+				Consequent: &ast.CallExpression{
+					Callee: MemberExpr("color", "new"),
+					Arguments: []ast.Expression{
+						MemberExpr("color", "lime"),
+						&ast.Literal{Value: float64(0)},
+					},
+				},
+				Alternate: &ast.CallExpression{
+					Callee: MemberExpr("color", "new"),
+					Arguments: []ast.Expression{
+						MemberExpr("color", "red"),
+						&ast.Literal{Value: float64(50)},
+					},
+				},
+			},
+			expectContains: []string{
+				"func() string {",
+				"visual.PineColorNew",
+				"#00E676",
+				"#FF5252",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringExpression(tt.expr)
+
+			if err != nil {
+				t.Fatalf("generateStringExpression() error = %v", err)
+			}
+
+			for _, expected := range tt.expectContains {
+				if !strings.Contains(result, expected) {
+					t.Errorf("result missing %q\nGot: %s", expected, result)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateStringVariableInit_ColorFunctionCalls(t *testing.T) {
+	tests := []struct {
+		name           string
+		expr           ast.Expression
+		expectContains []string
+	}{
+		{
+			name: "color.new assignment",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "new"),
+				Arguments: []ast.Expression{
+					MemberExpr("color", "blue"),
+					&ast.Literal{Value: float64(30)},
+				},
+			},
+			expectContains: []string{"myColor = visual.PineColorNew", "#2962FF"},
+		},
+		{
+			name: "color.rgb assignment",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "rgb"),
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: float64(100)},
+					&ast.Literal{Value: float64(200)},
+					&ast.Literal{Value: float64(50)},
+				},
+			},
+			expectContains: []string{"myColor = visual.PineColorRGB"},
+		},
+		{
+			name: "color.from_gradient assignment",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "from_gradient"),
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "rsi"},
+					&ast.Literal{Value: float64(0)},
+					&ast.Literal{Value: float64(100)},
+					MemberExpr("color", "red"),
+					MemberExpr("color", "green"),
+				},
+			},
+			expectContains: []string{"myColor = visual.PineColorFromGradient"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringVariableInit("myColor", tt.expr)
+
+			if err != nil {
+				t.Fatalf("generateStringVariableInit() error = %v", err)
+			}
+
+			for _, expected := range tt.expectContains {
+				if !strings.Contains(result, expected) {
+					t.Errorf("result missing %q\nGot: %s", expected, result)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateStringVariableInit_UnsupportedCallExpression(t *testing.T) {
+	gen := createStringExpressionTestGenerator()
+
+	_, err := gen.generateStringVariableInit("x", &ast.CallExpression{
+		Callee: MemberExpr("ta", "sma"),
+	})
+
+	if err == nil {
+		t.Error("expected error for non-color call expression in string variable init")
+	}
+}
+
 func createStringExpressionTestGenerator() *generator {
 	typeSystem := NewTypeInferenceEngine()
 	return &generator{
@@ -298,5 +490,7 @@ func createStringExpressionTestGenerator() *generator {
 		constEvaluator: validation.NewWarmupAnalyzer(),
 		boolConverter:  NewBooleanConverter(typeSystem),
 		typeSystem:     typeSystem,
+		colorHandler:   NewColorHandler(),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 }
