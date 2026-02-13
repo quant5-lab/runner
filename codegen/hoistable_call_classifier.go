@@ -64,7 +64,7 @@ func (c HoistableCallClassifier) shouldHoistTACall(call *ast.CallExpression, fun
 	}
 
 	if periodResult.IsRuntimeDynamic() {
-		return false
+		return SupportsDynamicPeriod(funcName)
 	}
 
 	return true

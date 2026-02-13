@@ -1,6 +1,4 @@
 //@version=5
-// TEST: Custom function as SMA period - FAILS (BLOCKER #18)
-// Error: "ta.sma period must be literal"
 indicator("Dynamic period: ta.sma(close, getPeriod())")
 getPeriod() => 14
 plot(ta.sma(close, getPeriod()))

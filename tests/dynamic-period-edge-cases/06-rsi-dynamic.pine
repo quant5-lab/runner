@@ -1,6 +1,4 @@
 //@version=5
-// TEST: RSI with dynamic period - FAILS (BLOCKER #18)
-// Error: "ta.rsi period must be literal"
 indicator("Dynamic period: ta.rsi(close, getPeriod())")
 getPeriod() => 14
 plot(ta.rsi(close, getPeriod()))

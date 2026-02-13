@@ -9,6 +9,7 @@ type InlineExpressionScanner struct {
 	variableInitFilter     *VariableInitCallFilter
 	conditionalArgAnalyzer *ConditionalArgumentAnalyzer
 	gen                    *generator
+	currentStmtIndex       int
 }
 
 func NewInlineExpressionScanner(g *generator) *InlineExpressionScanner {
@@ -29,7 +30,8 @@ func (s *InlineExpressionScanner) ScanProgram(program *ast.Program) []CallInfo {
 	var hoistable []CallInfo
 	callRegistry := make(map[*ast.CallExpression]bool)
 
-	for _, stmt := range program.Body {
+	for i, stmt := range program.Body {
+		s.currentStmtIndex = i
 		s.scanStatement(stmt, callRegistry, &hoistable)
 	}
 
@@ -87,6 +89,7 @@ func (s *InlineExpressionScanner) scanVariableDeclaration(decl *ast.VariableDecl
 		filtered := s.variableInitFilter.FilterHoistable(nestedCalls, declarator.Init)
 		for _, callInfo := range filtered {
 			if !registry[callInfo.Call] {
+				callInfo.StmtIndex = s.currentStmtIndex
 				*hoistable = append(*hoistable, callInfo)
 				registry[callInfo.Call] = true
 			}
@@ -167,9 +170,10 @@ func (s *InlineExpressionScanner) processCall(call *ast.CallExpression, registry
 		funcName := s.gen.extractFunctionName(call.Callee)
 
 		callInfo := CallInfo{
-			Call:     call,
-			FuncName: funcName,
-			ArgHash:  argHash,
+			Call:      call,
+			FuncName:  funcName,
+			ArgHash:   argHash,
+			StmtIndex: s.currentStmtIndex,
 		}
 
 		*hoistable = append(*hoistable, callInfo)
@@ -199,9 +203,10 @@ func (s *InlineExpressionScanner) processSumConditional(call *ast.CallExpression
 	argHash := hasher.Hash(condExpr)
 
 	callInfo := CallInfo{
-		FuncName: "ternary",
-		Call:     call,
-		ArgHash:  argHash,
+		FuncName:  "ternary",
+		Call:      call,
+		ArgHash:   argHash,
+		StmtIndex: s.currentStmtIndex,
 	}
 
 	*hoistable = append(*hoistable, callInfo)

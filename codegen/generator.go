@@ -784,18 +784,18 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += "\n"
 
-	/* Generate hoisted TA calculations (InlineExpressionScanner registrations) */
-	tempVarCalcs, err := g.tempVarMgr.GenerateCalculations()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate temp var calculations: %w", err)
-	}
-	if tempVarCalcs != "" {
-		code += tempVarCalcs
-		code += "\n"
-	}
-
+	/* Interleaved emission — period .Set() must precede .Get(0) within the same bar */
 	statementCounter.Reset()
-	for _, stmt := range program.Body {
+	for stmtIdx, stmt := range program.Body {
+		stmtCalcs, err := g.tempVarMgr.GenerateCalculationsForStatement(stmtIdx)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate temp var calculations for statement %d: %w", stmtIdx, err)
+		}
+		if stmtCalcs != "" {
+			code += stmtCalcs
+			code += "\n"
+		}
+
 		if err := statementCounter.Increment(); err != nil {
 			return "", err
 		}

@@ -1024,3 +1024,252 @@ func TestInlineExpressionScanner_VariableDeclarationWithTernaryTA(t *testing.T) 
 		t.Error("Expected ta.ema in ternary alternate to be hoistable")
 	}
 }
+
+/* Validates StmtIndex tracks top-level statement index through all container types */
+func TestInlineExpressionScanner_StatementIndexing(t *testing.T) {
+	makeTACall := func(fnName string) *ast.CallExpression {
+		parts := splitDot(fnName)
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: parts[0]},
+				Property: &ast.Identifier{Name: parts[1]},
+			},
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Literal{Value: float64(14)},
+			},
+		}
+	}
+
+	wrapInPlot := func(inner ast.Expression) *ast.ExpressionStatement {
+		return &ast.ExpressionStatement{
+			Expression: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "plot"},
+				Arguments: []ast.Expression{inner},
+			},
+		}
+	}
+
+	spacer := func() *ast.VariableDeclaration {
+		return &ast.VariableDeclaration{
+			Declarations: []ast.VariableDeclarator{
+				{ID: &ast.Identifier{Name: "spacer"}, Init: &ast.Literal{Value: 1}},
+			},
+		}
+	}
+
+	tests := []struct {
+		name            string
+		body            []ast.Node
+		expectedCount   int
+		expectedIndices []int // one per hoistable, in order
+	}{
+		{
+			name:            "single expression at index 0",
+			body:            []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+			expectedCount:   1,
+			expectedIndices: []int{0},
+		},
+		{
+			name: "preceded by non-TA statements",
+			body: []ast.Node{
+				spacer(), spacer(), wrapInPlot(makeTACall("ta.sma")),
+			},
+			expectedCount:   1,
+			expectedIndices: []int{2},
+		},
+		{
+			name: "multiple TA in separate statements get sequential indices",
+			body: []ast.Node{
+				spacer(),
+				wrapInPlot(makeTACall("ta.sma")),
+				wrapInPlot(makeTACall("ta.ema")),
+			},
+			expectedCount:   2,
+			expectedIndices: []int{1, 2},
+		},
+		{
+			name: "TA nested in if-consequent inherits enclosing index",
+			body: []ast.Node{
+				spacer(),
+				&ast.IfStatement{
+					Test:       &ast.Literal{Value: true},
+					Consequent: []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{1},
+		},
+		{
+			name: "TA nested in if-alternate inherits enclosing index",
+			body: []ast.Node{
+				spacer(), spacer(),
+				&ast.IfStatement{
+					Test:       &ast.Literal{Value: true},
+					Consequent: []ast.Node{},
+					Alternate:  []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{2},
+		},
+		{
+			name: "TA in if-condition gets the if-statement index",
+			body: []ast.Node{
+				spacer(),
+				&ast.IfStatement{
+					Test: &ast.BinaryExpression{
+						Left: makeTACall("ta.sma"), Operator: ">",
+						Right: &ast.Literal{Value: float64(0)},
+					},
+					Consequent: []ast.Node{},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{1},
+		},
+		{
+			name: "TA nested in for-body inherits enclosing index",
+			body: []ast.Node{
+				spacer(), spacer(),
+				&ast.ForStatement{
+					Counter: "i",
+					From:    &ast.Literal{Value: float64(0)},
+					To:      &ast.Literal{Value: float64(10)},
+					Body:    []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{2},
+		},
+		{
+			name: "TA nested in for-in body inherits enclosing index",
+			body: []ast.Node{
+				&ast.ForInStatement{
+					ElementVar: "val",
+					Collection: &ast.Identifier{Name: "arr"},
+					Body:       []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{0},
+		},
+		{
+			name: "TA nested in while-body inherits enclosing index",
+			body: []ast.Node{
+				spacer(),
+				&ast.WhileStatement{
+					Condition: &ast.Literal{Value: true},
+					Body:      []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{1},
+		},
+		{
+			name: "TA in while-condition gets the while-statement index",
+			body: []ast.Node{
+				spacer(), spacer(),
+				&ast.WhileStatement{
+					Condition: &ast.BinaryExpression{
+						Left: makeTACall("ta.sma"), Operator: ">",
+						Right: &ast.Literal{Value: float64(0)},
+					},
+					Body: []ast.Node{},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{2},
+		},
+		{
+			name: "deeply nested: for inside if still inherits top-level index",
+			body: []ast.Node{
+				spacer(),
+				&ast.IfStatement{
+					Test: &ast.Literal{Value: true},
+					Consequent: []ast.Node{
+						&ast.ForStatement{
+							Counter: "j",
+							From:    &ast.Literal{Value: float64(0)},
+							To:      &ast.Literal{Value: float64(5)},
+							Body:    []ast.Node{wrapInPlot(makeTACall("ta.sma"))},
+						},
+					},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{1},
+		},
+		{
+			name: "multiple TA in same statement share same index",
+			body: []ast.Node{
+				spacer(),
+				&ast.ExpressionStatement{
+					Expression: &ast.CallExpression{
+						Callee: &ast.Identifier{Name: "plot"},
+						Arguments: []ast.Expression{
+							&ast.BinaryExpression{
+								Operator: "+",
+								Left:     makeTACall("ta.sma"),
+								Right:    makeTACall("ta.ema"),
+							},
+						},
+					},
+				},
+			},
+			expectedCount:   2,
+			expectedIndices: []int{1, 1},
+		},
+		{
+			name: "variable declaration init carries enclosing statement index",
+			body: []ast.Node{
+				spacer(), spacer(),
+				&ast.VariableDeclaration{
+					Kind: "var",
+					Declarations: []ast.VariableDeclarator{
+						{
+							ID: &ast.Identifier{Name: "z"},
+							Init: &ast.BinaryExpression{
+								Operator: "+",
+								Left:     makeTACall("ta.sma"),
+								Right:    &ast.Literal{Value: float64(1)},
+							},
+						},
+					},
+				},
+			},
+			expectedCount:   1,
+			expectedIndices: []int{2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+			scanner := NewInlineExpressionScanner(gen)
+			program := &ast.Program{Body: tt.body}
+
+			hoistable := scanner.ScanProgram(program)
+
+			if len(hoistable) != tt.expectedCount {
+				t.Fatalf("got %d hoistable calls, want %d", len(hoistable), tt.expectedCount)
+			}
+			for i, want := range tt.expectedIndices {
+				if hoistable[i].StmtIndex != want {
+					t.Errorf("hoistable[%d].StmtIndex = %d, want %d (func=%s)",
+						i, hoistable[i].StmtIndex, want, hoistable[i].FuncName)
+				}
+			}
+		})
+	}
+}
+
+// splitDot splits "a.b" into [2]string{"a","b"}.
+func splitDot(s string) [2]string {
+	for i, c := range s {
+		if c == '.' {
+			return [2]string{s[:i], s[i+1:]}
+		}
+	}
+	return [2]string{s, ""}
+}

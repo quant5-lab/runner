@@ -441,3 +441,76 @@ func TestHoistableCallClassifier_NilTAFunctionRegistry(t *testing.T) {
 		})
 	}
 }
+
+/* Dynamic period must only hoist functions with codegen support — others silently miscompile */
+func TestHoistableCallClassifier_PeriodTypeHoistability(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	closeSrc := &ast.Identifier{Name: "close"}
+	literalPeriod := &ast.Literal{Value: float64(14)}
+	dynamicPeriod := &ast.Identifier{Name: "dynamicLength"}
+	binaryDynamic := &ast.BinaryExpression{
+		Left:     &ast.Identifier{Name: "baseLen"},
+		Operator: "*",
+		Right:    &ast.Literal{Value: float64(2)},
+	}
+
+	makeTACall := func(prop string, args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: prop},
+			},
+			Arguments: args,
+		}
+	}
+
+	makeBareCall := func(name string, args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee:    &ast.Identifier{Name: name},
+			Arguments: args,
+		}
+	}
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		expected bool
+	}{
+		/* Dynamic-period-supported functions: hoistable with any period form */
+		{"ta.sma literal period", makeTACall("sma", closeSrc, literalPeriod), true},
+		{"ta.sma dynamic identifier", makeTACall("sma", closeSrc, dynamicPeriod), true},
+		{"ta.sma dynamic binary expr", makeTACall("sma", closeSrc, binaryDynamic), true},
+		{"ta.ema dynamic period", makeTACall("ema", closeSrc, dynamicPeriod), true},
+		{"ta.rsi dynamic period", makeTACall("rsi", closeSrc, dynamicPeriod), true},
+		{"ta.stdev dynamic period", makeTACall("stdev", closeSrc, dynamicPeriod), true},
+		{"ta.highest dynamic period", makeTACall("highest", closeSrc, dynamicPeriod), true},
+		{"ta.lowest dynamic period", makeTACall("lowest", closeSrc, dynamicPeriod), true},
+
+		/* ATR special case: single argument period extraction */
+		{"ta.atr single dynamic arg", makeTACall("atr", dynamicPeriod), true},
+		{"ta.atr single literal arg", makeTACall("atr", literalPeriod), true},
+
+		/* Unsupported dynamic period: literal ok, dynamic blocked */
+		{"ta.wma literal period", makeTACall("wma", closeSrc, literalPeriod), true},
+		{"ta.wma dynamic period", makeTACall("wma", closeSrc, dynamicPeriod), false},
+		{"ta.rma dynamic period", makeTACall("rma", closeSrc, dynamicPeriod), false},
+		{"ta.linreg dynamic period", makeTACall("linreg", closeSrc, dynamicPeriod), false},
+		{"ta.sum dynamic period", makeTACall("sum", closeSrc, dynamicPeriod), false},
+
+		/* Bare form parity with namespaced */
+		{"bare sma dynamic period", makeBareCall("sma", closeSrc, dynamicPeriod), true},
+		{"bare ema dynamic period", makeBareCall("ema", closeSrc, dynamicPeriod), true},
+		{"bare wma dynamic period", makeBareCall("wma", closeSrc, dynamicPeriod), false},
+		{"bare rma dynamic period", makeBareCall("rma", closeSrc, dynamicPeriod), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := classifier.IsHoistable(tt.call); result != tt.expected {
+				t.Errorf("IsHoistable() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}

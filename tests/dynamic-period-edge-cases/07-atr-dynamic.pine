@@ -1,6 +1,4 @@
 //@version=5
-// TEST: ATR with dynamic period - FAILS (BLOCKER #18)
-// Error: "ta.atr period must be literal"
 indicator("Dynamic period: ta.atr(getPeriod())")
 getPeriod() => 14
 plot(ta.atr(getPeriod()))

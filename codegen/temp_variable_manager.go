@@ -227,19 +227,52 @@ func (m *TempVariableManager) GenerateCalculations() (string, error) {
 	code := ""
 
 	for _, varName := range m.orderedVars {
-		info, exists := m.varToCallInfo[varName]
-		if !exists {
-			continue
-		}
-		// Use TAFunctionRegistry to generate inline calculation
-		calcCode, err := m.gen.generateVariableFromCall(varName, info.Call)
+		calcCode, err := m.generateCalculationForVar(varName)
 		if err != nil {
-			return "", fmt.Errorf("failed to generate temp var %s: %w", varName, err)
+			return "", err
 		}
 		code += calcCode
 	}
 
 	return code, nil
+}
+
+func (m *TempVariableManager) GenerateCalculationsForStatement(stmtIdx int) (string, error) {
+	if len(m.orderedVars) == 0 {
+		return "", nil
+	}
+
+	if m.gen == nil {
+		return "", fmt.Errorf("generator context required for calculations")
+	}
+
+	code := ""
+
+	for _, varName := range m.orderedVars {
+		info, exists := m.varToCallInfo[varName]
+		if !exists || info.StmtIndex != stmtIdx {
+			continue
+		}
+		calcCode, err := m.generateCalculationForVar(varName)
+		if err != nil {
+			return "", err
+		}
+		code += calcCode
+	}
+
+	return code, nil
+}
+
+func (m *TempVariableManager) generateCalculationForVar(varName string) (string, error) {
+	info, exists := m.varToCallInfo[varName]
+	if !exists {
+		return "", nil
+	}
+	calcCode, err := m.gen.generateVariableFromCall(varName, info.Call)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp var %s: %w", varName, err)
+	}
+	return calcCode, nil
 }
 
 // GenerateNextCalls outputs .Next() calls for bar advancement (ForwardSeriesBuffer paradigm)

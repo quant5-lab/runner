@@ -47,6 +47,23 @@ func (g *DynamicPeriodTAGenerator) renderPeriodExpression(expr ast.Expression) s
 	}
 }
 
+type dynamicPeriodHandler func(
+	g *DynamicPeriodTAGenerator, varName string, sourceExpr ast.Expression, periodResult PeriodEvaluationResult,
+) string
+
+/* Single source of truth — do not duplicate this list */
+var dynamicPeriodDispatch = map[string]dynamicPeriodHandler{
+	"ta.sma":     (*DynamicPeriodTAGenerator).generateDynamicSMA,
+	"ta.ema":     (*DynamicPeriodTAGenerator).generateDynamicEMA,
+	"ta.rsi":     (*DynamicPeriodTAGenerator).generateDynamicRSI,
+	"ta.stdev":   (*DynamicPeriodTAGenerator).generateDynamicSTDEV,
+	"ta.highest": (*DynamicPeriodTAGenerator).generateDynamicHighest,
+	"ta.lowest":  (*DynamicPeriodTAGenerator).generateDynamicLowest,
+	"ta.atr": func(g *DynamicPeriodTAGenerator, varName string, _ ast.Expression, periodResult PeriodEvaluationResult) string {
+		return g.generateDynamicATR(varName, periodResult)
+	},
+}
+
 func (g *DynamicPeriodTAGenerator) Generate(
 	varName string,
 	functionName string,
@@ -57,24 +74,11 @@ func (g *DynamicPeriodTAGenerator) Generate(
 		return "", nil
 	}
 
-	switch functionName {
-	case "ta.sma":
-		return g.generateDynamicSMA(varName, sourceExpr, periodResult), nil
-	case "ta.ema":
-		return g.generateDynamicEMA(varName, sourceExpr, periodResult), nil
-	case "ta.rsi":
-		return g.generateDynamicRSI(varName, sourceExpr, periodResult), nil
-	case "ta.atr":
-		return g.generateDynamicATR(varName, periodResult), nil
-	case "ta.stdev":
-		return g.generateDynamicSTDEV(varName, sourceExpr, periodResult), nil
-	case "ta.highest":
-		return g.generateDynamicHighest(varName, sourceExpr, periodResult), nil
-	case "ta.lowest":
-		return g.generateDynamicLowest(varName, sourceExpr, periodResult), nil
-	default:
+	handler, ok := dynamicPeriodDispatch[functionName]
+	if !ok {
 		return "", fmt.Errorf("%s does not support runtime dynamic periods", functionName)
 	}
+	return handler(g, varName, sourceExpr, periodResult), nil
 }
 
 func (g *DynamicPeriodTAGenerator) generateDynamicSMA(
