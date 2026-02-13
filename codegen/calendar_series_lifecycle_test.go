@@ -35,7 +35,6 @@ func TestCalendarSeriesLifecycle(t *testing.T) {
 			methods := map[string]string{
 				"declarations":    lifecycle.GenerateDeclarations("\t"),
 				"initializations": lifecycle.GenerateInitializations("\t"),
-				"timezone":        lifecycle.GenerateTimezoneSetup("\t"),
 				"bar population":  lifecycle.GenerateBarPopulation("\t"),
 				"advancement":     lifecycle.GenerateAdvancement("\t", "i"),
 				"registrations":   lifecycle.GenerateRegistrations("\t"),
@@ -75,19 +74,6 @@ func TestCalendarSeriesLifecycle_CodeContent(t *testing.T) {
 		for _, s := range []string{"dayofweekSeries = series.NewSeries(len(ctx.Data))", "hourSeries = series.NewSeries(len(ctx.Data))"} {
 			if !strings.Contains(code, s) {
 				t.Errorf("missing %q in:\n%s", s, code)
-			}
-		}
-	})
-
-	t.Run("timezone setup", func(t *testing.T) {
-		code := lifecycle.GenerateTimezoneSetup("\t")
-		for _, required := range []string{
-			"exchangeLoc",
-			"time.LoadLocation(ctx.Timezone)",
-			"panic(",
-		} {
-			if !strings.Contains(code, required) {
-				t.Errorf("missing %q in:\n%s", required, code)
 			}
 		}
 	})
@@ -164,7 +150,6 @@ func TestCalendarSeriesLifecycle_NilReceiver(t *testing.T) {
 	nilSafeMethods := map[string]string{
 		"declarations":    lifecycle.GenerateDeclarations("\t"),
 		"initializations": lifecycle.GenerateInitializations("\t"),
-		"timezone":        lifecycle.GenerateTimezoneSetup("\t"),
 		"bar population":  lifecycle.GenerateBarPopulation("\t"),
 		"advancement":     lifecycle.GenerateAdvancement("\t", "i"),
 		"registrations":   lifecycle.GenerateRegistrations("\t"),

@@ -3,7 +3,8 @@ package codegen
 import "github.com/quant5-lab/runner/ast"
 
 type BuiltinUsageDetector struct {
-	targetNames map[string]bool
+	targetNames       map[string]bool
+	targetMemberExprs map[string]bool
 }
 
 func NewBuiltinUsageDetector(names []string) *BuiltinUsageDetector {
@@ -12,6 +13,19 @@ func NewBuiltinUsageDetector(names []string) *BuiltinUsageDetector {
 		targets[n] = true
 	}
 	return &BuiltinUsageDetector{targetNames: targets}
+}
+
+/* memberKeys use "obj.prop" format (e.g., "session.isfirstbar") */
+func NewBuiltinUsageDetectorWithMembers(names []string, memberKeys []string) *BuiltinUsageDetector {
+	targets := make(map[string]bool, len(names))
+	for _, n := range names {
+		targets[n] = true
+	}
+	members := make(map[string]bool, len(memberKeys))
+	for _, m := range memberKeys {
+		members[m] = true
+	}
+	return &BuiltinUsageDetector{targetNames: targets, targetMemberExprs: members}
 }
 
 func (d *BuiltinUsageDetector) Detect(program *ast.Program) map[string]bool {
@@ -73,8 +87,27 @@ func (d *BuiltinUsageDetector) scanExpression(expr ast.Expression, found map[str
 			found[e.Name] = true
 		}
 	case *ast.MemberExpression:
-		if ident, ok := e.Object.(*ast.Identifier); ok && d.targetNames[ident.Name] {
-			found[ident.Name] = true
+		if ident, ok := e.Object.(*ast.Identifier); ok {
+			if d.targetNames[ident.Name] {
+				found[ident.Name] = true
+			}
+			if prop, propOk := e.Property.(*ast.Identifier); propOk && d.targetMemberExprs != nil {
+				key := ident.Name + "." + prop.Name
+				if d.targetMemberExprs[key] {
+					found[key] = true
+				}
+			}
+		}
+		/* Handle subscript of member expression: session.isfirstbar[1] */
+		if innerMember, ok := e.Object.(*ast.MemberExpression); ok && e.Computed {
+			if innerObj, objOk := innerMember.Object.(*ast.Identifier); objOk {
+				if innerProp, propOk := innerMember.Property.(*ast.Identifier); propOk && d.targetMemberExprs != nil {
+					key := innerObj.Name + "." + innerProp.Name
+					if d.targetMemberExprs[key] {
+						found[key] = true
+					}
+				}
+			}
 		}
 		d.scanExpression(e.Object, found)
 		d.scanExpression(e.Property, found)

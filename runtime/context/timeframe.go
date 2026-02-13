@@ -26,6 +26,13 @@ func TimeframeToSeconds(tf string) int64 {
 	return timeframeConverter.ToSeconds(tf)
 }
 
+/* TimeframeMultiplier extracts numeric multiplier from Pine timeframe string
+ * Examples: "5m" → 5, "1D" → 1, "4h" → 4, "1M" → 1
+ */
+func TimeframeMultiplier(tf string) int64 {
+	return timeframeConverter.extractNumericPart(tf)
+}
+
 /* AlignTimestampToTimeframe rounds timestamp down to timeframe boundary
  * Example: 2024-01-01 14:30:00 aligned to 1D → 2024-01-01 00:00:00
  */

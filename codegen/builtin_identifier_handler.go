@@ -75,8 +75,16 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return "float64(i)"
 	case "time":
 		return "float64(bar.Time * 1000)"
+	case "time_close":
+		return "time_closeSeries.GetCurrent()"
+	case "time_tradingday":
+		return "time_tradingdaySeries.GetCurrent()"
 	case "last_bar_index":
 		return "last_bar_index"
+	case "last_bar_time":
+		return "last_bar_time"
+	case "timenow":
+		return "timenow"
 	default:
 		return ""
 	}
@@ -112,8 +120,16 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return "float64(ctx.BarIndex)"
 	case "time":
 		return "timeSeries.GetCurrent()"
+	case "time_close":
+		return "time_closeSeries.GetCurrent()"
+	case "time_tradingday":
+		return "time_tradingdaySeries.GetCurrent()"
 	case "last_bar_index":
 		return "last_bar_index"
+	case "last_bar_time":
+		return "last_bar_time"
+	case "timenow":
+		return "timenow"
 	default:
 		return ""
 	}
@@ -142,8 +158,24 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		return fmt.Sprintf("timeSeries.Get(%d)", offset)
 	}
 
+	if name == "time_close" {
+		return fmt.Sprintf("time_closeSeries.Get(%d)", offset)
+	}
+
+	if name == "time_tradingday" {
+		return fmt.Sprintf("time_tradingdaySeries.Get(%d)", offset)
+	}
+
 	if name == "last_bar_index" {
 		return "last_bar_index"
+	}
+
+	if name == "last_bar_time" {
+		return "last_bar_time"
+	}
+
+	if name == "timenow" {
+		return "timenow"
 	}
 
 	field := ""
@@ -270,6 +302,18 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 				offset := h.extractOffset(expr.Property)
 				return h.generateHistoricalTrueRange(offset), true
 			}
+
+			if baseOk && basePropOk {
+				key := baseObj.Name + "." + baseProp.Name
+				if h.registry.IsSessionSeriesBuiltin(key) {
+					offset := h.extractOffset(expr.Property)
+					seriesName := h.sessionSeriesName(key)
+					if offset == 0 {
+						return fmt.Sprintf("%s.GetCurrent() == 1.0", seriesName), true
+					}
+					return fmt.Sprintf("%s.Get(%d) == 1.0", seriesName, offset), true
+				}
+			}
 		}
 		return "", false
 	}
@@ -316,6 +360,24 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 	return "", false
 }
 
+/* Type-only resolution for callers needing coercion without full code generation */
+func (h *BuiltinIdentifierHandler) ResolveMemberExpressionGoType(expr *ast.MemberExpression) (GoValueType, bool) {
+	obj, okObj := expr.Object.(*ast.Identifier)
+	if !okObj {
+		return GoFloat64, false
+	}
+	prop, okProp := expr.Property.(*ast.Identifier)
+	if !okProp {
+		return GoFloat64, false
+	}
+	if h.namespaceResolver != nil {
+		if resolution, found := h.namespaceResolver.Resolve(obj.Name, prop.Name); found {
+			return resolution.GoType, true
+		}
+	}
+	return GoFloat64, false
+}
+
 func (h *BuiltinIdentifierHandler) extractOffset(expr ast.Expression) int {
 	lit, ok := expr.(*ast.Literal)
 	if !ok {
@@ -330,6 +392,19 @@ func (h *BuiltinIdentifierHandler) extractOffset(expr ast.Expression) int {
 	default:
 		return 0
 	}
+}
+
+func (h *BuiltinIdentifierHandler) sessionSeriesName(key string) string {
+	nameMap := map[string]string{
+		"session.isfirstbar":         "session_isfirstbarSeries",
+		"session.islastbar":          "session_islastbarSeries",
+		"session.isfirstbar_regular": "session_isfirstbar_regularSeries",
+		"session.islastbar_regular":  "session_islastbar_regularSeries",
+	}
+	if name, ok := nameMap[key]; ok {
+		return name
+	}
+	return ""
 }
 
 func (h *BuiltinIdentifierHandler) generateTrueRangeCalculation(barAccessor string) string {

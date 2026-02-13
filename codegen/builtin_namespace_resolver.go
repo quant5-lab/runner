@@ -2,7 +2,7 @@ package codegen
 
 type NamespaceResolution struct {
 	Code   string
-	IsBool bool
+	GoType GoValueType
 }
 
 type BuiltinNamespaceResolver struct {
@@ -16,6 +16,11 @@ func NewBuiltinNamespaceResolver() *BuiltinNamespaceResolver {
 		"timeframe": r.resolveTimeframe,
 		"syminfo":   r.resolveSyminfo,
 		"dayofweek": r.resolveDayOfWeek,
+		"session":   r.resolveSession,
+		"chart":     r.resolveChart,
+		"dividends": r.resolveDividends,
+		"earnings":  r.resolveEarnings,
+		"math":      r.resolveMath,
 	}
 	return r
 }
@@ -35,17 +40,19 @@ func (r *BuiltinNamespaceResolver) IsNamespace(obj string) bool {
 func (r *BuiltinNamespaceResolver) resolveBarState(prop string) (NamespaceResolution, bool) {
 	switch prop {
 	case "isfirst":
-		return NamespaceResolution{Code: "(ctx.BarIndex == 0)", IsBool: true}, true
+		return NamespaceResolution{Code: "(ctx.BarIndex == 0)", GoType: GoBool}, true
 	case "islast":
-		return NamespaceResolution{Code: "(ctx.BarIndex == len(ctx.Data)-1)", IsBool: true}, true
+		return NamespaceResolution{Code: "(ctx.BarIndex == len(ctx.Data)-1)", GoType: GoBool}, true
 	case "ishistory":
-		return NamespaceResolution{Code: "true", IsBool: true}, true
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
 	case "isrealtime":
-		return NamespaceResolution{Code: "false", IsBool: true}, true
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
 	case "isnew":
-		return NamespaceResolution{Code: "true", IsBool: true}, true
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
 	case "isconfirmed":
-		return NamespaceResolution{Code: "true", IsBool: true}, true
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
+	case "islastconfirmedhistory":
+		return NamespaceResolution{Code: "(ctx.BarIndex == len(ctx.Data)-1)", GoType: GoBool}, true
 	default:
 		return NamespaceResolution{}, false
 	}
@@ -54,15 +61,25 @@ func (r *BuiltinNamespaceResolver) resolveBarState(prop string) (NamespaceResolu
 func (r *BuiltinNamespaceResolver) resolveTimeframe(prop string) (NamespaceResolution, bool) {
 	switch prop {
 	case "ismonthly":
-		return NamespaceResolution{Code: "ctx.IsMonthly", IsBool: true}, true
+		return NamespaceResolution{Code: "ctx.IsMonthly", GoType: GoBool}, true
 	case "isdaily":
-		return NamespaceResolution{Code: "ctx.IsDaily", IsBool: true}, true
+		return NamespaceResolution{Code: "ctx.IsDaily", GoType: GoBool}, true
 	case "isweekly":
-		return NamespaceResolution{Code: "ctx.IsWeekly", IsBool: true}, true
+		return NamespaceResolution{Code: "ctx.IsWeekly", GoType: GoBool}, true
 	case "isintraday":
-		return NamespaceResolution{Code: "ctx.IsIntraday", IsBool: true}, true
+		return NamespaceResolution{Code: "ctx.IsIntraday", GoType: GoBool}, true
+	case "isdwm":
+		return NamespaceResolution{Code: "(ctx.IsDaily || ctx.IsWeekly || ctx.IsMonthly)", GoType: GoBool}, true
+	case "isminutes":
+		return NamespaceResolution{Code: "ctx.IsIntraday", GoType: GoBool}, true
+	case "isseconds":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "isticks":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "multiplier":
+		return NamespaceResolution{Code: "float64(context.TimeframeMultiplier(ctx.Timeframe))"}, true
 	case "period":
-		return NamespaceResolution{Code: "ctx.Timeframe"}, true
+		return NamespaceResolution{Code: "ctx.Timeframe", GoType: GoString}, true
 	default:
 		return NamespaceResolution{}, false
 	}
@@ -71,9 +88,27 @@ func (r *BuiltinNamespaceResolver) resolveTimeframe(prop string) (NamespaceResol
 func (r *BuiltinNamespaceResolver) resolveSyminfo(prop string) (NamespaceResolution, bool) {
 	switch prop {
 	case "tickerid", "ticker":
-		return NamespaceResolution{Code: "syminfo_tickerid"}, true
+		return NamespaceResolution{Code: "syminfo_tickerid", GoType: GoString}, true
 	case "timezone":
-		return NamespaceResolution{Code: "ctx.Timezone"}, true
+		return NamespaceResolution{Code: "ctx.Timezone", GoType: GoString}, true
+	case "type":
+		return NamespaceResolution{Code: `"stock"`, GoType: GoString}, true
+	case "prefix":
+		return NamespaceResolution{Code: `""`, GoType: GoString}, true
+	case "session":
+		return NamespaceResolution{Code: `"regular"`, GoType: GoString}, true
+	case "currency":
+		return NamespaceResolution{Code: `"USD"`, GoType: GoString}, true
+	case "basecurrency":
+		return NamespaceResolution{Code: `""`, GoType: GoString}, true
+	case "description":
+		return NamespaceResolution{Code: "syminfo_tickerid", GoType: GoString}, true
+	case "pointvalue":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "mintick":
+		return NamespaceResolution{Code: "0.01"}, true
+	case "volumetype":
+		return NamespaceResolution{Code: `"base"`, GoType: GoString}, true
 	default:
 		return NamespaceResolution{}, false
 	}
@@ -95,6 +130,89 @@ func (r *BuiltinNamespaceResolver) resolveDayOfWeek(prop string) (NamespaceResol
 		return NamespaceResolution{Code: "6.0"}, true
 	case "saturday":
 		return NamespaceResolution{Code: "7.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveSession(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "ismarket":
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
+	case "ispremarket":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "ispostmarket":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "isfirstbar":
+		return NamespaceResolution{Code: "session_isfirstbarSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+	case "islastbar":
+		return NamespaceResolution{Code: "session_islastbarSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+	case "isfirstbar_regular":
+		return NamespaceResolution{Code: "session_isfirstbar_regularSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+	case "islastbar_regular":
+		return NamespaceResolution{Code: "session_islastbar_regularSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveChart(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "is_standard":
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
+	case "is_heikinashi":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "is_kagi":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "is_linebreak":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "is_pnf":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "is_range":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "is_renko":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "bg_color":
+		return NamespaceResolution{Code: `"#FFFFFF"`, GoType: GoString}, true
+	case "fg_color":
+		return NamespaceResolution{Code: `"#000000"`, GoType: GoString}, true
+	case "left_visible_bar_time":
+		return NamespaceResolution{Code: "float64(ctx.Data[0].Time * 1000)"}, true
+	case "right_visible_bar_time":
+		return NamespaceResolution{Code: "float64(ctx.Data[len(ctx.Data)-1].Time * 1000)"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveDividends(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "future_amount", "future_ex_date", "future_pay_date":
+		return NamespaceResolution{Code: "math.NaN()"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveEarnings(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "future_eps", "future_period_end_time", "future_revenue", "future_time":
+		return NamespaceResolution{Code: "math.NaN()"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveMath(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "pi":
+		return NamespaceResolution{Code: "math.Pi"}, true
+	case "e":
+		return NamespaceResolution{Code: "math.E"}, true
+	case "phi":
+		return NamespaceResolution{Code: "1.618033988749895"}, true
+	case "rphi":
+		return NamespaceResolution{Code: "0.618033988749895"}, true
 	default:
 		return NamespaceResolution{}, false
 	}

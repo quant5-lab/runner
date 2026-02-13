@@ -25,6 +25,8 @@ func TestBuiltinIdentifierRegistry_IsBuiltinSeriesIdentifier(t *testing.T) {
 		{"ohlc4 is builtin", "ohlc4", true},
 		{"hlcc4 is builtin", "hlcc4", true},
 		{"time is builtin", "time", true},
+		{"time_close is builtin", "time_close", true},
+		{"time_tradingday is builtin", "time_tradingday", true},
 		{"user_var not builtin", "user_var", false},
 		{"CLOSE uppercase not builtin", "CLOSE", false},
 		{"TIME uppercase not builtin", "TIME", false},
@@ -112,6 +114,7 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
 
 	allBuiltins := []string{"close", "open", "high", "low", "volume", "tr", "bar_index", "hl2", "hlc3", "ohlc4", "hlcc4", "time",
+		"time_close", "time_tradingday",
 		"dayofweek", "dayofmonth", "hour", "minute", "month", "second", "year", "weekofyear"}
 
 	for _, builtin := range allBuiltins {
@@ -157,6 +160,8 @@ func TestBuiltinIdentifierRegistry_IsTimeSeriesBuiltin(t *testing.T) {
 		expected bool
 	}{
 		{"time is time-series", "time", true},
+		{"time_close is time-series", "time_close", true},
+		{"time_tradingday is time-series", "time_tradingday", true},
 		{"close not time-series", "close", false},
 		{"bar_index not time-series", "bar_index", false},
 		{"hl2 not time-series", "hl2", false},
@@ -274,9 +279,12 @@ func TestBuiltinIdentifierRegistry_IsConstantBuiltin(t *testing.T) {
 		expected bool
 	}{
 		{"last_bar_index is constant", "last_bar_index", true},
+		{"last_bar_time is constant", "last_bar_time", true},
+		{"timenow is constant", "timenow", true},
 		{"close not constant", "close", false},
 		{"dayofweek not constant", "dayofweek", false},
 		{"bar_index not constant", "bar_index", false},
+		{"time_close not constant", "time_close", false},
 		{"empty string", "", false},
 		{"unknown", "unknown", false},
 	}

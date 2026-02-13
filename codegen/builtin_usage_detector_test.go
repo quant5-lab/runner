@@ -310,3 +310,216 @@ func TestBuiltinUsageDetector_NilProgram(t *testing.T) {
 		t.Error("nil program should return nil")
 	}
 }
+
+func TestBuiltinUsageDetector_MemberExpressions(t *testing.T) {
+	tests := []struct {
+		name       string
+		members    []string
+		program    *ast.Program
+		wantFound  []string
+		wantAbsent []string
+	}{
+		{
+			name:    "session.isfirstbar in expression",
+			members: []string{"session.isfirstbar", "session.islastbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "session"},
+							Property: &ast.Identifier{Name: "isfirstbar"},
+						},
+					},
+				},
+			},
+			wantFound:  []string{"session.isfirstbar"},
+			wantAbsent: []string{"session.islastbar"},
+		},
+		{
+			name:    "session.isfirstbar subscript access",
+			members: []string{"session.isfirstbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.MemberExpression{
+							Object: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "session"},
+								Property: &ast.Identifier{Name: "isfirstbar"},
+							},
+							Property: &ast.Literal{Value: float64(1)},
+							Computed: true,
+						},
+					},
+				},
+			},
+			wantFound: []string{"session.isfirstbar"},
+		},
+		{
+			name:    "multiple session members in binary",
+			members: []string{"session.isfirstbar", "session.islastbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Left: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "session"},
+								Property: &ast.Identifier{Name: "isfirstbar"},
+							},
+							Operator: "or",
+							Right: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "session"},
+								Property: &ast.Identifier{Name: "islastbar"},
+							},
+						},
+					},
+				},
+			},
+			wantFound: []string{"session.isfirstbar", "session.islastbar"},
+		},
+		{
+			name:    "member in if condition",
+			members: []string{"session.isfirstbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.IfStatement{
+						Test: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "session"},
+							Property: &ast.Identifier{Name: "isfirstbar"},
+						},
+						Consequent: []ast.Node{},
+					},
+				},
+			},
+			wantFound: []string{"session.isfirstbar"},
+		},
+		{
+			name:    "member in call argument",
+			members: []string{"session.islastbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "plot"},
+							Arguments: []ast.Expression{
+								&ast.MemberExpression{
+									Object:   &ast.Identifier{Name: "session"},
+									Property: &ast.Identifier{Name: "islastbar"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFound: []string{"session.islastbar"},
+		},
+		{
+			name:    "non-target member expression ignored",
+			members: []string{"session.isfirstbar"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "syminfo"},
+							Property: &ast.Identifier{Name: "ticker"},
+						},
+					},
+				},
+			},
+			wantAbsent: []string{"session.isfirstbar", "syminfo.ticker"},
+		},
+		{
+			name:    "member in variable declaration",
+			members: []string{"session.isfirstbar_regular"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{Init: &ast.MemberExpression{
+								Object:   &ast.Identifier{Name: "session"},
+								Property: &ast.Identifier{Name: "isfirstbar_regular"},
+							}},
+						},
+					},
+				},
+			},
+			wantFound: []string{"session.isfirstbar_regular"},
+		},
+		{
+			name:    "member in ternary",
+			members: []string{"session.isfirstbar", "session.islastbar_regular"},
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{Init: &ast.ConditionalExpression{
+								Test: &ast.MemberExpression{
+									Object:   &ast.Identifier{Name: "session"},
+									Property: &ast.Identifier{Name: "isfirstbar"},
+								},
+								Consequent: &ast.Literal{Value: float64(1)},
+								Alternate: &ast.MemberExpression{
+									Object:   &ast.Identifier{Name: "session"},
+									Property: &ast.Identifier{Name: "islastbar_regular"},
+								},
+							}},
+						},
+					},
+				},
+			},
+			wantFound: []string{"session.isfirstbar", "session.islastbar_regular"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector := NewBuiltinUsageDetectorWithMembers(nil, tt.members)
+			found := detector.Detect(tt.program)
+
+			for _, name := range tt.wantFound {
+				if !found[name] {
+					t.Errorf("expected %q detected", name)
+				}
+			}
+			for _, name := range tt.wantAbsent {
+				if found[name] {
+					t.Errorf("expected %q not detected", name)
+				}
+			}
+		})
+	}
+}
+
+/* Mixed detection: both identifiers and member expressions */
+func TestBuiltinUsageDetector_MixedDetection(t *testing.T) {
+	detector := NewBuiltinUsageDetectorWithMembers(
+		[]string{"dayofweek", "hour"},
+		[]string{"session.isfirstbar"},
+	)
+
+	program := &ast.Program{
+		Body: []ast.Node{
+			&ast.ExpressionStatement{
+				Expression: &ast.BinaryExpression{
+					Left:     &ast.Identifier{Name: "dayofweek"},
+					Operator: "and",
+					Right: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "session"},
+						Property: &ast.Identifier{Name: "isfirstbar"},
+					},
+				},
+			},
+		},
+	}
+
+	found := detector.Detect(program)
+
+	if !found["dayofweek"] {
+		t.Error("expected dayofweek detected")
+	}
+	if !found["session.isfirstbar"] {
+		t.Error("expected session.isfirstbar detected")
+	}
+	if found["hour"] {
+		t.Error("hour not in program, should not be detected")
+	}
+}

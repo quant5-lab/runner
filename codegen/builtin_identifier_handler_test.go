@@ -735,3 +735,79 @@ func TestBuiltinIdentifierHandler_ResolveCalendarBuiltins(t *testing.T) {
 		})
 	}
 }
+
+func TestBuiltinIdentifierHandler_ResolveMemberExpressionGoType(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		expr         *ast.MemberExpression
+		expectedType GoValueType
+		expectFound  bool
+	}{
+		/* bool properties */
+		{"barstate.islast is bool", identMember("barstate", "islast"), GoBool, true},
+		{"barstate.isfirst is bool", identMember("barstate", "isfirst"), GoBool, true},
+		{"timeframe.isdaily is bool", identMember("timeframe", "isdaily"), GoBool, true},
+		{"session.ismarket is bool", identMember("session", "ismarket"), GoBool, true},
+		{"chart.is_standard is bool", identMember("chart", "is_standard"), GoBool, true},
+
+		/* string properties */
+		{"syminfo.type is string", identMember("syminfo", "type"), GoString, true},
+		{"syminfo.tickerid is string", identMember("syminfo", "tickerid"), GoString, true},
+		{"syminfo.currency is string", identMember("syminfo", "currency"), GoString, true},
+		{"timeframe.period is string", identMember("timeframe", "period"), GoString, true},
+		{"chart.bg_color is string", identMember("chart", "bg_color"), GoString, true},
+
+		/* float64 properties */
+		{"timeframe.multiplier is float64", identMember("timeframe", "multiplier"), GoFloat64, true},
+		{"syminfo.mintick is float64", identMember("syminfo", "mintick"), GoFloat64, true},
+		{"dayofweek.monday is float64", identMember("dayofweek", "monday"), GoFloat64, true},
+		{"math.pi is float64", identMember("math", "pi"), GoFloat64, true},
+
+		/* unknown namespace/property */
+		{"unknown namespace", identMember("unknown", "prop"), GoFloat64, false},
+		{"user variable", identMember("myVar", "field"), GoFloat64, false},
+
+		/* guard clauses: non-Identifier AST node types */
+		{"computed subscript property", &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "barstate"},
+			Property: &ast.Literal{Value: float64(0)},
+			Computed: true,
+		}, GoFloat64, false},
+		{"nested member as object", &ast.MemberExpression{
+			Object: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "a"},
+				Property: &ast.Identifier{Name: "b"},
+			},
+			Property: &ast.Identifier{Name: "c"},
+		}, GoFloat64, false},
+		{"call expression as object", &ast.MemberExpression{
+			Object:   &ast.CallExpression{Callee: &ast.Identifier{Name: "getObj"}},
+			Property: &ast.Identifier{Name: "field"},
+		}, GoFloat64, false},
+		{"literal as object", &ast.MemberExpression{
+			Object:   &ast.Literal{Value: float64(42)},
+			Property: &ast.Identifier{Name: "field"},
+		}, GoFloat64, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			goType, found := handler.ResolveMemberExpressionGoType(tt.expr)
+			if found != tt.expectFound {
+				t.Fatalf("ResolveMemberExpressionGoType found = %v, want %v", found, tt.expectFound)
+			}
+			if found && goType != tt.expectedType {
+				t.Errorf("ResolveMemberExpressionGoType type = %v, want %v", goType, tt.expectedType)
+			}
+		})
+	}
+}
+
+func identMember(obj, prop string) *ast.MemberExpression {
+	return &ast.MemberExpression{
+		Object:   &ast.Identifier{Name: obj},
+		Property: &ast.Identifier{Name: prop},
+	}
+}

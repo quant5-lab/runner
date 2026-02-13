@@ -8,11 +8,12 @@ type CalendarBuiltinInfo struct {
 }
 
 type BuiltinIdentifierRegistry struct {
-	ohlcvFields        map[string]bool
-	derivedPrices      map[string]bool
-	timeSeriesBuiltins map[string]bool
-	calendarBuiltins   map[string]CalendarBuiltinInfo
-	constantBuiltins   map[string]bool
+	ohlcvFields           map[string]bool
+	derivedPrices         map[string]bool
+	timeSeriesBuiltins    map[string]bool
+	calendarBuiltins      map[string]CalendarBuiltinInfo
+	constantBuiltins      map[string]bool
+	sessionSeriesBuiltins map[string]bool
 }
 
 func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
@@ -33,7 +34,9 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 			"hlcc4": true,
 		},
 		timeSeriesBuiltins: map[string]bool{
-			"time": true,
+			"time":            true,
+			"time_close":      true,
+			"time_tradingday": true,
 		},
 		calendarBuiltins: map[string]CalendarBuiltinInfo{
 			"dayofweek":  {PineName: "dayofweek", SeriesName: "dayofweekSeries", StructField: "DayOfWeek", ArrowExpression: "float64(barTime.Weekday() + 1)"},
@@ -47,6 +50,14 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 		},
 		constantBuiltins: map[string]bool{
 			"last_bar_index": true,
+			"last_bar_time":  true,
+			"timenow":        true,
+		},
+		sessionSeriesBuiltins: map[string]bool{
+			"session.isfirstbar":         true,
+			"session.islastbar":          true,
+			"session.isfirstbar_regular": true,
+			"session.islastbar_regular":  true,
 		},
 	}
 }
@@ -112,6 +123,18 @@ func (r *BuiltinIdentifierRegistry) DerivedPriceNames() []string {
 func (r *BuiltinIdentifierRegistry) TimeSeriesBuiltinNames() []string {
 	names := make([]string, 0, len(r.timeSeriesBuiltins))
 	for name := range r.timeSeriesBuiltins {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *BuiltinIdentifierRegistry) IsSessionSeriesBuiltin(key string) bool {
+	return r.sessionSeriesBuiltins[key]
+}
+
+func (r *BuiltinIdentifierRegistry) SessionSeriesBuiltinNames() []string {
+	names := make([]string, 0, len(r.sessionSeriesBuiltins))
+	for name := range r.sessionSeriesBuiltins {
 		names = append(names, name)
 	}
 	return names

@@ -83,16 +83,34 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
 
-	usageDetector := NewBuiltinUsageDetector(append(
-		gen.builtinHandler.CalendarBuiltinNames(),
-		"bar_index", "last_bar_index",
-	))
+	sessionMemberKeys := gen.builtinHandler.registry.SessionSeriesBuiltinNames()
+	usageDetector := NewBuiltinUsageDetectorWithMembers(
+		append(
+			gen.builtinHandler.CalendarBuiltinNames(),
+			"bar_index", "last_bar_index", "last_bar_time", "timenow",
+			"time_close", "time_tradingday",
+		),
+		sessionMemberKeys,
+	)
 	detected := usageDetector.Detect(program)
 	gen.hasBarIndexUsage = detected["bar_index"]
 	gen.hasLastBarIndex = detected["last_bar_index"]
+	gen.hasLastBarTime = detected["last_bar_time"]
+	gen.hasTimenow = detected["timenow"]
 	gen.calendarLifecycle = NewCalendarSeriesLifecycle(
 		gen.builtinHandler.ResolveCalendarBuiltins(detected),
 	)
+	gen.timeSeriesLifecycle = NewTimeSeriesLifecycle(
+		detected["time_close"],
+		detected["time_tradingday"],
+	)
+	gen.sessionLifecycle = NewSessionSeriesLifecycle(
+		detected["session.isfirstbar"],
+		detected["session.islastbar"],
+		detected["session.isfirstbar_regular"],
+		detected["session.islastbar_regular"],
+	)
+	gen.seriesInitCoercer = NewSeriesInitCoercer()
 
 	if err := NewLoopNestingValidator().Validate(program); err != nil {
 		return nil, err
@@ -140,6 +158,8 @@ type generator struct {
 	hasStrategyRuntimeAccess bool
 	hasBarIndexUsage         bool
 	hasLastBarIndex          bool
+	hasLastBarTime           bool
+	hasTimenow               bool
 	hasTickerCalls           bool
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
@@ -185,6 +205,9 @@ type generator struct {
 	udfAnalyzer            *UDFTempVarAnalyzer
 	statementAnalyzer      *StatementConditionalAnalyzer
 	calendarLifecycle      *CalendarSeriesLifecycle
+	timeSeriesLifecycle    *TimeSeriesLifecycle
+	sessionLifecycle       *SessionSeriesLifecycle
+	seriesInitCoercer      *SeriesInitCoercer
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -549,6 +572,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += g.calendarLifecycle.GenerateDeclarations(g.ind())
 	g.calendarLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
+	code += g.timeSeriesLifecycle.GenerateDeclarations(g.ind())
+	g.timeSeriesLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
+	code += g.sessionLifecycle.GenerateDeclarations(g.ind())
+	g.sessionLifecycle.GenerateSymbolTableRegistrations(g.symbolTable)
 
 	if len(g.variables) > 0 {
 		for varName, varType := range g.variables {
@@ -618,6 +645,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += g.ind() + "timeSeries = series.NewSeries(len(ctx.Data))\n"
 	code += g.calendarLifecycle.GenerateInitializations(g.ind())
+	code += g.timeSeriesLifecycle.GenerateInitializations(g.ind())
+	code += g.sessionLifecycle.GenerateInitializations(g.ind())
 
 	/* Initialize internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
@@ -655,6 +684,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		code += g.ind() + `ctx.RegisterSeries("timeSeries", timeSeries)` + "\n"
 		code += g.calendarLifecycle.GenerateRegistrations(g.ind())
+		code += g.timeSeriesLifecycle.GenerateRegistrations(g.ind())
+		code += g.sessionLifecycle.GenerateRegistrations(g.ind())
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
@@ -702,9 +733,19 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
-	code += g.calendarLifecycle.GenerateTimezoneSetup(g.ind())
+	/* Timezone setup: shared across calendar, time series, and session lifecycles */
+	if g.calendarLifecycle.HasCalendarUsage() || g.timeSeriesLifecycle.NeedsTimezone() || g.sessionLifecycle.NeedsTimezone() {
+		code += g.ind() + "exchangeLoc, err := time.LoadLocation(ctx.Timezone)\n"
+		code += g.ind() + `if err != nil { panic("invalid timezone: " + ctx.Timezone) }` + "\n"
+	}
 	if g.hasLastBarIndex {
 		code += g.ind() + "last_bar_index := float64(len(ctx.Data) - 1)\n"
+	}
+	if g.hasLastBarTime {
+		code += g.ind() + "last_bar_time := float64(ctx.Data[len(ctx.Data)-1].Time * 1000)\n"
+	}
+	if g.hasTimenow {
+		code += g.ind() + "timenow := float64(ctx.Data[len(ctx.Data)-1].Time * 1000)\n"
 	}
 
 	// Bar loop for strategy execution
@@ -733,6 +774,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += g.ind() + "timeSeries.Set(float64(bar.Time * 1000))\n"
 	code += g.calendarLifecycle.GenerateBarPopulation(g.ind())
+	code += g.timeSeriesLifecycle.GenerateBarPopulation(g.ind(), iterVar)
+	code += g.sessionLifecycle.GenerateBarPopulation(g.ind(), iterVar)
 	code += "\n"
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
@@ -795,8 +838,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("_ = %sSeries\n", varName)
 	}
 	code += g.calendarLifecycle.GenerateSuppressUnused(g.ind())
+	code += g.timeSeriesLifecycle.GenerateSuppressUnused(g.ind())
+	code += g.sessionLifecycle.GenerateSuppressUnused(g.ind())
 	if g.hasLastBarIndex {
 		code += g.ind() + "_ = last_bar_index\n"
+	}
+	if g.hasLastBarTime {
+		code += g.ind() + "_ = last_bar_time\n"
+	}
+	if g.hasTimenow {
+		code += g.ind() + "_ = timenow\n"
 	}
 
 	// Advance Series cursors at end of bar loop
@@ -810,6 +861,8 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += g.ind() + fmt.Sprintf("if %s < barCount-1 { timeSeries.Next() }\n", iterVar)
 	code += g.calendarLifecycle.GenerateAdvancement(g.ind(), iterVar)
+	code += g.timeSeriesLifecycle.GenerateAdvancement(g.ind(), iterVar)
+	code += g.sessionLifecycle.GenerateAdvancement(g.ind(), iterVar)
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {
@@ -2148,6 +2201,11 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 					}
 				}
 			}
+		}
+
+		if goType, resolved := g.builtinHandler.ResolveMemberExpressionGoType(expr); resolved && goType != GoFloat64 {
+			coerced := g.seriesInitCoercer.Coerce(memberCode, goType)
+			return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, coerced), nil
 		}
 
 		return tempVarCode + g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, memberCode), nil
