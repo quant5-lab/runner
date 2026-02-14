@@ -15,7 +15,7 @@ func NewSecurityInlineHandler() *SecurityInlineHandler {
 }
 
 func (h *SecurityInlineHandler) CanHandle(funcName string) bool {
-	return funcName == "request.security" || funcName == "security"
+	return IsSecurityFunction(funcName)
 }
 
 func (h *SecurityInlineHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {

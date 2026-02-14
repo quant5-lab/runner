@@ -93,6 +93,34 @@ func TestHoistableCallClassifier_IsStatefulValueFunction(t *testing.T) {
 	}
 }
 
+/* Validates security functions classified as hoistable across callee forms */
+func TestHoistableCallClassifier_SecurityFunctions(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	tests := []struct {
+		name     string
+		callee   ast.Expression
+		expected bool
+	}{
+		{"bare security", &ast.Identifier{Name: "security"}, true},
+		{"namespaced request.security", &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "request"},
+			Property: &ast.Identifier{Name: "security"},
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpression{Callee: tt.callee}
+			if result := classifier.IsHoistable(call); result != tt.expected {
+				funcName := gen.extractFunctionName(tt.callee)
+				t.Errorf("IsHoistable(%s) = %v, want %v", funcName, result, tt.expected)
+			}
+		})
+	}
+}
+
 /* Validates non-hoistable functions rejected */
 func TestHoistableCallClassifier_NonHoistable(t *testing.T) {
 	gen := newTestGenerator()
@@ -354,18 +382,6 @@ func TestHoistableCallClassifier_UnimplementedFunctions(t *testing.T) {
 				Arguments: []ast.Expression{
 					&ast.Identifier{Name: "close"},
 					&ast.Literal{Value: float64(12)},
-				},
-			},
-		},
-		{
-			name: "request.security",
-			call: &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "request"},
-					Property: &ast.Identifier{Name: "security"},
-				},
-				Arguments: []ast.Expression{
-					&ast.Literal{Value: "BTCUSDT"},
 				},
 			},
 		},

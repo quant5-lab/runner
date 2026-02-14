@@ -216,9 +216,10 @@ strategy("Test", overlay=true)
 signal = security(syminfo.tickerid, "1D", close) > 0 ? 1 : 0
 plot(signal)`,
 			expectNaN: []string{
-				"if !secFound { return math.NaN() }",
-				"if !mapperFound { return math.NaN() }",
-				"if secBarIdx < 0 { return math.NaN() }",
+				"!secFound",
+				"!mapperFound",
+				"secBarIdx < 0",
+				"Set(math.NaN())",
 			},
 		},
 	}

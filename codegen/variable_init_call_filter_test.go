@@ -109,6 +109,201 @@ func TestVariableInitCallFilter_RuntimeOnlySkipped(t *testing.T) {
 	}
 }
 
+/* Validates security functions hoisted in variable initializers across expression forms */
+func TestVariableInitCallFilter_SecurityHoisted(t *testing.T) {
+	gen := newTestGenerator()
+	filter := NewVariableInitCallFilter(
+		gen.taRegistry,
+		gen.inlineRegistry,
+		gen.runtimeOnlyFilter,
+		gen.exprAnalyzer,
+	)
+
+	securityCall := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "security"},
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "BTCUSDT"},
+			&ast.Literal{Value: "1D"},
+			&ast.Identifier{Name: "close"},
+		},
+	}
+
+	requestSecurityCall := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "request"},
+			Property: &ast.Identifier{Name: "security"},
+		},
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "BTCUSDT"},
+			&ast.Literal{Value: "1D"},
+			&ast.Identifier{Name: "close"},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		initExpr ast.Expression
+		expected int
+	}{
+		{
+			name: "security in conditional test",
+			initExpr: &ast.ConditionalExpression{
+				Test:       securityCall,
+				Consequent: &ast.Literal{Value: 1.0},
+				Alternate:  &ast.Literal{Value: 0.0},
+			},
+			expected: 1,
+		},
+		{
+			name: "security in conditional branches",
+			initExpr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Identifier{Name: "open"},
+				},
+				Consequent: securityCall,
+				Alternate:  requestSecurityCall,
+			},
+			expected: 2,
+		},
+		{
+			name: "security in binary expression",
+			initExpr: &ast.BinaryExpression{
+				Operator: ">",
+				Left:     securityCall,
+				Right:    &ast.Identifier{Name: "threshold"},
+			},
+			expected: 1,
+		},
+		{
+			name: "request.security in binary expression",
+			initExpr: &ast.BinaryExpression{
+				Operator: "+",
+				Left:     requestSecurityCall,
+				Right:    &ast.Literal{Value: 10.0},
+			},
+			expected: 1,
+		},
+		{
+			name: "multiple security calls",
+			initExpr: &ast.BinaryExpression{
+				Operator: "+",
+				Left:     securityCall,
+				Right:    requestSecurityCall,
+			},
+			expected: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nestedCalls := gen.exprAnalyzer.FindNestedCalls(tt.initExpr)
+			hoistable := filter.FilterHoistable(nestedCalls, tt.initExpr)
+
+			if len(hoistable) != tt.expected {
+				t.Fatalf("Expected %d hoistable security call(s), got %d", tt.expected, len(hoistable))
+			}
+		})
+	}
+}
+
+/* Validates direct init security calls are NOT hoisted */
+func TestVariableInitCallFilter_SecurityDirectInitNotHoisted(t *testing.T) {
+	gen := newTestGenerator()
+	filter := NewVariableInitCallFilter(
+		gen.taRegistry,
+		gen.inlineRegistry,
+		gen.runtimeOnlyFilter,
+		gen.exprAnalyzer,
+	)
+
+	tests := []struct {
+		name     string
+		initExpr ast.Expression
+	}{
+		{
+			name: "bare security direct init",
+			initExpr: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+					&ast.Literal{Value: "1D"},
+					&ast.Identifier{Name: "close"},
+				},
+			},
+		},
+		{
+			name: "request.security direct init",
+			initExpr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "request"},
+					Property: &ast.Identifier{Name: "security"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+					&ast.Literal{Value: "1D"},
+					&ast.Identifier{Name: "close"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nestedCalls := gen.exprAnalyzer.FindNestedCalls(tt.initExpr)
+			hoistable := filter.FilterHoistable(nestedCalls, tt.initExpr)
+
+			if len(hoistable) != 0 {
+				t.Errorf("Expected 0 hoistable calls for direct security init, got %d", len(hoistable))
+			}
+		})
+	}
+}
+
+/* Validates security nested in expressions requires hoisting of security only */
+func TestVariableInitCallFilter_SecurityInNestedExpressions(t *testing.T) {
+	gen := newTestGenerator()
+	filter := NewVariableInitCallFilter(
+		gen.taRegistry,
+		gen.inlineRegistry,
+		gen.runtimeOnlyFilter,
+		gen.exprAnalyzer,
+	)
+
+	initExpr := &ast.BinaryExpression{
+		Operator: "*",
+		Left: &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "math"},
+				Property: &ast.Identifier{Name: "abs"},
+			},
+			Arguments: []ast.Expression{
+				&ast.CallExpression{
+					Callee: &ast.Identifier{Name: "security"},
+					Arguments: []ast.Expression{
+						&ast.Literal{Value: "BTCUSDT"},
+						&ast.Literal{Value: "1D"},
+						&ast.Identifier{Name: "close"},
+					},
+				},
+			},
+		},
+		Right: &ast.Literal{Value: float64(2)},
+	}
+
+	nestedCalls := gen.exprAnalyzer.FindNestedCalls(initExpr)
+	hoistable := filter.FilterHoistable(nestedCalls, initExpr)
+
+	if len(hoistable) != 1 {
+		t.Fatalf("Expected 1 hoistable call (security), got %d", len(hoistable))
+	}
+
+	if hoistable[0].FuncName != "security" {
+		t.Errorf("Expected security to be hoistable, got %s", hoistable[0].FuncName)
+	}
+}
+
 /* Validates inline-only functions require security context to hoist */
 func TestVariableInitCallFilter_InlineOnlySecurityContext(t *testing.T) {
 	gen := newTestGenerator()

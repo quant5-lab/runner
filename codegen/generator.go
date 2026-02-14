@@ -2306,8 +2306,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		return mathHandler.GenerateCode(g, varName, call)
 	}
 
-	switch funcName {
-	case "request.security", "security":
+	if IsSecurityFunction(funcName) {
 		if len(call.Arguments) < 3 {
 			return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // security() missing arguments\n", varName), nil
 		}
@@ -2409,7 +2408,9 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "}\n"
 
 		return code, nil
+	}
 
+	switch funcName {
 	case "plot":
 		opts := ParsePlotOptions(call)
 
@@ -2769,7 +2770,7 @@ func (g *generator) generateTupleDestructuringDeclaration(declarator ast.Variabl
 	}
 
 	/* Route security()/request.security() tuple calls to specialized handler */
-	if funcName == "request.security" || funcName == "security" {
+	if IsSecurityFunction(funcName) {
 		return g.generateTupleSecurityDeclaration(varNames, callExpr)
 	}
 

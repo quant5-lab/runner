@@ -27,6 +27,10 @@ func NewHoistableCallClassifier(g *generator) HoistableCallClassifier {
 func (c HoistableCallClassifier) IsHoistable(call *ast.CallExpression) bool {
 	funcName := c.gen.extractFunctionName(call.Callee)
 
+	if IsSecurityFunction(funcName) {
+		return true
+	}
+
 	if c.IsStatefulValueFunction(funcName) {
 		return true
 	}

@@ -61,6 +61,9 @@ func (f *VariableInitCallFilter) isSkippableInlineOnly(callInfo CallInfo, initEx
 }
 
 func (f *VariableInitCallFilter) requiresTempVar(callInfo CallInfo) bool {
+	if IsSecurityFunction(callInfo.FuncName) {
+		return true
+	}
 	if f.taRegistry.IsSupported(callInfo.FuncName) {
 		return true
 	}

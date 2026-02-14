@@ -125,6 +125,5 @@ func (d *ArrowSecurityDetector) scanExpression(expr ast.Expression) bool {
 }
 
 func isSecurityCallExpression(call *ast.CallExpression) bool {
-	funcName := extractCallFunctionName(call)
-	return funcName == "request.security" || funcName == "security"
+	return IsSecurityFunction(extractCallFunctionName(call))
 }

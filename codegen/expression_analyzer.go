@@ -76,7 +76,7 @@ func (ea *ExpressionAnalyzer) findSecurityCallContaining(targetCall *ast.CallExp
 
 func (ea *ExpressionAnalyzer) isSecurityCall(call *ast.CallExpression) bool {
 	funcName := ea.gen.extractFunctionName(call.Callee)
-	return funcName == "security" || funcName == "request.security"
+	return IsSecurityFunction(funcName)
 }
 
 func (ea *ExpressionAnalyzer) expressionContainsCall(targetCall *ast.CallExpression, expr ast.Expression) bool {
