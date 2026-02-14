@@ -28,3 +28,11 @@ func CalendarFieldArrowIIFE(arrowExpression, indexCode string) string {
 func BarIndexArrowIIFE(indexCode string) string {
 	return boundsCheckedArrowIIFE(indexCode, "return float64(barIdx)")
 }
+
+func TrueRangeArrowIIFE(indexCode string) string {
+	innerBody := "curBar := ctx.Data[barIdx]; " +
+		"if barIdx < 1 { return curBar.High - curBar.Low }; " +
+		"prevClose := ctx.Data[barIdx-1].Close; " +
+		"return math.Max(curBar.High - curBar.Low, math.Max(math.Abs(curBar.High - prevClose), math.Abs(curBar.Low - prevClose)))"
+	return boundsCheckedArrowIIFE(indexCode, innerBody)
+}

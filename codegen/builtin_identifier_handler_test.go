@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
@@ -90,7 +92,16 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess(t *testing.T) {
 		{"high", "high", "bar.High"},
 		{"low", "low", "bar.Low"},
 		{"volume", "volume", "bar.Volume"},
+		{"bar_index", "bar_index", "float64(i)"},
 		{"time", "time", "float64(bar.Time * 1000)"},
+		{"time_close", "time_close", "time_closeSeries.GetCurrent()"},
+		{"time_tradingday", "time_tradingday", "time_tradingdaySeries.GetCurrent()"},
+
+		/* derived prices */
+		{"hl2", "hl2", "((bar.High + bar.Low) / 2)"},
+		{"hlc3", "hlc3", "((bar.High + bar.Low + bar.Close) / 3)"},
+		{"ohlc4", "ohlc4", "((bar.Open + bar.High + bar.Low + bar.Close) / 4)"},
+		{"hlcc4", "hlcc4", "((bar.High + bar.Low + bar.Close + bar.Close) / 4)"},
 
 		/* calendar builtins */
 		{"dayofweek", "dayofweek", "dayofweekSeries.GetCurrent()"},
@@ -104,6 +115,8 @@ func TestBuiltinIdentifierHandler_GenerateCurrentBarAccess(t *testing.T) {
 
 		/* constant builtins */
 		{"last_bar_index", "last_bar_index", "last_bar_index"},
+		{"last_bar_time", "last_bar_time", "last_bar_time"},
+		{"timenow", "timenow", "timenow"},
 
 		{"unknown", "unknown", ""},
 	}
@@ -154,7 +167,16 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 		{"high in security", "high", "highSeries.GetCurrent()"},
 		{"low in security", "low", "lowSeries.GetCurrent()"},
 		{"volume in security", "volume", "volumeSeries.GetCurrent()"},
+		{"bar_index in security", "bar_index", "float64(ctx.BarIndex)"},
 		{"time in security", "time", "timeSeries.GetCurrent()"},
+		{"time_close in security", "time_close", "time_closeSeries.GetCurrent()"},
+		{"time_tradingday in security", "time_tradingday", "time_tradingdaySeries.GetCurrent()"},
+
+		/* derived prices in security */
+		{"hl2 in security", "hl2", "((highSeries.GetCurrent() + lowSeries.GetCurrent()) / 2)"},
+		{"hlc3 in security", "hlc3", "((highSeries.GetCurrent() + lowSeries.GetCurrent() + closeSeries.GetCurrent()) / 3)"},
+		{"ohlc4 in security", "ohlc4", "((openSeries.GetCurrent() + highSeries.GetCurrent() + lowSeries.GetCurrent() + closeSeries.GetCurrent()) / 4)"},
+		{"hlcc4 in security", "hlcc4", "((highSeries.GetCurrent() + lowSeries.GetCurrent() + closeSeries.GetCurrent() + closeSeries.GetCurrent()) / 4)"},
 
 		/* calendar builtins in security */
 		{"dayofweek in security", "dayofweek", "dayofweekSeries.GetCurrent()"},
@@ -168,6 +190,8 @@ func TestBuiltinIdentifierHandler_GenerateSecurityContextAccess(t *testing.T) {
 
 		/* constant builtins in security */
 		{"last_bar_index in security", "last_bar_index", "last_bar_index"},
+		{"last_bar_time in security", "last_bar_time", "last_bar_time"},
+		{"timenow in security", "timenow", "timenow"},
 	}
 
 	for _, tt := range tests {
@@ -341,38 +365,67 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
 	tests := []struct {
-		name              string
-		identifier        string
-		inSecurityContext bool
-		expectedCode      string
-		expectedResolved  bool
+		name             string
+		identifier       string
+		scope            AccessScope
+		expectedCode     string
+		expectedResolved bool
 	}{
-		{"na identifier", "na", false, "math.NaN()", true},
-		{"close current bar", "close", false, "bar.Close", true},
-		{"close in security", "close", true, "closeSeries.GetCurrent()", true},
-		{"time current bar", "time", false, "float64(bar.Time * 1000)", true},
-		{"time in security", "time", true, "timeSeries.GetCurrent()", true},
+		{"na identifier", "na", BarLoopScope, "math.NaN()", true},
+		{"close current bar", "close", BarLoopScope, "bar.Close", true},
+		{"close in security", "close", SecurityScope, "closeSeries.GetCurrent()", true},
+		{"time current bar", "time", BarLoopScope, "float64(bar.Time * 1000)", true},
+		{"time in security", "time", SecurityScope, "timeSeries.GetCurrent()", true},
 
 		/* calendar builtins */
-		{"dayofweek current", "dayofweek", false, "dayofweekSeries.GetCurrent()", true},
-		{"dayofweek in security", "dayofweek", true, "dayofweekSeries.GetCurrent()", true},
-		{"hour current", "hour", false, "hourSeries.GetCurrent()", true},
-		{"year current", "year", false, "yearSeries.GetCurrent()", true},
+		{"dayofweek current", "dayofweek", BarLoopScope, "dayofweekSeries.GetCurrent()", true},
+		{"dayofweek in security", "dayofweek", SecurityScope, "dayofweekSeries.GetCurrent()", true},
+		{"hour current", "hour", BarLoopScope, "hourSeries.GetCurrent()", true},
+		{"year current", "year", BarLoopScope, "yearSeries.GetCurrent()", true},
 
 		/* constant builtins */
-		{"last_bar_index current", "last_bar_index", false, "last_bar_index", true},
-		{"last_bar_index in security", "last_bar_index", true, "last_bar_index", true},
+		{"last_bar_index current", "last_bar_index", BarLoopScope, "last_bar_index", true},
+		{"last_bar_index in security", "last_bar_index", SecurityScope, "last_bar_index", true},
 
-		{"user variable", "my_var", false, "", false},
+		/* arrow scope — direct bar fields */
+		{"close in arrow", "close", ArrowScope, "ctx.Data[ctx.BarIndex].Close", true},
+		{"open in arrow", "open", ArrowScope, "ctx.Data[ctx.BarIndex].Open", true},
+		{"high in arrow", "high", ArrowScope, "ctx.Data[ctx.BarIndex].High", true},
+		{"low in arrow", "low", ArrowScope, "ctx.Data[ctx.BarIndex].Low", true},
+		{"volume in arrow", "volume", ArrowScope, "ctx.Data[ctx.BarIndex].Volume", true},
+
+		/* arrow scope — computed builtins */
+		{"bar_index in arrow", "bar_index", ArrowScope, "float64(ctx.BarIndex)", true},
+		{"time in arrow", "time", ArrowScope, "float64(ctx.Data[ctx.BarIndex].Time * 1000)", true},
+		{"last_bar_index in arrow", "last_bar_index", ArrowScope, "float64(len(ctx.Data) - 1)", true},
+		{"last_bar_time in arrow", "last_bar_time", ArrowScope, "float64(ctx.Data[len(ctx.Data)-1].Time * 1000)", true},
+		{"timenow in arrow", "timenow", ArrowScope, "float64(ctx.Data[len(ctx.Data)-1].Time * 1000)", true},
+
+		/* arrow scope — calendar builtins use LookupSeries */
+		{"dayofweek in arrow", "dayofweek", ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("dayofweekSeries"); ok { return s.GetCurrent() }; return math.NaN() }()`, true},
+		{"hour in arrow", "hour", ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("hourSeries"); ok { return s.GetCurrent() }; return math.NaN() }()`, true},
+
+		/* arrow scope — time_close and time_tradingday use LookupSeries */
+		{"time_close in arrow", "time_close", ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("time_closeSeries"); ok { return s.GetCurrent() }; return math.NaN() }()`, true},
+		{"time_tradingday in arrow", "time_tradingday", ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("time_tradingdaySeries"); ok { return s.GetCurrent() }; return math.NaN() }()`, true},
+
+		/* na is scope-independent */
+		{"na in arrow", "na", ArrowScope, "math.NaN()", true},
+
+		{"user variable", "my_var", BarLoopScope, "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expr := &ast.Identifier{Name: tt.identifier}
-			code, resolved := handler.TryResolveIdentifier(expr, tt.inSecurityContext)
+			code, resolved := handler.TryResolveIdentifier(expr, tt.scope)
 			if code != tt.expectedCode || resolved != tt.expectedResolved {
 				t.Errorf("TryResolveIdentifier(%s, %v) = (%s, %v), want (%s, %v)",
-					tt.identifier, tt.inSecurityContext, code, resolved, tt.expectedCode, tt.expectedResolved)
+					tt.identifier, tt.scope, code, resolved, tt.expectedCode, tt.expectedResolved)
 			}
 		})
 	}
@@ -382,36 +435,45 @@ func TestBuiltinIdentifierHandler_TryResolveIdentifier_TrueRange(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
 	tests := []struct {
-		name              string
-		inSecurityContext bool
-		expectedResolved  bool
+		name             string
+		scope            AccessScope
+		expectedResolved bool
 	}{
-		{"tr current bar", false, true},
-		{"tr in security", true, true},
+		{"tr current bar", BarLoopScope, true},
+		{"tr in security", SecurityScope, true},
+		{"tr in arrow", ArrowScope, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expr := &ast.Identifier{Name: "tr"}
-			code, resolved := handler.TryResolveIdentifier(expr, tt.inSecurityContext)
+			code, resolved := handler.TryResolveIdentifier(expr, tt.scope)
 
 			if resolved != tt.expectedResolved {
-				t.Errorf("TryResolveIdentifier(tr, %v) resolved = %v, want %v", tt.inSecurityContext, resolved, tt.expectedResolved)
+				t.Errorf("TryResolveIdentifier(tr, %v) resolved = %v, want %v", tt.scope, resolved, tt.expectedResolved)
 			}
 
 			if resolved {
-				if tt.inSecurityContext {
+				switch tt.scope {
+				case SecurityScope:
 					expectedComponents := []string{"math.Max", "highSeries.GetCurrent()", "lowSeries.GetCurrent()", "closeSeries.Get(1)"}
 					for _, component := range expectedComponents {
 						if !contains(code, component) {
-							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.scope, component, code)
 						}
 					}
-				} else {
+				case ArrowScope:
+					expectedComponents := []string{"math.Max", "ctx.Data[ctx.BarIndex]", "curBar", "prevClose"}
+					for _, component := range expectedComponents {
+						if !contains(code, component) {
+							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.scope, component, code)
+						}
+					}
+				default:
 					expectedComponents := []string{"math.Max", "bar.High", "bar.Low", "ctx.Data[ctx.BarIndex-1].Close"}
 					for _, component := range expectedComponents {
 						if !contains(code, component) {
-							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.inSecurityContext, component, code)
+							t.Errorf("TryResolveIdentifier(tr, %v) missing component: %s\nGot: %s", tt.scope, component, code)
 						}
 					}
 				}
@@ -424,14 +486,14 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
 	tests := []struct {
-		name              string
-		obj               string
-		prop              string
-		computed          bool
-		offset            int
-		inSecurityContext bool
-		expectedCode      string
-		expectedResolved  bool
+		name             string
+		obj              string
+		prop             string
+		computed         bool
+		offset           int
+		scope            AccessScope
+		expectedCode     string
+		expectedResolved bool
 	}{
 		{
 			"strategy.position_avg_price",
@@ -439,7 +501,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"position_avg_price",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"strategy_position_avg_priceSeries.Get(0)",
 			true,
 		},
@@ -449,7 +511,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"0",
 			true,
 			0,
-			false,
+			BarLoopScope,
 			"bar.Close",
 			true,
 		},
@@ -459,7 +521,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"0",
 			true,
 			0,
-			true,
+			SecurityScope,
 			"closeSeries.GetCurrent()",
 			true,
 		},
@@ -469,7 +531,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"1",
 			true,
 			1,
-			false,
+			BarLoopScope,
 			"func() float64 { if i-1 >= 0 { return ctx.Data[i-1].Close }; return math.NaN() }()",
 			true,
 		},
@@ -479,7 +541,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"field",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"",
 			false,
 		},
@@ -489,7 +551,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"0",
 			true,
 			0,
-			false,
+			BarLoopScope,
 			"float64(bar.Time * 1000)",
 			true,
 		},
@@ -499,7 +561,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"1",
 			true,
 			1,
-			false,
+			BarLoopScope,
 			"timeSeries.Get(1)",
 			true,
 		},
@@ -509,7 +571,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"isfirst",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"(ctx.BarIndex == 0)",
 			true,
 		},
@@ -519,7 +581,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"period",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"ctx.Timeframe",
 			true,
 		},
@@ -529,7 +591,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"tickerid",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"syminfo_tickerid",
 			true,
 		},
@@ -539,7 +601,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"sunday",
 			false,
 			0,
-			false,
+			BarLoopScope,
 			"1.0",
 			true,
 		},
@@ -549,7 +611,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"0",
 			true,
 			0,
-			false,
+			BarLoopScope,
 			"dayofweekSeries.GetCurrent()",
 			true,
 		},
@@ -559,7 +621,7 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"1",
 			true,
 			1,
-			false,
+			BarLoopScope,
 			"dayofweekSeries.Get(1)",
 			true,
 		},
@@ -569,8 +631,113 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 			"3",
 			true,
 			3,
-			false,
+			BarLoopScope,
 			"hourSeries.Get(3)",
+			true,
+		},
+		/* arrow scope — strategy uses LookupSeries */
+		{
+			"strategy.position_avg_price in arrow",
+			"strategy",
+			"position_avg_price",
+			false,
+			0,
+			ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("strategy_position_avg_priceSeries"); ok { return s.GetCurrent() }; return math.NaN() }()`,
+			true,
+		},
+		{
+			"strategy.equity in arrow",
+			"strategy",
+			"equity",
+			false,
+			0,
+			ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("strategy_equitySeries"); ok { return s.GetCurrent() }; return math.NaN() }()`,
+			true,
+		},
+		/* arrow scope — subscript current value */
+		{
+			"close[0] in arrow",
+			"close",
+			"0",
+			true,
+			0,
+			ArrowScope,
+			"ctx.Data[ctx.BarIndex].Close",
+			true,
+		},
+		{
+			"time[0] in arrow",
+			"time",
+			"0",
+			true,
+			0,
+			ArrowScope,
+			"float64(ctx.Data[ctx.BarIndex].Time * 1000)",
+			true,
+		},
+		/* arrow scope — subscript historical uses ctx.BarIndex offset */
+		{
+			"close[1] in arrow",
+			"close",
+			"1",
+			true,
+			1,
+			ArrowScope,
+			"func() float64 { if ctx.BarIndex-1 < 0 { return math.NaN() }; return ctx.Data[ctx.BarIndex-1].Close }()",
+			true,
+		},
+		{
+			"time[1] in arrow",
+			"time",
+			"1",
+			true,
+			1,
+			ArrowScope,
+			"func() float64 { if ctx.BarIndex-1 < 0 { return math.NaN() }; return float64(ctx.Data[ctx.BarIndex-1].Time * 1000) }()",
+			true,
+		},
+		/* arrow scope — calendar historical uses LookupSeries with offset */
+		{
+			"calendar dayofweek[1] in arrow",
+			"dayofweek",
+			"1",
+			true,
+			1,
+			ArrowScope,
+			`func() float64 { if s, ok := ctx.LookupSeries("dayofweekSeries"); ok { return s.Get(1) }; return math.NaN() }()`,
+			true,
+		},
+		/* arrow scope — namespace delegation */
+		{
+			"barstate.isfirst in arrow",
+			"barstate",
+			"isfirst",
+			false,
+			0,
+			ArrowScope,
+			"(ctx.BarIndex == 0)",
+			true,
+		},
+		{
+			"syminfo.tickerid in arrow (overridden)",
+			"syminfo",
+			"tickerid",
+			false,
+			0,
+			ArrowScope,
+			"ctx.Symbol",
+			true,
+		},
+		{
+			"dayofweek.sunday in arrow",
+			"dayofweek",
+			"sunday",
+			false,
+			0,
+			ArrowScope,
+			"1.0",
 			true,
 		},
 	}
@@ -591,10 +758,10 @@ func TestBuiltinIdentifierHandler_TryResolveMemberExpression(t *testing.T) {
 				Computed: tt.computed,
 			}
 
-			code, resolved := handler.TryResolveMemberExpression(expr, tt.inSecurityContext)
+			code, resolved := handler.TryResolveMemberExpression(expr, tt.scope)
 			if code != tt.expectedCode || resolved != tt.expectedResolved {
 				t.Errorf("TryResolveMemberExpression(%s.%s, %v) = (%s, %v), want (%s, %v)",
-					tt.obj, tt.prop, tt.inSecurityContext, code, resolved, tt.expectedCode, tt.expectedResolved)
+					tt.obj, tt.prop, tt.scope, code, resolved, tt.expectedCode, tt.expectedResolved)
 			}
 		})
 	}
@@ -809,5 +976,276 @@ func identMember(obj, prop string) *ast.MemberExpression {
 	return &ast.MemberExpression{
 		Object:   &ast.Identifier{Name: obj},
 		Property: &ast.Identifier{Name: prop},
+	}
+}
+
+func TestTryResolveMemberExpression_TaBuiltinsNotSupported(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	unsupported := []string{"close", "open", "high", "low", "volume"}
+
+	for _, name := range unsupported {
+		t.Run("ta."+name, func(t *testing.T) {
+			expr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: name},
+				Computed: false,
+			}
+			_, resolved := handler.TryResolveMemberExpression(expr, BarLoopScope)
+			if resolved {
+				t.Errorf("ta.%s should not be resolved (update test if implemented)", name)
+			}
+		})
+	}
+}
+
+func TestTryResolveMemberExpression_TrNestedSubscript(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	offsets := []int{0, 1, 2, 5}
+
+	scopes := []struct {
+		name      string
+		scope     AccessScope
+		wantParts []string
+		wantNot   []string
+	}{
+		{"bar_loop", BarLoopScope, []string{"math.Max", "math.Abs", "ctx.Data", "High", "Low", "Close"}, []string{"ctx.BarIndex"}},
+		{"arrow", ArrowScope, []string{"math.Max", "math.Abs", "ctx.Data[barIdx]", "prevClose"}, []string{"i-"}},
+	}
+
+	for _, sc := range scopes {
+		for _, offset := range offsets {
+			name := fmt.Sprintf("ta.tr[%d]_%s", offset, sc.name)
+			t.Run(name, func(t *testing.T) {
+				nestedExpr := &ast.MemberExpression{
+					Object: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: "tr"},
+						Computed: false,
+					},
+					Property: &ast.Literal{Value: offset},
+					Computed: true,
+				}
+
+				code, resolved := handler.TryResolveMemberExpression(nestedExpr, sc.scope)
+				if !resolved {
+					t.Fatalf("ta.tr[%d] in %s should be resolved", offset, sc.name)
+				}
+
+				for _, part := range sc.wantParts {
+					if !contains(code, part) {
+						t.Errorf("ta.tr[%d] in %s missing %q, got: %s", offset, sc.name, part, code)
+					}
+				}
+
+				for _, bad := range sc.wantNot {
+					if contains(code, bad) {
+						t.Errorf("ta.tr[%d] in %s must not contain %q, got: %s", offset, sc.name, bad, code)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestTryResolveMemberExpression_TrSimpleSubscriptAllScopes(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	scopes := []struct {
+		name      string
+		scope     AccessScope
+		wantParts []string
+		wantNot   []string
+	}{
+		{"bar_loop", BarLoopScope, []string{"math.Max", "math.Abs", "ctx.Data", "High", "Low", "Close"}, []string{"ctx.BarIndex"}},
+		{"arrow", ArrowScope, []string{"math.Max", "math.Abs", "ctx.Data[barIdx]", "prevClose"}, []string{"i-"}},
+	}
+
+	for _, sc := range scopes {
+		for _, offset := range []int{1, 3} {
+			name := fmt.Sprintf("tr[%d]_%s", offset, sc.name)
+			t.Run(name, func(t *testing.T) {
+				expr := &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "tr"},
+					Property: &ast.Literal{Value: offset},
+					Computed: true,
+				}
+
+				code, resolved := handler.TryResolveMemberExpression(expr, sc.scope)
+				if !resolved {
+					t.Fatalf("tr[%d] in %s should be resolved", offset, sc.name)
+				}
+
+				for _, part := range sc.wantParts {
+					if !contains(code, part) {
+						t.Errorf("tr[%d] in %s missing %q, got: %s", offset, sc.name, part, code)
+					}
+				}
+
+				for _, bad := range sc.wantNot {
+					if contains(code, bad) {
+						t.Errorf("tr[%d] in %s must not contain %q, got: %s", offset, sc.name, bad, code)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestTryResolveMemberExpression_SessionNestedSubscript(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		sessionProp  string
+		offset       int
+		scope        AccessScope
+		wantContains []string
+	}{
+		{
+			"session.isfirstbar[0] bar loop",
+			"isfirstbar", 0, BarLoopScope,
+			[]string{"session_isfirstbarSeries", "GetCurrent()", "== 1.0"},
+		},
+		{
+			"session.isfirstbar[1] bar loop",
+			"isfirstbar", 1, BarLoopScope,
+			[]string{"session_isfirstbarSeries", "Get(1)", "== 1.0"},
+		},
+		{
+			"session.isfirstbar[0] arrow",
+			"isfirstbar", 0, ArrowScope,
+			[]string{"ctx.LookupSeries", "session_isfirstbarSeries", "GetCurrent()"},
+		},
+		{
+			"session.isfirstbar[1] arrow",
+			"isfirstbar", 1, ArrowScope,
+			[]string{"ctx.LookupSeries", "session_isfirstbarSeries", "Get(1)"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "session"},
+					Property: &ast.Identifier{Name: tt.sessionProp},
+					Computed: false,
+				},
+				Property: &ast.Literal{Value: tt.offset},
+				Computed: true,
+			}
+
+			code, resolved := handler.TryResolveMemberExpression(expr, tt.scope)
+			if !resolved {
+				t.Fatalf("%s should be resolved", tt.name)
+			}
+
+			for _, want := range tt.wantContains {
+				if !contains(code, want) {
+					t.Errorf("%s should contain %q, got: %s", tt.name, want, code)
+				}
+			}
+		})
+	}
+}
+
+func TestTryResolveMemberExpression_NamespaceDelegation(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+	resolver := NewBuiltinNamespaceResolver()
+
+	namespaces := map[string]string{
+		"barstate":  "isfirst",
+		"timeframe": "period",
+		"syminfo":   "tickerid",
+	}
+
+	for ns, prop := range namespaces {
+		t.Run(ns+"."+prop, func(t *testing.T) {
+			expected, found := resolver.Resolve(ns, prop)
+			if !found {
+				t.Fatalf("resolver.Resolve(%s, %s) not found", ns, prop)
+			}
+
+			expr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: ns},
+				Property: &ast.Identifier{Name: prop},
+			}
+			handlerCode, handlerFound := handler.TryResolveMemberExpression(expr, BarLoopScope)
+			if !handlerFound {
+				t.Fatalf("handler.TryResolveMemberExpression(%s.%s) not found", ns, prop)
+			}
+
+			if handlerCode != expected.Code {
+				t.Errorf("handler returned %q, resolver returned %q", handlerCode, expected.Code)
+			}
+		})
+	}
+}
+
+func TestTryResolveMemberExpression_SessionNamespaceArrow(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		prop         string
+		scope        AccessScope
+		expectedCode string
+	}{
+		{"session.isfirstbar bar loop", "isfirstbar", BarLoopScope, "session_isfirstbarSeries.GetCurrent() == 1.0"},
+		{"session.isfirstbar arrow", "isfirstbar", ArrowScope,
+			`func() bool { if s, ok := ctx.LookupSeries("session_isfirstbarSeries"); ok { return s.GetCurrent() == 1.0 }; return false }()`},
+		{"session.ismarket bar loop", "ismarket", BarLoopScope, "true"},
+		{"session.ismarket arrow", "ismarket", ArrowScope, "true"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "session"},
+				Property: &ast.Identifier{Name: tt.prop},
+			}
+			code, resolved := handler.TryResolveMemberExpression(expr, tt.scope)
+			if !resolved {
+				t.Fatalf("%s should be resolved", tt.name)
+			}
+			if code != tt.expectedCode {
+				t.Errorf("%s = %q, want %q", tt.name, code, tt.expectedCode)
+			}
+		})
+	}
+}
+
+func TestTryResolveMemberExpression_TaTrAllScopes(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	scopes := []struct {
+		name      string
+		scope     AccessScope
+		wantParts []string
+	}{
+		{"bar loop", BarLoopScope, []string{"bar.High", "bar.Low", "math.Max"}},
+		{"security", SecurityScope, []string{"highSeries.GetCurrent()", "lowSeries.GetCurrent()", "math.Max"}},
+		{"arrow", ArrowScope, []string{"ctx.Data[ctx.BarIndex]", "curBar", "math.Max"}},
+	}
+
+	for _, tt := range scopes {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "tr"},
+				Computed: false,
+			}
+			code, resolved := handler.TryResolveMemberExpression(expr, tt.scope)
+			if !resolved {
+				t.Fatalf("ta.tr in %s should be resolved", tt.name)
+			}
+			for _, part := range tt.wantParts {
+				if !strings.Contains(code, part) {
+					t.Errorf("ta.tr in %s missing %q, got: %s", tt.name, part, code)
+				}
+			}
+		})
 	}
 }

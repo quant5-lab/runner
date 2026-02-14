@@ -99,7 +99,7 @@ func (h *CrossInlineHandler) resolveArgument(arg ast.Expression, g *generator) (
 }
 
 func (h *CrossInlineHandler) resolveIdentifier(ident *ast.Identifier, g *generator) (string, string, error) {
-	if code, resolved := g.builtinHandler.TryResolveIdentifier(ident, false); resolved {
+	if code, resolved := g.builtinHandler.TryResolveIdentifier(ident, BarLoopScope); resolved {
 		prevCode := g.convertSeriesAccessToPrev(code)
 		return code, prevCode, nil
 	}

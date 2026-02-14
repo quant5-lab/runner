@@ -81,7 +81,7 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 	}
 
 	// Try other builtin resolution (high, low, close, etc.)
-	code, resolved := f.gen.builtinHandler.TryResolveIdentifier(id, false)
+	code, resolved := f.gen.builtinHandler.TryResolveIdentifier(id, ArrowScope)
 	if resolved {
 		return NewBuiltinIdentifierAccessor(code), nil
 	}
@@ -119,7 +119,7 @@ func (f *ArrowAwareAccessorFactory) createMemberAccessor(member *ast.MemberExpre
 		return NewArrowOHLCVFieldAccessGenerator(fieldName), nil
 	}
 
-	code, resolved := f.gen.builtinHandler.TryResolveMemberExpression(member, false)
+	code, resolved := f.gen.builtinHandler.TryResolveMemberExpression(member, ArrowScope)
 	if resolved {
 		return NewBuiltinIdentifierAccessor(code), nil
 	}

@@ -90,7 +90,7 @@ spread(src) =>
 plot(spread(open))
 `,
 			mustContainAll: []string{
-				"diff := (src - bar.Close)",
+				"diff := (src - ctx.Data[ctx.BarIndex].Close)",
 				"math.Abs(diff)",
 			},
 			forbiddenPattern: []string{

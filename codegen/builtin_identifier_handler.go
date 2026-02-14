@@ -11,14 +11,18 @@ type BuiltinIdentifierHandler struct {
 	formulaGen        *DerivedPriceFormulaGenerator
 	colorResolver     *ColorConstantResolver
 	namespaceResolver *BuiltinNamespaceResolver
+	arrowGen          *ArrowBuiltinAccessGenerator
 }
 
 func NewBuiltinIdentifierHandler() *BuiltinIdentifierHandler {
+	registry := NewBuiltinIdentifierRegistry()
+	formulaGen := NewDerivedPriceFormulaGenerator()
 	return &BuiltinIdentifierHandler{
-		registry:          NewBuiltinIdentifierRegistry(),
-		formulaGen:        NewDerivedPriceFormulaGenerator(),
+		registry:          registry,
+		formulaGen:        formulaGen,
 		colorResolver:     NewColorConstantResolver(),
 		namespaceResolver: NewBuiltinNamespaceResolver(),
+		arrowGen:          NewArrowBuiltinAccessGenerator(registry, formulaGen),
 	}
 }
 
@@ -58,17 +62,11 @@ func (h *BuiltinIdentifierHandler) GenerateCurrentBarAccess(name string) string 
 		return info.SeriesName + ".GetCurrent()"
 	}
 
+	if field, ok := OHLCVFieldName(name); ok {
+		return fmt.Sprintf("bar.%s", field)
+	}
+
 	switch name {
-	case "close":
-		return "bar.Close"
-	case "open":
-		return "bar.Open"
-	case "high":
-		return "bar.High"
-	case "low":
-		return "bar.Low"
-	case "volume":
-		return "bar.Volume"
 	case "tr":
 		return h.generateTrueRangeCalculation("bar")
 	case "bar_index":
@@ -103,17 +101,11 @@ func (h *BuiltinIdentifierHandler) GenerateSecurityContextAccess(name string) st
 		return info.SeriesName + ".GetCurrent()"
 	}
 
+	if _, ok := OHLCVFieldName(name); ok {
+		return fmt.Sprintf("%sSeries.GetCurrent()", name)
+	}
+
 	switch name {
-	case "close":
-		return "closeSeries.GetCurrent()"
-	case "open":
-		return "openSeries.GetCurrent()"
-	case "high":
-		return "highSeries.GetCurrent()"
-	case "low":
-		return "lowSeries.GetCurrent()"
-	case "volume":
-		return "volumeSeries.GetCurrent()"
 	case "tr":
 		return h.generateTrueRangeCalculationSeries()
 	case "bar_index":
@@ -178,19 +170,8 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 		return "timenow"
 	}
 
-	field := ""
-	switch name {
-	case "close":
-		field = "Close"
-	case "open":
-		field = "Open"
-	case "high":
-		field = "High"
-	case "low":
-		field = "Low"
-	case "volume":
-		field = "Volume"
-	default:
+	field, ok := OHLCVFieldName(name)
+	if !ok {
 		return ""
 	}
 
@@ -201,17 +182,17 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string) string {
 	switch property {
 	case "position_avg_price":
-		return "strategy_position_avg_priceSeries.Get(0)"
+		return StrategyPositionAvgPriceSeriesName + ".Get(0)"
 	case "position_size":
-		return "strategy_position_sizeSeries.Get(0)"
+		return StrategyPositionSizeSeriesName + ".Get(0)"
 	case "position_entry_name":
 		return "strat.GetPositionEntryName()"
 	case "equity":
-		return "strategy_equitySeries.Get(0)"
+		return StrategyEquitySeriesName + ".Get(0)"
 	case "netprofit":
-		return "strategy_netprofitSeries.Get(0)"
+		return StrategyNetProfitSeriesName + ".Get(0)"
 	case "closedtrades":
-		return "strategy_closedtradesSeries.Get(0)"
+		return StrategyClosedTradesSeriesName + ".Get(0)"
 	default:
 		return ""
 	}
@@ -250,6 +231,74 @@ func (h *BuiltinIdentifierHandler) IsDerivedPrice(name string) bool {
 	return h.registry.IsDerivedPrice(name)
 }
 
+func (h *BuiltinIdentifierHandler) generateBuiltinAccess(name string, scope AccessScope) string {
+	switch scope {
+	case ArrowScope:
+		return h.arrowGen.GenerateCurrentAccess(name)
+	case SecurityScope:
+		return h.GenerateSecurityContextAccess(name)
+	default:
+		return h.GenerateCurrentBarAccess(name)
+	}
+}
+
+func (h *BuiltinIdentifierHandler) generateHistoricalBuiltinAccess(name string, offset int, scope AccessScope) string {
+	if scope == ArrowScope {
+		return h.arrowGen.GenerateHistoricalAccess(name, offset)
+	}
+	return h.GenerateHistoricalAccess(name, offset)
+}
+
+func (h *BuiltinIdentifierHandler) generateStrategyAccess(property string, scope AccessScope) string {
+	if scope == ArrowScope {
+		return h.arrowGen.GenerateStrategyAccess(property)
+	}
+	return h.GenerateStrategyRuntimeAccess(property)
+}
+
+func (h *BuiltinIdentifierHandler) resolveNamespace(obj, prop string, scope AccessScope) (NamespaceResolution, bool) {
+	if scope == ArrowScope {
+		return h.namespaceResolver.ResolveForArrow(obj, prop)
+	}
+	return h.namespaceResolver.Resolve(obj, prop)
+}
+
+func (h *BuiltinIdentifierHandler) resolveNestedMemberExpression(expr *ast.MemberExpression, scope AccessScope) (string, bool) {
+	objMember, ok := expr.Object.(*ast.MemberExpression)
+	if !ok || !expr.Computed {
+		return "", false
+	}
+
+	baseObj, baseOk := objMember.Object.(*ast.Identifier)
+	baseProp, basePropOk := objMember.Property.(*ast.Identifier)
+	if !baseOk || !basePropOk {
+		return "", false
+	}
+
+	if baseObj.Name == "ta" && baseProp.Name == "tr" {
+		offset := h.extractOffset(expr.Property)
+		if scope == ArrowScope {
+			return TrueRangeArrowIIFE(fmt.Sprintf("%d", offset)), true
+		}
+		return h.generateHistoricalTrueRange(offset), true
+	}
+
+	key := baseObj.Name + "." + baseProp.Name
+	if h.registry.IsSessionSeriesBuiltin(key) {
+		offset := h.extractOffset(expr.Property)
+		seriesName := SessionSeriesName(key)
+		if scope == ArrowScope {
+			return SeriesLookupWithOffsetIIFE(seriesName, offset), true
+		}
+		if offset == 0 {
+			return fmt.Sprintf("%s.GetCurrent() == 1.0", seriesName), true
+		}
+		return fmt.Sprintf("%s.Get(%d) == 1.0", seriesName, offset), true
+	}
+
+	return "", false
+}
+
 func (h *BuiltinIdentifierHandler) GenerateDerivedPriceFormula(name, highAccess, lowAccess, closeAccess, openAccess string) string {
 	return h.formulaGen.Generate(name, highAccess, lowAccess, closeAccess, openAccess)
 }
@@ -264,7 +313,7 @@ func (h *BuiltinIdentifierHandler) ResolveCalendarBuiltins(detectedNames map[str
 	return resolved
 }
 
-func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, inSecurityContext bool) (string, bool) {
+func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, scope AccessScope) (string, bool) {
 	if h == nil || h.colorResolver == nil {
 		return "", false
 	}
@@ -277,45 +326,20 @@ func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, in
 		return fmt.Sprintf("%q", hex), true
 	}
 
-	if !h.IsBuiltinSeriesIdentifier(expr.Name) {
-		if h.registry.IsConstantBuiltin(expr.Name) {
-			return h.GenerateCurrentBarAccess(expr.Name), true
+	if h.IsBuiltinSeriesIdentifier(expr.Name) || h.registry.IsConstantBuiltin(expr.Name) {
+		code := h.generateBuiltinAccess(expr.Name, scope)
+		if code != "" {
+			return code, true
 		}
-		return "", false
 	}
 
-	if inSecurityContext {
-		return h.GenerateSecurityContextAccess(expr.Name), true
-	}
-
-	return h.GenerateCurrentBarAccess(expr.Name), true
+	return "", false
 }
 
-func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberExpression, inSecurityContext bool) (string, bool) {
+func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberExpression, scope AccessScope) (string, bool) {
 	obj, okObj := expr.Object.(*ast.Identifier)
 	if !okObj {
-		if objMember, ok := expr.Object.(*ast.MemberExpression); ok && expr.Computed {
-			baseObj, baseOk := objMember.Object.(*ast.Identifier)
-			baseProp, basePropOk := objMember.Property.(*ast.Identifier)
-
-			if baseOk && basePropOk && baseObj.Name == "ta" && baseProp.Name == "tr" {
-				offset := h.extractOffset(expr.Property)
-				return h.generateHistoricalTrueRange(offset), true
-			}
-
-			if baseOk && basePropOk {
-				key := baseObj.Name + "." + baseProp.Name
-				if h.registry.IsSessionSeriesBuiltin(key) {
-					offset := h.extractOffset(expr.Property)
-					seriesName := h.sessionSeriesName(key)
-					if offset == 0 {
-						return fmt.Sprintf("%s.GetCurrent() == 1.0", seriesName), true
-					}
-					return fmt.Sprintf("%s.Get(%d) == 1.0", seriesName, offset), true
-				}
-			}
-		}
-		return "", false
+		return h.resolveNestedMemberExpression(expr, scope)
 	}
 
 	prop, okProp := expr.Property.(*ast.Identifier)
@@ -324,11 +348,11 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 	}
 
 	if okProp && obj.Name == "ta" && prop.Name == "tr" {
-		return h.GenerateCurrentBarAccess("tr"), true
+		return h.generateBuiltinAccess("tr", scope), true
 	}
 
 	if okProp && h.IsStrategyRuntimeValue(obj.Name, prop.Name) {
-		return h.GenerateStrategyRuntimeAccess(prop.Name), true
+		return h.generateStrategyAccess(prop.Name, scope), true
 	}
 
 	if okProp && obj.Name == "strategy" && (prop.Name == "long" || prop.Name == "short") {
@@ -336,25 +360,24 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 	}
 
 	if okProp && h.namespaceResolver != nil {
-		if resolution, found := h.namespaceResolver.Resolve(obj.Name, prop.Name); found {
+		if resolution, found := h.resolveNamespace(obj.Name, prop.Name, scope); found {
 			return resolution.Code, true
 		}
 	}
 
 	if h.IsBuiltinSeriesIdentifier(obj.Name) && expr.Computed {
-		// Delegate variable subscripts to subscriptResolver for loop counter handling
 		if _, isLiteral := expr.Property.(*ast.Literal); !isLiteral {
 			return "", false
 		}
 
 		offset := h.extractOffset(expr.Property)
 		if offset == 0 {
-			if inSecurityContext {
-				return h.GenerateSecurityContextAccess(obj.Name), true
+			code := h.generateBuiltinAccess(obj.Name, scope)
+			if code != "" {
+				return code, true
 			}
-			return h.GenerateCurrentBarAccess(obj.Name), true
 		}
-		return h.GenerateHistoricalAccess(obj.Name, offset), true
+		return h.generateHistoricalBuiltinAccess(obj.Name, offset, scope), true
 	}
 
 	return "", false
@@ -392,19 +415,6 @@ func (h *BuiltinIdentifierHandler) extractOffset(expr ast.Expression) int {
 	default:
 		return 0
 	}
-}
-
-func (h *BuiltinIdentifierHandler) sessionSeriesName(key string) string {
-	nameMap := map[string]string{
-		"session.isfirstbar":         "session_isfirstbarSeries",
-		"session.islastbar":          "session_islastbarSeries",
-		"session.isfirstbar_regular": "session_isfirstbar_regularSeries",
-		"session.islastbar_regular":  "session_islastbar_regularSeries",
-	}
-	if name, ok := nameMap[key]; ok {
-		return name
-	}
-	return ""
 }
 
 func (h *BuiltinIdentifierHandler) generateTrueRangeCalculation(barAccessor string) string {

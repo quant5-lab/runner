@@ -71,9 +71,9 @@ plot(k)`,
 			mustContain: []string{
 				"func() (float64, float64)",
 				"ta.Stoch(",
-				"bar.Close",
-				"bar.High",
-				"bar.Low",
+				"ctx.Data[ctx.BarIndex].Close",
+				"ctx.Data[ctx.BarIndex].High",
+				"ctx.Data[ctx.BarIndex].Low",
 				"14",
 			},
 			mustNotContain: []string{

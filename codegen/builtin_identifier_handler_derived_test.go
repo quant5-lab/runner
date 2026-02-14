@@ -3,6 +3,8 @@ package codegen
 import (
 	"strings"
 	"testing"
+
+	"github.com/quant5-lab/runner/ast"
 )
 
 func TestBuiltinIdentifierHandler_DerivedPrices_IsBuiltinSeriesIdentifier(t *testing.T) {
@@ -300,6 +302,100 @@ func TestBuiltinIdentifierHandler_DerivedPrices_ConsistencyAcrossContexts(t *tes
 			}
 			if !strings.Contains(historical, "Series.Get(i-1)") {
 				t.Errorf("Historical access for %s should use Series.Get(offset)", price)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_DerivedPrices_ArrowScope(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		priceName    string
+		wantContains []string
+	}{
+		{
+			"hl2 arrow", "hl2",
+			[]string{"ctx.Data[ctx.BarIndex].High", "ctx.Data[ctx.BarIndex].Low", "/ 2"},
+		},
+		{
+			"hlc3 arrow", "hlc3",
+			[]string{"ctx.Data[ctx.BarIndex].High", "ctx.Data[ctx.BarIndex].Low", "ctx.Data[ctx.BarIndex].Close", "/ 3"},
+		},
+		{
+			"ohlc4 arrow", "ohlc4",
+			[]string{"ctx.Data[ctx.BarIndex].Open", "ctx.Data[ctx.BarIndex].High", "ctx.Data[ctx.BarIndex].Low", "ctx.Data[ctx.BarIndex].Close", "/ 4"},
+		},
+		{
+			"hlcc4 arrow", "hlcc4",
+			[]string{"ctx.Data[ctx.BarIndex].High", "ctx.Data[ctx.BarIndex].Low", "ctx.Data[ctx.BarIndex].Close", "/ 4"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.Identifier{Name: tt.priceName}
+			code, resolved := handler.TryResolveIdentifier(expr, ArrowScope)
+			if !resolved {
+				t.Fatalf("TryResolveIdentifier(%s, ArrowScope) not resolved", tt.priceName)
+			}
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(code, want) {
+					t.Errorf("%s arrow code should contain %q, got: %s", tt.priceName, want, code)
+				}
+			}
+
+			/* must NOT contain bar-loop patterns */
+			if strings.Contains(code, "bar.High") || strings.Contains(code, "bar.Low") {
+				t.Errorf("%s arrow code should not contain bar.* accessors, got: %s", tt.priceName, code)
+			}
+		})
+	}
+}
+
+func TestBuiltinIdentifierHandler_DerivedPrices_ArrowHistorical(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		priceName    string
+		offset       int
+		wantContains []string
+	}{
+		{
+			"hl2[1] arrow", "hl2", 1,
+			[]string{"ctx.BarIndex-1", "math.NaN()", "/ 2"},
+		},
+		{
+			"ohlc4[2] arrow", "ohlc4", 2,
+			[]string{"ctx.BarIndex-2", "math.NaN()", "/ 4"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := &ast.Identifier{Name: tt.priceName}
+			expr := &ast.MemberExpression{
+				Object:   obj,
+				Property: &ast.Literal{Value: tt.offset},
+				Computed: true,
+			}
+			code, resolved := handler.TryResolveMemberExpression(expr, ArrowScope)
+			if !resolved {
+				t.Fatalf("%s should be resolved", tt.name)
+			}
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(code, want) {
+					t.Errorf("%s should contain %q, got: %s", tt.name, want, code)
+				}
+			}
+
+			/* must NOT contain bar-loop index pattern */
+			if strings.Contains(code, "i-") && !strings.Contains(code, "ctx.BarIndex-") {
+				t.Errorf("%s should use ctx.BarIndex, not i, got: %s", tt.name, code)
 			}
 		})
 	}

@@ -1,5 +1,7 @@
 package codegen
 
+import "fmt"
+
 type NamespaceResolution struct {
 	Code   string
 	GoType GoValueType
@@ -35,6 +37,56 @@ func (r *BuiltinNamespaceResolver) Resolve(obj, prop string) (NamespaceResolutio
 func (r *BuiltinNamespaceResolver) IsNamespace(obj string) bool {
 	_, exists := r.dispatchers[obj]
 	return exists
+}
+
+/* Overrides builtins referencing outer-scope variables; delegates ctx-compatible cases to Resolve */
+func (r *BuiltinNamespaceResolver) ResolveForArrow(obj, prop string) (NamespaceResolution, bool) {
+	switch obj {
+	case "syminfo":
+		return r.resolveSyminfoForArrow(prop)
+	case "session":
+		return r.resolveSessionForArrow(prop)
+	default:
+		return r.Resolve(obj, prop)
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveSyminfoForArrow(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "tickerid", "ticker":
+		return NamespaceResolution{Code: "ctx.Symbol", GoType: GoString}, true
+	case "description":
+		return NamespaceResolution{Code: "ctx.Symbol", GoType: GoString}, true
+	default:
+		return r.resolveSyminfo(prop)
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveSessionForArrow(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "ismarket":
+		return NamespaceResolution{Code: "true", GoType: GoBool}, true
+	case "ispremarket":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "ispostmarket":
+		return NamespaceResolution{Code: "false", GoType: GoBool}, true
+	case "isfirstbar":
+		return NamespaceResolution{Code: arrowSessionBoolLookup(SessionIsFirstBarSeriesName), GoType: GoBool}, true
+	case "islastbar":
+		return NamespaceResolution{Code: arrowSessionBoolLookup(SessionIsLastBarSeriesName), GoType: GoBool}, true
+	case "isfirstbar_regular":
+		return NamespaceResolution{Code: arrowSessionBoolLookup(SessionIsFirstBarRegularSeriesName), GoType: GoBool}, true
+	case "islastbar_regular":
+		return NamespaceResolution{Code: arrowSessionBoolLookup(SessionIsLastBarRegularSeriesName), GoType: GoBool}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func arrowSessionBoolLookup(seriesName string) string {
+	return fmt.Sprintf(
+		`func() bool { if s, ok := ctx.LookupSeries(%q); ok { return s.GetCurrent() == 1.0 }; return false }()`,
+		seriesName)
 }
 
 func (r *BuiltinNamespaceResolver) resolveBarState(prop string) (NamespaceResolution, bool) {
@@ -144,13 +196,13 @@ func (r *BuiltinNamespaceResolver) resolveSession(prop string) (NamespaceResolut
 	case "ispostmarket":
 		return NamespaceResolution{Code: "false", GoType: GoBool}, true
 	case "isfirstbar":
-		return NamespaceResolution{Code: "session_isfirstbarSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+		return NamespaceResolution{Code: SessionIsFirstBarSeriesName + ".GetCurrent() == 1.0", GoType: GoBool}, true
 	case "islastbar":
-		return NamespaceResolution{Code: "session_islastbarSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+		return NamespaceResolution{Code: SessionIsLastBarSeriesName + ".GetCurrent() == 1.0", GoType: GoBool}, true
 	case "isfirstbar_regular":
-		return NamespaceResolution{Code: "session_isfirstbar_regularSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+		return NamespaceResolution{Code: SessionIsFirstBarRegularSeriesName + ".GetCurrent() == 1.0", GoType: GoBool}, true
 	case "islastbar_regular":
-		return NamespaceResolution{Code: "session_islastbar_regularSeries.GetCurrent() == 1.0", GoType: GoBool}, true
+		return NamespaceResolution{Code: SessionIsLastBarRegularSeriesName + ".GetCurrent() == 1.0", GoType: GoBool}, true
 	default:
 		return NamespaceResolution{}, false
 	}

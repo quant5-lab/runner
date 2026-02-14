@@ -13,7 +13,7 @@ type ArgumentExpressionGenerator struct {
 	parameterIndex    int
 	signatureRegistry *FunctionSignatureRegistry
 	builtinHandler    *BuiltinIdentifierHandler
-	inSecurityContext bool
+	scope             AccessScope
 	coercer           *NumericExpressionCoercer
 }
 
@@ -28,7 +28,7 @@ func NewArgumentExpressionGenerator(
 		parameterIndex:    paramIdx,
 		signatureRegistry: gen.funcSigRegistry,
 		builtinHandler:    gen.builtinHandler,
-		inSecurityContext: gen.inSecurityContext,
+		scope:             gen.accessScope(),
 		coercer:           NewNumericExpressionCoercer(gen.boolConverter),
 	}
 }
@@ -90,7 +90,7 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 		return id.Name, nil
 	}
 
-	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.inSecurityContext); resolved {
+	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.scope); resolved {
 		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
 
 		if hasSignature && paramType == ParamTypeSeries {
@@ -110,6 +110,12 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback string) (string, error) {
+	if g.scope == ArrowScope {
+		if _, ok := OHLCVFieldName(name); ok {
+			return SeriesPointerLookupIIFE(name + "Series"), nil
+		}
+		return fallback, nil
+	}
 	switch name {
 	case "close":
 		return "closeSeries", nil
@@ -127,6 +133,9 @@ func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback stri
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToValue(name, fallback string) (string, error) {
+	if g.scope != BarLoopScope {
+		return fallback, nil
+	}
 	switch name {
 	case "close":
 		return "closeSeries.Get(0)", nil

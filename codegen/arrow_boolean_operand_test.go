@@ -174,11 +174,11 @@ isBull() =>
 plot(isBull())
 `,
 			mustContainAll: []string{
-				"if (bar.Close > bar.Open) { return 1.0 }",
+				"if (ctx.Data[ctx.BarIndex].Close > ctx.Data[ctx.BarIndex].Open) { return 1.0 }",
 				"return 0.0",
 			},
 			forbiddenPattern: []string{
-				"return (bar.Close > bar.Open)\n",
+				"return (ctx.Data[ctx.BarIndex].Close > ctx.Data[ctx.BarIndex].Open)\n",
 			},
 		},
 		{

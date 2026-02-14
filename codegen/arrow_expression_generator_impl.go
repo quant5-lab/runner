@@ -149,7 +149,7 @@ func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (s
 		return access, nil
 	}
 
-	if code, resolved := e.gen.builtinHandler.TryResolveIdentifier(id, false); resolved {
+	if code, resolved := e.gen.builtinHandler.TryResolveIdentifier(id, ArrowScope); resolved {
 		return code, nil
 	}
 
@@ -262,7 +262,7 @@ func (e *ArrowExpressionGeneratorImpl) generateMemberExpression(mem *ast.MemberE
 		}
 	}
 
-	if code, resolved := e.gen.builtinHandler.TryResolveMemberExpression(mem, false); resolved {
+	if code, resolved := e.gen.builtinHandler.TryResolveMemberExpression(mem, ArrowScope); resolved {
 		return code, nil
 	}
 
@@ -357,6 +357,10 @@ func (e *ArrowExpressionGeneratorImpl) generateBuiltinSubscript(seriesName, inde
 
 	if handler.IsDerivedPrice(seriesName) {
 		return e.generateDerivedPriceSubscript(seriesName, indexCode)
+	}
+
+	if seriesName == "tr" {
+		return TrueRangeArrowIIFE(indexCode)
 	}
 
 	return OHLCVFieldArrowIIFE(capitalizeFirstLetter(seriesName), indexCode)

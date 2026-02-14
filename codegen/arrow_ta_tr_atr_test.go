@@ -172,7 +172,7 @@ func TestArrowTACall_TrHistoricalOffset(t *testing.T) {
 				Computed: true,
 			}
 
-			code, resolved := handler.TryResolveMemberExpression(nestedExpr, false)
+			code, resolved := handler.TryResolveMemberExpression(nestedExpr, BarLoopScope)
 			if !tt.expectValid {
 				if resolved {
 					t.Error("Expected unresolved for invalid offset, got resolved")

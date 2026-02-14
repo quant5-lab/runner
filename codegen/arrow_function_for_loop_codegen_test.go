@@ -406,10 +406,10 @@ calc(multiplier) =>
 plot(calc(2))
 `,
 			mustContainAll: []string{
-				"value := (bar.Close * multiplier)",
+				"value := (ctx.Data[ctx.BarIndex].Close * multiplier)",
 			},
 			forbiddenPattern: []string{
-				"float64((bar.Close * multiplier))", // Should not double-wrap
+				"float64((ctx.Data[ctx.BarIndex].Close * multiplier))", // Should not double-wrap
 			},
 			description: "non-literal expressions not wrapped in float64()",
 		},

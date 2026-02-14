@@ -819,7 +819,7 @@ getClose() =>
 result = getClose()
 plot(result)`,
 			mustContain: []string{
-				"return bar.Close",
+				"return ctx.Data[ctx.BarIndex].Close",
 			},
 		},
 		{

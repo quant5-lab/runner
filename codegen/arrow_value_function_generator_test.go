@@ -171,11 +171,11 @@ func TestArrowValueFunctionGenerator_Nz_BuiltinSeries(t *testing.T) {
 		builtin  string
 		expected string
 	}{
-		{"close", "close", "value.Nz(bar.Close, 0)"},
-		{"open", "open", "value.Nz(bar.Open, 0)"},
-		{"high", "high", "value.Nz(bar.High, 0)"},
-		{"low", "low", "value.Nz(bar.Low, 0)"},
-		{"volume", "volume", "value.Nz(bar.Volume, 0)"},
+		{"close", "close", "value.Nz(ctx.Data[ctx.BarIndex].Close, 0)"},
+		{"open", "open", "value.Nz(ctx.Data[ctx.BarIndex].Open, 0)"},
+		{"high", "high", "value.Nz(ctx.Data[ctx.BarIndex].High, 0)"},
+		{"low", "low", "value.Nz(ctx.Data[ctx.BarIndex].Low, 0)"},
+		{"volume", "volume", "value.Nz(ctx.Data[ctx.BarIndex].Volume, 0)"},
 	}
 
 	for _, tt := range tests {
@@ -281,7 +281,7 @@ func TestArrowValueFunctionGenerator_Na_AllContexts(t *testing.T) {
 		{
 			name:     "builtin series",
 			arg:      &ast.Identifier{Name: "close"},
-			expected: "math.IsNaN(bar.Close)",
+			expected: "math.IsNaN(ctx.Data[ctx.BarIndex].Close)",
 		},
 		{
 			name:     "literal",
@@ -360,7 +360,7 @@ func TestArrowValueFunctionGenerator_Fixnan_AllContexts(t *testing.T) {
 			name: "builtin series",
 			arg:  &ast.Identifier{Name: "close"},
 			requiredPatterns: []string{
-				"val := bar.Close",
+				"val := ctx.Data[ctx.BarIndex].Close",
 			},
 		},
 		{

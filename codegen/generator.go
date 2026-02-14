@@ -705,11 +705,16 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// StateManager for strategy.* runtime values (Series storage)
 	if g.hasStrategyRuntimeAccess {
 		code += g.ind() + "sm := strategy.NewStateManager(len(ctx.Data))\n"
-		code += g.ind() + "strategy_position_avg_priceSeries := sm.PositionAvgPriceSeries()\n"
-		code += g.ind() + "strategy_position_sizeSeries := sm.PositionSizeSeries()\n"
-		code += g.ind() + "strategy_equitySeries := sm.EquitySeries()\n"
-		code += g.ind() + "strategy_netprofitSeries := sm.NetProfitSeries()\n"
-		code += g.ind() + "strategy_closedtradesSeries := sm.ClosedTradesSeries()\n"
+		code += g.ind() + fmt.Sprintf("%s := sm.PositionAvgPriceSeries()\n", StrategyPositionAvgPriceSeriesName)
+		code += g.ind() + fmt.Sprintf("%s := sm.PositionSizeSeries()\n", StrategyPositionSizeSeriesName)
+		code += g.ind() + fmt.Sprintf("%s := sm.EquitySeries()\n", StrategyEquitySeriesName)
+		code += g.ind() + fmt.Sprintf("%s := sm.NetProfitSeries()\n", StrategyNetProfitSeriesName)
+		code += g.ind() + fmt.Sprintf("%s := sm.ClosedTradesSeries()\n", StrategyClosedTradesSeriesName)
+		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyPositionAvgPriceSeriesName, StrategyPositionAvgPriceSeriesName)
+		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyPositionSizeSeriesName, StrategyPositionSizeSeriesName)
+		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyEquitySeriesName, StrategyEquitySeriesName)
+		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyNetProfitSeriesName, StrategyNetProfitSeriesName)
+		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyClosedTradesSeriesName, StrategyClosedTradesSeriesName)
 		code += "\n"
 	}
 
@@ -949,7 +954,7 @@ func (g *generator) generateExpression(expr ast.Expression) (string, error) {
 		// In arrow function context or as call argument, return identifier directly
 		if g.inArrowFunctionBody {
 			// Check if it's a builtin identifier
-			if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+			if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {
 				return code, nil
 			}
 			// Check if it's a function parameter or variable
@@ -1180,7 +1185,7 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			return "bar_indexSeries.GetCurrent()", nil
 		}
 
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, ArrowScope); resolved {
 			return code, nil
 		}
 
@@ -1219,6 +1224,9 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			if obj, ok := e.Object.(*ast.Identifier); ok {
 				return g.subscriptResolver.ResolveSubscript(obj.Name, e.Property, g), nil
 			}
+		}
+		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, ArrowScope); resolved {
+			return code, nil
 		}
 		return g.generateMemberExpression(e)
 
@@ -1360,13 +1368,13 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 			condCode, consequentCode, alternateCode), nil
 
 	case *ast.Identifier:
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, false); resolved {
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, BarLoopScope); resolved {
 			return code, nil
 		}
 		return e.Name + "Series.Get(0)", nil
 
 	case *ast.MemberExpression:
-		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
+		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, BarLoopScope); resolved {
 			return code, nil
 		}
 		return g.extractSeriesExpression(e), nil
@@ -1487,7 +1495,7 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Identifier:
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {
 			return code, nil
 		}
 
@@ -1649,7 +1657,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 						sourceSeries = id.Name
 					}
 				}
-				if seriesCode, resolved := g.builtinHandler.TryResolveIdentifier(&ast.Identifier{Name: sourceSeries}, false); resolved {
+				if seriesCode, resolved := g.builtinHandler.TryResolveIdentifier(&ast.Identifier{Name: sourceSeries}, BarLoopScope); resolved {
 					code += g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, seriesCode)
 				} else {
 					code += g.ind() + fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", varName, sourceSeries)
@@ -2187,7 +2195,7 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 	case *ast.Identifier:
 		refName := expr.Name
 
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(expr, g.inSecurityContext); resolved {
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(expr, g.accessScope()); resolved {
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, code), nil
 		}
 
@@ -2911,7 +2919,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}
 
-		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, false); resolved {
+		if code, resolved := g.builtinHandler.TryResolveMemberExpression(e, BarLoopScope); resolved {
 			return code
 		}
 
@@ -2983,7 +2991,7 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return e.Name
 		}
 
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.inSecurityContext); resolved {
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {
 			return code
 		}
 
@@ -3222,6 +3230,13 @@ func (g *generator) generatePlaceholder() string {
 	g.indent--
 	code += g.ind() + "}\n"
 	return code
+}
+
+func (g *generator) accessScope() AccessScope {
+	if g.inArrowFunctionBody {
+		return ArrowScope
+	}
+	return ScopeFromSecurityFlag(g.inSecurityContext)
 }
 
 func (g *generator) ind() string {

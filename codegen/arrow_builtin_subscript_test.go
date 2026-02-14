@@ -45,7 +45,7 @@ func TestArrowBuiltinSubscript_RoutingCategories(t *testing.T) {
 		{"high", "high", "ohlcv", []string{"ctx.Data[barIdx].High"}, []string{"highSeries.Get("}},
 		{"low", "low", "ohlcv", []string{"ctx.Data[barIdx].Low"}, []string{"lowSeries.Get("}},
 		{"volume", "volume", "ohlcv", []string{"ctx.Data[barIdx].Volume"}, []string{"volumeSeries.Get("}},
-		{"tr", "tr", "ohlcv", []string{"ctx.Data[barIdx].Tr"}, []string{"trSeries.Get("}},
+		{"tr", "tr", "true_range", []string{"ctx.Data[barIdx]", "math.Max", "math.Abs", "prevClose"}, []string{"trSeries.Get(", "ctx.Data[barIdx].Tr"}},
 	}
 
 	for _, tt := range tests {
