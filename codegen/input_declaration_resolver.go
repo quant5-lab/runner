@@ -53,18 +53,18 @@ func (g *generator) tryRegisterInputHandlerConstant(varName, funcName string, ca
 }
 
 func (g *generator) inputHandlerForFunc(funcName string) func(*ast.CallExpression, string) (string, error) {
-	switch funcName {
-	case "input.float", "input.price":
+	switch InputValueKindOf(funcName) {
+	case InputValueFloat:
 		return g.inputHandler.GenerateInputFloat
-	case "input.int", "input.time":
+	case InputValueInt:
 		return g.inputHandler.GenerateInputInt
-	case "input.bool":
+	case InputValueBool:
 		return g.inputHandler.GenerateInputBool
-	case "input.string", "input.symbol", "input.timeframe", "input.text_area":
+	case InputValueString:
 		return g.inputHandler.GenerateInputString
-	case "input.session":
+	case InputValueSession:
 		return g.inputHandler.GenerateInputSession
-	case "input.color":
+	case InputValueColor:
 		return g.inputHandler.GenerateInputColor
 	default:
 		return nil

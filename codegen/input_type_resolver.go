@@ -2,6 +2,48 @@ package codegen
 
 import "github.com/quant5-lab/runner/ast"
 
+type InputValueKind int
+
+const (
+	InputValueUnknown InputValueKind = iota
+	InputValueFloat
+	InputValueInt
+	InputValueBool
+	InputValueString
+	InputValueSession
+	InputValueColor
+	InputValueSource
+)
+
+var inputValueKinds = map[string]InputValueKind{
+	"input.float":     InputValueFloat,
+	"input.int":       InputValueInt,
+	"input.bool":      InputValueBool,
+	"input.string":    InputValueString,
+	"input.session":   InputValueSession,
+	"input.source":    InputValueSource,
+	"input.symbol":    InputValueString,
+	"input.timeframe": InputValueString,
+	"input.text_area": InputValueString,
+	"input.price":     InputValueFloat,
+	"input.time":      InputValueInt,
+	"input.color":     InputValueColor,
+}
+
+func InputValueKindOf(name string) InputValueKind {
+	return inputValueKinds[name]
+}
+
+func IsInputFuncName(name string) bool {
+	_, ok := inputValueKinds[name]
+	return ok
+}
+
+func IsInputConstantFuncName(name string) bool {
+	kind, ok := inputValueKinds[name]
+	return ok && kind != InputValueSource
+}
+
 var v4InputTypeMapping = map[string]string{
 	"session":   "input.session",
 	"source":    "input.source",

@@ -101,11 +101,7 @@ func (a *SecurityCallAnalyzer) shouldRegisterTempVar(callInfo CallInfo) bool {
 		return true
 	}
 
-	isInputFunction := (callInfo.FuncName == "input.float" || callInfo.FuncName == "input.int" ||
-		callInfo.FuncName == "input.bool" || callInfo.FuncName == "input.string" ||
-		callInfo.FuncName == "input.session" || callInfo.FuncName == "input.source")
-
-	return isInputFunction
+	return IsInputFuncName(callInfo.FuncName)
 }
 
 func (a *SecurityCallAnalyzer) registerConditionals(callInfo CallInfo) {

@@ -25,13 +25,7 @@ func NewInputHandler() *InputHandler {
 }
 
 func (ih *InputHandler) DetectInputFunction(call *ast.CallExpression) bool {
-	funcName := extractFunctionNameFromCall(call)
-	return funcName == "input.float" || funcName == "input.int" ||
-		funcName == "input.bool" || funcName == "input.string" ||
-		funcName == "input.session" || funcName == "input.source" ||
-		funcName == "input.symbol" || funcName == "input.timeframe" ||
-		funcName == "input.text_area" || funcName == "input.price" ||
-		funcName == "input.time" || funcName == "input.color"
+	return IsInputFuncName(extractFunctionNameFromCall(call))
 }
 
 func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName string) (string, error) {

@@ -6,6 +6,178 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+func TestInputValueKindOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		funcName string
+		want     InputValueKind
+	}{
+		{"float explicit", "input.float", InputValueFloat},
+		{"price maps to float", "input.price", InputValueFloat},
+		{"int explicit", "input.int", InputValueInt},
+		{"time maps to int", "input.time", InputValueInt},
+		{"bool", "input.bool", InputValueBool},
+		{"string explicit", "input.string", InputValueString},
+		{"symbol maps to string", "input.symbol", InputValueString},
+		{"timeframe maps to string", "input.timeframe", InputValueString},
+		{"text_area maps to string", "input.text_area", InputValueString},
+		{"session distinct kind", "input.session", InputValueSession},
+		{"color", "input.color", InputValueColor},
+		{"source series kind", "input.source", InputValueSource},
+		{"unimplemented input.enum", "input.enum", InputValueUnknown},
+		{"non-input function", "ta.sma", InputValueUnknown},
+		{"empty string", "", InputValueUnknown},
+		{"partial match input prefix", "input", InputValueUnknown},
+		{"case sensitivity", "Input.Float", InputValueUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InputValueKindOf(tt.funcName)
+			if got != tt.want {
+				t.Errorf("InputValueKindOf(%q) = %d, want %d", tt.funcName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInputValueKindOf_AllRegisteredKinds(t *testing.T) {
+	allFuncNames := []string{
+		"input.float", "input.int", "input.bool", "input.string",
+		"input.session", "input.source", "input.symbol", "input.timeframe",
+		"input.text_area", "input.price", "input.time", "input.color",
+	}
+
+	seenKinds := make(map[InputValueKind]bool)
+	for _, name := range allFuncNames {
+		kind := InputValueKindOf(name)
+		if kind == InputValueUnknown {
+			t.Errorf("registered input function %q returned InputValueUnknown", name)
+		}
+		seenKinds[kind] = true
+	}
+
+	expectedKinds := []InputValueKind{
+		InputValueFloat, InputValueInt, InputValueBool,
+		InputValueString, InputValueSession, InputValueColor, InputValueSource,
+	}
+	for _, expected := range expectedKinds {
+		if !seenKinds[expected] {
+			t.Errorf("expected kind %d never returned by any registered function", expected)
+		}
+	}
+}
+
+func TestIsInputFuncName(t *testing.T) {
+	tests := []struct {
+		name     string
+		funcName string
+		want     bool
+	}{
+		{"float", "input.float", true},
+		{"int", "input.int", true},
+		{"bool", "input.bool", true},
+		{"string", "input.string", true},
+		{"session", "input.session", true},
+		{"source series", "input.source", true},
+		{"symbol", "input.symbol", true},
+		{"timeframe", "input.timeframe", true},
+		{"text_area", "input.text_area", true},
+		{"price", "input.price", true},
+		{"time", "input.time", true},
+		{"color", "input.color", true},
+		{"unimplemented enum", "input.enum", false},
+		{"ta function", "ta.sma", false},
+		{"empty", "", false},
+		{"prefix only", "input", false},
+		{"case mismatch", "Input.Float", false},
+		{"whitespace", " input.float", false},
+		{"suffix whitespace", "input.float ", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsInputFuncName(tt.funcName)
+			if got != tt.want {
+				t.Errorf("IsInputFuncName(%q) = %v, want %v", tt.funcName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsInputFuncName_ConsistencyWithInputValueKindOf(t *testing.T) {
+	testCases := []string{
+		"input.float", "input.int", "input.bool", "input.string",
+		"input.session", "input.source", "input.color",
+		"input.enum", "ta.sma", "", "unknown",
+	}
+
+	for _, name := range testCases {
+		isInput := IsInputFuncName(name)
+		kind := InputValueKindOf(name)
+		kindIndicatesInput := kind != InputValueUnknown
+
+		if isInput != kindIndicatesInput {
+			t.Errorf("inconsistency for %q: IsInputFuncName=%v but kind=%d", name, isInput, kind)
+		}
+	}
+}
+
+func TestIsInputConstantFuncName(t *testing.T) {
+	tests := []struct {
+		name     string
+		funcName string
+		want     bool
+	}{
+		{"float constant", "input.float", true},
+		{"int constant", "input.int", true},
+		{"bool constant", "input.bool", true},
+		{"string constant", "input.string", true},
+		{"session constant", "input.session", true},
+		{"symbol constant", "input.symbol", true},
+		{"timeframe constant", "input.timeframe", true},
+		{"text_area constant", "input.text_area", true},
+		{"price constant", "input.price", true},
+		{"time constant", "input.time", true},
+		{"color constant", "input.color", true},
+		{"source is series not constant", "input.source", false},
+		{"unimplemented enum", "input.enum", false},
+		{"ta function", "ta.sma", false},
+		{"empty", "", false},
+		{"prefix only", "input", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsInputConstantFuncName(tt.funcName)
+			if got != tt.want {
+				t.Errorf("IsInputConstantFuncName(%q) = %v, want %v", tt.funcName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsInputConstantFuncName_ConsistencyWithInputValueKindOf(t *testing.T) {
+	allFuncNames := []string{
+		"input.float", "input.int", "input.bool", "input.string",
+		"input.session", "input.source", "input.symbol", "input.timeframe",
+		"input.text_area", "input.price", "input.time", "input.color",
+	}
+
+	for _, name := range allFuncNames {
+		isConstant := IsInputConstantFuncName(name)
+		kind := InputValueKindOf(name)
+
+		if kind == InputValueSource && isConstant {
+			t.Errorf("%q has kind InputValueSource but IsInputConstantFuncName returned true", name)
+		}
+
+		if kind != InputValueSource && kind != InputValueUnknown && !isConstant {
+			t.Errorf("%q has constant kind %d but IsInputConstantFuncName returned false", name, kind)
+		}
+	}
+}
+
 func TestInputFuncNameFromLiteral(t *testing.T) {
 	tests := []struct {
 		name  string

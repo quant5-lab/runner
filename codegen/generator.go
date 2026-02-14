@@ -1637,9 +1637,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			}
 
 			// Handle input functions
-			if funcName == "input.float" || funcName == "input.int" ||
-				funcName == "input.bool" || funcName == "input.string" ||
-				funcName == "input.session" {
+			if IsInputConstantFuncName(funcName) {
 				// Already handled in first pass - skip code generation here
 				continue
 			}

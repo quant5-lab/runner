@@ -316,6 +316,15 @@ plot(close)
 		},
 		/* v5 direct call → const */
 		{
+			name: "v5_session",
+			pineScript: `//@version=5
+indicator("V5 Session")
+sess = input.session(defval="0930-1600", title="Session")
+plot(close)
+`,
+			expectedConst: `const sess = "0930-1600"`,
+		},
+		{
 			name: "v5_text_area",
 			pineScript: `//@version=5
 indicator("V5 Text Area")

@@ -567,6 +567,16 @@ func TestInputConstantExtractor_ExtractInputConstant_FallThrough(t *testing.T) {
 			expected: "\"D\"",
 		},
 		{
+			name:     "input.session routes to string extraction",
+			funcName: "input.session",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "0950-1345"},
+				},
+			},
+			expected: "\"0950-1345\"",
+		},
+		{
 			name:     "ta.sma returns empty (not input function)",
 			funcName: "ta.sma",
 			call: &ast.CallExpression{

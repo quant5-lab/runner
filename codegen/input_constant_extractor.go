@@ -27,16 +27,16 @@ func (ice *InputConstantExtractor) ExtractInputConstant(call *ast.CallExpression
 		return ""
 	}
 
-	switch funcName {
-	case "input.float", "input.price":
+	switch InputValueKindOf(funcName) {
+	case InputValueFloat:
 		return ice.extractInputFloatValue(call)
-	case "input.int", "input.time":
+	case InputValueInt:
 		return ice.extractInputIntValue(call)
-	case "input.bool":
+	case InputValueBool:
 		return ice.extractInputBoolValue(call)
-	case "input.string", "input.symbol", "input.timeframe", "input.text_area":
+	case InputValueString, InputValueSession:
 		return ice.extractInputStringValue(call)
-	case "input.color":
+	case InputValueColor:
 		return ice.extractInputColorValue(call)
 	default:
 		return ""
