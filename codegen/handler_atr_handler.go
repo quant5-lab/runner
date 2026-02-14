@@ -24,7 +24,12 @@ func (h *ATRHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	}
 
 	if periodResult.IsRuntimeDynamic() {
-		return "", fmt.Errorf("ta.atr period must be compile-time constant (PineScript requires simple int)")
+		dynamicGen := NewDynamicPeriodTAGenerator(g)
+		code, err := dynamicGen.Generate(varName, "ta.atr", nil, periodResult)
+		if err != nil {
+			return "", err
+		}
+		return g.indentCode(code), nil
 	}
 
 	return g.generateInlineATR(varName, periodResult.StaticValue)

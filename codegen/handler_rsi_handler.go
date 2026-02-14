@@ -24,7 +24,17 @@ func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	}
 
 	if comp.PeriodResult.IsRuntimeDynamic() {
-		return "", fmt.Errorf("ta.rsi period must be compile-time constant (PineScript requires simple int)")
+		dynamicGen := NewDynamicPeriodTAGenerator(g)
+		code, err := dynamicGen.Generate(varName, "ta.rsi", comp.SourceExpr, comp.PeriodResult)
+		if err != nil {
+			return "", err
+		}
+		suppress := ""
+		internalNames, _ := h.GetInternalSeriesNames(varName, call)
+		for _, name := range internalNames {
+			suppress += g.ind() + fmt.Sprintf("_ = %sSeries\n", name)
+		}
+		return g.indentCode(comp.Preamble + suppress + code), nil
 	}
 
 	code, err := g.generateRSI(varName, comp.PeriodResult.StaticValue, comp.AccessGen, comp.NeedsNaNCheck)
@@ -34,9 +44,6 @@ func (h *RSIHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	return comp.Preamble + code, nil
 }
 
-/* GetInternalSeriesNames implements CompositeIndicatorMetadata interface.
- * RSI requires 4 internal series for gains, losses, and their RMA smoothing.
- */
 func (h *RSIHandler) GetInternalSeriesNames(varName string, call *ast.CallExpression) ([]string, error) {
 	return []string{
 		fmt.Sprintf("_%s_gains", varName),
