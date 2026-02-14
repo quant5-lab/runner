@@ -1,6 +1,6 @@
-Remaining blockers: while loops (#1), ~~input.color (#15)~~, drawing objects line.*/label.* (#13)
+Remaining blockers: array type syntax (#12), ~~input.color (#15)~~, drawing objects line.*/label.* (#13)
 
-Parse: ❌ (while loop on line 111 — blocker #1)
+Parse: ❌ (unexpected token "[" at line 75 — array type declaration `line[]`)
 Generate: ❌ Not reached (also blocked by #13 line.*/label.*, ~~#15 input.color~~)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
