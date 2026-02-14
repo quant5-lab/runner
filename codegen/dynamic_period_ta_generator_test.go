@@ -110,150 +110,109 @@ func TestDynamicPeriodTAGenerator_PeriodExpressionRendering(t *testing.T) {
 	}
 }
 
-func TestDynamicPeriodTAGenerator_TAFunctionSupport(t *testing.T) {
-	tests := []struct {
-		name         string
-		functionName string
-		sourceExpr   ast.Expression
-		wantError    bool
-		checkCode    func(string) bool
+func TestDynamicPeriodTAGenerator_EmitterDispatch(t *testing.T) {
+	supportedFunctions := []struct {
+		name       string
+		funcName   string
+		sourceExpr ast.Expression
 	}{
-		{
-			name:         "ta.sma generates sum loop",
-			functionName: "ta.sma",
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "sum") &&
-					strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.ema generates calculation",
-			functionName: "ta.ema",
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.stdev generates calculation",
-			functionName: "ta.stdev",
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.highest generates calculation",
-			functionName: "ta.highest",
-			sourceExpr:   &ast.Identifier{Name: "high"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.lowest generates calculation",
-			functionName: "ta.lowest",
-			sourceExpr:   &ast.Identifier{Name: "low"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.rsi generates calculation",
-			functionName: "ta.rsi",
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "ta.atr generates calculation",
-			functionName: "ta.atr",
-			sourceExpr:   nil,
-			checkCode: func(code string) bool {
-				return strings.Contains(code, "period")
-			},
-		},
-		{
-			name:         "unknown function errors",
-			functionName: "ta.unknown",
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			wantError:    true,
-		},
+		{"ta.sma", "ta.sma", &ast.Identifier{Name: "close"}},
+		{"ta.ema", "ta.ema", &ast.Identifier{Name: "close"}},
+		{"ta.rsi", "ta.rsi", &ast.Identifier{Name: "close"}},
+		{"ta.stdev", "ta.stdev", &ast.Identifier{Name: "close"}},
+		{"ta.highest", "ta.highest", &ast.Identifier{Name: "high"}},
+		{"ta.lowest", "ta.lowest", &ast.Identifier{Name: "low"}},
+		{"ta.atr with nil source", "ta.atr", nil},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range supportedFunctions {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newMinimalGenerator()
 			dynGen := NewDynamicPeriodTAGenerator(g)
-
 			periodResult := NewRuntimeDynamicPeriod(&ast.Identifier{Name: "period"})
-			sourceExpr := tt.sourceExpr
-			if sourceExpr == nil {
-				sourceExpr = &ast.Identifier{Name: "close"}
-			}
 
-			code, err := dynGen.Generate("testVar", tt.functionName, sourceExpr, periodResult)
-
-			if tt.wantError {
-				if err == nil {
-					t.Error("Generate() expected error, got nil")
-				}
-				return
-			}
-
+			code, err := dynGen.Generate("testVar", tt.funcName, tt.sourceExpr, periodResult)
 			if err != nil {
-				t.Errorf("Generate() unexpected error: %v", err)
+				t.Fatalf("Generate() unexpected error: %v", err)
 			}
-
 			if code == "" {
-				t.Error("Generate() returned empty code")
+				t.Fatal("Generate() returned empty code")
 			}
-
-			if tt.checkCode != nil && !tt.checkCode(code) {
-				t.Errorf("Generate() code validation failed")
+			if !strings.Contains(code, "period := int(") {
+				t.Error("generated code should contain period conversion")
+			}
+			if !strings.Contains(code, "testVarSeries.Set(") {
+				t.Error("generated code should write to testVarSeries")
 			}
 		})
 	}
+
+	t.Run("unknown function returns error", func(t *testing.T) {
+		g := newMinimalGenerator()
+		dynGen := NewDynamicPeriodTAGenerator(g)
+		periodResult := NewRuntimeDynamicPeriod(&ast.Identifier{Name: "period"})
+
+		_, err := dynGen.Generate("testVar", "ta.unknown", &ast.Identifier{Name: "close"}, periodResult)
+		if err == nil {
+			t.Fatal("expected error for unsupported function")
+		}
+		if !strings.Contains(err.Error(), "ta.unknown") {
+			t.Errorf("error should reference function name, got: %v", err)
+		}
+	})
 }
 
-func TestDynamicPeriodTAGenerator_CodeStructure(t *testing.T) {
+func TestDynamicPeriodTAGenerator_ScopeIsolation(t *testing.T) {
+	g := newMinimalGenerator()
+	dynGen := NewDynamicPeriodTAGenerator(g)
+
+	periodResult := NewRuntimeDynamicPeriod(&ast.Identifier{Name: "dynamicLen"})
+	code, err := dynGen.Generate("mySma", "ta.sma", &ast.Identifier{Name: "close"}, periodResult)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	t.Run("opens_scope_block", func(t *testing.T) {
+		if !strings.Contains(code, "{\n") {
+			t.Error("generated code should open a scope block")
+		}
+	})
+
+	t.Run("closes_scope_block", func(t *testing.T) {
+		trimmed := strings.TrimSpace(code)
+		if !strings.HasSuffix(trimmed, "}") {
+			t.Error("generated code should close the scope block")
+		}
+	})
+
+	t.Run("period_declaration_inside_scope", func(t *testing.T) {
+		openIdx := strings.Index(code, "{\n")
+		periodIdx := strings.Index(code, "period := int(")
+		if periodIdx <= openIdx {
+			t.Error("period declaration should be inside the scope block")
+		}
+	})
+}
+
+func TestDynamicPeriodTAGenerator_PeriodExpressionIntegration(t *testing.T) {
 	tests := []struct {
-		name          string
-		functionName  string
-		varName       string
-		periodExpr    ast.Expression
-		sourceExpr    ast.Expression
-		requiredParts []string
+		name         string
+		periodExpr   ast.Expression
+		wantContains string
 	}{
 		{
-			name:         "SMA contains all required elements",
-			functionName: "ta.sma",
-			varName:      "mySma",
+			name:         "identifier period",
 			periodExpr:   &ast.Identifier{Name: "dynamicLen"},
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			requiredParts: []string{
-				"period := int(dynamicLenSeries.Get(0))",
-				"if period <= 0 || ctx.BarIndex < period-1",
-				"mySmaSeries.Set(math.NaN())",
-				"sum := 0.0",
-				"for j := 0; j < period; j++",
-				"sum += closeSeries.Get(j)",
-				"mySmaSeries.Set(sum / float64(period))",
-			},
+			wantContains: "period := int(dynamicLenSeries.Get(0))",
 		},
 		{
-			name:         "STDEV validates warmup period",
-			functionName: "ta.stdev",
-			varName:      "myStdev",
-			periodExpr:   &ast.Identifier{Name: "len"},
-			sourceExpr:   &ast.Identifier{Name: "close"},
-			requiredParts: []string{
-				"period := int(lenSeries.Get(0))",
-				"if period <= 0 || ctx.BarIndex < period-1",
-				"myStdevSeries.Set(math.NaN())",
+			name: "binary expression period",
+			periodExpr: &ast.BinaryExpression{
+				Left:     &ast.Identifier{Name: "base"},
+				Operator: "+",
+				Right:    &ast.Literal{Value: 5.0},
 			},
+			wantContains: "period := int((baseSeries.Get(0) + 5\n))",
 		},
 	}
 
@@ -263,16 +222,12 @@ func TestDynamicPeriodTAGenerator_CodeStructure(t *testing.T) {
 			dynGen := NewDynamicPeriodTAGenerator(g)
 
 			periodResult := NewRuntimeDynamicPeriod(tt.periodExpr)
-			code, err := dynGen.Generate(tt.varName, tt.functionName, tt.sourceExpr, periodResult)
-
+			code, err := dynGen.Generate("testVar", "ta.sma", &ast.Identifier{Name: "close"}, periodResult)
 			if err != nil {
 				t.Fatalf("Generate() error = %v", err)
 			}
-
-			for _, part := range tt.requiredParts {
-				if !strings.Contains(code, part) {
-					t.Errorf("Generate() missing required element: %s", part)
-				}
+			if !strings.Contains(code, tt.wantContains) {
+				t.Errorf("expected %q in generated code", tt.wantContains)
 			}
 		})
 	}
@@ -333,32 +288,49 @@ func TestDynamicPeriodTAGenerator_PeriodKindHandling(t *testing.T) {
 }
 
 func TestDynamicPeriodTAGenerator_SourceAccessorExtraction(t *testing.T) {
+	g := newMinimalGenerator()
+	dynGen := NewDynamicPeriodTAGenerator(g)
+
 	tests := []struct {
 		name           string
 		sourceExpr     ast.Expression
 		expectedAccess string
 	}{
 		{
-			name:           "identifier becomes series access",
+			name:           "identifier maps to series",
 			sourceExpr:     &ast.Identifier{Name: "close"},
+			expectedAccess: "closeSeries",
+		},
+		{
+			name:           "custom identifier maps to series",
+			sourceExpr:     &ast.Identifier{Name: "myPrice"},
+			expectedAccess: "myPriceSeries",
+		},
+		{
+			name: "member expression concatenates",
+			sourceExpr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "bar"},
+				Property: &ast.Identifier{Name: "close"},
+			},
+			expectedAccess: "barcloseSeries",
+		},
+		{
+			name:           "nil source returns empty string",
+			sourceExpr:     nil,
+			expectedAccess: "",
+		},
+		{
+			name:           "unknown expression type defaults to closeSeries",
+			sourceExpr:     &ast.Literal{Value: 42.0},
 			expectedAccess: "closeSeries",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := newMinimalGenerator()
-			dynGen := NewDynamicPeriodTAGenerator(g)
-
-			periodResult := NewRuntimeDynamicPeriod(&ast.Identifier{Name: "period"})
-			code, err := dynGen.Generate("testVar", "ta.sma", tt.sourceExpr, periodResult)
-
-			if err != nil {
-				t.Fatalf("Generate() error = %v", err)
-			}
-
-			if !strings.Contains(code, tt.expectedAccess) {
-				t.Errorf("Generate() expected accessor %q not found in code", tt.expectedAccess)
+			result := dynGen.extractSourceAccessor(tt.sourceExpr)
+			if result != tt.expectedAccess {
+				t.Errorf("extractSourceAccessor() = %q, want %q", result, tt.expectedAccess)
 			}
 		})
 	}

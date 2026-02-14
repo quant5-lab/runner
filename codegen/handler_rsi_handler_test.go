@@ -7,7 +7,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestRSIHandler_TAFunctionHandlerInterface validates RSIHandler implements TAFunctionHandler correctly */
 func TestRSIHandler_TAFunctionHandlerInterface(t *testing.T) {
 	handler := &RSIHandler{}
 
@@ -33,7 +32,6 @@ func TestRSIHandler_TAFunctionHandlerInterface(t *testing.T) {
 	})
 }
 
-/* TestRSIHandler_CodeGenerationDispatch validates handler generates code via generator */
 func TestRSIHandler_CodeGenerationDispatch(t *testing.T) {
 	handler := &RSIHandler{}
 	gen := newTestGenerator()
@@ -56,7 +54,7 @@ func TestRSIHandler_CodeGenerationDispatch(t *testing.T) {
 
 	t.Run("contains_rsi_calculation", func(t *testing.T) {
 		if !strings.Contains(code, "rs :=") && !strings.Contains(code, "rsi :=") {
-			t.Error("Generated code missing RSI calculation (code should be self-explanatory)")
+			t.Error("missing RSI calculation logic")
 		}
 	})
 
@@ -67,7 +65,6 @@ func TestRSIHandler_CodeGenerationDispatch(t *testing.T) {
 	})
 }
 
-/* TestRSIHandler_IntegrationWithTARegistry validates TAFunctionRegistry routes to RSIHandler */
 func TestRSIHandler_IntegrationWithTARegistry(t *testing.T) {
 	registry := NewTAFunctionRegistry()
 
@@ -116,7 +113,6 @@ func TestRSIHandler_IntegrationWithTARegistry(t *testing.T) {
 	})
 }
 
-/* TestRSIHandler_CompositeIndicatorMetadataInterface validates metadata interface implementation */
 func TestRSIHandler_CompositeIndicatorMetadataInterface(t *testing.T) {
 	handler := &RSIHandler{}
 
@@ -188,7 +184,6 @@ func TestRSIHandler_CompositeIndicatorMetadataInterface(t *testing.T) {
 	})
 }
 
-/* TestRSIHandler_ErrorHandling validates error cases */
 func TestRSIHandler_ErrorHandling(t *testing.T) {
 	handler := &RSIHandler{}
 	gen := newTestGenerator()
@@ -234,6 +229,51 @@ func TestRSIHandler_ErrorHandling(t *testing.T) {
 
 		if len(seriesNames) != 4 {
 			t.Errorf("Expected 4 series even with nil call, got %d", len(seriesNames))
+		}
+	})
+}
+
+func TestRSIHandler_DynamicPeriodDelegation(t *testing.T) {
+	handler := &RSIHandler{}
+	gen := newTestGenerator()
+
+	t.Run("delegates_to_dynamic_generator", func(t *testing.T) {
+		call := &ast.CallExpression{
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Identifier{Name: "dynamicLen"},
+			},
+		}
+
+		code, err := handler.GenerateCode(gen, "myRsi", call)
+		if err != nil {
+			t.Fatalf("GenerateCode() error = %v", err)
+		}
+
+		if code == "" {
+			t.Fatal("GenerateCode() returned empty string for dynamic period")
+		}
+
+		if !strings.Contains(code, "myRsiSeries.Set(") {
+			t.Error("dynamic RSI should write to myRsiSeries")
+		}
+	})
+
+	t.Run("static_period_uses_standard_path", func(t *testing.T) {
+		call := &ast.CallExpression{
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Literal{Value: 14},
+			},
+		}
+
+		code, err := handler.GenerateCode(gen, "myRsi", call)
+		if err != nil {
+			t.Fatalf("GenerateCode() error = %v", err)
+		}
+
+		if strings.Contains(code, "period := int(") {
+			t.Error("static period RSI should not contain dynamic period conversion")
 		}
 	})
 }
