@@ -177,6 +177,14 @@ func evaluateOHLCVAtBar(id *ast.Identifier, secCtx *context.Context, barIdx int)
 		return bar.Low, nil
 	case "volume":
 		return bar.Volume, nil
+	case "ohlc4":
+		return (bar.Open + bar.High + bar.Low + bar.Close) / 4, nil
+	case "hlc3":
+		return (bar.High + bar.Low + bar.Close) / 3, nil
+	case "hl2":
+		return (bar.High + bar.Low) / 2, nil
+	case "hlcc4":
+		return (bar.High + bar.Low + bar.Close + bar.Close) / 4, nil
 	default:
 		return 0.0, newUnknownIdentifierError(id.Name)
 	}

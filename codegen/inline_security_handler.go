@@ -36,37 +36,11 @@ func (h *SecurityInlineHandler) GenerateInline(expr *ast.CallExpression, g *gene
 	}
 
 	expressionArg := expr.Arguments[2]
-	lookahead := h.extractLookahead(expr.Arguments)
+	lookahead := resolveSecurityLookahead(expr, g.pineVersion)
 
 	g.hasSecurityCalls = true
 
 	return h.generateIIFE(symbolResult, timeframeResult, expressionArg, lookahead, g)
-}
-
-func (h *SecurityInlineHandler) extractLookahead(args []ast.Expression) bool {
-	if len(args) < 4 {
-		return false
-	}
-
-	resolver := NewConstantResolver()
-	fourthArg := args[3]
-
-	if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
-		for _, prop := range objExpr.Properties {
-			if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
-				if resolved, ok := resolver.ResolveToBool(prop.Value); ok {
-					return resolved
-				}
-				break
-			}
-		}
-	} else {
-		if resolved, ok := resolver.ResolveToBool(fourthArg); ok {
-			return resolved
-		}
-	}
-
-	return false
 }
 
 func (h *SecurityInlineHandler) generateIIFE(symbolResult, timeframeResult *ExtractionResult, exprArg ast.Expression, lookahead bool, g *generator) (string, error) {
@@ -106,28 +80,14 @@ func (h *SecurityInlineHandler) generateIIFE(symbolResult, timeframeResult *Extr
 func (h *SecurityInlineHandler) generateExpressionEvaluation(exprArg ast.Expression, g *generator) (string, error) {
 	switch expr := exprArg.(type) {
 	case *ast.Identifier:
-		return h.generateOHLCVAccess(expr.Name), nil
+		if fieldExpr, ok := SecurityBarFieldExpression(expr.Name, "secCtx.Data[secBarIdx]"); ok {
+			return "\t\treturn " + fieldExpr + "\n", nil
+		}
+		return "\t\treturn math.NaN()\n", nil
 	case *ast.CallExpression, *ast.BinaryExpression, *ast.ConditionalExpression:
 		return h.generateStreamingEvaluation(exprArg, g)
 	default:
 		return "\t\treturn math.NaN()\n", nil
-	}
-}
-
-func (h *SecurityInlineHandler) generateOHLCVAccess(fieldName string) string {
-	switch fieldName {
-	case "close":
-		return "\t\treturn secCtx.Data[secBarIdx].Close\n"
-	case "open":
-		return "\t\treturn secCtx.Data[secBarIdx].Open\n"
-	case "high":
-		return "\t\treturn secCtx.Data[secBarIdx].High\n"
-	case "low":
-		return "\t\treturn secCtx.Data[secBarIdx].Low\n"
-	case "volume":
-		return "\t\treturn secCtx.Data[secBarIdx].Volume\n"
-	default:
-		return "\t\treturn math.NaN()\n"
 	}
 }
 

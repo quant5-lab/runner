@@ -35,10 +35,20 @@ func buildVariableMap(program *ast.Program) map[string]string {
 				if decl.Init == nil {
 					continue
 				}
+				id, ok := decl.ID.(*ast.Identifier)
+				if !ok {
+					continue
+				}
 				if lit, ok := decl.Init.(*ast.Literal); ok {
 					if s, ok := lit.Value.(string); ok {
-						if id, ok := decl.ID.(*ast.Identifier); ok {
-							vars[id.Name] = strings.Trim(s, "\"'")
+						vars[id.Name] = strings.Trim(s, "\"'")
+					}
+					continue
+				}
+				if call, ok := decl.Init.(*ast.CallExpression); ok {
+					if isInputCallExpr(call) {
+						if defval := extractInputDefvalLiteral(call); defval != "" {
+							vars[id.Name] = strings.Trim(defval, "\"'")
 						}
 					}
 				}

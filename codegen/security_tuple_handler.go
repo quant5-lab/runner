@@ -57,7 +57,7 @@ func parseTupleSecurityArguments(g *generator, varNames []string, call *ast.Call
 		symbolResult:    symbolResult,
 		timeframeResult: timeframeResult,
 		cacheKey:        NewSecurityCacheKeyBuilder().Build(symbolResult, timeframeResult),
-		lookahead:       extractSecurityLookahead(call),
+		lookahead:       resolveSecurityLookahead(call, g.pineVersion),
 	}, nil
 }
 

@@ -43,7 +43,7 @@ func (g *ArrowSecurityCallGenerator) Generate(call *ast.CallExpression) (string,
 
 	g.gen.hasSecurityCalls = true
 
-	lookahead := extractSecurityLookahead(call)
+	lookahead := resolveSecurityLookahead(call, g.gen.pineVersion)
 	exprArg := call.Arguments[2]
 
 	return g.generateIIFE(symbolResult, timeframeResult, exprArg, lookahead)
@@ -85,7 +85,10 @@ func (g *ArrowSecurityCallGenerator) generateIIFE(symbolResult, timeframeResult 
 
 func (g *ArrowSecurityCallGenerator) generateEvaluation(exprArg ast.Expression) (string, error) {
 	if id, ok := exprArg.(*ast.Identifier); ok {
-		return generateOHLCVFieldAccess(id.Name), nil
+		if expr, ok := SecurityBarFieldExpression(id.Name, "secCtx.Data[secBarIdx]"); ok {
+			return "\t\treturn " + expr + "\n", nil
+		}
+		return "\t\treturn math.NaN()\n", nil
 	}
 	return g.generateStreamingEvaluation(exprArg)
 }
@@ -104,21 +107,4 @@ func (g *ArrowSecurityCallGenerator) generateStreamingEvaluation(exprArg ast.Exp
 	b.WriteString("\t\tif evalErr != nil { return math.NaN() }\n")
 	b.WriteString("\t\treturn secValue\n")
 	return b.String(), nil
-}
-
-func generateOHLCVFieldAccess(fieldName string) string {
-	switch fieldName {
-	case "close":
-		return "\t\treturn secCtx.Data[secBarIdx].Close\n"
-	case "open":
-		return "\t\treturn secCtx.Data[secBarIdx].Open\n"
-	case "high":
-		return "\t\treturn secCtx.Data[secBarIdx].High\n"
-	case "low":
-		return "\t\treturn secCtx.Data[secBarIdx].Low\n"
-	case "volume":
-		return "\t\treturn secCtx.Data[secBarIdx].Volume\n"
-	default:
-		return "\t\treturn math.NaN()\n"
-	}
 }

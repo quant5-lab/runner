@@ -75,6 +75,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Conversion error: %v\n", err)
 		os.Exit(1)
 	}
+	estreeAST.PineVersion = pineVersion
 
 	identifierSanitizer := preprocessor.NewIdentifierSanitizer()
 	estreeAST, err = identifierSanitizer.Transform(estreeAST)

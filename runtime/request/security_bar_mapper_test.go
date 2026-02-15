@@ -151,7 +151,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   0,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "mid day 1 with lookahead on",
@@ -165,7 +165,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   1,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "last bar of day 1 with lookahead on",
@@ -179,7 +179,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   2,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "first bar of day 2 with lookahead on",

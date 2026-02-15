@@ -109,9 +109,8 @@ func TestSecurityInlineHandler_GenerateInline_ArgumentValidation(t *testing.T) {
 	}
 }
 
-func TestSecurityInlineHandler_GenerateInline_OHLCVFields(t *testing.T) {
+func TestSecurityInlineHandler_GenerateInline_FieldAccess(t *testing.T) {
 	handler := NewSecurityInlineHandler()
-	g := newTestGenerator()
 
 	tests := []struct {
 		field        string
@@ -122,10 +121,15 @@ func TestSecurityInlineHandler_GenerateInline_OHLCVFields(t *testing.T) {
 		{"high", "secCtx.Data[secBarIdx].High"},
 		{"low", "secCtx.Data[secBarIdx].Low"},
 		{"volume", "secCtx.Data[secBarIdx].Volume"},
+		{"ohlc4", "/ 4"},
+		{"hlc3", "/ 3"},
+		{"hl2", "/ 2"},
+		{"hlcc4", "/ 4"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.field, func(t *testing.T) {
+			g := newTestGenerator()
 			call := &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "request"},
@@ -245,30 +249,24 @@ func TestSecurityInlineHandler_GenerateInline_ComplexExpressions(t *testing.T) {
 	}
 }
 
-func TestSecurityInlineHandler_GenerateOHLCVAccess(t *testing.T) {
+func TestSecurityInlineHandler_GenerateInline_UnknownFieldFallback(t *testing.T) {
 	handler := NewSecurityInlineHandler()
+	g := newTestGenerator()
 
-	tests := []struct {
-		field    string
-		expected string
-	}{
-		{"close", "\t\treturn secCtx.Data[secBarIdx].Close\n"},
-		{"open", "\t\treturn secCtx.Data[secBarIdx].Open\n"},
-		{"high", "\t\treturn secCtx.Data[secBarIdx].High\n"},
-		{"low", "\t\treturn secCtx.Data[secBarIdx].Low\n"},
-		{"volume", "\t\treturn secCtx.Data[secBarIdx].Volume\n"},
-		{"invalid", "\t\treturn math.NaN()\n"},
-		{"", "\t\treturn math.NaN()\n"},
-		{"Close", "\t\treturn math.NaN()\n"},
+	call := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "security"},
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "BTCUSDT"},
+			&ast.Literal{Value: "1D"},
+			&ast.Identifier{Name: "invalid_field"},
+		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.field, func(t *testing.T) {
-			result := handler.generateOHLCVAccess(tt.field)
-			if result != tt.expected {
-				t.Errorf("generateOHLCVAccess(%q) = %q, want %q", tt.field, result, tt.expected)
-			}
-		})
+	result, err := handler.GenerateInline(call, g)
+	if err != nil {
+		t.Fatalf("GenerateInline failed: %v", err)
+	}
+	if !strings.Contains(result, "math.NaN()") {
+		t.Error("unknown identifier field should return NaN")
 	}
 }
 
@@ -308,7 +306,6 @@ func TestSecurityInlineHandler_IIFEStructure(t *testing.T) {
 		}
 	}
 
-	/* Check for either constant key or fmt.Sprintf pattern */
 	hasConstantKey := strings.Contains(result, `secKey := "`)
 	hasSprintfKey := strings.Contains(result, "secKey := fmt.Sprintf(")
 	if !hasConstantKey && !hasSprintfKey {
@@ -316,15 +313,12 @@ func TestSecurityInlineHandler_IIFEStructure(t *testing.T) {
 	}
 
 	if strings.HasPrefix(result, "(func() float64 {") && strings.HasSuffix(result, "}())") {
-		// Valid IIFE structure
 	} else {
 		t.Error("IIFE structure invalid: should start with '(func() float64 {' and end with '}())'")
 	}
 }
 
-func TestSecurityInlineHandler_ExtractLookahead(t *testing.T) {
-	handler := NewSecurityInlineHandler()
-
+func TestExtractSecurityLookahead(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []ast.Expression
@@ -424,9 +418,55 @@ func TestSecurityInlineHandler_ExtractLookahead(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := handler.extractLookahead(tt.args)
+			call := &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "security"},
+				Arguments: tt.args,
+			}
+			result := extractSecurityLookahead(call)
 			if result != tt.expected {
-				t.Errorf("extractLookahead() = %v, want %v", result, tt.expected)
+				t.Errorf("extractSecurityLookahead() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolveSecurityLookahead(t *testing.T) {
+	threeArgs := []ast.Expression{
+		&ast.Literal{Value: "BTCUSDT"},
+		&ast.Literal{Value: "1D"},
+		&ast.Identifier{Name: "close"},
+	}
+	fourArgsExplicitOff := []ast.Expression{
+		&ast.Literal{Value: "BTCUSDT"},
+		&ast.Literal{Value: "1D"},
+		&ast.Identifier{Name: "close"},
+		&ast.Literal{Value: false},
+	}
+
+	tests := []struct {
+		name        string
+		args        []ast.Expression
+		pineVersion int
+		expected    bool
+	}{
+		{"v2 no 4th arg defaults on", threeArgs, 2, true},
+		{"v1 no 4th arg defaults on", threeArgs, 1, true},
+		{"v3 no 4th arg defaults off", threeArgs, 3, false},
+		{"v4 no 4th arg defaults off", threeArgs, 4, false},
+		{"v5 no 4th arg defaults off", threeArgs, 5, false},
+		{"v0 no 4th arg defaults off", threeArgs, 0, false},
+		{"v2 explicit off stays off", fourArgsExplicitOff, 2, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "security"},
+				Arguments: tt.args,
+			}
+			result := resolveSecurityLookahead(call, tt.pineVersion)
+			if result != tt.expected {
+				t.Errorf("resolveSecurityLookahead() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

@@ -6,8 +6,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-// SecurityExpressionHandler generates code for security() expression evaluation
-// Handles historical offset extraction and bar index adjustment
 type SecurityExpressionHandler struct {
 	indentFunc           func() string
 	incrementIndent      func()
@@ -40,23 +38,16 @@ func NewSecurityExpressionHandler(config SecurityExpressionConfig) *SecurityExpr
 	}
 }
 
-// GenerateEvaluationCode produces code to evaluate expression in security context
-// Handles patterns: close, pivothigh(), fixnan(pivothigh()[1])
-// Historical offset extraction delegated to runtime StreamingRequest
 func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 	varName string,
 	exprArg ast.Expression,
 	secBarIdxVar string,
 ) (string, error) {
-	// Check for simple OHLCV field access
 	if ident, ok := exprArg.(*ast.Identifier); ok {
 		return h.generateOHLCVAccess(varName, ident, secBarIdxVar), nil
 	}
 
-	// Complex expression - delegate offset extraction to runtime
 	code := ""
-
-	// Generate evaluator initialization with variable registry and bar mapper support
 	h.markSecurityExprEval()
 	code += h.indentFunc() + "if secBarEvaluator == nil {\n"
 	h.incrementIndent()
@@ -84,7 +75,6 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 	code += h.indentFunc() + "var varSeries *series.Series\n"
 	code += h.indentFunc() + "switch varName {\n"
 
-	// Generate case for each series variable in the symbol table
 	taFunctions := map[string]bool{
 		"minus": true, "plus": true, "sum": true, "truerange": true,
 		"abs": true, "max": true, "min": true, "sign": true,
@@ -147,23 +137,17 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 }
 
 func (h *SecurityExpressionHandler) generateOHLCVAccess(varName string, ident *ast.Identifier, barIdxVar string) string {
-	fieldName := ident.Name
-	switch fieldName {
-	case "close":
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Close)\n", varName, barIdxVar)
-	case "open":
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Open)\n", varName, barIdxVar)
-	case "high":
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].High)\n", varName, barIdxVar)
-	case "low":
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Low)\n", varName, barIdxVar)
-	case "volume":
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(secCtx.Data[%s].Volume)\n", varName, barIdxVar)
-	case "bar_index":
+	barAccess := fmt.Sprintf("secCtx.Data[%s]", barIdxVar)
+
+	if ident.Name == "bar_index" {
 		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(float64(%s))\n", varName, barIdxVar)
-	default:
-		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 	}
+
+	if fieldExpr, ok := SecurityBarFieldExpression(ident.Name, barAccess); ok {
+		return h.indentFunc() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, fieldExpr)
+	}
+
+	return h.indentFunc() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
 }
 
 func (h *SecurityExpressionHandler) collectVariableReferences(expr ast.Expression) []string {
@@ -174,8 +158,7 @@ func (h *SecurityExpressionHandler) collectVariableReferences(expr ast.Expressio
 			case "close", "open", "high", "low", "volume":
 				// OHLCV fields - handled by evaluator
 			default:
-				// Only register variables that start with known prefixes indicating they're computed
-				// This excludes inputs like leftBars, bb_1d_bblenght which are constants
+				/* Excludes constants like leftBars, bb_1d_bblenght — only computed variables */
 				if hasComputedVariablePrefix(ident.Name) {
 					vars[ident.Name] = true
 				}
@@ -191,14 +174,11 @@ func (h *SecurityExpressionHandler) collectVariableReferences(expr ast.Expressio
 }
 
 func hasComputedVariablePrefix(name string) bool {
-	// Computed variables typically have patterns like:
-	// bb_1d_newisOverBBTop, bb_1d_newisUnderBBBottom, etc.
-	// Look for "newis" or "is" followed by uppercase (indicates boolean state variable)
+	/* Matches naming conventions like bb_1d_newisOverBBTop, bb_1d_newisUnderBBBottom */
 	if len(name) < 4 {
 		return false
 	}
 
-	// Check for common computed variable patterns
 	patterns := []string{"newis", "is_", "_is"}
 	for _, pattern := range patterns {
 		for i := 0; i <= len(name)-len(pattern); i++ {
@@ -251,7 +231,6 @@ func (h *SecurityExpressionHandler) extractHistoricalOffset(expr ast.Expression)
 			if memberExpr, ok := arg.(*ast.MemberExpression); ok {
 				if offsetLit, ok := memberExpr.Property.(*ast.Literal); ok {
 					if offsetVal, ok := offsetLit.Value.(float64); ok {
-						// Rebuild call with inner expression (without subscript)
 						newArgs := make([]ast.Expression, len(callExpr.Arguments))
 						copy(newArgs, callExpr.Arguments)
 						newArgs[i] = memberExpr.Object

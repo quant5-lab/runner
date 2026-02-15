@@ -7,7 +7,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestArrowSecurityCallGenerator_CanHandle verifies call expression routing */
 func TestArrowSecurityCallGenerator_CanHandle(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -72,33 +71,6 @@ func TestArrowSecurityCallGenerator_CanHandle(t *testing.T) {
 	}
 }
 
-/* TestArrowSecurityCallGenerator_OHLCVFieldAccess verifies OHLCV direct field mapping */
-func TestArrowSecurityCallGenerator_OHLCVFieldAccess(t *testing.T) {
-	tests := []struct {
-		name     string
-		field    string
-		expected string
-	}{
-		{"close", "close", "secCtx.Data[secBarIdx].Close"},
-		{"open", "open", "secCtx.Data[secBarIdx].Open"},
-		{"high", "high", "secCtx.Data[secBarIdx].High"},
-		{"low", "low", "secCtx.Data[secBarIdx].Low"},
-		{"volume", "volume", "secCtx.Data[secBarIdx].Volume"},
-		{"unknown_returns_nan", "vwap", "math.NaN()"},
-		{"empty_returns_nan", "", "math.NaN()"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := generateOHLCVFieldAccess(tt.field)
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("expected %q in output, got %q", tt.expected, result)
-			}
-		})
-	}
-}
-
-/* TestArrowSecurityCallGenerator_Generate_OHLCVFields verifies IIFE generation for OHLCV identifiers */
 func TestArrowSecurityCallGenerator_Generate_OHLCVFields(t *testing.T) {
 	fields := []string{"close", "open", "high", "low", "volume"}
 
@@ -135,7 +107,46 @@ func TestArrowSecurityCallGenerator_Generate_OHLCVFields(t *testing.T) {
 	}
 }
 
-/* TestArrowSecurityCallGenerator_Generate_ScopeIsolation verifies IIFE uses arrowCtx, not direct scope */
+func TestArrowSecurityCallGenerator_Generate_DerivedPriceFields(t *testing.T) {
+	derivedFields := map[string]string{
+		"ohlc4": "/ 4",
+		"hlc3":  "/ 3",
+		"hl2":   "/ 2",
+		"hlcc4": "/ 4",
+	}
+
+	for field, divisor := range derivedFields {
+		t.Run(field, func(t *testing.T) {
+			g := newTestGenerator()
+			arrowSecGen := NewArrowSecurityCallGenerator(g)
+
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "request"},
+					Property: &ast.Identifier{Name: "security"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+					&ast.Literal{Value: "1D"},
+					&ast.Identifier{Name: field},
+				},
+			}
+
+			code, err := arrowSecGen.Generate(call)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !strings.Contains(code, divisor) {
+				t.Errorf("expected derived price formula with %q for %s in output.\nGot:\n%s", divisor, field, code)
+			}
+			if !strings.Contains(code, "secCtx.Data[secBarIdx]") {
+				t.Errorf("expected bar data access for %s.\nGot:\n%s", field, code)
+			}
+		})
+	}
+}
+
 func TestArrowSecurityCallGenerator_Generate_ScopeIsolation(t *testing.T) {
 	g := newTestGenerator()
 	arrowSecGen := NewArrowSecurityCallGenerator(g)
@@ -157,7 +168,6 @@ func TestArrowSecurityCallGenerator_Generate_ScopeIsolation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	/* Must access through ArrowContext bridge */
 	requiredPatterns := []string{
 		"arrowCtx.SecurityContexts[secKey]",
 		"arrowCtx.SecurityBarMappers[secKey]",
@@ -170,7 +180,6 @@ func TestArrowSecurityCallGenerator_Generate_ScopeIsolation(t *testing.T) {
 		}
 	}
 
-	/* Must NOT access direct executeStrategy-scope variables */
 	trimmed := strings.ReplaceAll(code, "arrowCtx.SecurityContexts", "REPLACED")
 	trimmed = strings.ReplaceAll(trimmed, "arrowCtx.SecurityBarMappers", "REPLACED")
 	if strings.Contains(trimmed, "securityContexts[") || strings.Contains(trimmed, "securityBarMappers[") {
@@ -178,7 +187,6 @@ func TestArrowSecurityCallGenerator_Generate_ScopeIsolation(t *testing.T) {
 	}
 }
 
-/* TestArrowSecurityCallGenerator_Generate_InsufficientArgs verifies graceful fallback */
 func TestArrowSecurityCallGenerator_Generate_InsufficientArgs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -217,7 +225,6 @@ func TestArrowSecurityCallGenerator_Generate_InsufficientArgs(t *testing.T) {
 	}
 }
 
-/* TestArrowSecurityCallGenerator_Generate_SetsSecurityFlag verifies generator state mutation */
 func TestArrowSecurityCallGenerator_Generate_SetsSecurityFlag(t *testing.T) {
 	g := newTestGenerator()
 	arrowSecGen := NewArrowSecurityCallGenerator(g)
@@ -248,7 +255,6 @@ func TestArrowSecurityCallGenerator_Generate_SetsSecurityFlag(t *testing.T) {
 	}
 }
 
-/* TestArrowSecurityCallGenerator_Generate_NaNGuards verifies defensive checks in generated IIFE */
 func TestArrowSecurityCallGenerator_Generate_NaNGuards(t *testing.T) {
 	g := newTestGenerator()
 	arrowSecGen := NewArrowSecurityCallGenerator(g)

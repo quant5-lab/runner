@@ -43,18 +43,13 @@ func (m *SecurityBarMapper) BuildMapping(
 /*
 BuildMappingWithDateFilter creates downscaling mappings (Higher TF → Lower TF bar ranges).
 
-Used when security timeframe < base timeframe (e.g., Daily base with Hourly security).
-Maps each higher TF bar to all lower TF bars occurring on the same calendar date.
+Each higher TF bar owns lower TF bars from its date up to the next higher TF bar's date.
+Gaps in higher TF data (weekends, holidays) extend the previous bar's range, matching
+TradingView behavior.
 
-Example: Daily → Hourly downscaling
-  - Daily bar 2023-01-15 → Hourly bars [09:00..16:00] on 2023-01-15
-  - Daily bar 2023-01-16 → Hourly bars [09:00..16:00] on 2023-01-16
-
-Parameters:
-  - higherTimeframeBars: Target security timeframe bars (e.g., Daily)
-  - lowerTimeframeBars: Base execution timeframe bars (e.g., Hourly)
-  - baseDateRange: Optional date filter (empty = no filter)
-  - timezone: Timezone for date extraction (default "UTC")
+Example (with weekend gap):
+  - Daily Fri 2025-01-03 → Hourly [Fri 09:00..Sun 18:00] (extends through weekend)
+  - Daily Mon 2025-01-06 → Hourly [Mon 09:00..Mon 18:00]
 */
 func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 	higherTimeframeBars []context.OHLCV,
@@ -74,8 +69,6 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 	m.ranges = make([]BarRange, 0, len(higherTimeframeBars))
 	lowerIdx := 0
 
-	// Skip lower TF bars that are before the first higher TF bar
-	// This handles cases where data ranges don't fully overlap
 	if len(higherTimeframeBars) > 0 && len(lowerTimeframeBars) > 0 {
 		firstHigherDate := ExtractDateInTimezone(higherTimeframeBars[0].Time, timezone)
 		for lowerIdx < len(lowerTimeframeBars) {
@@ -87,14 +80,18 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 		}
 	}
 
-	for dailyIdx, dailyBar := range higherTimeframeBars {
+	for dailyIdx := range higherTimeframeBars {
 		startIdx := lowerIdx
-		dailyDate := ExtractDateInTimezone(dailyBar.Time, timezone)
+
+		nextDailyDate := ""
+		if dailyIdx+1 < len(higherTimeframeBars) {
+			nextDailyDate = ExtractDateInTimezone(higherTimeframeBars[dailyIdx+1].Time, timezone)
+		}
 
 		for lowerIdx < len(lowerTimeframeBars) {
 			lowerBarDate := ExtractDateInTimezone(lowerTimeframeBars[lowerIdx].Time, timezone)
 
-			if lowerBarDate != dailyDate {
+			if nextDailyDate != "" && lowerBarDate >= nextDailyDate {
 				break
 			}
 

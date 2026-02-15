@@ -32,8 +32,9 @@ type Node interface {
 }
 
 type Program struct {
-	NodeType NodeType `json:"type"`
-	Body     []Node   `json:"body"`
+	NodeType    NodeType `json:"type"`
+	Body        []Node   `json:"body"`
+	PineVersion int      `json:"pineVersion,omitempty"`
 }
 
 func (p *Program) Type() NodeType { return TypeProgram }

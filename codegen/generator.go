@@ -44,6 +44,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		typeSystem:         typeSystem,
 		boolConverter:      boolConverter,
 		registryGuard:      registryGuard,
+		pineVersion:        program.PineVersion,
 	}
 
 	gen.inputHandler = NewInputHandler()
@@ -167,6 +168,7 @@ type generator struct {
 	hasLastBarTime           bool
 	hasTimenow               bool
 	hasTickerCalls           bool
+	pineVersion              int
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard
 	persistenceEmitter       *VarPersistenceEmitter
@@ -2361,7 +2363,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code += g.ind() + "} else {\n"
 		g.indent++
 
-		lookahead := extractSecurityLookahead(call)
+		lookahead := resolveSecurityLookahead(call, g.pineVersion)
 
 		code += g.ind() + "securityBarMapper, mapperFound := securityBarMappers[secKey]\n"
 		code += g.ind() + "if !mapperFound {\n"
@@ -3005,12 +3007,18 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 
 		return g.resolveUserIdentifierAccess(e.Name)
 	case *ast.Literal:
-		/* Numeric literal - always use float64 for consistency */
 		switch v := e.Value.(type) {
 		case float64:
 			return g.literalFormatter.FormatFloat(v)
 		case int:
 			return fmt.Sprintf("%d.0", v)
+		case bool:
+			if v {
+				return "1.0"
+			}
+			return "0.0"
+		case string:
+			return fmt.Sprintf("%q", v)
 		}
 	case *ast.BinaryExpression:
 		/* Binary expressions should be formatted with operator precedence */

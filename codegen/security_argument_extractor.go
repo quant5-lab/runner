@@ -180,3 +180,12 @@ func extractSecurityLookahead(call *ast.CallExpression) bool {
 
 	return false
 }
+
+/* Pine v1-v2 default to lookahead=on when no explicit 4th argument is provided */
+func resolveSecurityLookahead(call *ast.CallExpression, pineVersion int) bool {
+	lookahead := extractSecurityLookahead(call)
+	if !lookahead && pineVersion > 0 && pineVersion <= 2 && len(call.Arguments) < 4 {
+		return true
+	}
+	return lookahead
+}

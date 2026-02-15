@@ -30,6 +30,14 @@ func TestStreamingBarEvaluator_OHLCVFields(t *testing.T) {
 		{"volume_bar0", "volume", 0, 1000},
 		{"volume_bar1", "volume", 1, 1100},
 		{"volume_bar2", "volume", 2, 1200},
+		{"ohlc4_bar0", "ohlc4", 0, (100 + 105 + 95 + 102) / 4.0},
+		{"ohlc4_bar1", "ohlc4", 1, (102 + 107 + 97 + 104) / 4.0},
+		{"hlc3_bar0", "hlc3", 0, (105 + 95 + 102) / 3.0},
+		{"hlc3_bar2", "hlc3", 2, (109 + 99 + 106) / 3.0},
+		{"hl2_bar0", "hl2", 0, (105 + 95) / 2.0},
+		{"hl2_bar1", "hl2", 1, (107 + 97) / 2.0},
+		{"hlcc4_bar0", "hlcc4", 0, (105 + 95 + 102 + 102) / 4.0},
+		{"hlcc4_bar2", "hlcc4", 2, (109 + 99 + 106 + 106) / 4.0},
 	}
 
 	for _, tt := range tests {

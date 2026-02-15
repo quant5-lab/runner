@@ -525,6 +525,84 @@ func TestAnalyzeAndGeneratePrefetch_RuntimeDeduplication(t *testing.T) {
 	}
 }
 
+func TestAnalyzeAndGeneratePrefetch_InputDefvalTimeframeResolution(t *testing.T) {
+	/* Simulates: timeframe = input(title="Timeframe", type=resolution, defval='1D') + security(tickerid, timeframe, ohlc4[1]) */
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Kind:     "var",
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "timeframe"},
+						Init: &ast.CallExpression{
+							NodeType: ast.TypeCallExpression,
+							Callee:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "input"},
+							Arguments: []ast.Expression{
+								&ast.ObjectExpression{
+									NodeType: ast.TypeObjectExpression,
+									Properties: []ast.Property{
+										{Key: &ast.Identifier{Name: "title"}, Value: &ast.Literal{Value: "Timeframe"}},
+										{Key: &ast.Identifier{Name: "defval"}, Value: &ast.Literal{Value: "1D"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Kind:     "var",
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "dailyOhlc4"},
+						Init: &ast.CallExpression{
+							NodeType: ast.TypeCallExpression,
+							Callee: &ast.MemberExpression{
+								NodeType: ast.TypeMemberExpression,
+								Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+								Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+							},
+							Arguments: []ast.Expression{
+								&ast.MemberExpression{
+									NodeType: ast.TypeMemberExpression,
+									Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "syminfo"},
+									Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "tickerid"},
+								},
+								&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "timeframe"},
+								&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "ohlc4"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+
+	/* Timeframe must resolve to literal "1D", not ctx.Timeframe */
+	if !contains(injection.PrefetchCode, `TimeframeToSeconds("1D")`) {
+		t.Errorf("Expected TimeframeToSeconds(\"1D\") from input defval, got ctx.Timeframe fallback\n%s", injection.PrefetchCode)
+	}
+	/* secTimeframeSeconds must use literal "1D", not ctx.Timeframe */
+	if contains(injection.PrefetchCode, `secTimeframeSeconds = context.TimeframeToSeconds(ctx.Timeframe)`) {
+		t.Errorf("secTimeframeSeconds should use \"1D\" not ctx.Timeframe\n%s", injection.PrefetchCode)
+	}
+
+	/* Fetch must use "1D" timeframe */
+	if !contains(injection.PrefetchCode, `"1D"`) {
+		t.Errorf("Expected literal \"1D\" in prefetch code\n%s", injection.PrefetchCode)
+	}
+}
+
 func countOccurrences(haystack, needle string) int {
 	count := 0
 	offset := 0
