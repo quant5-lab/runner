@@ -1,0 +1,24 @@
+//@version=5
+strategy("Test barssince + mfi", overlay=false)
+
+bullish = close > open
+bearish = close < open
+
+bs_bull = ta.barssince(bullish)
+bs_bear = ta.barssince(bearish)
+
+trend_bias = bs_bull < bs_bear ? 1 : -1
+
+mfi_val = ta.mfi(hlc3, 14)
+
+signal = mfi_val < 30 and trend_bias == 1 ? 1 : mfi_val > 70 and trend_bias == -1 ? -1 : 0
+
+plot(bs_bull, title="bs_bull", color=color.green)
+plot(bs_bear, title="bs_bear", color=color.red)
+plot(mfi_val, title="mfi", color=color.blue)
+plot(signal, title="signal", color=color.orange)
+
+if signal == 1
+    strategy.entry("Long", strategy.long)
+if signal == -1
+    strategy.entry("Short", strategy.short)

@@ -1,9 +1,8 @@
 AlphaTrend Strategy (v5) — ATR-based trend follower with MFI/RSI filter
 
 Parse: ✅
-Generate: ❌ (unsupported function in expression position: ta.mfi)
-Compile: ❌ Not reached
+Generate: ✅
+Compile: ❌ (variable redeclaration: composite indicator preamble emitted twice in ternary branches; non-boolean condition in ternary IIFE)
 Execute: ❌ Not reached
 
-Blocker: #5 (ta.mfi not implemented)
-Secondary: ta.barssince() also unimplemented (#5)
+Blocker: #3 (ternary codegen duplicates composite indicator variables in self-referencing assignment)

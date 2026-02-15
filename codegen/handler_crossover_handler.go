@@ -6,7 +6,7 @@ import "github.com/quant5-lab/runner/ast"
 type CrossoverHandler struct{}
 
 func (h *CrossoverHandler) CanHandle(funcName string) bool {
-	return funcName == "ta.crossover"
+	return funcName == "ta.crossover" || funcName == "crossover"
 }
 
 func (h *CrossoverHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {

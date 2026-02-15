@@ -67,14 +67,19 @@ func (f *VariableInitCallFilter) requiresTempVar(callInfo CallInfo) bool {
 	if f.taRegistry.IsSupported(callInfo.FuncName) {
 		return true
 	}
+	if sharedTASignatures.Contains(callInfo.FuncName) {
+		return true
+	}
 	return f.containsNestedTA(callInfo)
 }
 
 func (f *VariableInitCallFilter) containsNestedTA(callInfo CallInfo) bool {
 	innerCalls := f.exprAnalyzer.FindNestedCalls(callInfo.Call)
 	for _, inner := range innerCalls {
-		if inner.Call != callInfo.Call && f.taRegistry.IsSupported(inner.FuncName) {
-			return true
+		if inner.Call != callInfo.Call {
+			if f.taRegistry.IsSupported(inner.FuncName) || sharedTASignatures.Contains(inner.FuncName) {
+				return true
+			}
 		}
 	}
 	return false

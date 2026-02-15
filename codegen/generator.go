@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"regexp"
 	"strings"
@@ -56,6 +57,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.compositeIndicatorRegistry = NewCompositeIndicatorRegistry()
 	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
 	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})
+	gen.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
+	gen.compositeIndicatorRegistry.Register("mfi", &MFIHandler{})
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
@@ -2306,6 +2309,11 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	// Try TA function registry first
 	if g.taRegistry.IsSupported(funcName) {
 		return g.taRegistry.GenerateInlineTA(g, varName, funcName, call)
+	}
+
+	if sharedTASignatures.Contains(funcName) {
+		log.Printf("WARNING: TA function %s has no handler — producing NaN stub", funcName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
 	}
 
 	// Handle math functions that need Series storage (have TA dependencies)

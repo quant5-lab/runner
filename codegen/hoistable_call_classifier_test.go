@@ -337,10 +337,10 @@ func TestHoistableCallClassifier_TAFunctionRegistryGate(t *testing.T) {
 					&ast.Identifier{Name: "open"},
 				},
 			},
-			expected: false,
+			expected: true,
 		},
 		{
-			name: "ta.valuewhen with literal second arg",
+			name: "ta.valuewhen with real 3-arg signature",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "ta"},
@@ -348,7 +348,8 @@ func TestHoistableCallClassifier_TAFunctionRegistryGate(t *testing.T) {
 				},
 				Arguments: []ast.Expression{
 					&ast.Identifier{Name: "condition"},
-					&ast.Literal{Value: float64(1)},
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(0)},
 				},
 			},
 			expected: true,
@@ -364,6 +365,7 @@ func TestHoistableCallClassifier_TAFunctionRegistryGate(t *testing.T) {
 	}
 }
 
+/* Signature-registered TA functions without handlers ARE hoistable via TASignatureRegistry gate */
 func TestHoistableCallClassifier_UnimplementedFunctions(t *testing.T) {
 	gen := newTestGenerator()
 	classifier := NewHoistableCallClassifier(gen)
@@ -389,14 +391,99 @@ func TestHoistableCallClassifier_UnimplementedFunctions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if classifier.IsHoistable(tt.call) {
-				t.Error("Expected function without handler to NOT be hoistable")
+			if !classifier.IsHoistable(tt.call) {
+				t.Error("Signature-registered TA function must be hoistable via TASignatureRegistry gate")
 			}
 		})
 	}
 }
 
-/* Validates classifier degrades gracefully with nil TAFunctionRegistry */
+/* Validates TASignatureRegistry gate catches all function categories without handlers */
+func TestHoistableCallClassifier_SignatureRegistryGate(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	makeTACall := func(prop string, args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: prop},
+			},
+			Arguments: args,
+		}
+	}
+
+	closeSrc := &ast.Identifier{Name: "close"}
+	period := &ast.Literal{Value: float64(14)}
+
+	tests := []struct {
+		name string
+		call *ast.CallExpression
+	}{
+		{"ta.vwma", makeTACall("vwma", closeSrc, period)},
+		{"ta.hma", makeTACall("hma", closeSrc, period)},
+		{"ta.cci", makeTACall("cci", closeSrc, period)},
+		{"ta.variance", makeTACall("variance", closeSrc, period)},
+		{"ta.cum single-arg", makeTACall("cum", closeSrc)},
+		{"ta.falling", makeTACall("falling", closeSrc, period)},
+		{"ta.rising", makeTACall("rising", closeSrc, period)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !classifier.IsHoistable(tt.call) {
+				t.Errorf("Signature-registered %s must be hoistable via TASignatureRegistry gate", tt.name)
+			}
+		})
+	}
+}
+
+/* Validates functions outside all registries remain non-hoistable */
+func TestHoistableCallClassifier_TrulyUnknownFunctions(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	tests := []struct {
+		name string
+		call *ast.CallExpression
+	}{
+		{
+			name: "str.length",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "str"},
+					Property: &ast.Identifier{Name: "length"},
+				},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "s"}},
+			},
+		},
+		{
+			name: "array.size",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "array"},
+					Property: &ast.Identifier{Name: "size"},
+				},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}},
+			},
+		},
+		{
+			name: "completely_unknown",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "completely_unknown"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "x"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if classifier.IsHoistable(tt.call) {
+				t.Errorf("%s should NOT be hoistable — not in any TA registry", tt.name)
+			}
+		})
+	}
+}
 func TestHoistableCallClassifier_NilTAFunctionRegistry(t *testing.T) {
 	gen := newTestGenerator()
 
@@ -434,7 +521,7 @@ func TestHoistableCallClassifier_NilTAFunctionRegistry(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "registry-only function NOT hoistable when registry nil",
+			name: "signature-registered function hoistable even when handler registry nil",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "ta"},
@@ -445,7 +532,7 @@ func TestHoistableCallClassifier_NilTAFunctionRegistry(t *testing.T) {
 					&ast.Literal{Value: float64(20)},
 				},
 			},
-			expected: false,
+			expected: true,
 		},
 	}
 
@@ -526,6 +613,86 @@ func TestHoistableCallClassifier_PeriodTypeHoistability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if result := classifier.IsHoistable(tt.call); result != tt.expected {
 				t.Errorf("IsHoistable() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+/* TestHoistableCallClassifier_AllHandlerRegisteredFunctions validates hoisting for ALL handler-registered functions
+ *
+ * Ensures all 21 handler-registered functions are hoistable in expression position
+ *
+ * Comprehensive edge case coverage for handler gate logic (unconditional return true for handlers)
+ */
+func TestHoistableCallClassifier_AllHandlerRegisteredFunctions(t *testing.T) {
+	gen := newTestGenerator()
+	classifier := NewHoistableCallClassifier(gen)
+
+	/* All 21 handler-registered functions with both namespaced and bare forms */
+	handlerFunctions := []struct {
+		funcName   string
+		nameSpaced string
+		bare       string
+	}{
+		{"SMA", "ta.sma", "sma"},
+		{"EMA", "ta.ema", "ema"},
+		{"STDEV", "ta.stdev", "stdev"},
+		{"WMA", "ta.wma", "wma"},
+		{"DEV", "ta.dev", "dev"},
+		{"ATR", "ta.atr", "atr"},
+		{"RMA", "ta.rma", "rma"},
+		{"RSI", "ta.rsi", "rsi"},
+		{"Change", "ta.change", "change"},
+		{"PivotHigh", "ta.pivothigh", "pivothigh"},
+		{"PivotLow", "ta.pivotlow", "pivotlow"},
+		{"Crossover", "ta.crossover", "crossover"},
+		{"Crossunder", "ta.crossunder", "crossunder"},
+		{"Fixnan", "fixnan", "fixnan"},
+		{"Sum", "sum", "sum"},
+		{"Valuewhen", "ta.valuewhen", "valuewhen"},
+		{"Highest", "ta.highest", "highest"},
+		{"Lowest", "ta.lowest", "lowest"},
+		{"Linreg", "ta.linreg", "linreg"},
+		{"BarsSince", "ta.barssince", "barssince"},
+		{"MFI", "ta.mfi", "mfi"},
+	}
+
+	for _, fn := range handlerFunctions {
+		/* Test namespaced form in expression position */
+		t.Run(fn.funcName+" namespaced in expression", func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: fn.nameSpaced[3:]}, // Strip "ta."
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(14)},
+				},
+			}
+
+			/* Special handling for functions without "ta." prefix in namespaced form */
+			if fn.funcName == "Fixnan" || fn.funcName == "Sum" {
+				call.Callee = &ast.Identifier{Name: fn.nameSpaced}
+			}
+
+			if !classifier.IsHoistable(call) {
+				t.Errorf("Handler-registered function %s must be hoistable in expression position", fn.nameSpaced)
+			}
+		})
+
+		/* Test bare form in expression position */
+		t.Run(fn.funcName+" bare in expression", func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: fn.bare},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: float64(14)},
+				},
+			}
+
+			if !classifier.IsHoistable(call) {
+				t.Errorf("Handler-registered function %s (bare) must be hoistable in expression position", fn.bare)
 			}
 		})
 	}

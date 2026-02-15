@@ -40,10 +40,18 @@ func (c HoistableCallClassifier) IsHoistable(call *ast.CallExpression) bool {
 	}
 
 	if c.hasImplementedTAHandler(funcName) {
-		return c.shouldHoistTACall(call, funcName)
+		return true
+	}
+
+	if c.isSignatureRegisteredTA(funcName) {
+		return true
 	}
 
 	return false
+}
+
+func (c HoistableCallClassifier) isSignatureRegisteredTA(funcName string) bool {
+	return sharedTASignatures.Contains(funcName)
 }
 
 func (c HoistableCallClassifier) IsStatefulValueFunction(funcName string) bool {

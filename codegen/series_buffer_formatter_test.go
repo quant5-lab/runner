@@ -202,3 +202,73 @@ func TestSeriesBufferFormatter_QuotingConsistency(t *testing.T) {
 		})
 	}
 }
+
+/* TestSeriesBufferFormatter_DynamicOffsetAccess validates runtime offset expression handling
+ *
+ * Tests formatSeriesDynamicGet and formatArrowSeriesDynamicGet generate correct code for dynamic offsets:
+ * - Top-level: {varName}Series.Get({offsetExpr})
+ * - Arrow: arrowCtx.GetOrCreateSeries("{varName}").Get({offsetExpr})
+ *
+ * Generalized test for loop-based series access with runtime-evaluated offsets (e.g., MFI summation loops)
+ */
+func TestSeriesBufferFormatter_DynamicOffsetAccess(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		varName              string
+		offsetExpr           string
+		expectedTopLevel     string
+		expectedArrowContext string
+	}{
+		{
+			name:                 "Simple loop variable",
+			varName:              "positive_mf",
+			offsetExpr:           "j",
+			expectedTopLevel:     "positive_mfSeries.Get(j)",
+			expectedArrowContext: "arrowCtx.GetOrCreateSeries(\"positive_mf\").Get(j)",
+		},
+		{
+			name:                 "Loop variable with expression",
+			varName:              "prices",
+			offsetExpr:           "i + 1",
+			expectedTopLevel:     "pricesSeries.Get(i + 1)",
+			expectedArrowContext: "arrowCtx.GetOrCreateSeries(\"prices\").Get(i + 1)",
+		},
+		{
+			name:                 "Complex offset expression",
+			varName:              "buffer",
+			offsetExpr:           "lookback * offset",
+			expectedTopLevel:     "bufferSeries.Get(lookback * offset)",
+			expectedArrowContext: "arrowCtx.GetOrCreateSeries(\"buffer\").Get(lookback * offset)",
+		},
+		{
+			name:                 "Nested expression",
+			varName:              "data",
+			offsetExpr:           "int(period - j)",
+			expectedTopLevel:     "dataSeries.Get(int(period - j))",
+			expectedArrowContext: "arrowCtx.GetOrCreateSeries(\"data\").Get(int(period - j))",
+		},
+		{
+			name:                 "Single character var with simple offset",
+			varName:              "k",
+			offsetExpr:           "idx",
+			expectedTopLevel:     "kSeries.Get(idx)",
+			expectedArrowContext: "arrowCtx.GetOrCreateSeries(\"k\").Get(idx)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			/* Test top-level context */
+			got := formatSeriesDynamicGet(tc.varName, tc.offsetExpr)
+			if got != tc.expectedTopLevel {
+				t.Errorf("formatSeriesDynamicGet mismatch\nExpected: %s\nGot:      %s", tc.expectedTopLevel, got)
+			}
+
+			/* Test arrow context */
+			got = formatArrowSeriesDynamicGet(tc.varName, tc.offsetExpr)
+			if got != tc.expectedArrowContext {
+				t.Errorf("formatArrowSeriesDynamicGet mismatch\nExpected: %s\nGot:      %s", tc.expectedArrowContext, got)
+			}
+		})
+	}
+}

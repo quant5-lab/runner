@@ -6,7 +6,7 @@ import "github.com/quant5-lab/runner/ast"
 type CrossunderHandler struct{}
 
 func (h *CrossunderHandler) CanHandle(funcName string) bool {
-	return funcName == "ta.crossunder"
+	return funcName == "ta.crossunder" || funcName == "crossunder"
 }
 
 func (h *CrossunderHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {

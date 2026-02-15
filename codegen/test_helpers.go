@@ -37,6 +37,8 @@ func newTestGenerator() *generator {
 	}
 	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
 	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})
+	gen.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
+	gen.compositeIndicatorRegistry.Register("mfi", &MFIHandler{})
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -39,33 +38,27 @@ if ta.crossover(sma20 + ema10, high)
 	}
 }
 
-func TestCrossover_BinaryExpressionInlineStateful_ShouldFail(t *testing.T) {
+/* Inline stateful TA calls in binary expressions are now hoisted automatically */
+func TestCrossover_BinaryExpressionInlineStateful_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 if ta.crossover(ta.sma(close, 20) + ta.ema(close, 10), high)
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for inline stateful indicator in binary expression")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator ta.ema must be assigned to variable") {
-		t.Errorf("Expected error about EMA variable assignment, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 
-func TestCrossover_NestedTACallWithStateful_ShouldFail(t *testing.T) {
+/* Nested stateful TA calls are now hoisted automatically */
+func TestCrossover_NestedTACallWithStateful_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 if ta.crossover(ta.sma(ta.ema(close, 10), 20), high)
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for nested stateful indicator")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator ta.ema must be assigned to variable") {
-		t.Errorf("Expected error about EMA variable assignment, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 
@@ -92,34 +85,28 @@ if ta.crossover(condition ? close : open, ta.sma(close, 20))
 	}
 }
 
-func TestCrossover_TernaryWithStatefulIndicator_ShouldFail(t *testing.T) {
+/* Stateful TA calls in ternary expressions are now hoisted automatically */
+func TestCrossover_TernaryWithStatefulIndicator_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 condition = close > open
 if ta.crossover(condition ? ta.ema(close, 10) : close, high)
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for stateful indicator in ternary expression")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator ta.ema must be assigned to variable") {
-		t.Errorf("Expected error about EMA variable assignment, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 
-func TestCrossover_ComplexArithmeticWithMultipleStateful_ShouldFail(t *testing.T) {
+/* Multiple stateful TA calls in arithmetic are now hoisted automatically */
+func TestCrossover_ComplexArithmeticWithMultipleStateful_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 if ta.crossover((ta.ema(close, 10) + ta.rma(high, 20)) / 2, ta.sma(close, 50))
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for multiple stateful indicators in expression")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator") {
-		t.Errorf("Expected error about stateful indicator, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 
@@ -135,33 +122,27 @@ if ta.crossover(-ema10, 0)
 	}
 }
 
-func TestCrossover_UnaryExpressionWithStatefulCall_ShouldFail(t *testing.T) {
+/* Stateful TA calls in unary expressions are now hoisted automatically */
+func TestCrossover_UnaryExpressionWithStatefulCall_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 if ta.crossover(-ta.ema(close, 10), 0)
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for stateful indicator in unary expression")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator ta.ema must be assigned to variable") {
-		t.Errorf("Expected error about EMA variable assignment, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 
-func TestCrossover_DeepNestingMixedWindowAndStateful_ShouldFail(t *testing.T) {
+/* Deeply nested mixed window and stateful TA calls are now hoisted automatically */
+func TestCrossover_DeepNestingMixedWindowAndStateful_Hoisted(t *testing.T) {
 	pine := `//@version=5
 strategy("Test")
 if ta.crossover(ta.sma(ta.wma(ta.ema(close, 5), 10), 20), high)
     strategy.entry("long", strategy.long)
 `
-	err := compilePine(pine)
-	if err == nil {
-		t.Fatal("Expected error for deeply nested stateful indicator")
-	}
-	if !strings.Contains(err.Error(), "stateful indicator ta.ema must be assigned to variable") {
-		t.Errorf("Expected error about EMA variable assignment, got: %v", err)
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation via hoisting, got: %v", err)
 	}
 }
 

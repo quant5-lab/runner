@@ -19,8 +19,8 @@ func TestPivotHandlers_CanHandle(t *testing.T) {
 	}{
 		{"namespaced pivothigh", "ta.pivothigh", true, false},
 		{"namespaced pivotlow", "ta.pivotlow", false, true},
-		{"non-namespaced pivothigh", "pivothigh", false, false},
-		{"non-namespaced pivotlow", "pivotlow", false, false},
+		{"non-namespaced pivothigh", "pivothigh", true, false},
+		{"non-namespaced pivotlow", "pivotlow", false, true},
 		{"ta.sma", "ta.sma", false, false},
 		{"ta.ema", "ta.ema", false, false},
 		{"random function", "myFunc", false, false},

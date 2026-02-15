@@ -365,3 +365,109 @@ func TestStatefulIndicatorBuilder_MultiIndicatorContext(t *testing.T) {
 		}
 	})
 }
+
+/* TestStatefulIndicatorContext_DynamicOffsetAccess validates runtime offset expression handling
+ *
+ * Tests that both context implementations correctly handle dynamic offset expressions:
+ * - TopLevel: {varName}Series.Get({offsetExpr})
+ * - Arrow: arrowCtx.GetOrCreateSeries("{varName}").Get({offsetExpr})
+ *
+ * Generalized test for loop-based lookback accumulation (MFI summation, custom windowing)
+ */
+func TestStatefulIndicatorContext_DynamicOffsetAccess(t *testing.T) {
+	testCases := []struct {
+		name       string
+		context    StatefulIndicatorContext
+		varName    string
+		offsetExpr string
+		expected   string
+	}{
+		{
+			name:       "TopLevel: simple loop variable",
+			context:    NewTopLevelIndicatorContext(),
+			varName:    "positive_mf",
+			offsetExpr: "j",
+			expected:   "positive_mfSeries.Get(j)",
+		},
+		{
+			name:       "TopLevel: offset expression with arithmetic",
+			context:    NewTopLevelIndicatorContext(),
+			varName:    "buffer",
+			offsetExpr: "period - i",
+			expected:   "bufferSeries.Get(period - i)",
+		},
+		{
+			name:       "TopLevel: complex nested expression",
+			context:    NewTopLevelIndicatorContext(),
+			varName:    "window",
+			offsetExpr: "int(lookback * ratio)",
+			expected:   "windowSeries.Get(int(lookback * ratio))",
+		},
+		{
+			name:       "Arrow: simple loop variable",
+			context:    NewArrowFunctionIndicatorContext(),
+			varName:    "sum_buffer",
+			offsetExpr: "k",
+			expected:   "arrowCtx.GetOrCreateSeries(\"sum_buffer\").Get(k)",
+		},
+		{
+			name:       "Arrow: offset with addition",
+			context:    NewArrowFunctionIndicatorContext(),
+			varName:    "values",
+			offsetExpr: "idx + 1",
+			expected:   "arrowCtx.GetOrCreateSeries(\"values\").Get(idx + 1)",
+		},
+		{
+			name:       "Arrow: complex expression",
+			context:    NewArrowFunctionIndicatorContext(),
+			varName:    "accumulator",
+			offsetExpr: "warmup - step",
+			expected:   "arrowCtx.GetOrCreateSeries(\"accumulator\").Get(warmup - step)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.context.GenerateSeriesDynamicAccess(tc.varName, tc.offsetExpr)
+			if got != tc.expected {
+				t.Errorf("GenerateSeriesDynamicAccess mismatch\nExpected: %s\nGot:      %s", tc.expected, got)
+			}
+		})
+	}
+}
+
+/* TestStatefulIndicatorContext_DynamicVsStaticAccess validates consistent formatting between static and dynamic
+ *
+ * Ensures that dynamic access with literal "0" produces the same result as static access with offset 0
+ *
+ * Edge case validation for API consistency
+ */
+func TestStatefulIndicatorContext_DynamicVsStaticAccess(t *testing.T) {
+	testCases := []struct {
+		name    string
+		context StatefulIndicatorContext
+		varName string
+	}{
+		{
+			name:    "TopLevel context",
+			context: NewTopLevelIndicatorContext(),
+			varName: "test_var",
+		},
+		{
+			name:    "Arrow context",
+			context: NewArrowFunctionIndicatorContext(),
+			varName: "test_var",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			static := tc.context.GenerateSeriesAccess(tc.varName, 0)
+			dynamic := tc.context.GenerateSeriesDynamicAccess(tc.varName, "0")
+
+			if static != dynamic {
+				t.Errorf("Static vs Dynamic mismatch for offset 0\nStatic:  %s\nDynamic: %s", static, dynamic)
+			}
+		})
+	}
+}

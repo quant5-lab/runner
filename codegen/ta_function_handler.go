@@ -52,6 +52,8 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&HighestHandler{},
 			&LowestHandler{},
 			&LinregHandler{},
+			&BarsSinceHandler{},
+			&MFIHandler{},
 		},
 	}
 }
