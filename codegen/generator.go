@@ -50,6 +50,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.inputHandler = NewInputHandler()
 	gen.inputConstExtractor = NewInputConstantExtractor()
 	gen.mathHandler = NewMathHandler()
+	gen.calendarHandler = NewCalendarHandler()
+	gen.timeframeFuncHandler = NewTimeframeFuncCallHandler()
 	gen.colorHandler = NewColorHandler()
 	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
@@ -182,6 +184,8 @@ type generator struct {
 	inputHandler               *InputHandler
 	inputConstExtractor        *InputConstantExtractor
 	mathHandler                *MathHandler
+	calendarHandler            *CalendarHandler
+	timeframeFuncHandler       *TimeframeFuncCallHandler
 	colorHandler               *ColorHandler
 	valueHandler               *ValueHandler
 	subscriptResolver          *SubscriptResolver
@@ -2531,6 +2535,21 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 				return "", err
 			}
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, mathCode), nil
+		}
+		if g.calendarHandler.CanHandle(funcName) {
+			calCode, err := g.calendarHandler.GenerateCalendarCall(funcName, call.Arguments, g)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, calCode), nil
+		}
+		/* timeframe.change/in_seconds/from_seconds in variable init */
+		if g.timeframeFuncHandler.CanHandle(funcName) {
+			tfCode, err := g.timeframeFuncHandler.GenerateCode(g, call)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, tfCode), nil
 		}
 		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
 	}

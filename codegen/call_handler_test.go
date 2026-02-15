@@ -59,7 +59,13 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"color.g", 7, "ColorCallHandler"},
 		{"color.b", 7, "ColorCallHandler"},
 		{"color.t", 7, "ColorCallHandler"},
-		{"unknown_function", 9, "UnknownFunctionHandler"},
+		{"year", 8, "CalendarCallHandler"},
+		{"timestamp", 8, "CalendarCallHandler"},
+		{"dayofweek", 8, "CalendarCallHandler"},
+		{"timeframe.in_seconds", 9, "TimeframeFuncCallHandler"},
+		{"timeframe.from_seconds", 9, "TimeframeFuncCallHandler"},
+		{"timeframe.change", 9, "TimeframeFuncCallHandler"},
+		{"unknown_function", 11, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {

@@ -43,6 +43,8 @@ func newTestGenerator() *generator {
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
+	gen.calendarHandler = NewCalendarHandler()
+	gen.timeframeFuncHandler = NewTimeframeFuncCallHandler()
 
 	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)

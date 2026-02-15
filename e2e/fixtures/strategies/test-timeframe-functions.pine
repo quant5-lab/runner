@@ -1,0 +1,22 @@
+//@version=5
+indicator("Timeframe Functions", overlay=false)
+
+// timeframe.in_seconds — no args (current chart timeframe)
+tf_sec = timeframe.in_seconds()
+
+// timeframe.in_seconds — explicit timeframe string
+tf_daily = timeframe.in_seconds("D")
+tf_weekly = timeframe.in_seconds("W")
+
+// timeframe.from_seconds — returns string, roundtrip through in_seconds
+tf_from_86400 = timeframe.from_seconds(86400)
+tf_roundtrip = timeframe.in_seconds(tf_from_86400)
+
+// timeframe.change — period boundary detection
+new_day = timeframe.change("D")
+
+plot(tf_sec, "tf_seconds")
+plot(tf_daily, "tf_daily_seconds")
+plot(tf_weekly, "tf_weekly_seconds")
+plot(tf_roundtrip, "tf_roundtrip")
+plot(new_day, "new_day")

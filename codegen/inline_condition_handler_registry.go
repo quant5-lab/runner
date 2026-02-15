@@ -23,6 +23,7 @@ func NewInlineConditionHandlerRegistry(tempVarMgr *TempVariableManager) *InlineC
 			NewCrossoverInlineHandler(),
 			NewCrossunderInlineHandler(),
 			NewChangeInlineHandler(),
+			NewTimeframeChangeInlineHandler(),
 			NewSecurityInlineHandler(),
 			NewLowestInlineHandler(),
 			NewHighestInlineHandler(),

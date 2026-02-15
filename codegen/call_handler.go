@@ -44,6 +44,8 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(&TAIndicatorCallHandler{})
 	router.RegisterHandler(NewTickerFunctionHandler())
 	router.RegisterHandler(&ColorCallHandler{})
+	router.RegisterHandler(NewCalendarCallHandler())
+	router.RegisterHandler(NewTimeframeFuncCallHandler())
 	router.RegisterHandler(&UserDefinedFunctionHandler{})
 	router.RegisterHandler(&UnknownFunctionHandler{})
 

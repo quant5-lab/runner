@@ -1,0 +1,29 @@
+//@version=5
+indicator("Timestamp Overloads", overlay=false)
+
+// 1-arg: string date
+ts_str = timestamp("2023-01-15")
+
+// 5-arg: year, month, day, hour, minute
+ts_5 = timestamp(2023, 1, 15, 10, 30)
+
+// 6-arg date components: year, month, day, hour, minute, second
+ts_6 = timestamp(2023, 1, 15, 10, 30, 45)
+
+// 6-arg timezone variant: timezone, year, month, day, hour, minute
+ts_tz5 = timestamp("UTC", 2023, 1, 15, 10, 30)
+
+// 7-arg: timezone, year, month, day, hour, minute, second
+ts_7 = timestamp("UTC", 2023, 1, 15, 10, 30, 45)
+
+// Timestamp used in condition (common real-world pattern)
+startDate = timestamp(2023, 1, 1, 0, 0)
+inRange = time >= startDate
+
+plot(ts_str, "ts_string")
+plot(ts_5, "ts_5arg")
+plot(ts_6, "ts_6arg")
+plot(ts_tz5, "ts_tz5arg")
+plot(ts_7, "ts_7arg")
+plot(startDate, "start_date")
+plot(inRange ? 1 : 0, "in_range")

@@ -6,138 +6,141 @@ func TestTimeframeConverter_ToSeconds(t *testing.T) {
 	converter := NewTimeframeConverter()
 
 	tests := []struct {
-		name        string
-		timeframe   string
-		expected    int64
-		description string
+		name      string
+		timeframe string
+		expected  int64
 	}{
-		{
-			name:        "second resolution",
-			timeframe:   "1s",
-			expected:    1,
-			description: "1 second should convert to 1",
-		},
-		{
-			name:        "minute resolution",
-			timeframe:   "5m",
-			expected:    300,
-			description: "5 minutes should convert to 300 seconds",
-		},
-		{
-			name:        "hour resolution",
-			timeframe:   "1h",
-			expected:    3600,
-			description: "1 hour should convert to 3600 seconds",
-		},
-		{
-			name:        "multi hour",
-			timeframe:   "4h",
-			expected:    14400,
-			description: "4 hours should convert to 14400 seconds",
-		},
-		{
-			name:        "daily uppercase",
-			timeframe:   "1D",
-			expected:    86400,
-			description: "1 day (uppercase) should convert to 86400 seconds",
-		},
-		{
-			name:        "daily lowercase",
-			timeframe:   "1d",
-			expected:    86400,
-			description: "1 day (lowercase) should convert to 86400 seconds",
-		},
-		{
-			name:        "weekly uppercase",
-			timeframe:   "1W",
-			expected:    604800,
-			description: "1 week (uppercase) should convert to 604800 seconds",
-		},
-		{
-			name:        "weekly lowercase",
-			timeframe:   "1w",
-			expected:    604800,
-			description: "1 week (lowercase) should convert to 604800 seconds",
-		},
-		{
-			name:        "monthly",
-			timeframe:   "1M",
-			expected:    2592000,
-			description: "1 month should convert to 2592000 seconds (30 days)",
-		},
-		{
-			name:        "single char daily",
-			timeframe:   "D",
-			expected:    86400,
-			description: "single char D should convert to 86400 (PineScript shorthand)",
-		},
-		{
-			name:        "single char weekly",
-			timeframe:   "W",
-			expected:    604800,
-			description: "single char W should convert to 604800 (PineScript shorthand)",
-		},
-		{
-			name:        "single char monthly",
-			timeframe:   "M",
-			expected:    2592000,
-			description: "single char M should convert to 2592000 (PineScript shorthand)",
-		},
-		{
-			name:        "empty string",
-			timeframe:   "",
-			expected:    0,
-			description: "empty string should return 0",
-		},
-		{
-			name:        "invalid unit",
-			timeframe:   "5x",
-			expected:    0,
-			description: "invalid unit should return 0",
-		},
-		{
-			name:        "large multiplier",
-			timeframe:   "240h",
-			expected:    864000,
-			description: "240 hours should convert correctly",
-		},
+		{"second", "1s", 1},
+		{"5 minutes", "5m", 300},
+		{"1 hour", "1h", 3600},
+		{"4 hours", "4h", 14400},
+		{"daily uppercase", "1D", 86400},
+		{"daily lowercase", "1d", 86400},
+		{"weekly uppercase", "1W", 604800},
+		{"weekly lowercase", "1w", 604800},
+		{"monthly", "1M", 2628003},
+		{"2 months", "2M", 5256006},
+		{"12 months", "12M", 31536036},
+		{"single char D", "D", 86400},
+		{"single char W", "W", 604800},
+		{"single char M", "M", 2628003},
+		{"zero multiplier", "0m", 60},
+		{"empty string", "", 0},
+		{"invalid unit", "5x", 0},
+		{"large multiplier", "240h", 864000},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := converter.ToSeconds(tt.timeframe)
 			if result != tt.expected {
-				t.Errorf("%s: ToSeconds(%q) = %d, expected %d",
-					tt.description, tt.timeframe, result, tt.expected)
+				t.Errorf("ToSeconds(%q) = %d, want %d", tt.timeframe, result, tt.expected)
 			}
 		})
 	}
 }
 
-func TestTimeframeConverter_EdgeCases(t *testing.T) {
+func TestTimeframeConverter_FromSeconds(t *testing.T) {
 	converter := NewTimeframeConverter()
 
-	t.Run("zero multiplier defaults to 1", func(t *testing.T) {
-		result := converter.ToSeconds("0m")
-		expected := int64(60) // Should default to 1m
-		if result != expected {
-			t.Errorf("zero multiplier should default to 1: got %d, expected %d", result, expected)
+	tests := []struct {
+		seconds  int64
+		expected string
+	}{
+		{1, "1s"},
+		{60, "1m"},
+		{300, "5m"},
+		{3600, "1h"},
+		{14400, "4h"},
+		{86400, "1D"},
+		{604800, "1W"},
+		{2628003, "1M"},
+		{120, "2m"},
+		{7200, "2h"},
+		{172800, "2D"},
+		{5256006, "2M"},
+		{15768018, "6M"},
+		{31536036, "12M"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := converter.FromSeconds(tt.seconds)
+			if result != tt.expected {
+				t.Errorf("FromSeconds(%d) = %q, want %q", tt.seconds, result, tt.expected)
+			}
+		})
+	}
+
+	t.Run("zero returns empty", func(t *testing.T) {
+		result := converter.FromSeconds(0)
+		if result != "" {
+			t.Errorf("FromSeconds(0) = %q, want empty", result)
 		}
 	})
 
-	t.Run("no number defaults to 1", func(t *testing.T) {
-		result := converter.ToSeconds("h")
-		expected := int64(3600) // Should be 1h
-		if result != expected {
-			t.Errorf("no number should default to 1h: got %d, expected %d", result, expected)
+	t.Run("negative returns empty", func(t *testing.T) {
+		result := converter.FromSeconds(-1)
+		if result != "" {
+			t.Errorf("FromSeconds(-1) = %q, want empty", result)
 		}
 	})
 
-	t.Run("case sensitivity for units", func(t *testing.T) {
-		upperD := converter.ToSeconds("1D")
-		lowerD := converter.ToSeconds("1d")
-		if upperD != lowerD || upperD != 86400 {
-			t.Errorf("uppercase and lowercase D should be equivalent: %d vs %d", upperD, lowerD)
+	t.Run("above 366 days caps to 12M", func(t *testing.T) {
+		result := converter.FromSeconds(31622401)
+		if result != "12M" {
+			t.Errorf("FromSeconds(31622401) = %q, want %q", result, "12M")
+		}
+	})
+
+	t.Run("exactly 366 days is 366D", func(t *testing.T) {
+		result := converter.FromSeconds(31622400)
+		if result != "366D" {
+			t.Errorf("FromSeconds(31622400) = %q, want %q", result, "366D")
+		}
+	})
+
+	t.Run("very large value caps to 12M", func(t *testing.T) {
+		result := converter.FromSeconds(100_000_000)
+		if result != "12M" {
+			t.Errorf("FromSeconds(100000000) = %q, want %q", result, "12M")
+		}
+	})
+}
+
+func TestTimeframeConverter_RoundtripProperties(t *testing.T) {
+	converter := NewTimeframeConverter()
+
+	t.Run("canonical forms survive roundtrip", func(t *testing.T) {
+		canonicalTimeframes := []string{
+			"1s", "1m", "5m", "15m",
+			"1h", "4h",
+			"1D", "2D",
+			"1W",
+			"1M", "2M", "6M", "12M",
+		}
+		for _, tf := range canonicalTimeframes {
+			seconds := converter.ToSeconds(tf)
+			roundtripped := converter.FromSeconds(seconds)
+			if roundtripped != tf {
+				t.Errorf("FromSeconds(ToSeconds(%q)) = %q, want %q (via %d seconds)",
+					tf, roundtripped, tf, seconds)
+			}
+		}
+	})
+
+	t.Run("lowercase aliases normalize to canonical", func(t *testing.T) {
+		aliases := map[string]string{
+			"1d": "1D",
+			"1w": "1W",
+		}
+		for alias, canonical := range aliases {
+			seconds := converter.ToSeconds(alias)
+			result := converter.FromSeconds(seconds)
+			if result != canonical {
+				t.Errorf("FromSeconds(ToSeconds(%q)) = %q, want canonical %q",
+					alias, result, canonical)
+			}
 		}
 	})
 }
