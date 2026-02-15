@@ -64,7 +64,6 @@ func (h *TickerFunctionHandler) GenerateCode(g *generator, call *ast.CallExpress
 	}
 }
 
-/* extractTickerExpression handles different expression types for ticker symbols */
 func (h *TickerFunctionHandler) extractTickerExpression(g *generator, expr ast.Expression) (string, error) {
 	switch exp := expr.(type) {
 	case *ast.MemberExpression:
@@ -155,12 +154,36 @@ func (h *TickerFunctionHandler) generateLineBreak(g *generator, call *ast.CallEx
 }
 
 func (h *TickerFunctionHandler) generatePointFigure(g *generator, call *ast.CallExpression) (string, error) {
-	return fmt.Sprintf("\"POINTFIG:\" + %s", "ctx.Symbol"), nil
+	if len(call.Arguments) < 3 {
+		return "", fmt.Errorf("pointfigure() requires at least 3 arguments (symbol, source, style)")
+	}
+
+	symbolArg, err := h.extractTickerExpression(g, call.Arguments[0])
+	if err != nil {
+		return "", err
+	}
+	sourceArg := g.extractSeriesExpression(call.Arguments[1])
+	styleArg, err := h.extractTickerExpression(g, call.Arguments[2])
+	if err != nil {
+		return "", err
+	}
+
+	paramArg := "14"
+	if len(call.Arguments) > 3 {
+		paramArg = g.extractSeriesExpression(call.Arguments[3])
+	}
+
+	reversalArg := "3"
+	if len(call.Arguments) > 4 {
+		reversalArg = g.extractSeriesExpression(call.Arguments[4])
+	}
+
+	return fmt.Sprintf("ticker.PointFigure(%s, %s, %s, float64(%s), float64(%s))", symbolArg, sourceArg, styleArg, paramArg, reversalArg), nil
 }
 
 func (h *TickerFunctionHandler) generateTickerNew(g *generator, call *ast.CallExpression) (string, error) {
 	if len(call.Arguments) < 2 {
-		return "", fmt.Errorf("ticker.new() requires 2 arguments")
+		return "", fmt.Errorf("ticker.new() requires at least 2 arguments (prefix, ticker)")
 	}
 
 	prefixArg, err := h.extractTickerExpression(g, call.Arguments[0])
@@ -172,11 +195,30 @@ func (h *TickerFunctionHandler) generateTickerNew(g *generator, call *ast.CallEx
 		return "", err
 	}
 
-	return fmt.Sprintf("%s + \":\" + %s", prefixArg, tickerArg), nil
+	sessionArg := resolveTickerModifierArg(g, call.Arguments, 2)
+	adjustmentArg := resolveTickerModifierArg(g, call.Arguments, 3)
+	backAdjustmentArg := resolveTickerModifierArg(g, call.Arguments, 4)
+	settlementArg := resolveTickerModifierArg(g, call.Arguments, 5)
+
+	return fmt.Sprintf("ticker.New(%s, %s, %s, %s, %s, %s)", prefixArg, tickerArg, sessionArg, adjustmentArg, backAdjustmentArg, settlementArg), nil
 }
 
 func (h *TickerFunctionHandler) generateTickerModify(g *generator, call *ast.CallExpression) (string, error) {
-	return fmt.Sprintf("ctx.Symbol"), nil
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("ticker.modify() requires at least 1 argument (tickerid)")
+	}
+
+	tickeridArg, err := h.extractTickerExpression(g, call.Arguments[0])
+	if err != nil {
+		return "", err
+	}
+
+	sessionArg := resolveTickerModifierArg(g, call.Arguments, 1)
+	adjustmentArg := resolveTickerModifierArg(g, call.Arguments, 2)
+	backAdjustmentArg := resolveTickerModifierArg(g, call.Arguments, 3)
+	settlementArg := resolveTickerModifierArg(g, call.Arguments, 4)
+
+	return fmt.Sprintf("ticker.Modify(%s, %s, %s, %s, %s)", tickeridArg, sessionArg, adjustmentArg, backAdjustmentArg, settlementArg), nil
 }
 
 func (h *TickerFunctionHandler) generateTickerStandard(g *generator, call *ast.CallExpression) (string, error) {
@@ -188,17 +230,21 @@ func (h *TickerFunctionHandler) generateTickerStandard(g *generator, call *ast.C
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("ticker.NewModifierParser().ExtractBaseSymbol(%s)", tickerIDArg), nil
+	return fmt.Sprintf("ticker.Standard(%s)", tickerIDArg), nil
 }
 
 func (h *TickerFunctionHandler) generateTickerInherit(g *generator, call *ast.CallExpression) (string, error) {
 	if len(call.Arguments) < 2 {
-		return "", fmt.Errorf("ticker.inherit() requires 2 arguments")
+		return "", fmt.Errorf("ticker.inherit() requires 2 arguments (from_tickerid, symbol)")
 	}
 
+	fromArg, err := h.extractTickerExpression(g, call.Arguments[0])
+	if err != nil {
+		return "", err
+	}
 	symbolArg, err := h.extractTickerExpression(g, call.Arguments[1])
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("ctx.Symbol + \":\" + %s", symbolArg), nil
+	return fmt.Sprintf("ticker.Inherit(%s, %s)", fromArg, symbolArg), nil
 }

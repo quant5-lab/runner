@@ -1,0 +1,15 @@
+//@version=5
+strategy("Ticker Standard Security", overlay=true)
+
+stdClose = request.security(ticker.standard(syminfo.tickerid), timeframe.period, close)
+
+fast = ta.sma(stdClose, 10)
+slow = ta.sma(stdClose, 30)
+
+if ta.crossover(fast, slow)
+    strategy.entry("Long", strategy.long)
+if ta.crossunder(fast, slow)
+    strategy.entry("Short", strategy.short)
+
+plot(fast, "Fast MA")
+plot(slow, "Slow MA")

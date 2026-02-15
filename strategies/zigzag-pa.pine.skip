@@ -1,8 +1,8 @@
-Codegen limitation: heikenashi() function not implemented
+Codegen limitation: v4→v5 preprocessor does not rename heikenashi() to ticker.heikinashi()
 
 Parse: ✅ (v4→v5 preprocessing)
 Generate: ❌ (unsupported function in expression position: heikenashi)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
-Blocker: #10 (ticker.heikinashi not implemented)
+Blocker: ~~#10 CLOSED~~ — v4→v5 preprocessor missing heikenashi → ticker.heikinashi rename (untracked)

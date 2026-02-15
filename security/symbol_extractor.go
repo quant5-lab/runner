@@ -8,14 +8,10 @@ import (
 )
 
 /* SymbolExtractor handles symbol extraction from all expression types */
-type SymbolExtractor struct {
-	parser *ticker.ModifierParser
-}
+type SymbolExtractor struct{}
 
 func NewSymbolExtractor() *SymbolExtractor {
-	return &SymbolExtractor{
-		parser: ticker.NewModifierParser(),
-	}
+	return &SymbolExtractor{}
 }
 
 /* Extract returns base symbol and modifier type from expression */
@@ -25,7 +21,7 @@ func (e *SymbolExtractor) Extract(expr ast.Expression) (symbol string, modifierT
 		return "", ""
 	}
 
-	baseSymbol, modType, hasModifier := e.parser.Parse(rawSymbol)
+	baseSymbol, modType, hasModifier := ticker.ParseModifiedSymbol(rawSymbol)
 	if hasModifier {
 		return baseSymbol, modType
 	}
@@ -98,7 +94,7 @@ func (e *SymbolExtractor) extractFromTickerCall(call *ast.CallExpression) string
 	case "ticker.standard":
 		if len(call.Arguments) >= 1 {
 			modifiedSymbol := e.extractRaw(call.Arguments[0])
-			return e.parser.ExtractBaseSymbol(modifiedSymbol)
+			return ticker.ExtractBaseSymbol(modifiedSymbol)
 		}
 	}
 

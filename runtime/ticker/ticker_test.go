@@ -21,115 +21,167 @@ func TestHeikinashi(t *testing.T) {
 }
 
 func TestRenko(t *testing.T) {
-	result := Renko("BTCUSDT", "ATR", 14.0)
-	expected := "RENKO:BTCUSDT:ATR:14.00"
-	if result != expected {
-		t.Errorf("Renko() = %q, want %q", result, expected)
+	tests := []struct {
+		name     string
+		symbol   string
+		style    string
+		param    float64
+		expected string
+	}{
+		{"basic", "BTCUSDT", "ATR", 14.0, "RENKO:BTCUSDT:ATR:14.00"},
+		{"exchange prefixed", "BINANCE:BTCUSDT", "ATR", 14.0, "RENKO:BINANCE:BTCUSDT:ATR:14.00"},
+		{"traditional style", "AAPL", "Traditional", 1.0, "RENKO:AAPL:Traditional:1.00"},
+		{"empty symbol", "", "ATR", 14.0, "RENKO::ATR:14.00"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Renko(tt.symbol, tt.style, tt.param)
+			if result != tt.expected {
+				t.Errorf("Renko() = %q, want %q", result, tt.expected)
+			}
+		})
 	}
 }
 
 func TestKagi(t *testing.T) {
-	result := Kagi("BTCUSDT", 3.5)
-	expected := "KAGI:BTCUSDT:3.50"
-	if result != expected {
-		t.Errorf("Kagi() = %q, want %q", result, expected)
+	tests := []struct {
+		name     string
+		symbol   string
+		reversal float64
+		expected string
+	}{
+		{"basic", "BTCUSDT", 3.5, "KAGI:BTCUSDT:3.50"},
+		{"exchange prefixed", "BINANCE:BTCUSDT", 3.5, "KAGI:BINANCE:BTCUSDT:3.50"},
+		{"empty symbol", "", 3.5, "KAGI::3.50"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Kagi(tt.symbol, tt.reversal)
+			if result != tt.expected {
+				t.Errorf("Kagi() = %q, want %q", result, tt.expected)
+			}
+		})
 	}
 }
 
 func TestLineBreak(t *testing.T) {
-	result := LineBreak("BTCUSDT", 3)
-	expected := "LINEBREAK:BTCUSDT:3"
-	if result != expected {
-		t.Errorf("LineBreak() = %q, want %q", result, expected)
+	tests := []struct {
+		name          string
+		symbol        string
+		numberOfLines int
+		expected      string
+	}{
+		{"basic", "BTCUSDT", 3, "LINEBREAK:BTCUSDT:3"},
+		{"exchange prefixed", "BINANCE:BTCUSDT", 3, "LINEBREAK:BINANCE:BTCUSDT:3"},
+		{"single line", "AAPL", 1, "LINEBREAK:AAPL:1"},
+		{"empty symbol", "", 3, "LINEBREAK::3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := LineBreak(tt.symbol, tt.numberOfLines)
+			if result != tt.expected {
+				t.Errorf("LineBreak() = %q, want %q", result, tt.expected)
+			}
+		})
 	}
 }
 
-/* TestParseModifiedSymbol validates modifier parsing across all supported types.
- * Tests correct extraction of base symbol and modifier type from formatted strings.
- */
 func TestParseModifiedSymbol(t *testing.T) {
 	tests := []struct {
+		name             string
 		tickerID         string
 		expectedBase     string
 		expectedModifier ModifierType
 		expectedHas      bool
 	}{
-		{"HEIKINASHI:BTCUSDT", "BTCUSDT", ModifierHeikinAshi, true},
-		{"RENKO:BTCUSDT:ATR:14.00", "BTCUSDT", ModifierRenko, true},
-		{"KAGI:ETHUSDT:3.50", "ETHUSDT", ModifierKagi, true},
-		{"LINEBREAK:AAPL:3", "AAPL", ModifierLineBreak, true},
-		{"POINTFIG:TSLA", "TSLA", ModifierPointFig, true},
-		{"BTCUSDT", "BTCUSDT", "", false},
-		{"BINANCE:BTCUSDT", "BINANCE:BTCUSDT", "", false},
-		{"INVALID:SYMBOL", "INVALID:SYMBOL", "", false},
-		{"", "", "", false},
+		{"heikinashi", "HEIKINASHI:BTCUSDT", "BTCUSDT", ModifierHeikinAshi, true},
+		{"renko", "RENKO:BTCUSDT:ATR:14.00", "BTCUSDT", ModifierRenko, true},
+		{"kagi", "KAGI:ETHUSDT:3.50", "ETHUSDT", ModifierKagi, true},
+		{"linebreak", "LINEBREAK:AAPL:3", "AAPL", ModifierLineBreak, true},
+		{"pointfigure", "POINTFIG:TSLA", "TSLA", ModifierPointFig, true},
+		{"plain symbol", "BTCUSDT", "BTCUSDT", "", false},
+		{"exchange prefixed", "BINANCE:BTCUSDT", "BINANCE:BTCUSDT", "", false},
+		{"unknown prefix", "INVALID:SYMBOL", "INVALID:SYMBOL", "", false},
+		{"empty", "", "", "", false},
+		{"heikinashi with session metadata", "HEIKINASHI:BTCUSDT|s=regular", "BTCUSDT", ModifierHeikinAshi, true},
+		{"renko with adjustment metadata", "RENKO:BTCUSDT:ATR:14.00|a=splits", "BTCUSDT", ModifierRenko, true},
+		{"exchange prefix with metadata", "BINANCE:BTCUSDT|s=extended", "BINANCE:BTCUSDT", "", false},
+		{"plain symbol with metadata", "BTCUSDT|s=regular", "BTCUSDT", "", false},
 	}
 
 	for _, tt := range tests {
-		base, modifier, has := ParseModifiedSymbol(tt.tickerID)
-		if base != tt.expectedBase {
-			t.Errorf("ParseModifiedSymbol(%q) base = %q, want %q", tt.tickerID, base, tt.expectedBase)
-		}
-		if modifier != tt.expectedModifier {
-			t.Errorf("ParseModifiedSymbol(%q) modifier = %q, want %q", tt.tickerID, modifier, tt.expectedModifier)
-		}
-		if has != tt.expectedHas {
-			t.Errorf("ParseModifiedSymbol(%q) has = %v, want %v", tt.tickerID, has, tt.expectedHas)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			base, modifier, has := ParseModifiedSymbol(tt.tickerID)
+			if base != tt.expectedBase {
+				t.Errorf("ParseModifiedSymbol(%q) base = %q, want %q", tt.tickerID, base, tt.expectedBase)
+			}
+			if modifier != tt.expectedModifier {
+				t.Errorf("ParseModifiedSymbol(%q) modifier = %q, want %q", tt.tickerID, modifier, tt.expectedModifier)
+			}
+			if has != tt.expectedHas {
+				t.Errorf("ParseModifiedSymbol(%q) has = %v, want %v", tt.tickerID, has, tt.expectedHas)
+			}
+		})
 	}
 }
 
 func TestIsModified(t *testing.T) {
 	tests := []struct {
+		name     string
 		tickerID string
 		expected bool
 	}{
-		{"HEIKINASHI:BTCUSDT", true},
-		{"RENKO:BTCUSDT:ATR:14.00", true},
-		{"BTCUSDT", false},
-		{"BINANCE:BTCUSDT", false},
+		{"heikinashi", "HEIKINASHI:BTCUSDT", true},
+		{"renko", "RENKO:BTCUSDT:ATR:14.00", true},
+		{"kagi", "KAGI:ETHUSDT:3.50", true},
+		{"linebreak", "LINEBREAK:AAPL:3", true},
+		{"pointfigure", "POINTFIG:TSLA", true},
+		{"plain symbol", "BTCUSDT", false},
+		{"exchange prefixed", "BINANCE:BTCUSDT", false},
+		{"unknown prefix", "INVALID:SYMBOL", false},
+		{"empty", "", false},
+		{"heikinashi with metadata", "HEIKINASHI:BTCUSDT|s=regular", true},
+		{"exchange prefix with metadata", "BINANCE:BTCUSDT|s=extended", false},
 	}
 
 	for _, tt := range tests {
-		result := IsModified(tt.tickerID)
-		if result != tt.expected {
-			t.Errorf("IsModified(%q) = %v, want %v", tt.tickerID, result, tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsModified(tt.tickerID)
+			if result != tt.expected {
+				t.Errorf("IsModified(%q) = %v, want %v", tt.tickerID, result, tt.expected)
+			}
+		})
 	}
 }
 
 func TestExtractBaseSymbol(t *testing.T) {
 	tests := []struct {
+		name     string
 		tickerID string
 		expected string
 	}{
-		{"HEIKINASHI:BTCUSDT", "BTCUSDT"},
-		{"RENKO:BTCUSDT:ATR:14.00", "BTCUSDT"},
-		{"BTCUSDT", "BTCUSDT"},
-		{"BINANCE:BTCUSDT", "BINANCE:BTCUSDT"},
+		{"heikinashi", "HEIKINASHI:BTCUSDT", "BTCUSDT"},
+		{"renko", "RENKO:BTCUSDT:ATR:14.00", "BTCUSDT"},
+		{"kagi", "KAGI:ETHUSDT:3.50", "ETHUSDT"},
+		{"linebreak", "LINEBREAK:AAPL:3", "AAPL"},
+		{"pointfigure", "POINTFIG:TSLA", "TSLA"},
+		{"plain symbol", "BTCUSDT", "BTCUSDT"},
+		{"exchange prefixed", "BINANCE:BTCUSDT", "BINANCE:BTCUSDT"},
+		{"empty", "", ""},
+		{"heikinashi with metadata", "HEIKINASHI:BTCUSDT|s=regular", "BTCUSDT"},
+		{"exchange prefix with metadata", "BINANCE:BTCUSDT|s=extended|a=splits", "BINANCE:BTCUSDT"},
+		{"plain symbol with metadata", "BTCUSDT|a=dividends", "BTCUSDT"},
 	}
 
 	for _, tt := range tests {
-		result := ExtractBaseSymbol(tt.tickerID)
-		if result != tt.expected {
-			t.Errorf("ExtractBaseSymbol(%q) = %q, want %q", tt.tickerID, result, tt.expected)
-		}
-	}
-}
-
-func TestModifierParserBackwardCompatibility(t *testing.T) {
-	parser := NewModifierParser()
-
-	base, modifier, has := parser.Parse("HEIKINASHI:BTCUSDT")
-	if base != "BTCUSDT" || modifier != ModifierHeikinAshi || !has {
-		t.Error("ModifierParser.Parse() backward compatibility broken")
-	}
-
-	if !parser.IsModified("HEIKINASHI:BTCUSDT") {
-		t.Error("ModifierParser.IsModified() backward compatibility broken")
-	}
-
-	if parser.ExtractBaseSymbol("HEIKINASHI:BTCUSDT") != "BTCUSDT" {
-		t.Error("ModifierParser.ExtractBaseSymbol() backward compatibility broken")
+		t.Run(tt.name, func(t *testing.T) {
+			result := ExtractBaseSymbol(tt.tickerID)
+			if result != tt.expected {
+				t.Errorf("ExtractBaseSymbol(%q) = %q, want %q", tt.tickerID, result, tt.expected)
+			}
+		})
 	}
 }

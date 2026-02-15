@@ -5,4 +5,4 @@ Generate: ✅
 Compile: ❌ (variable redeclaration: composite indicator preamble emitted twice in ternary branches; non-boolean condition in ternary IIFE)
 Execute: ❌ Not reached
 
-Blocker: #3 (ternary codegen duplicates composite indicator variables in self-referencing assignment)
+Blocker: ~~#3 CLOSED~~ — ternary codegen duplicates composite indicator variables (untracked)

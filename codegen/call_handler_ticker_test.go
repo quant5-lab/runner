@@ -7,12 +7,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestTickerFunctionHandler_CanHandle validates ticker function recognition
- *
- * Tests that the TickerFunctionHandler correctly identifies all ticker modifier
- * functions (with/without namespace prefix) and defers non-ticker functions
- * to subsequent handlers in the call chain.
- */
 func TestTickerFunctionHandler_CanHandle(t *testing.T) {
 	handler := NewTickerFunctionHandler()
 
@@ -21,27 +15,23 @@ func TestTickerFunctionHandler_CanHandle(t *testing.T) {
 		funcName string
 		want     bool
 	}{
-		// Chart type modifiers without prefix (global namespace)
 		{"heikinashi", "heikinashi", true},
 		{"renko", "renko", true},
 		{"kagi", "kagi", true},
 		{"linebreak", "linebreak", true},
 		{"pointfigure", "pointfigure", true},
 
-		// Chart type modifiers with ticker namespace
 		{"ticker.heikinashi", "ticker.heikinashi", true},
 		{"ticker.renko", "ticker.renko", true},
 		{"ticker.kagi", "ticker.kagi", true},
 		{"ticker.linebreak", "ticker.linebreak", true},
 		{"ticker.pointfigure", "ticker.pointfigure", true},
 
-		// Ticker ID manipulation functions
 		{"ticker.new", "ticker.new", true},
 		{"ticker.modify", "ticker.modify", true},
 		{"ticker.standard", "ticker.standard", true},
 		{"ticker.inherit", "ticker.inherit", true},
 
-		// Non-ticker functions (should not handle)
 		{"ta.sma", "ta.sma", false},
 		{"strategy.entry", "strategy.entry", false},
 		{"plot", "plot", false},
@@ -49,7 +39,6 @@ func TestTickerFunctionHandler_CanHandle(t *testing.T) {
 		{"unknown_func", "unknown", false},
 		{"empty", "", false},
 
-		// Case sensitivity validation
 		{"HEIKINASHI", "HEIKINASHI", false},
 		{"Ticker.New", "Ticker.New", false},
 	}
@@ -64,12 +53,6 @@ func TestTickerFunctionHandler_CanHandle(t *testing.T) {
 	}
 }
 
-/* TestTickerFunctionHandler_GenerateCode validates ticker function code generation
- *
- * Tests comprehensive symbol expression handling across all ticker modifier types,
- * validating proper translation to Go runtime ticker package calls with correct
- * argument extraction and type handling.
- */
 func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -78,7 +61,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 		expectError    bool
 		validateOutput func(t *testing.T, code string)
 	}{
-		// Heikinashi: Simple ticker modifier with single symbol argument
 		{
 			name: "heikinashi with syminfo.tickerid",
 			call: &ast.CallExpression{
@@ -152,8 +134,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
-
-		// Renko: Multi-parameter chart type with style and box size
 		{
 			name: "renko with all parameters",
 			call: &ast.CallExpression{
@@ -198,8 +178,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
-
-		// Kagi: Reversal-based chart with reversal amount
 		{
 			name: "kagi with percentage reversal",
 			call: &ast.CallExpression{
@@ -236,8 +214,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
-
-		// LineBreak: Three-line break chart
 		{
 			name: "linebreak with line count",
 			call: &ast.CallExpression{
@@ -255,8 +231,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
-
-		// Ticker.new: Construct custom ticker ID
 		{
 			name: "ticker.new with exchange and symbol",
 			call: &ast.CallExpression{
@@ -271,7 +245,71 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 			},
 			expectError: false,
 			validateOutput: func(t *testing.T, code string) {
-				expected := "\"BINANCE\" + \":\" + \"BTCUSDT\""
+				expected := `ticker.New("BINANCE", "BTCUSDT", "", "", "", "")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.new with session and adjustment",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BINANCE"},
+					&ast.Literal{Value: "BTCUSDT"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "session"},
+						Property: &ast.Identifier{Name: "regular"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "adjustment"},
+						Property: &ast.Identifier{Name: "splits"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.New("BINANCE", "BTCUSDT", ticker.SessionRegular, ticker.AdjustmentSplits, "", "")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.new with all six arguments",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "NYSE"},
+					&ast.Literal{Value: "AAPL"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "session"},
+						Property: &ast.Identifier{Name: "extended"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "adjustment"},
+						Property: &ast.Identifier{Name: "dividends"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "backadjustment"},
+						Property: &ast.Identifier{Name: "on"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "settlement_as_close"},
+						Property: &ast.Identifier{Name: "off"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.New("NYSE", "AAPL", ticker.SessionExtended, ticker.AdjustmentDividends, ticker.BackAdjustmentOn, ticker.SettlementOff)`
 				if code != expected {
 					t.Errorf("Expected %q, got: %q", expected, code)
 				}
@@ -295,13 +333,12 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 			},
 			expectError: false,
 			validateOutput: func(t *testing.T, code string) {
-				if code != "exchange + \":\" + symbol" {
-					t.Errorf("Expected variable concatenation, got: %q", code)
+				expected := `ticker.New(exchange, symbol, "", "", "", "")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
 				}
 			},
 		},
-
-		// Ticker.standard: Extract base symbol from modified ticker
 		{
 			name: "ticker.standard with modified ticker ID",
 			call: &ast.CallExpression{
@@ -315,7 +352,29 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 			},
 			expectError: false,
 			validateOutput: func(t *testing.T, code string) {
-				expected := "ticker.NewModifierParser().ExtractBaseSymbol(\"HEIKINASHI:BTCUSDT\")"
+				expected := "ticker.Standard(\"HEIKINASHI:BTCUSDT\")"
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.standard with syminfo.tickerid",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "standard"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := "ticker.Standard(ctx.Symbol)"
 				if code != expected {
 					t.Errorf("Expected %q, got: %q", expected, code)
 				}
@@ -337,28 +396,91 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
-
-		// Ticker.modify: Returns current symbol (no modification)
 		{
-			name: "ticker.modify returns current symbol",
+			name: "ticker.modify with session",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "ticker"},
 					Property: &ast.Identifier{Name: "modify"},
 				},
-				Arguments: []ast.Expression{},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "session"},
+						Property: &ast.Identifier{Name: "extended"},
+					},
+				},
 			},
 			expectError: false,
 			validateOutput: func(t *testing.T, code string) {
-				if code != "ctx.Symbol" {
-					t.Errorf("Expected ctx.Symbol, got: %q", code)
+				expected := `ticker.Modify(ctx.Symbol, ticker.SessionExtended, "", "", "")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
 				}
 			},
 		},
-
-		// Ticker.inherit: Inherit context from another symbol
 		{
-			name: "ticker.inherit with modifier and target",
+			name: "ticker.modify with tickerid only",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "modify"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.Modify(ctx.Symbol, "", "", "", "")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.modify with all four modifiers",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "modify"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BINANCE:BTCUSDT"},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "session"},
+						Property: &ast.Identifier{Name: "regular"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "adjustment"},
+						Property: &ast.Identifier{Name: "none"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "backadjustment"},
+						Property: &ast.Identifier{Name: "off"},
+					},
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "settlement_as_close"},
+						Property: &ast.Identifier{Name: "on"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.Modify("BINANCE:BTCUSDT", ticker.SessionRegular, ticker.AdjustmentNone, ticker.BackAdjustmentOff, ticker.SettlementOn)`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.inherit with source and target",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "ticker"},
@@ -371,16 +493,35 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 			},
 			expectError: false,
 			validateOutput: func(t *testing.T, code string) {
-				if !strings.Contains(code, "ctx.Symbol") {
-					t.Error("Expected ctx.Symbol prefix")
-				}
-				if !strings.Contains(code, "ETHUSDT") {
-					t.Error("Expected target symbol ETHUSDT")
+				expected := `ticker.Inherit("HEIKINASHI", "ETHUSDT")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
 				}
 			},
 		},
-
-		// Error cases: Insufficient arguments
+		{
+			name: "ticker.inherit with syminfo expressions",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "inherit"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+					&ast.Literal{Value: "ETHUSDT"},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.Inherit(ctx.Symbol, "ETHUSDT")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
 		{
 			name: "heikinashi missing symbol argument",
 			call: &ast.CallExpression{
@@ -443,13 +584,107 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "ticker.modify missing tickerid",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "modify"},
+				},
+				Arguments: []ast.Expression{},
+			},
+			expectError: true,
+		},
+		{
+			name: "pointfigure missing required args",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "pointfigure"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "pointfigure with all parameters",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "pointfigure"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: "ATR"},
+					&ast.Literal{Value: 14.0},
+					&ast.Literal{Value: 3.0},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				if !strings.Contains(code, "ticker.PointFigure") {
+					t.Error("Expected ticker.PointFigure call")
+				}
+				if !strings.Contains(code, "BTCUSDT") {
+					t.Error("Expected symbol BTCUSDT")
+				}
+				if !strings.Contains(code, "ATR") {
+					t.Error("Expected style ATR")
+				}
+			},
+		},
+		{
+			name: "pointfigure with minimum args uses defaults",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "pointfigure"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "AAPL"},
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: "Traditional"},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				if !strings.Contains(code, "ticker.PointFigure") {
+					t.Error("Expected ticker.PointFigure call")
+				}
+				if !strings.Contains(code, "float64(14)") {
+					t.Error("Expected default param 14")
+				}
+				if !strings.Contains(code, "float64(3)") {
+					t.Error("Expected default reversal 3")
+				}
+			},
+		},
+		{
+			name: "pointfigure with syminfo.tickerid",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "pointfigure"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: "ATR"},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				if !strings.Contains(code, "ctx.Symbol") {
+					t.Error("Expected ctx.Symbol for syminfo.tickerid")
+				}
+				if !strings.Contains(code, "ticker.PointFigure") {
+					t.Error("Expected ticker.PointFigure call")
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
 
-			// Setup variable context if needed
 			if tt.setupVars != nil {
 				for name, typ := range tt.setupVars {
 					g.variables[name] = typ
@@ -481,11 +716,6 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 	}
 }
 
-/* TestTickerFunctionHandler_NilSafety validates graceful handling of malformed AST nodes
- *
- * Tests that the handler properly handles nil or invalid AST structures without
- * panicking, returning appropriate error codes or empty results.
- */
 func TestTickerFunctionHandler_NilSafety(t *testing.T) {
 	handler := NewTickerFunctionHandler()
 	g := newTestGenerator()
@@ -545,14 +775,6 @@ func TestTickerFunctionHandler_NilSafety(t *testing.T) {
 	}
 }
 
-/* TestTickerFunctionHandler_SymbolExpressionTypes validates all supported symbol input types
- *
- * Tests that the handler correctly processes different types of symbol expressions:
- * - Literal strings (explicit symbols)
- * - MemberExpression (syminfo.tickerid, syminfo.ticker)
- * - Identifier (variable references)
- * - Constants (resolved at compile time)
- */
 func TestTickerFunctionHandler_SymbolExpressionTypes(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -609,7 +831,6 @@ func TestTickerFunctionHandler_SymbolExpressionTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
 
-			// Setup test context
 			if tt.setupVars != nil {
 				for name, typ := range tt.setupVars {
 					g.variables[name] = typ
@@ -640,11 +861,6 @@ func TestTickerFunctionHandler_SymbolExpressionTypes(t *testing.T) {
 	}
 }
 
-/* TestTickerFunctionHandler_IntegrationWithCallRouter validates handler chain behavior
- *
- * Tests that the ticker handler properly integrates with the call expression router,
- * including precedence ordering and fallback to unknown function handler.
- */
 func TestTickerFunctionHandler_IntegrationWithCallRouter(t *testing.T) {
 	router := NewCallExpressionRouter()
 	g := newTestGenerator()
@@ -683,7 +899,6 @@ func TestTickerFunctionHandler_IntegrationWithCallRouter(t *testing.T) {
 				if strings.Contains(code, "ticker.") {
 					t.Error("Ticker handler should not handle non-ticker functions")
 				}
-				// Should fall through to UnknownFunctionHandler
 				if !strings.Contains(code, "//") {
 					t.Error("Expected TODO comment from UnknownFunctionHandler")
 				}
@@ -725,11 +940,6 @@ func TestTickerFunctionHandler_IntegrationWithCallRouter(t *testing.T) {
 	}
 }
 
-/* TestTickerFunctionHandler_GeneratorStateManagement validates hasTickerCalls flag
- *
- * Tests that the handler correctly sets the generator's hasTickerCalls flag,
- * which triggers import of the runtime ticker package in generated code.
- */
 func TestTickerFunctionHandler_GeneratorStateManagement(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -778,7 +988,6 @@ func TestTickerFunctionHandler_GeneratorStateManagement(t *testing.T) {
 			g := newTestGenerator()
 			handler := NewTickerFunctionHandler()
 
-			// Verify initial state
 			if g.hasTickerCalls {
 				t.Error("Generator should not have hasTickerCalls set initially")
 			}
@@ -788,7 +997,6 @@ func TestTickerFunctionHandler_GeneratorStateManagement(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			// Verify flag was set
 			if tt.expectTickerImport && !g.hasTickerCalls {
 				t.Error("Expected hasTickerCalls flag to be set")
 			}

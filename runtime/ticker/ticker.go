@@ -40,9 +40,10 @@ func LineBreak(symbol string, numberOfLines int) string {
 }
 
 func ParseModifiedSymbol(tickerID string) (baseSymbol string, modifierType ModifierType, hasModifier bool) {
-	parts := strings.Split(tickerID, ":")
+	stripped := StripModifiers(tickerID)
+	parts := strings.Split(stripped, ":")
 	if len(parts) < 2 {
-		return tickerID, "", false
+		return stripped, "", false
 	}
 
 	for _, mod := range knownModifiers {
@@ -51,7 +52,7 @@ func ParseModifiedSymbol(tickerID string) (baseSymbol string, modifierType Modif
 		}
 	}
 
-	return tickerID, "", false
+	return stripped, "", false
 }
 
 func IsModified(tickerID string) bool {
@@ -62,23 +63,4 @@ func IsModified(tickerID string) bool {
 func ExtractBaseSymbol(tickerID string) string {
 	baseSymbol, _, _ := ParseModifiedSymbol(tickerID)
 	return baseSymbol
-}
-
-/* ModifierParser retained for backward compatibility */
-type ModifierParser struct{}
-
-func NewModifierParser() *ModifierParser {
-	return &ModifierParser{}
-}
-
-func (p *ModifierParser) Parse(tickerID string) (string, ModifierType, bool) {
-	return ParseModifiedSymbol(tickerID)
-}
-
-func (p *ModifierParser) IsModified(tickerID string) bool {
-	return IsModified(tickerID)
-}
-
-func (p *ModifierParser) ExtractBaseSymbol(tickerID string) string {
-	return ExtractBaseSymbol(tickerID)
 }
