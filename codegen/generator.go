@@ -2551,6 +2551,15 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			}
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, tfCode), nil
 		}
+
+		routedCode, err := g.callRouter.RouteCall(g, call)
+		if err != nil {
+			return "", fmt.Errorf("failed to route %s: %w", funcName, err)
+		}
+		if routedCode != "" && !strings.HasPrefix(strings.TrimSpace(routedCode), "//") {
+			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, routedCode), nil
+		}
+
 		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
 	}
 }

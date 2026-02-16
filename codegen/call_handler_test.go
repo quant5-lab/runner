@@ -65,7 +65,7 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"timeframe.in_seconds", 9, "TimeframeFuncCallHandler"},
 		{"timeframe.from_seconds", 9, "TimeframeFuncCallHandler"},
 		{"timeframe.change", 9, "TimeframeFuncCallHandler"},
-		{"unknown_function", 11, "UnknownFunctionHandler"},
+		{"unknown_function", 12, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {

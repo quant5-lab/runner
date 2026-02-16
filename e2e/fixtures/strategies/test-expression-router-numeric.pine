@@ -1,0 +1,14 @@
+//@version=5
+strategy("Expression Router Numeric Functions", overlay=true, default_qty_type=strategy.cash)
+
+mathResult = math.abs(close - open)
+valueResult = nz(close[1], close)
+mathPow = math.pow(close, 2)
+
+signal = mathResult > 0.01 and valueResult > 0 and mathPow > 0
+
+if signal and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+
+if not signal and strategy.position_size > 0
+    strategy.close("Long")
