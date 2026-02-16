@@ -105,15 +105,15 @@ func TestTupleIndicatorRegistry_IsRegistered(t *testing.T) {
 		{"ta.macd registered", "ta.macd", true},
 		{"ta.bb registered", "ta.bb", true},
 		{"ta.stoch registered", "ta.stoch", true},
+		{"ta.dmi registered", "ta.dmi", true},
 
 		/* Implemented tuple indicators — bare v4 aliases */
 		{"macd v4 registered", "macd", true},
 		{"bb v4 registered", "bb", true},
 		{"stoch v4 registered", "stoch", true},
+		{"dmi v4 registered", "dmi", true},
 
 		/* Unregistered tuple signatures (no runtime implementation) */
-		{"ta.dmi unregistered", "ta.dmi", false},
-		{"dmi unregistered", "dmi", false},
 		{"ta.kc unregistered", "ta.kc", false},
 		{"kc unregistered", "kc", false},
 		{"ta.supertrend unregistered", "ta.supertrend", false},

@@ -42,6 +42,15 @@ func (r *TupleIndicatorRegistry) registerBuiltinIndicators() {
 		SourceArgIndex:  -1,
 		PeriodArgCount:  2,
 	})
+
+	r.registerWithBareAlias(&TupleIndicatorSpec{
+		FunctionName:    "ta.dmi",
+		OutputCount:     3,
+		RuntimeFunction: "ta.Dmi",
+		SourceArgIndex:  -1,
+		PeriodArgCount:  2,
+		ImplicitSources: []string{"high", "low", "close"},
+	})
 }
 
 /* registerWithBareAlias registers ta.X and automatically derives bare X alias */
@@ -55,6 +64,7 @@ func (r *TupleIndicatorRegistry) registerWithBareAlias(spec *TupleIndicatorSpec)
 			RuntimeFunction: spec.RuntimeFunction,
 			SourceArgIndex:  spec.SourceArgIndex,
 			PeriodArgCount:  spec.PeriodArgCount,
+			ImplicitSources: spec.ImplicitSources,
 		}
 	}
 }

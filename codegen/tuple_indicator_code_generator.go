@@ -50,8 +50,14 @@ func (g *TupleIndicatorCodeGenerator) Generate(
 	out.WriteString(ind() + "} else {\n")
 	ctx.IncreaseIndent()
 
-	out.WriteString(g.generateWindowExtraction(params.SourceExpr, ind))
-	out.WriteString(g.generateRuntimeCall(spec, params, ind))
+	if len(spec.ImplicitSources) > 0 {
+		out.WriteString(g.generateImplicitArrayExtraction(spec.ImplicitSources, ind))
+		out.WriteString(g.generateImplicitSourcesRuntimeCall(spec, params, ind))
+	} else {
+		out.WriteString(g.generateWindowExtraction(params.SourceExpr, ind))
+		out.WriteString(g.generateRuntimeCall(spec, params, ind))
+	}
+
 	out.WriteString(g.generateResultStorage(spec, outputVars, ind))
 
 	ctx.DecreaseIndent()
@@ -150,4 +156,61 @@ func (g *TupleIndicatorCodeGenerator) generateResultStorage(
 	}
 
 	return out.String()
+}
+
+/* generateImplicitArrayExtraction extracts high/low/close arrays from local series */
+func (g *TupleIndicatorCodeGenerator) generateImplicitArrayExtraction(
+	sources []string,
+	indenter func() string,
+) string {
+	out := &strings.Builder{}
+	for _, source := range sources {
+		varName := source + "Window"
+		seriesName := source + "Series"
+		out.WriteString(indenter() + fmt.Sprintf(
+			"%s := make([]float64, i+1)\n",
+			varName,
+		))
+		out.WriteString(indenter() + fmt.Sprintf(
+			"for j := 0; j < i+1; j++ {\n",
+		))
+		out.WriteString(indenter() + fmt.Sprintf(
+			"\t%s[j] = %s.Get(i - j)\n",
+			varName,
+			seriesName,
+		))
+		out.WriteString(indenter() + "}\n")
+	}
+	out.WriteString("\n")
+	return out.String()
+} /* generateImplicitSourcesRuntimeCall generates call with implicit arrays */
+func (g *TupleIndicatorCodeGenerator) generateImplicitSourcesRuntimeCall(
+	spec *TupleIndicatorSpec,
+	params *TupleIndicatorArguments,
+	indenter func() string,
+) string {
+	arrayArgs := ""
+	for _, source := range spec.ImplicitSources {
+		arrayArgs += source + "Window, "
+	}
+
+	periodArgs := ""
+	for _, p := range params.Periods {
+		periodArgs += fmt.Sprintf("%d, ", p)
+	}
+
+	/* Remove trailing comma+space */
+	allArgs := arrayArgs + periodArgs
+	if len(allArgs) >= 2 {
+		allArgs = allArgs[:len(allArgs)-2]
+	}
+
+	outputVarList := g.buildOutputVarList(spec.OutputCount)
+
+	return indenter() + fmt.Sprintf(
+		"%s := %s(%s)\n\n",
+		outputVarList,
+		spec.RuntimeFunction,
+		allArgs,
+	)
 }

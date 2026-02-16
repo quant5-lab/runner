@@ -1,0 +1,16 @@
+//@version=4
+indicator("DMI Comparison", overlay=false)
+
+[diplus, diminus, adx] = dmi(14, 14)
+
+uptrend = diplus > diminus
+downtrend = diminus > diplus
+strongAdx = adx > 25
+weakAdx = adx < 20
+
+signal = uptrend and strongAdx ? 1 : downtrend and strongAdx ? -1 : 0
+
+plot(diplus, title="+DI", color=color.green)
+plot(diminus, title="-DI", color=color.red)
+plot(adx, title="ADX", color=color.blue)
+plot(signal * 10, title="Signal", color=color.orange, linewidth=3)

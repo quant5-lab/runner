@@ -1,0 +1,19 @@
+//@version=5
+strategy("DMI Crossover", overlay=false)
+
+[diplus, diminus, adx] = ta.dmi(14, 14)
+
+diCross = ta.crossover(diplus, diminus)
+diCrossUnder = ta.crossunder(diplus, diminus)
+
+strongTrend = adx > 20
+
+if diCross and strongTrend
+    strategy.entry("Long", strategy.long)
+if diCrossUnder and strongTrend
+    strategy.entry("Short", strategy.short)
+
+plot(diplus, title="+DI", color=color.green)
+plot(diminus, title="-DI", color=color.red)
+plot(adx, title="ADX", color=color.blue)
+hline(20, title="Threshold", color=color.gray)

@@ -1,0 +1,8 @@
+//@version=5
+indicator("DMI Basic", overlay=false)
+
+[diplus, diminus, adx] = ta.dmi(14, 14)
+
+plot(diplus, title="+DI", color=color.green)
+plot(diminus, title="-DI", color=color.red)
+plot(adx, title="ADX", color=color.blue)

@@ -1,0 +1,21 @@
+//@version=5
+indicator("DMI Periods", overlay=false)
+
+len = input(14, title="DI Length")
+smoothing = input(13, title="ADX Smoothing")
+
+[diplus1, diminus1, adx1] = ta.dmi(len, smoothing)
+[diplus2, diminus2, adx2] = ta.dmi(5, 3)
+[diplus3, diminus3, adx3] = ta.dmi(21, 21)
+
+plot(diplus1, title="+DI(14,13)", color=color.green)
+plot(diminus1, title="-DI(14,13)", color=color.red)
+plot(adx1, title="ADX(14,13)", color=color.blue)
+
+plot(diplus2, title="+DI(5,3)", color=color.lime, linewidth=2)
+plot(diminus2, title="-DI(5,3)", color=color.maroon, linewidth=2)
+plot(adx2, title="ADX(5,3)", color=color.navy, linewidth=2)
+
+plot(diplus3, title="+DI(21,21)", color=color.teal)
+plot(diminus3, title="-DI(21,21)", color=color.orange)
+plot(adx3, title="ADX(21,21)", color=color.purple)

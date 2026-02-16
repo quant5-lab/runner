@@ -28,10 +28,29 @@ func (e *TupleIndicatorArgumentExtractor) Extract(
 		return nil, fmt.Errorf("insufficient arguments for tuple indicator")
 	}
 
-	sourceExpr := sourceExprExtractor(call.Arguments[0])
+	/* For indicators with ImplicitSources, all args are periods (no source arg) */
+	sourceExpr := ""
+	argStartIndex := 1
+	if call.Arguments[0] != nil {
+		/* Check if first arg is numeric literal */
+		if lit, ok := call.Arguments[0].(*ast.Literal); ok && isNumeric(lit.Value) {
+			/* First arg is numeric → no source arg, all are periods */
+			argStartIndex = 0
+		} else if ident, ok := call.Arguments[0].(*ast.Identifier); ok {
+			/* Check if identifier resolves to numeric constant */
+			if val, exists := constants[ident.Name]; exists && isNumeric(val) {
+				/* First arg is numeric constant → no source arg, all are periods */
+				argStartIndex = 0
+			} else {
+				sourceExpr = sourceExprExtractor(call.Arguments[0])
+			}
+		} else {
+			sourceExpr = sourceExprExtractor(call.Arguments[0])
+		}
+	}
 
 	var periods []int
-	for i := 1; i < len(call.Arguments); i++ {
+	for i := argStartIndex; i < len(call.Arguments); i++ {
 		period := e.extractPeriodValue(call.Arguments[i], constants)
 		periods = append(periods, period)
 	}
@@ -40,6 +59,15 @@ func (e *TupleIndicatorArgumentExtractor) Extract(
 		SourceExpr: sourceExpr,
 		Periods:    periods,
 	}, nil
+}
+
+func isNumeric(val interface{}) bool {
+	switch val.(type) {
+	case float64, int, int64, int32:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *TupleIndicatorArgumentExtractor) extractPeriodValue(

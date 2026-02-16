@@ -80,24 +80,37 @@ func Rma(source []float64, period int) []float64 {
 	result := make([]float64, len(source))
 	alpha := 1.0 / float64(period)
 
-	// First value is SMA
 	sum := 0.0
-	for i := 0; i < period; i++ {
-		if i >= len(source) {
-			result[i] = math.NaN()
-			continue
-		}
+	validCount := 0
+	firstValidIdx := -1
+
+	for i := 0; i < len(source); i++ {
 		result[i] = math.NaN()
-		sum += source[i]
+
+		if !math.IsNaN(source[i]) {
+			if firstValidIdx == -1 {
+				firstValidIdx = i
+			}
+			sum += source[i]
+			validCount++
+
+			if validCount == period {
+				result[i] = sum / float64(period)
+				break
+			}
+		}
 	}
 
-	if period <= len(source) {
-		result[period-1] = sum / float64(period)
+	if validCount < period {
+		return result
 	}
 
-	// RMA calculation
-	for i := period; i < len(source); i++ {
-		result[i] = alpha*source[i] + (1-alpha)*result[i-1]
+	startIdx := firstValidIdx + validCount - 1
+
+	for i := startIdx + 1; i < len(source); i++ {
+		if !math.IsNaN(source[i]) {
+			result[i] = alpha*source[i] + (1-alpha)*result[i-1]
+		}
 	}
 
 	return result

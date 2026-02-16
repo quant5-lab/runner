@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "DMI Historical",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-02-16T09:09:34Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}
