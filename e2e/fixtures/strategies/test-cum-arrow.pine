@@ -1,0 +1,8 @@
+//@version=5
+indicator("Test ta.cum inline", overlay=false)
+
+cumVolume = ta.cum(volume)
+cumClose = ta.cum(close)
+
+plot(cumVolume, title="cum_volume", color=color.orange)
+plot(cumClose, title="cum_close", color=color.blue)

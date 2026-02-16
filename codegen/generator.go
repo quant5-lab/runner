@@ -3442,6 +3442,39 @@ func (g *generator) generateChange(varName string, sourceExpr string, offset int
 	return code, nil
 }
 
+func (g *generator) generateCum(varName string, sourceExpr string) (string, error) {
+	code := g.ind() + fmt.Sprintf("/* Inline ta.cum(%s) */\n", sourceExpr)
+	code += g.ind() + "{\n"
+	g.indent++
+
+	code += g.ind() + fmt.Sprintf("current := %s\n", sourceExpr)
+	code += g.ind() + "if math.IsNaN(current) {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
+	g.indent--
+	code += g.ind() + "} else {\n"
+	g.indent++
+	code += g.ind() + "var prevSum float64\n"
+	code += g.ind() + "if i > 0 {\n"
+	g.indent++
+	code += g.ind() + fmt.Sprintf("prevSum = %sSeries.Get(1)\n", varName)
+	code += g.ind() + "if math.IsNaN(prevSum) {\n"
+	g.indent++
+	code += g.ind() + "prevSum = 0.0\n"
+	g.indent--
+	code += g.ind() + "}\n"
+	g.indent--
+	code += g.ind() + "}\n"
+	code += g.ind() + fmt.Sprintf("%sSeries.Set(prevSum + current)\n", varName)
+	g.indent--
+	code += g.ind() + "}\n"
+
+	g.indent--
+	code += g.ind() + "}\n"
+
+	return code, nil
+}
+
 func (g *generator) generateValuewhen(varName string, conditionExpr string, sourceExpr string, occurrence int) (string, error) {
 	code := g.ind() + fmt.Sprintf("/* Inline valuewhen(%s, %s, %d) */\n", conditionExpr, sourceExpr, occurrence)
 

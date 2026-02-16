@@ -449,3 +449,24 @@ func Pivotlow(source []float64, leftBars, rightBars int) []float64 {
 
 	return result
 }
+
+/* Cum calculates cumulative sum of source (PineScript compatible) */
+func Cum(source []float64) []float64 {
+	if len(source) == 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	cumSum := 0.0
+
+	for i := range source {
+		if math.IsNaN(source[i]) {
+			result[i] = math.NaN()
+		} else {
+			cumSum += source[i]
+			result[i] = cumSum
+		}
+	}
+
+	return result
+}
