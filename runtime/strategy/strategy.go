@@ -561,6 +561,30 @@ func (s *Strategy) GetTradeHistory() *TradeHistory {
 	return s.tradeHistory
 }
 
+func (s *Strategy) GetInitialCapital() float64 {
+	return s.equityCalculator.initialCapital
+}
+
+func (s *Strategy) GetGrossProfit() float64 {
+	return AggregateGrossProfit(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetGrossLoss() float64 {
+	return AggregateGrossLoss(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetWinningTradesCount() int {
+	return CountWinningTrades(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetLosingTradesCount() int {
+	return CountLosingTrades(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetEvenTradesCount() int {
+	return CountEvenTrades(s.tradeHistory.GetClosedTrades())
+}
+
 /* Helper function */
 func abs(x float64) float64 {
 	if x < 0 {

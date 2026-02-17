@@ -606,3 +606,291 @@ func TestStrategyCloseAll(t *testing.T) {
 		t.Errorf("Should have 2 closed trades, got %d", len(closedTrades))
 	}
 }
+
+func TestStrategyGetInitialCapital(t *testing.T) {
+	tests := []struct {
+		name            string
+		initialCapital  float64
+		expectedCapital float64
+	}{
+		{
+			name:            "standard_capital",
+			initialCapital:  10000,
+			expectedCapital: 10000,
+		},
+		{
+			name:            "large_capital",
+			initialCapital:  1000000,
+			expectedCapital: 1000000,
+		},
+		{
+			name:            "small_capital",
+			initialCapital:  100,
+			expectedCapital: 100,
+		},
+		{
+			name:            "fractional_capital",
+			initialCapital:  12345.67,
+			expectedCapital: 12345.67,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCapital)
+
+			result := s.GetInitialCapital()
+			if result != tt.expectedCapital {
+				t.Errorf("Expected %.2f, got %.2f", tt.expectedCapital, result)
+			}
+		})
+	}
+}
+
+func TestStrategyGrossProfitLoss(t *testing.T) {
+	tests := []struct {
+		name                string
+		trades              []struct{ dir, qty, entryPrice, exitPrice float64 }
+		expectedGrossProfit float64
+		expectedGrossLoss   float64
+		expectedWinCount    int
+		expectedLossCount   int
+		expectedEvenCount   int
+	}{
+		{
+			name: "mixed_long_short_trades",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 10, 100, 110}, // +100
+				{1, 5, 105, 100},  // -25
+				{-1, 10, 100, 95}, // +50
+			},
+			expectedGrossProfit: 150,
+			expectedGrossLoss:   -25,
+			expectedWinCount:    2,
+			expectedLossCount:   1,
+			expectedEvenCount:   0,
+		},
+		{
+			name: "all_profitable_trades",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 10, 100, 110}, // +100
+				{1, 5, 100, 120},  // +100
+				{-1, 10, 100, 90}, // +100
+			},
+			expectedGrossProfit: 300,
+			expectedGrossLoss:   0,
+			expectedWinCount:    3,
+			expectedLossCount:   0,
+			expectedEvenCount:   0,
+		},
+		{
+			name: "all_losing_trades",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 10, 100, 90},   // -100
+				{1, 5, 100, 95},    // -25
+				{-1, 10, 100, 110}, // -100
+			},
+			expectedGrossProfit: 0,
+			expectedGrossLoss:   -225,
+			expectedWinCount:    0,
+			expectedLossCount:   3,
+			expectedEvenCount:   0,
+		},
+		{
+			name: "breakeven_trades",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 10, 100, 100}, // 0
+				{-1, 5, 100, 100}, // 0
+			},
+			expectedGrossProfit: 0,
+			expectedGrossLoss:   0,
+			expectedWinCount:    0,
+			expectedLossCount:   0,
+			expectedEvenCount:   2,
+		},
+		{
+			name: "large_position_sizes",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 1000, 100, 101}, // +1000
+				{1, 500, 100, 98},   // -1000
+			},
+			expectedGrossProfit: 1000,
+			expectedGrossLoss:   -1000,
+			expectedWinCount:    1,
+			expectedLossCount:   1,
+			expectedEvenCount:   0,
+		},
+		{
+			name: "fractional_quantities",
+			trades: []struct{ dir, qty, entryPrice, exitPrice float64 }{
+				{1, 0.5, 100, 110}, // +5
+				{1, 0.25, 100, 90}, // -2.5
+			},
+			expectedGrossProfit: 5,
+			expectedGrossLoss:   -2.5,
+			expectedWinCount:    1,
+			expectedLossCount:   1,
+			expectedEvenCount:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", 10000)
+
+			barIndex := 1
+			timestamp := int64(1000)
+
+			for i, trade := range tt.trades {
+				entryID := "trade" + string(rune('0'+i))
+				var direction string
+				if trade.dir > 0 {
+					direction = Long
+				} else {
+					direction = Short
+				}
+
+				s.Entry(entryID, direction, trade.qty, "")
+				s.OnBarUpdate(barIndex, trade.entryPrice, timestamp)
+				barIndex++
+				timestamp += 1000
+
+				s.Close(entryID, trade.exitPrice, timestamp, "")
+				s.OnBarUpdate(barIndex, trade.exitPrice, timestamp)
+				barIndex++
+				timestamp += 1000
+			}
+
+			grossProfit := s.GetGrossProfit()
+			if grossProfit != tt.expectedGrossProfit {
+				t.Errorf("GrossProfit: expected %.2f, got %.2f", tt.expectedGrossProfit, grossProfit)
+			}
+
+			grossLoss := s.GetGrossLoss()
+			if grossLoss != tt.expectedGrossLoss {
+				t.Errorf("GrossLoss: expected %.2f, got %.2f", tt.expectedGrossLoss, grossLoss)
+			}
+
+			winCount := s.GetWinningTradesCount()
+			if winCount != tt.expectedWinCount {
+				t.Errorf("WinningTrades: expected %d, got %d", tt.expectedWinCount, winCount)
+			}
+
+			lossCount := s.GetLosingTradesCount()
+			if lossCount != tt.expectedLossCount {
+				t.Errorf("LosingTrades: expected %d, got %d", tt.expectedLossCount, lossCount)
+			}
+
+			evenCount := s.GetEvenTradesCount()
+			if evenCount != tt.expectedEvenCount {
+				t.Errorf("EvenTrades: expected %d, got %d", tt.expectedEvenCount, evenCount)
+			}
+		})
+	}
+}
+
+func TestStrategyStatisticsBeforeAnyTrades(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	if s.GetGrossProfit() != 0 {
+		t.Errorf("GrossProfit before trades: expected 0, got %.2f", s.GetGrossProfit())
+	}
+
+	if s.GetGrossLoss() != 0 {
+		t.Errorf("GrossLoss before trades: expected 0, got %.2f", s.GetGrossLoss())
+	}
+
+	if s.GetWinningTradesCount() != 0 {
+		t.Errorf("WinningTrades before trades: expected 0, got %d", s.GetWinningTradesCount())
+	}
+
+	if s.GetLosingTradesCount() != 0 {
+		t.Errorf("LosingTrades before trades: expected 0, got %d", s.GetLosingTradesCount())
+	}
+
+	if s.GetEvenTradesCount() != 0 {
+		t.Errorf("EvenTrades before trades: expected 0, got %d", s.GetEvenTradesCount())
+	}
+}
+
+func TestStrategyStatisticsWithOpenTrades(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 2)
+
+	s.Entry("long1", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Close("long1", 110, 2000, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	s.Entry("long2", Long, 10, "")
+	s.OnBarUpdate(3, 100, 3000)
+
+	grossProfit := s.GetGrossProfit()
+	if grossProfit != 100 {
+		t.Errorf("GrossProfit with open trade: expected 100, got %.2f", grossProfit)
+	}
+
+	winCount := s.GetWinningTradesCount()
+	if winCount != 1 {
+		t.Errorf("WinningTrades with open trade: expected 1, got %d", winCount)
+	}
+
+	s.Close("long2", 90, 4000, "")
+	s.OnBarUpdate(4, 90, 4000)
+
+	grossLoss := s.GetGrossLoss()
+	if grossLoss != -100 {
+		t.Errorf("GrossLoss after closing: expected -100, got %.2f", grossLoss)
+	}
+
+	lossCount := s.GetLosingTradesCount()
+	if lossCount != 1 {
+		t.Errorf("LosingTrades after closing: expected 1, got %d", lossCount)
+	}
+}
+
+func TestStrategyStatisticsStability(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Entry("long1", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Close("long1", 110, 2000, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	profit1 := s.GetGrossProfit()
+	win1 := s.GetWinningTradesCount()
+
+	for i := 3; i < 100; i++ {
+		s.OnBarUpdate(i, 110+float64(i), int64(1000*i))
+	}
+
+	profit2 := s.GetGrossProfit()
+	win2 := s.GetWinningTradesCount()
+
+	if profit1 != profit2 {
+		t.Errorf("GrossProfit changed: expected %.2f, got %.2f", profit1, profit2)
+	}
+
+	if win1 != win2 {
+		t.Errorf("WinCount changed: expected %d, got %d", win1, win2)
+	}
+}
+
+func TestStrategyEvenTrades(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Entry("long1", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Close("long1", 100, 2000, "")
+	s.OnBarUpdate(2, 100, 2000)
+
+	evenCount := s.GetEvenTradesCount()
+	if evenCount != 1 {
+		t.Errorf("EvenTrades: expected 1, got %d", evenCount)
+	}
+}

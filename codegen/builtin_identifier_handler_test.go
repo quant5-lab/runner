@@ -348,6 +348,15 @@ func TestBuiltinIdentifierHandler_GenerateStrategyRuntimeAccess(t *testing.T) {
 		{"position_avg_price", "position_avg_price", "strategy_position_avg_priceSeries.Get(0)"},
 		{"position_size", "position_size", "strategy_position_sizeSeries.Get(0)"},
 		{"position_entry_name", "position_entry_name", "strat.GetPositionEntryName()"},
+		{"equity", "equity", "strategy_equitySeries.Get(0)"},
+		{"netprofit", "netprofit", "strategy_netprofitSeries.Get(0)"},
+		{"closedtrades", "closedtrades", "strategy_closedtradesSeries.Get(0)"},
+		{"initial_capital", "initial_capital", "strat.GetInitialCapital()"},
+		{"grossprofit", "grossprofit", "strat.GetGrossProfit()"},
+		{"grossloss", "grossloss", "strat.GetGrossLoss()"},
+		{"wintrades", "wintrades", "float64(strat.GetWinningTradesCount())"},
+		{"losstrades", "losstrades", "float64(strat.GetLosingTradesCount())"},
+		{"eventrades", "eventrades", "float64(strat.GetEvenTradesCount())"},
 		{"unknown property", "unknown", ""},
 	}
 

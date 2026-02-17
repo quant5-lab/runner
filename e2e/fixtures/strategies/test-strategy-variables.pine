@@ -1,0 +1,28 @@
+//@version=5
+strategy("Strategy Variables Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+if bar_index == 5
+    strategy.entry("Long1", strategy.long)
+
+if bar_index == 10
+    strategy.close("Long1")
+
+if bar_index == 15
+    strategy.entry("Short1", strategy.short)
+
+if bar_index == 20
+    strategy.close("Short1")
+
+capital = strategy.initial_capital
+gross_profit = strategy.grossprofit
+gross_loss = strategy.grossloss
+win_count = strategy.wintrades
+loss_count = strategy.losstrades
+even_count = strategy.eventrades
+
+plot(capital, "Initial Capital", color=color.blue)
+plot(gross_profit, "Gross Profit", color=color.green)
+plot(gross_loss, "Gross Loss", color=color.red)
+plot(win_count, "Win Trades", color=color.lime)
+plot(loss_count, "Loss Trades", color=color.maroon)
+plot(even_count, "Even Trades", color=color.gray)
