@@ -1,0 +1,22 @@
+//@version=5
+indicator("Test ta.median ta.mode", overlay=false)
+
+// Test median over different periods
+median5 = ta.median(close, 5)
+median10 = ta.median(close, 10)
+median20 = ta.median(close, 20)
+
+// Test mode (most frequent value)
+mode5 = ta.mode(close, 5)
+mode10 = ta.mode(close, 10)
+
+// Median should be between min and max
+max10 = ta.max(close, 10)
+min10 = ta.min(close, 10)
+median_valid = median10 >= min10 and median10 <= max10
+
+plot(median5, "Median 5", color=color.blue)
+plot(median10, "Median 10", color=color.orange)
+plot(median20, "Median 20", color=color.purple)
+plot(mode5, "Mode 5", color=color.green)
+plot(mode10, "Mode 10", color=color.red)

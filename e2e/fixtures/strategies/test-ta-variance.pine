@@ -1,0 +1,21 @@
+//@version=5
+indicator("Test ta.variance", overlay=false)
+
+// Test variance calculation
+variance5 = ta.variance(close, 5)
+variance10 = ta.variance(close, 10)
+variance20 = ta.variance(close, 20)
+
+// Standard deviation should equal sqrt(variance)
+stdev10 = ta.stdev(close, 10)
+stdev_from_variance = math.sqrt(variance10)
+stdev_match = math.abs(stdev10 - stdev_from_variance) < 0.0001
+
+// Variance should be non-negative
+variance_positive = variance10 >= 0
+
+plot(variance5, "Variance 5", color=color.red)
+plot(variance10, "Variance 10", color=color.blue)
+plot(variance20, "Variance 20", color=color.green)
+plot(stdev10, "StDev 10", color=color.orange)
+plot(stdev_from_variance, "StDev from Var", color=color.purple)

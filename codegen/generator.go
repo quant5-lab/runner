@@ -137,6 +137,9 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	if gen.hasTickerCalls {
 		additionalImports = append(additionalImports, "github.com/quant5-lab/runner/runtime/ticker")
 	}
+	if gen.hasSortUsage {
+		additionalImports = append(additionalImports, "sort")
+	}
 
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
@@ -170,6 +173,7 @@ type generator struct {
 	hasLastBarTime           bool
 	hasTimenow               bool
 	hasTickerCalls           bool
+	hasSortUsage             bool
 	pineVersion              int
 	limits                   CodeGenerationLimits
 	safetyGuard              RuntimeSafetyGuard

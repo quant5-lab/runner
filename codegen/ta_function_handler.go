@@ -55,6 +55,12 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&BarsSinceHandler{},
 			&MFIHandler{},
 			&CumHandler{},
+			&MaxHandler{},
+			&MinHandler{},
+			&MedianHandler{},
+			&VarianceHandler{},
+			&RangeHandler{},
+			&ModeHandler{},
 		},
 	}
 }

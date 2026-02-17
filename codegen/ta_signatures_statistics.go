@@ -76,5 +76,36 @@ func RegisterStatisticsSignatures() []TAFunctionMetadata {
 	}
 	signatures = appendWithBareAlias(signatures, "ta.linreg", "", linregOverloads)
 
+	maxMinOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = append(signatures, NewTAFunctionMetadata("ta.max", "", maxMinOverloads))
+	signatures = append(signatures, NewTAFunctionMetadata("ta.min", "", maxMinOverloads))
+
+	rangeOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(1, []TAArgumentSpec{
+			NewScalarIntArgument(0),
+		}),
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.range", "high-low", rangeOverloads)
+
+	modeOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(1, []TAArgumentSpec{
+			NewScalarIntArgument(0),
+		}),
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.mode", "close", modeOverloads)
+
 	return signatures
 }

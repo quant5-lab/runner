@@ -98,6 +98,144 @@ func (s *SumAccumulator) NeedsNaNGuard() bool {
 	return true
 }
 
+// MaxAccumulator finds maximum value in window
+type MaxAccumulator struct{}
+
+func NewMaxAccumulator() *MaxAccumulator {
+	return &MaxAccumulator{}
+}
+
+func (m *MaxAccumulator) Initialize() string {
+	return "maxVal := math.Inf(-1)\nhasNaN := false"
+}
+
+func (m *MaxAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("if %s > maxVal { maxVal = %s }", value, value)
+}
+
+func (m *MaxAccumulator) Finalize(period int) string {
+	return "maxVal"
+}
+
+func (m *MaxAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// MinAccumulator finds minimum value in window
+type MinAccumulator struct{}
+
+func NewMinAccumulator() *MinAccumulator {
+	return &MinAccumulator{}
+}
+
+func (m *MinAccumulator) Initialize() string {
+	return "minVal := math.Inf(1)\nhasNaN := false"
+}
+
+func (m *MinAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("if %s < minVal { minVal = %s }", value, value)
+}
+
+func (m *MinAccumulator) Finalize(period int) string {
+	return "minVal"
+}
+
+func (m *MinAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// MedianAccumulator finds median value in window using sorting
+type MedianAccumulator struct{}
+
+func NewMedianAccumulator() *MedianAccumulator {
+	return &MedianAccumulator{}
+}
+
+func (m *MedianAccumulator) Initialize() string {
+	return "window := make([]float64, 0)\nhasNaN := false"
+}
+
+func (m *MedianAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("window = append(window, %s)", value)
+}
+
+func (m *MedianAccumulator) Finalize(period int) string {
+	return fmt.Sprintf("func() float64 { sorted := make([]float64, %d); copy(sorted, window); sort.Float64s(sorted); if %d%%2 == 0 { return (sorted[%d/2-1] + sorted[%d/2]) / 2.0 } else { return sorted[%d/2] } }()", period, period, period, period, period)
+}
+
+func (m *MedianAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// RangeAccumulator calculates range (max - min) in window
+type RangeAccumulator struct{}
+
+func NewRangeAccumulator() *RangeAccumulator {
+	return &RangeAccumulator{}
+}
+
+func (r *RangeAccumulator) Initialize() string {
+	return "minVal := math.Inf(1)\nmaxVal := math.Inf(-1)\nhasNaN := false"
+}
+
+func (r *RangeAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("if %s < minVal { minVal = %s }; if %s > maxVal { maxVal = %s }", value, value, value, value)
+}
+
+func (r *RangeAccumulator) Finalize(period int) string {
+	return "maxVal - minVal"
+}
+
+func (r *RangeAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// ModeAccumulator finds most frequent value in window
+type ModeAccumulator struct{}
+
+func NewModeAccumulator() *ModeAccumulator {
+	return &ModeAccumulator{}
+}
+
+func (m *ModeAccumulator) Initialize() string {
+	return "frequency := make(map[float64]int)\nhasNaN := false"
+}
+
+func (m *ModeAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("frequency[%s]++", value)
+}
+
+func (m *ModeAccumulator) Finalize(period int) string {
+	return "func() float64 { maxFreq := 0; modeVal := 0.0; for val, freq := range frequency { if freq > maxFreq || (freq == maxFreq && val > modeVal) { maxFreq = freq; modeVal = val } }; return modeVal }()"
+}
+
+func (m *ModeAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
+// VarianceAccumulatorForTA calculates variance (two-pass algorithm)
+type VarianceAccumulatorForTA struct{}
+
+func NewVarianceAccumulatorForTA() *VarianceAccumulatorForTA {
+	return &VarianceAccumulatorForTA{}
+}
+
+func (v *VarianceAccumulatorForTA) Initialize() string {
+	return "sum := 0.0\nvalues := make([]float64, 0)\nhasNaN := false"
+}
+
+func (v *VarianceAccumulatorForTA) Accumulate(value string) string {
+	return fmt.Sprintf("sum += %s; values = append(values, %s)", value, value)
+}
+
+func (v *VarianceAccumulatorForTA) Finalize(period int) string {
+	return fmt.Sprintf("func() float64 { mean := sum / %d.0; sumSqDiff := 0.0; for _, v := range values { diff := v - mean; sumSqDiff += diff * diff }; return sumSqDiff / %d.0 }()", period, period)
+}
+
+func (v *VarianceAccumulatorForTA) NeedsNaNGuard() bool {
+	return true
+}
+
 // VarianceAccumulator calculates variance for standard deviation (STDEV).
 //
 // This accumulator requires a pre-calculated mean value. It computes:
