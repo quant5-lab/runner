@@ -35,6 +35,7 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 
 	r.RegisterWithBareAlias("ta.sma", &SMAIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.wma", &WMAIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.vwma", &VWMAIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.stdev", &STDEVIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.highest", &HighestIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.lowest", &LowestIIFEGenerator{namingStrategy: windowNamer})
@@ -137,6 +138,8 @@ type SumIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 type SWMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
+type VWMAIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
 type ATRIIFEGenerator struct{ namingStrategy series_naming.Strategy }
 
 func (g *SMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -170,6 +173,16 @@ func (g *SWMAIIFEGenerator) Generate(accessor AccessGenerator, _ PeriodExpressio
 
 	return NewIIFECodeBuilder().
 		WithWarmupCheckPeriodExpression(fixedPeriod, accessor.GetBaseOffset()).
+		WithBody(body).
+		Build()
+}
+
+func (g *VWMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
+	body := fmt.Sprintf("weightedSum := 0.0; volumeSum := 0.0; for j := 0; j < %s; j++ { val := %s; if !math.IsNaN(val) { weightedSum += val * ctx.Data[ctx.BarIndex-j].Volume; volumeSum += ctx.Data[ctx.BarIndex-j].Volume } }; ", period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
+	body += "return weightedSum / volumeSum"
+
+	return NewIIFECodeBuilder().
+		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
 		WithBody(body).
 		Build()
 }

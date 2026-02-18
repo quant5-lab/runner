@@ -236,6 +236,32 @@ func (v *VarianceAccumulatorForTA) NeedsNaNGuard() bool {
 	return true
 }
 
+// VolumeWeightedSumAccumulator computes volume-weighted average.
+//
+// Implements VWMA formula: sma(source * volume, length) / sma(volume, length)
+// Accumulates both source*volume products and raw volumes, then divides.
+type VolumeWeightedSumAccumulator struct{}
+
+func NewVolumeWeightedSumAccumulator() *VolumeWeightedSumAccumulator {
+	return &VolumeWeightedSumAccumulator{}
+}
+
+func (v *VolumeWeightedSumAccumulator) Initialize() string {
+	return "weightedSum := 0.0\nvolumeSum := 0.0\nhasNaN := false"
+}
+
+func (v *VolumeWeightedSumAccumulator) Accumulate(value string) string {
+	return fmt.Sprintf("if math.IsNaN(%s) { hasNaN = true } else { weightedSum += %s * bar.Volume; volumeSum += bar.Volume }", value, value)
+}
+
+func (v *VolumeWeightedSumAccumulator) Finalize(period int) string {
+	return "weightedSum / volumeSum"
+}
+
+func (v *VolumeWeightedSumAccumulator) NeedsNaNGuard() bool {
+	return true
+}
+
 // VarianceAccumulator calculates variance for standard deviation (STDEV).
 //
 // This accumulator requires a pre-calculated mean value. It computes:

@@ -37,6 +37,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&EMAHandler{},
 			&STDEVHandler{},
 			&WMAHandler{},
+			&VWMAHandler{},
 			&DEVHandler{},
 			&ATRHandler{},
 			&RMAHandler{},
