@@ -39,6 +39,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(NewMetaFunctionHandler())
 	router.RegisterHandler(&PlotFunctionHandler{})
 	router.RegisterHandler(NewStrategyActionHandler())
+	router.RegisterHandler(NewTradeCollectionCallHandler())
 	router.RegisterHandler(&MathCallHandler{})
 	router.RegisterHandler(NewValueCallHandler())
 	router.RegisterHandler(&TAIndicatorCallHandler{})
@@ -99,18 +100,44 @@ func (r *CallExpressionRouter) RouteCall(g *generator, call *ast.CallExpression)
 //   - Identifier "plot" → "plot"
 //   - MemberExpression "ta.sma" → "ta.sma"
 //   - MemberExpression "strategy.entry" → "strategy.entry"
+//   - Nested MemberExpression "strategy.closedtrades.profit" → "strategy.closedtrades.profit"
 func extractCallFunctionName(call *ast.CallExpression) string {
 	switch callee := call.Callee.(type) {
 	case *ast.Identifier:
 		return callee.Name
 	case *ast.MemberExpression:
-		obj := extractIdentifierName(callee.Object)
-		prop := extractIdentifierName(callee.Property)
-		if obj != "" && prop != "" {
-			return obj + "." + prop
-		}
+		return extractMemberExpressionFullPath(callee)
 	}
 	return ""
+}
+
+// extractMemberExpressionFullPath recursively builds dotted path from nested member expressions.
+//
+// Examples:
+//   - MemberExpression{Object: "ta", Property: "sma"} → "ta.sma"
+//   - MemberExpression{Object: MemberExpression{Object: "strategy", Property: "closedtrades"}, Property: "profit"} → "strategy.closedtrades.profit"
+func extractMemberExpressionFullPath(expr *ast.MemberExpression) string {
+	// Get property name (rightmost part)
+	prop := extractIdentifierName(expr.Property)
+	if prop == "" {
+		return ""
+	}
+
+	// Recursively process object (left side)
+	switch obj := expr.Object.(type) {
+	case *ast.Identifier:
+		// Base case: object is simple identifier
+		return obj.Name + "." + prop
+	case *ast.MemberExpression:
+		// Recursive case: object is another member expression
+		objPath := extractMemberExpressionFullPath(obj)
+		if objPath == "" {
+			return ""
+		}
+		return objPath + "." + prop
+	default:
+		return ""
+	}
 }
 
 func extractIdentifierName(expr ast.Expression) string {

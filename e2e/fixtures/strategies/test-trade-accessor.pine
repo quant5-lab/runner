@@ -1,0 +1,55 @@
+//@version=5
+strategy("Trade Accessor Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Entry conditions: simple bar_index triggers
+if bar_index == 10
+    strategy.entry("Long1", strategy.long, comment="First long entry")
+
+if bar_index == 20
+    strategy.close("Long1", comment="Close first long")
+
+if bar_index == 30
+    strategy.entry("Short1", strategy.short, comment="First short entry")
+
+if bar_index == 40
+    strategy.close("Short1", comment="Close first short")
+
+if bar_index == 50
+    strategy.entry("Long2", strategy.long, comment="Second long entry")
+
+if bar_index == 60
+    strategy.close("Long2", comment="Close second long")
+
+// Access closed trade properties (most recent trade)
+lastClosedProfit = strategy.closedtrades.profit(0)
+lastClosedSize = strategy.closedtrades.size(0)
+lastClosedEntryPrice = strategy.closedtrades.entry_price(0)
+lastClosedExitPrice = strategy.closedtrades.exit_price(0)
+lastClosedEntryID = strategy.closedtrades.entry_id(0)
+lastClosedEntryComment = strategy.closedtrades.entry_comment(0)
+lastClosedExitComment = strategy.closedtrades.exit_comment(0)
+lastClosedEntryBar = strategy.closedtrades.entry_bar_index(0)
+lastClosedExitBar = strategy.closedtrades.exit_bar_index(0)
+
+// Access second-to-last closed trade
+secondLastProfit = strategy.closedtrades.profit(1)
+secondLastSize = strategy.closedtrades.size(1)
+
+// Access open trade properties (current open position)
+openTradeProfit = strategy.opentrades.profit(0)
+openTradeSize = strategy.opentrades.size(0)
+openTradeEntryPrice = strategy.opentrades.entry_price(0)
+openTradeEntryID = strategy.opentrades.entry_id(0)
+openTradeEntryComment = strategy.opentrades.entry_comment(0)
+
+// Plot closed trade data
+plot(lastClosedProfit, "Last Closed Profit", color=color.green)
+plot(lastClosedSize, "Last Closed Size", color=color.blue)
+plot(lastClosedEntryPrice, "Last Entry Price", color=color.orange)
+plot(lastClosedExitPrice, "Last Exit Price", color=color.red)
+plot(secondLastProfit, "Second Last Profit", color=color.lime)
+
+// Plot open trade data
+plot(openTradeProfit, "Open Trade Profit", color=color.purple)
+plot(openTradeSize, "Open Trade Size", color=color.aqua)
+plot(openTradeEntryPrice, "Open Entry Price", color=color.yellow)
