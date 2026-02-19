@@ -26,6 +26,7 @@ func (r *TASignatureRegistry) registerAllSignatures() {
 		RegisterMinMaxSignatures(),
 		RegisterUtilitySignatures(),
 		RegisterTupleSignatures(),
+		RegisterMomentumSignatures(),
 	}
 
 	for _, signatureGroup := range allSignatures {

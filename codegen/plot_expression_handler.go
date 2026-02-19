@@ -102,12 +102,12 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 		return h.HandleATRFunction(call, funcName)
 	}
 
-	if h.taRegistry.IsSupported(funcName) {
-		return h.HandleTAFunction(call, funcName)
-	}
-
 	if h.mathHandler.CanHandle(funcName) {
 		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
+	}
+
+	if h.taRegistry.IsSupported(funcName) {
+		return h.HandleTAFunction(call, funcName)
 	}
 
 	/* Check ValueHandler for nz, fixnan, etc. */

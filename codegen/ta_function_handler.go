@@ -62,6 +62,15 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&VarianceHandler{},
 			&RangeHandler{},
 			&ModeHandler{},
+			&RisingHandler{},
+			&FallingHandler{},
+			&CrossHandler{},
+			&HighestbarsHandler{},
+			&LowestbarsHandler{},
+			&MomHandler{},
+			&RocHandler{},
+			&CmoHandler{},
+			&WprHandler{},
 		},
 	}
 }

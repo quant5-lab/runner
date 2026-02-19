@@ -54,6 +54,23 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 
 	r.RegisterDualPeriodWithBareAlias("ta.pivothigh", &PivotHighIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterDualPeriodWithBareAlias("ta.pivotlow", &PivotLowIIFEGenerator{namingStrategy: windowNamer})
+
+	r.RegisterWithBareAlias("ta.max", &MaxIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.min", &MinIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.range", &RangeIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.variance", &VarianceIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.dev", &DevIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.median", &MedianIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.mode", &ModeIIFEGenerator{namingStrategy: windowNamer})
+
+	r.RegisterWithBareAlias("ta.rising", &RisingIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.falling", &FallingIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.highestbars", &HighestbarsIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.lowestbars", &LowestbarsIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.mom", &MomIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.roc", &RocIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.cmo", &CmoIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.wpr", &WprIIFEGenerator{namingStrategy: windowNamer})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {

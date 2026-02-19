@@ -1,0 +1,41 @@
+//@version=5
+indicator("Test ta momentum functions", overlay=false)
+
+// Rising: true when series strictly rising over period
+r3 = ta.rising(close, 3)
+r5 = ta.rising(close, 5)
+
+// Falling: true when series strictly falling over period
+f3 = ta.falling(close, 3)
+f5 = ta.falling(close, 5)
+
+// Cross: true when series a crosses series b in either direction
+sma14 = ta.sma(close, 14)
+crossed = ta.cross(close, sma14)
+
+// Highestbars / lowestbars: bars-back to extreme
+hb5 = ta.highestbars(close, 5)
+hb10 = ta.highestbars(close, 10)
+lb5 = ta.lowestbars(close, 5)
+lb10 = ta.lowestbars(close, 10)
+
+// Mom: close - close[length]
+m10 = ta.mom(close, 10)
+
+// ROC: percent change over length
+roc12 = ta.roc(close, 12)
+
+// CMO: Chande Momentum Oscillator
+cmo9 = ta.cmo(close, 9)
+
+// WPR: Williams %R (uses OHLC directly)
+wpr14 = ta.wpr(14)
+
+plot(r3, "Rising 3", color=color.green)
+plot(f3, "Falling 3", color=color.red)
+plot(hb5, "HighestBars 5", color=color.blue)
+plot(lb5, "LowestBars 5", color=color.orange)
+plot(m10, "Mom 10", color=color.purple)
+plot(roc12, "ROC 12", color=color.teal)
+plot(cmo9, "CMO 9", color=color.maroon)
+plot(wpr14, "WPR 14", color=color.navy)

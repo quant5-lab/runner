@@ -130,6 +130,10 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		return nil, err
 	}
 
+	if strings.Contains(body, "sort.") {
+		gen.hasSortUsage = true
+	}
+
 	additionalImports := []string{}
 	if gen.hasSecurityCalls {
 		additionalImports = append(additionalImports, "github.com/quant5-lab/runner/security")

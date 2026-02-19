@@ -39,6 +39,15 @@ func TestHandlerBareNameParity(t *testing.T) {
 		{"Linreg", &LinregHandler{}, "ta.linreg", "linreg"},
 		{"BarsSince", &BarsSinceHandler{}, "ta.barssince", "barssince"},
 		{"MFI", &MFIHandler{}, "ta.mfi", "mfi"},
+		{"Rising", &RisingHandler{}, "ta.rising", "rising"},
+		{"Falling", &FallingHandler{}, "ta.falling", "falling"},
+		{"Cross", &CrossHandler{}, "ta.cross", "cross"},
+		{"Highestbars", &HighestbarsHandler{}, "ta.highestbars", "highestbars"},
+		{"Lowestbars", &LowestbarsHandler{}, "ta.lowestbars", "lowestbars"},
+		{"Mom", &MomHandler{}, "ta.mom", "mom"},
+		{"Roc", &RocHandler{}, "ta.roc", "roc"},
+		{"Cmo", &CmoHandler{}, "ta.cmo", "cmo"},
+		{"Wpr", &WprHandler{}, "ta.wpr", "wpr"},
 	}
 
 	for _, h := range handlers {
