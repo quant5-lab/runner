@@ -11,6 +11,7 @@ func TestTradeAccessor_ClosedTradePropertyAccess(t *testing.T) {
 
 	trade := Trade{
 		EntryID:      "LONG_ENTRY_001",
+		ExitID:       "EXIT_STOP_001",
 		Direction:    Long,
 		Size:         10.0,
 		EntryPrice:   100.0,
@@ -59,8 +60,8 @@ func TestTradeAccessor_ClosedTradePropertyAccess(t *testing.T) {
 	})
 
 	t.Run("exit_id", func(t *testing.T) {
-		if got := accessor.ClosedTradeExitID(0); got != "LONG_ENTRY_001" {
-			t.Errorf("exit_id(0) = %q, want %q", got, "LONG_ENTRY_001")
+		if got := accessor.ClosedTradeExitID(0); got != "EXIT_STOP_001" {
+			t.Errorf("exit_id(0) = %q, want %q", got, "EXIT_STOP_001")
 		}
 	})
 
@@ -134,7 +135,6 @@ func TestTradeAccessor_BoundsValidation(t *testing.T) {
 	history := NewTradeHistory()
 	accessor := NewTradeAccessor(history)
 
-	// Add one trade to test boundary conditions
 	trade := Trade{
 		EntryID:    "test",
 		Direction:  Long,
@@ -256,6 +256,24 @@ func TestTradeAccessor_ProfitPercentCalculation(t *testing.T) {
 		})
 	}
 
+	t.Run("zero_entry_price", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+
+		trade := Trade{
+			Direction:  Long,
+			EntryPrice: 0.0,
+			Size:       10.0,
+			Profit:     10.0,
+		}
+		history.closedTrades = append(history.closedTrades, trade)
+
+		got := accessor.ClosedTradeProfitPercent(0)
+		if !math.IsNaN(got) {
+			t.Errorf("profit_percent with zero entry price = %f, want NaN", got)
+		}
+	})
+
 	t.Run("zero_position_size", func(t *testing.T) {
 		history := NewTradeHistory()
 		accessor := NewTradeAccessor(history)
@@ -263,14 +281,14 @@ func TestTradeAccessor_ProfitPercentCalculation(t *testing.T) {
 		trade := Trade{
 			Direction:  Long,
 			EntryPrice: 100.0,
-			Size:       0.0, // Edge case: zero size
+			Size:       0.0,
 			Profit:     10.0,
 		}
 		history.closedTrades = append(history.closedTrades, trade)
 
 		got := accessor.ClosedTradeProfitPercent(0)
-		if !math.IsInf(got, 1) && !math.IsNaN(got) {
-			t.Errorf("profit_percent with zero size should be Inf or NaN, got %f", got)
+		if !math.IsNaN(got) {
+			t.Errorf("profit_percent with zero size = %f, want NaN", got)
 		}
 	})
 }
@@ -314,13 +332,12 @@ func TestTradeAccessor_MultipleTradesIndexing(t *testing.T) {
 	history := NewTradeHistory()
 	accessor := NewTradeAccessor(history)
 
-	// Add 5 closed trades with distinct values
 	for i := 0; i < 5; i++ {
 		trade := Trade{
-			EntryID:    string(rune('A' + i)), // "A", "B", "C", "D", "E"
-			Profit:     float64(i * 10),       // 0, 10, 20, 30, 40
-			Size:       float64(i + 1),        // 1, 2, 3, 4, 5
-			EntryPrice: 100.0 + float64(i),    // 100, 101, 102, 103, 104
+			EntryID:    string(rune('A' + i)),
+			Profit:     float64(i * 10),
+			Size:       float64(i + 1),
+			EntryPrice: 100.0 + float64(i),
 			Direction:  Long,
 		}
 		history.closedTrades = append(history.closedTrades, trade)
@@ -359,15 +376,346 @@ func TestTradeAccessor_MultipleTradesIndexing(t *testing.T) {
 }
 
 func TestTradeAccessor_NilSafety(t *testing.T) {
-	/* Current implementation passes history to constructor - documents expected behavior for nil history scenario */
 	history := NewTradeHistory()
 	accessor := NewTradeAccessor(history)
 
-	// Verify zero-length slices behave correctly
 	if !math.IsNaN(accessor.ClosedTradeProfit(0)) {
 		t.Error("Empty history should return NaN for float accessors")
 	}
 	if accessor.ClosedTradeEntryID(0) != "" {
 		t.Error("Empty history should return empty string for string accessors")
+	}
+}
+
+func TestTradeHistory_UpdateOpenTradeMetrics(t *testing.T) {
+	tests := []struct {
+		name         string
+		direction    string
+		entryPrice   float64
+		size         float64
+		barHigh      float64
+		barLow       float64
+		wantRunup    float64
+		wantDrawdown float64
+	}{
+		{
+			name:         "long trade favorable bar",
+			direction:    Long,
+			entryPrice:   100.0,
+			size:         10.0,
+			barHigh:      108.0,
+			barLow:       97.0,
+			wantRunup:    80.0, // (108-100)*10
+			wantDrawdown: 30.0, // (100-97)*10
+		},
+		{
+			name:         "short trade favorable bar",
+			direction:    Short,
+			entryPrice:   100.0,
+			size:         10.0,
+			barHigh:      103.0,
+			barLow:       92.0,
+			wantRunup:    80.0, // (100-92)*10
+			wantDrawdown: 30.0, // (103-100)*10
+		},
+		{
+			name:         "long trade no adverse excursion",
+			direction:    Long,
+			entryPrice:   100.0,
+			size:         5.0,
+			barHigh:      110.0,
+			barLow:       100.0, // Low == entry - no adverse excursion
+			wantRunup:    50.0,  // (110-100)*5
+			wantDrawdown: 0.0,   // (100-100)*5 = 0
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := NewTradeHistory()
+			th.AddOpenTrade(Trade{
+				EntryID:    "test",
+				Direction:  tt.direction,
+				Size:       tt.size,
+				EntryPrice: tt.entryPrice,
+			})
+
+			th.UpdateOpenTradeMetrics(tt.barHigh, tt.barLow)
+
+			trades := th.GetOpenTrades()
+			if len(trades) != 1 {
+				t.Fatalf("Expected 1 open trade, got %d", len(trades))
+			}
+			if trades[0].MaxRunup != tt.wantRunup {
+				t.Errorf("MaxRunup = %f, want %f", trades[0].MaxRunup, tt.wantRunup)
+			}
+			if trades[0].MaxDrawdown != tt.wantDrawdown {
+				t.Errorf("MaxDrawdown = %f, want %f", trades[0].MaxDrawdown, tt.wantDrawdown)
+			}
+		})
+	}
+
+	t.Run("running max across multiple bars", func(t *testing.T) {
+		th := NewTradeHistory()
+		th.AddOpenTrade(Trade{
+			EntryID:    "long1",
+			Direction:  Long,
+			Size:       10.0,
+			EntryPrice: 100.0,
+		})
+
+		th.UpdateOpenTradeMetrics(105.0, 98.0)  // runup=50, drawdown=20
+		th.UpdateOpenTradeMetrics(112.0, 101.0) // runup=120 (new high), drawdown still 20
+		th.UpdateOpenTradeMetrics(103.0, 95.0)  // runup still 120, drawdown=50 (new low)
+
+		trades := th.GetOpenTrades()
+		if trades[0].MaxRunup != 120.0 {
+			t.Errorf("MaxRunup = %f, want 120.0 (running max)", trades[0].MaxRunup)
+		}
+		if trades[0].MaxDrawdown != 50.0 {
+			t.Errorf("MaxDrawdown = %f, want 50.0 (running max)", trades[0].MaxDrawdown)
+		}
+	})
+}
+
+func TestTradeAccessor_MaxExcursionPercent(t *testing.T) {
+	tests := []struct {
+		name            string
+		entryPrice      float64
+		size            float64
+		maxDrawdown     float64
+		maxRunup        float64
+		wantDrawdownPct float64
+		wantRunupPct    float64
+	}{
+		{
+			name:            "standard values",
+			entryPrice:      100.0,
+			size:            10.0,
+			maxDrawdown:     50.0,
+			maxRunup:        80.0,
+			wantDrawdownPct: 5.0, // 50/(100*10)*100
+			wantRunupPct:    8.0, // 80/(100*10)*100
+		},
+		{
+			name:            "small position",
+			entryPrice:      1000.0,
+			size:            1.0,
+			maxDrawdown:     10.0,
+			maxRunup:        25.0,
+			wantDrawdownPct: 1.0, // 10/1000*100
+			wantRunupPct:    2.5, // 25/1000*100
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			history := NewTradeHistory()
+			accessor := NewTradeAccessor(history)
+
+			trade := Trade{
+				Direction:   Long,
+				EntryPrice:  tt.entryPrice,
+				Size:        tt.size,
+				MaxDrawdown: tt.maxDrawdown,
+				MaxRunup:    tt.maxRunup,
+			}
+			history.closedTrades = append(history.closedTrades, trade)
+
+			gotDrawdown := accessor.ClosedTradeMaxDrawdownPercent(0)
+			if math.Abs(gotDrawdown-tt.wantDrawdownPct) > 0.0001 {
+				t.Errorf("MaxDrawdownPercent = %f, want %f", gotDrawdown, tt.wantDrawdownPct)
+			}
+
+			gotRunup := accessor.ClosedTradeMaxRunupPercent(0)
+			if math.Abs(gotRunup-tt.wantRunupPct) > 0.0001 {
+				t.Errorf("MaxRunupPercent = %f, want %f", gotRunup, tt.wantRunupPct)
+			}
+		})
+	}
+
+	t.Run("zero_basis_returns_nan", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+
+		trade := Trade{Direction: Long, EntryPrice: 0.0, Size: 10.0, MaxDrawdown: 50.0}
+		history.closedTrades = append(history.closedTrades, trade)
+
+		if !math.IsNaN(accessor.ClosedTradeMaxDrawdownPercent(0)) {
+			t.Error("MaxDrawdownPercent with zero entryPrice should return NaN")
+		}
+	})
+
+	t.Run("zero_size_returns_nan", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+
+		trade := Trade{Direction: Long, EntryPrice: 100.0, Size: 0.0, MaxDrawdown: 50.0, MaxRunup: 30.0}
+		history.closedTrades = append(history.closedTrades, trade)
+
+		if !math.IsNaN(accessor.ClosedTradeMaxDrawdownPercent(0)) {
+			t.Error("MaxDrawdownPercent with zero size should return NaN")
+		}
+		if !math.IsNaN(accessor.ClosedTradeMaxRunupPercent(0)) {
+			t.Error("MaxRunupPercent with zero size should return NaN")
+		}
+	})
+
+	t.Run("open_trade_standard_values", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+
+		trade := Trade{
+			Direction:   Long,
+			EntryPrice:  100.0,
+			Size:        10.0,
+			MaxDrawdown: 50.0,
+			MaxRunup:    80.0,
+		}
+		history.openTrades = append(history.openTrades, trade)
+
+		gotDrawdown := accessor.OpenTradeMaxDrawdownPercent(0)
+		if math.Abs(gotDrawdown-5.0) > 0.0001 {
+			t.Errorf("OpenTradeMaxDrawdownPercent = %f, want 5.0", gotDrawdown)
+		}
+
+		gotRunup := accessor.OpenTradeMaxRunupPercent(0)
+		if math.Abs(gotRunup-8.0) > 0.0001 {
+			t.Errorf("OpenTradeMaxRunupPercent = %f, want 8.0", gotRunup)
+		}
+	})
+
+	t.Run("open_trade_zero_basis_returns_nan", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+
+		trade := Trade{Direction: Long, EntryPrice: 0.0, Size: 10.0, MaxDrawdown: 50.0}
+		history.openTrades = append(history.openTrades, trade)
+
+		if !math.IsNaN(accessor.OpenTradeMaxDrawdownPercent(0)) {
+			t.Error("OpenTradeMaxDrawdownPercent with zero basis should return NaN")
+		}
+		if !math.IsNaN(accessor.OpenTradeMaxRunupPercent(0)) {
+			t.Error("OpenTradeMaxRunupPercent with zero basis should return NaN")
+		}
+	})
+}
+
+func TestTradeAccessor_OpenTradeProfitPercent(t *testing.T) {
+	tests := []struct {
+		name       string
+		entryPrice float64
+		size       float64
+		profit     float64
+		want       float64
+	}{
+		{"standard_profit", 100.0, 10.0, 50.0, 5.0},
+		{"standard_loss", 200.0, 5.0, -25.0, -2.5},
+		{"zero_profit", 100.0, 10.0, 0.0, 0.0},
+		{"fractional_size", 100.0, 0.5, 10.0, 20.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			history := NewTradeHistory()
+			accessor := NewTradeAccessor(history)
+
+			history.openTrades = append(history.openTrades, Trade{
+				Direction:  Long,
+				EntryPrice: tt.entryPrice,
+				Size:       tt.size,
+				Profit:     tt.profit,
+			})
+
+			got := accessor.OpenTradeProfitPercent(0)
+			if math.Abs(got-tt.want) > 0.0001 {
+				t.Errorf("OpenTradeProfitPercent = %f, want %f", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("zero_entry_price", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+		history.openTrades = append(history.openTrades, Trade{Direction: Long, EntryPrice: 0.0, Size: 10.0, Profit: 10.0})
+		if !math.IsNaN(accessor.OpenTradeProfitPercent(0)) {
+			t.Error("OpenTradeProfitPercent with zero entry price should return NaN")
+		}
+	})
+
+	t.Run("zero_size", func(t *testing.T) {
+		history := NewTradeHistory()
+		accessor := NewTradeAccessor(history)
+		history.openTrades = append(history.openTrades, Trade{Direction: Long, EntryPrice: 100.0, Size: 0.0, Profit: 10.0})
+		if !math.IsNaN(accessor.OpenTradeProfitPercent(0)) {
+			t.Error("OpenTradeProfitPercent with zero size should return NaN")
+		}
+	})
+}
+
+func TestTradeHistory_MetricsFrozenAfterClose(t *testing.T) {
+	th := NewTradeHistory()
+	th.AddOpenTrade(Trade{
+		EntryID:    "long1",
+		Direction:  Long,
+		Size:       10.0,
+		EntryPrice: 100.0,
+	})
+
+	th.UpdateOpenTradeMetrics(110.0, 95.0)
+
+	th.CloseTrade("long1", "exit1", 108.0, 5, 1000, "", 0)
+
+	closed := th.GetClosedTrades()
+	if len(closed) != 1 {
+		t.Fatalf("Expected 1 closed trade, got %d", len(closed))
+	}
+	if closed[0].MaxRunup != 100.0 {
+		t.Errorf("Closed trade MaxRunup = %f, want 100.0 (frozen at close)", closed[0].MaxRunup)
+	}
+	if closed[0].MaxDrawdown != 50.0 {
+		t.Errorf("Closed trade MaxDrawdown = %f, want 50.0 (frozen at close)", closed[0].MaxDrawdown)
+	}
+
+	th.UpdateOpenTradeMetrics(120.0, 80.0)
+
+	closed = th.GetClosedTrades()
+	if closed[0].MaxRunup != 100.0 {
+		t.Errorf("Closed trade MaxRunup changed after close: %f, want 100.0", closed[0].MaxRunup)
+	}
+	if closed[0].MaxDrawdown != 50.0 {
+		t.Errorf("Closed trade MaxDrawdown changed after close: %f, want 50.0", closed[0].MaxDrawdown)
+	}
+}
+
+func TestTradeHistory_MultipleOpenTradesMetrics(t *testing.T) {
+	th := NewTradeHistory()
+	th.AddOpenTrade(Trade{EntryID: "long1", Direction: Long, Size: 10.0, EntryPrice: 100.0})
+	th.AddOpenTrade(Trade{EntryID: "short1", Direction: Short, Size: 5.0, EntryPrice: 200.0})
+
+	// barHigh=105, barLow=95
+	// Long:  runup=(105-100)*10=50, drawdown=(100-95)*10=50
+	// Short: runup=(200-95)*5=525,  drawdown=(105-200)*5=-475 → clamped to 0
+	th.UpdateOpenTradeMetrics(105.0, 95.0)
+
+	open := th.GetOpenTrades()
+	if len(open) != 2 {
+		t.Fatalf("Expected 2 open trades, got %d", len(open))
+	}
+
+	longTrade := open[0]
+	if longTrade.MaxRunup != 50.0 {
+		t.Errorf("Long MaxRunup = %f, want 50.0", longTrade.MaxRunup)
+	}
+	if longTrade.MaxDrawdown != 50.0 {
+		t.Errorf("Long MaxDrawdown = %f, want 50.0", longTrade.MaxDrawdown)
+	}
+
+	shortTrade := open[1]
+	if shortTrade.MaxRunup != 525.0 {
+		t.Errorf("Short MaxRunup = %f, want 525.0 ((200-95)*5)", shortTrade.MaxRunup)
+	}
+	if shortTrade.MaxDrawdown != 0.0 {
+		t.Errorf("Short MaxDrawdown = %f, want 0.0 (barHigh=105 below entry=200)", shortTrade.MaxDrawdown)
 	}
 }

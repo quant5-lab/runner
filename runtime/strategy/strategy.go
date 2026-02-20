@@ -18,9 +18,17 @@ const (
 	OrderActionCloseAll = "close_all"
 )
 
+/* Commission type constants - matches strategy.commission.* Pine namespace */
+const (
+	CommissionPercent         = "percent"
+	CommissionCashPerOrder    = "cash_per_order"
+	CommissionCashPerContract = "cash_per_contract"
+)
+
 /* Trade represents a single trade (open or closed) */
 type Trade struct {
 	EntryID      string  `json:"entryId"`
+	ExitID       string  `json:"exitId"`
 	Direction    string  `json:"direction"`
 	Size         float64 `json:"size"`
 	EntryPrice   float64 `json:"entryPrice"`
@@ -32,11 +40,15 @@ type Trade struct {
 	ExitTime     int64   `json:"exitTime"`
 	ExitComment  string  `json:"exitComment"`
 	Profit       float64 `json:"profit"`
+	MaxDrawdown  float64 `json:"maxDrawdown"`
+	MaxRunup     float64 `json:"maxRunup"`
+	Commission   float64 `json:"commission"`
 }
 
 /* Order represents a pending order - unified for entry and close operations */
 type Order struct {
 	ID           string
+	ExitID       string // Semantic exit ID propagated to Trade.ExitID on fill
 	Action       string // OrderActionEntry, OrderActionClose, OrderActionCloseAll
 	Direction    string
 	Qty          float64
@@ -79,12 +91,13 @@ func (om *OrderManager) CreateEntryOrder(id, direction string, qty float64, crea
 }
 
 /* CreateCloseOrder creates a pending close order for specific entry */
-func (om *OrderManager) CreateCloseOrder(fromEntry string, createdBar int, comment string) Order {
+func (om *OrderManager) CreateCloseOrder(exitID, fromEntry string, createdBar int, comment string) Order {
 	orderID := fmt.Sprintf("_close_%s_%d", fromEntry, createdBar)
 	om.removeOrderByID(orderID)
 
 	order := Order{
 		ID:          orderID,
+		ExitID:      exitID,
 		Action:      OrderActionClose,
 		Type:        "market",
 		CreatedBar:  createdBar,
@@ -218,13 +231,15 @@ func (th *TradeHistory) AddOpenTrade(trade Trade) {
 }
 
 /* CloseTrade closes a trade by entry ID */
-func (th *TradeHistory) CloseTrade(entryID string, exitPrice float64, exitBar int, exitTime int64, exitComment string) *Trade {
+func (th *TradeHistory) CloseTrade(entryID, exitID string, exitPrice float64, exitBar int, exitTime int64, exitComment string, exitCommission float64) *Trade {
 	for i, trade := range th.openTrades {
 		if trade.EntryID == entryID {
+			trade.ExitID = exitID
 			trade.ExitPrice = exitPrice
 			trade.ExitBar = exitBar
 			trade.ExitTime = exitTime
 			trade.ExitComment = exitComment
+			trade.Commission += exitCommission
 
 			// Calculate profit
 			priceDiff := exitPrice - trade.EntryPrice
@@ -236,7 +251,7 @@ func (th *TradeHistory) CloseTrade(entryID string, exitPrice float64, exitBar in
 
 			th.closedTrades = append(th.closedTrades, trade)
 			th.openTrades = append(th.openTrades[:i], th.openTrades[i+1:]...)
-			return &trade
+			return &th.closedTrades[len(th.closedTrades)-1]
 		}
 	}
 	return nil
@@ -250,6 +265,33 @@ func (th *TradeHistory) GetOpenTrades() []Trade {
 /* GetClosedTrades returns closed trades */
 func (th *TradeHistory) GetClosedTrades() []Trade {
 	return th.closedTrades
+}
+
+/* UpdateOpenTradeMetrics updates MaxDrawdown and MaxRunup for all open trades based on bar data */
+func (th *TradeHistory) UpdateOpenTradeMetrics(barHigh, barLow float64) {
+	for i := range th.openTrades {
+		trade := &th.openTrades[i]
+		var favorable, adverse float64
+		if trade.Direction == Long {
+			favorable = (barHigh - trade.EntryPrice) * trade.Size
+			adverse = (trade.EntryPrice - barLow) * trade.Size
+		} else {
+			favorable = (trade.EntryPrice - barLow) * trade.Size
+			adverse = (barHigh - trade.EntryPrice) * trade.Size
+		}
+		if favorable < 0 {
+			favorable = 0
+		}
+		if adverse < 0 {
+			adverse = 0
+		}
+		if favorable > trade.MaxRunup {
+			trade.MaxRunup = favorable
+		}
+		if adverse > trade.MaxDrawdown {
+			trade.MaxDrawdown = adverse
+		}
+	}
 }
 
 /* EquityCalculator calculates equity */
@@ -293,6 +335,8 @@ type Strategy struct {
 	currentBar       int
 	currentPrice     float64
 	pyramiding       int
+	commissionValue  float64
+	commissionType   string
 }
 
 func NewStrategy() *Strategy {
@@ -325,6 +369,25 @@ func (s *Strategy) CallWithPyramiding(strategyName string, initialCapital float6
 	s.equityCalculator = NewEquityCalculator(initialCapital)
 	s.reversalHandler.equityCalculator = s.equityCalculator
 	s.pyramiding = pyramiding
+}
+
+/* SetCommission configures commission calculation for all trades */
+func (s *Strategy) SetCommission(value float64, commType string) {
+	s.commissionValue = value
+	s.commissionType = commType
+}
+
+/* calcCommission computes commission for one side of a trade (entry or exit) */
+func (s *Strategy) calcCommission(qty, price float64) float64 {
+	switch s.commissionType {
+	case CommissionPercent:
+		return qty * price * s.commissionValue / 100.0
+	case CommissionCashPerOrder:
+		return s.commissionValue
+	case CommissionCashPerContract:
+		return qty * s.commissionValue
+	}
+	return 0.0
 }
 
 func (s *Strategy) Entry(id, direction string, qty float64, comment string) error {
@@ -367,18 +430,20 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, com
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
 		if trade.EntryID == id {
-			s.orderManager.CreateCloseOrder(id, s.currentBar, comment)
+			// Per Pine semantics: strategy.close("buy") → exit_id = "buy"
+			s.orderManager.CreateCloseOrder(id, id, s.currentBar, comment)
 			return
 		}
 	}
 }
 
 /* executeCloseOrder executes a close order at given price - internal use only */
-func (s *Strategy) executeCloseOrder(entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
+func (s *Strategy) executeCloseOrder(exitID, entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
 		if trade.EntryID == entryID {
-			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, fillPrice, fillBar, fillTime, comment)
+			exitCommission := s.calcCommission(trade.Size, fillPrice)
+			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, exitID, fillPrice, fillBar, fillTime, comment, exitCommission)
 			if closedTrade != nil {
 				// Update position tracker
 				oppositeDir := Long
@@ -412,7 +477,8 @@ func (s *Strategy) CloseAll(currentPrice float64, currentTime int64, comment str
 func (s *Strategy) executeCloseAllOrder(fillPrice float64, fillBar int, fillTime int64, comment string) {
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
-		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, fillPrice, fillBar, fillTime, comment)
+		exitCommission := s.calcCommission(trade.Size, fillPrice)
+		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, "", fillPrice, fillBar, fillTime, comment, exitCommission)
 		if closedTrade != nil {
 			// Update position tracker
 			oppositeDir := Long
@@ -429,7 +495,17 @@ func (s *Strategy) executeCloseAllOrder(fillPrice float64, fillBar int, fillTime
 
 /* Exit exits with stop/limit orders (simplified - just closes) */
 func (s *Strategy) Exit(id, fromEntry string, currentPrice float64, currentTime int64, comment string) {
-	s.Close(fromEntry, currentPrice, currentTime, comment)
+	if !s.initialized {
+		return
+	}
+	openTrades := s.tradeHistory.GetOpenTrades()
+	for _, trade := range openTrades {
+		if trade.EntryID == fromEntry {
+			// Per Pine semantics: strategy.exit("my_exit_id", "from_entry") → exit_id = "my_exit_id"
+			s.orderManager.CreateCloseOrder(id, fromEntry, s.currentBar, comment)
+			return
+		}
+	}
 }
 
 /* ExitWithLevels checks stop/limit levels and closes if triggered */
@@ -455,11 +531,11 @@ func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLeve
 	// Check stop loss (long: low <= stop, short: high >= stop)
 	if !math.IsNaN(stopLevel) {
 		if trade.Direction == Long && barLow <= stopLevel {
-			s.executeCloseOrder(fromEntry, stopLevel, s.currentBar, barTime, comment)
+			s.executeCloseOrder(exitID, fromEntry, stopLevel, s.currentBar, barTime, comment)
 			return
 		}
 		if trade.Direction == Short && barHigh >= stopLevel {
-			s.executeCloseOrder(fromEntry, stopLevel, s.currentBar, barTime, comment)
+			s.executeCloseOrder(exitID, fromEntry, stopLevel, s.currentBar, barTime, comment)
 			return
 		}
 	}
@@ -467,11 +543,11 @@ func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLeve
 	// Check take profit (long: high >= limit, short: low <= limit)
 	if !math.IsNaN(limitLevel) {
 		if trade.Direction == Long && barHigh >= limitLevel {
-			s.executeCloseOrder(fromEntry, limitLevel, s.currentBar, barTime, comment)
+			s.executeCloseOrder(exitID, fromEntry, limitLevel, s.currentBar, barTime, comment)
 			return
 		}
 		if trade.Direction == Short && barLow <= limitLevel {
-			s.executeCloseOrder(fromEntry, limitLevel, s.currentBar, barTime, comment)
+			s.executeCloseOrder(exitID, fromEntry, limitLevel, s.currentBar, barTime, comment)
 			return
 		}
 	}
@@ -494,6 +570,7 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 
 			s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
 
+			entryCommission := s.calcCommission(order.Qty, openPrice)
 			s.tradeHistory.AddOpenTrade(Trade{
 				EntryID:      order.ID,
 				Direction:    order.Direction,
@@ -502,10 +579,11 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 				EntryBar:     currentBar,
 				EntryTime:    openTime,
 				EntryComment: order.EntryComment,
+				Commission:   entryCommission,
 			})
 
 		case OrderActionClose:
-			s.executeCloseOrder(order.FromEntry, openPrice, currentBar, openTime, order.ExitComment)
+			s.executeCloseOrder(order.ExitID, order.FromEntry, openPrice, currentBar, openTime, order.ExitComment)
 
 		case OrderActionCloseAll:
 			s.executeCloseAllOrder(openPrice, currentBar, openTime, order.ExitComment)
@@ -513,6 +591,14 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 
 		s.orderManager.RemoveOrder(order.ID)
 	}
+}
+
+/* OnBarMetrics updates per-trade MaxDrawdown and MaxRunup using bar high/low data */
+func (s *Strategy) OnBarMetrics(barHigh, barLow float64) {
+	if !s.initialized {
+		return
+	}
+	s.tradeHistory.UpdateOpenTradeMetrics(barHigh, barLow)
 }
 
 /* GetPositionSize returns current position size */
@@ -583,6 +669,26 @@ func (s *Strategy) GetLosingTradesCount() int {
 
 func (s *Strategy) GetEvenTradesCount() int {
 	return CountEvenTrades(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetOpenProfit(currentPrice float64) float64 {
+	return CalcOpenProfit(s.tradeHistory.GetOpenTrades(), currentPrice)
+}
+
+func (s *Strategy) GetOpenTradesCount() int {
+	return len(s.tradeHistory.GetOpenTrades())
+}
+
+func (s *Strategy) GetAvgTrade() float64 {
+	return AvgTrade(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetAvgWinningTrade() float64 {
+	return AvgWinningTrade(s.tradeHistory.GetClosedTrades())
+}
+
+func (s *Strategy) GetAvgLosingTrade() float64 {
+	return AvgLosingTrade(s.tradeHistory.GetClosedTrades())
 }
 
 /* Helper function */

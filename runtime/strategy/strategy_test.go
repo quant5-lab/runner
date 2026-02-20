@@ -107,7 +107,7 @@ func TestTradeHistory(t *testing.T) {
 	}
 
 	// Close trade
-	closedTrade := th.CloseTrade("long1", 110, 10, 2000, "")
+	closedTrade := th.CloseTrade("long1", "", 110, 10, 2000, "", 0.0)
 	if closedTrade == nil {
 		t.Fatal("Trade should be closed")
 	}
@@ -150,7 +150,7 @@ func TestTradeHistoryWithComment(t *testing.T) {
 	}
 
 	/* Close trade with exit comment */
-	closedTrade := th.CloseTrade("long1", 110, 10, 2000, "Take profit")
+	closedTrade := th.CloseTrade("long1", "", 110, 10, 2000, "Take profit", 0.0)
 	if closedTrade == nil {
 		t.Fatal("Trade should be closed")
 	}
@@ -171,7 +171,7 @@ func TestTradeHistoryWithComment(t *testing.T) {
 		EntryTime:    3000,
 		EntryComment: "Second entry",
 	})
-	closedTrade2 := th.CloseTrade("long2", 108, 3, 4000, "")
+	closedTrade2 := th.CloseTrade("long2", "", 108, 3, 4000, "", 0.0)
 	if closedTrade2.ExitComment != "" {
 		t.Errorf("Expected empty exit comment, got %q", closedTrade2.ExitComment)
 	}

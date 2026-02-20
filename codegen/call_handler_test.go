@@ -11,7 +11,6 @@ import (
 func TestCallExpressionRouter_Registration(t *testing.T) {
 	router := NewCallExpressionRouter()
 
-	// Verify router initializes with handlers
 	if router == nil {
 		t.Fatal("NewCallExpressionRouter() returned nil")
 	}
@@ -20,8 +19,6 @@ func TestCallExpressionRouter_Registration(t *testing.T) {
 		t.Error("Router has no registered handlers")
 	}
 
-	// Verify handler order (critical for chain of responsibility)
-	// UnknownFunctionHandler should be last (catch-all)
 	lastHandler := router.handlers[len(router.handlers)-1]
 	if _, ok := lastHandler.(*UnknownFunctionHandler); !ok {
 		t.Error("Last handler should be UnknownFunctionHandler (catch-all)")
@@ -72,13 +69,11 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.funcName, func(t *testing.T) {
-			// Find the first handler that can handle this function
-			// (mimics router behavior - first match wins)
 			foundHandlerIdx := -1
 			for i, handler := range router.handlers {
 				if handler.CanHandle(tt.funcName) {
 					foundHandlerIdx = i
-					break // First match wins
+					break
 				}
 			}
 
@@ -296,7 +291,6 @@ func TestCallExpressionRouter_NilSafety(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Should not panic, should handle gracefully
 			code, err := router.RouteCall(g, tt.call)
 			if err != nil {
 				// Error is acceptable for invalid input

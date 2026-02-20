@@ -109,7 +109,7 @@ func TestTradeCollectionCallHandler_GenerateCode(t *testing.T) {
 				Callee:    &ast.Identifier{Name: "profit"},
 				Arguments: []ast.Expression{&ast.Literal{Value: "0"}},
 			},
-			wantCode: "", // Handler returns empty for non-member expressions
+			wantCode: "",
 			wantErr:  false,
 		},
 		{
@@ -124,7 +124,7 @@ func TestTradeCollectionCallHandler_GenerateCode(t *testing.T) {
 				},
 				Arguments: []ast.Expression{&ast.Literal{Value: "0"}},
 			},
-			wantCode: "", // Handler returns empty for non-identifier properties
+			wantCode: "",
 			wantErr:  false,
 		},
 	}
@@ -162,66 +162,10 @@ func TestTradeCollectionCallHandler_GenerateCode(t *testing.T) {
 	}
 }
 
-func TestExtractMemberExpressionPath(t *testing.T) {
-	tests := []struct {
-		name string
-		expr ast.Expression
-		want string
-	}{
-		{
-			name: "simple identifier",
-			expr: &ast.Identifier{Name: "strategy"},
-			want: "strategy",
-		},
-		{
-			name: "two-level member",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "strategy"},
-				Property: &ast.Identifier{Name: "closedtrades"},
-			},
-			want: "strategy.closedtrades",
-		},
-		{
-			name: "three-level member",
-			expr: &ast.MemberExpression{
-				Object: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "strategy"},
-					Property: &ast.Identifier{Name: "closedtrades"},
-				},
-				Property: &ast.Identifier{Name: "profit"},
-			},
-			want: "strategy.closedtrades.profit",
-		},
-		{
-			name: "literal instead of identifier",
-			expr: &ast.Literal{Value: "not_an_identifier"},
-			want: "",
-		},
-		{
-			name: "member with non-identifier object",
-			expr: &ast.MemberExpression{
-				Object:   &ast.Literal{Value: "123"},
-				Property: &ast.Identifier{Name: "prop"},
-			},
-			want: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractMemberExpressionPath(tt.expr)
-			if got != tt.want {
-				t.Errorf("extractMemberExpressionPath() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestTradeCollectionCallHandler_IntegrationWithRouter(t *testing.T) {
-	// Verify handler integrates properly with CallExpressionRouter
-	router := NewCallExpressionRouter()
-	handler := NewTradeCollectionCallHandler()
-	router.RegisterHandler(handler)
+	// Verify handler integrates properly with an isolated router (not shared global state)
+	router := &CallExpressionRouter{handlers: make([]CallExpressionHandler, 0)}
+	router.RegisterHandler(NewTradeCollectionCallHandler())
 
 	g := &generator{
 		variables:  make(map[string]string),

@@ -5,4 +5,4 @@ Generate: ❌ Not reached (first 300 lines: codegen fails with time() IIFE gap)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
-Blocker: ~~#2~~ (time IIFE + dayofweek now supported; unverifiable due to parse failure), #7 (strategy.risk.*, strategy.closedtrades/opentrades collection access), #14 (alert), ~~#9~~ (str.* fully implemented), ~~#8~~ (input.session already handled)
+Blocker: ~~#2~~ (time IIFE + dayofweek now supported; unverifiable due to parse failure), #7 (strategy.risk.*, ~~strategy.closedtrades/opentrades collection access~~), #14 (alert), ~~#9~~ (str.* fully implemented), ~~#8~~ (input.session already handled)

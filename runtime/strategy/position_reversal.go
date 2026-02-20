@@ -63,10 +63,12 @@ func (h *PositionReversalHandler) closeTrade(
 ) {
 	closedTrade := h.tradeHistory.CloseTrade(
 		trade.EntryID,
+		"",
 		exitPrice,
 		exitBar,
 		exitTime,
 		"Position reversal",
+		0.0,
 	)
 
 	if closedTrade != nil {

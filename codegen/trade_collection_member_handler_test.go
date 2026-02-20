@@ -51,6 +51,13 @@ func TestTradeCollectionMemberHandler_CanHandle(t *testing.T) {
 		{"opentrades_max_runup_percent", "opentrades", "max_runup_percent", true},
 		{"opentrades_max_drawdown_percent", "opentrades", "max_drawdown_percent", true},
 
+		// opentrades has no exit_* properties — trades are still open
+		{"opentrades_exit_id", "opentrades", "exit_id", false},
+		{"opentrades_exit_price", "opentrades", "exit_price", false},
+		{"opentrades_exit_bar_index", "opentrades", "exit_bar_index", false},
+		{"opentrades_exit_comment", "opentrades", "exit_comment", false},
+		{"opentrades_exit_time", "opentrades", "exit_time", false},
+
 		// Invalid: wrong object
 		{"wrong_object", "trades", "profit", false},
 		{"strategy_prefix", "strategy.closedtrades", "profit", false},
@@ -132,7 +139,7 @@ func TestTradeCollectionMemberHandler_GenerateAccess_ArgumentValidation(t *testi
 	}
 }
 
-func TestTradeCollectionMemberHandler_GenerateAccess_CodeGeneration(t *testing.T) {
+func TestTradeCollectionMemberHandler_GenerateAccess_OutputFormat(t *testing.T) {
 	handler := NewTradeCollectionMemberHandler()
 
 	tests := []struct {
@@ -142,40 +149,12 @@ func TestTradeCollectionMemberHandler_GenerateAccess_CodeGeneration(t *testing.T
 		args     []ast.Expression
 		wantCode string
 	}{
-		// Closedtrades numeric properties with literal index
-		{"closedtrades_profit_literal", "closedtrades", "profit", []ast.Expression{&ast.Literal{Value: "5"}}, "tradeAccessor.ClosedTradeProfit(int(5))"},
-		{"closedtrades_entry_price_zero", "closedtrades", "entry_price", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeEntryPrice(int(0))"},
-		{"closedtrades_exit_price", "closedtrades", "exit_price", []ast.Expression{&ast.Literal{Value: "10"}}, "tradeAccessor.ClosedTradeExitPrice(int(10))"},
-		{"closedtrades_size_literal", "closedtrades", "size", []ast.Expression{&ast.Literal{Value: "3"}}, "tradeAccessor.ClosedTradeSize(int(3))"},
-		{"closedtrades_commission", "closedtrades", "commission", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeCommission(int(0))"},
-		{"closedtrades_profit_percent", "closedtrades", "profit_percent", []ast.Expression{&ast.Literal{Value: "1"}}, "tradeAccessor.ClosedTradeProfitPercent(int(1))"},
-		{"closedtrades_entry_bar_index", "closedtrades", "entry_bar_index", []ast.Expression{&ast.Literal{Value: "2"}}, "tradeAccessor.ClosedTradeEntryBarIndex(int(2))"},
-		{"closedtrades_exit_bar_index", "closedtrades", "exit_bar_index", []ast.Expression{&ast.Literal{Value: "2"}}, "tradeAccessor.ClosedTradeExitBarIndex(int(2))"},
-		{"closedtrades_entry_time", "closedtrades", "entry_time", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeEntryTime(int(0))"},
-		{"closedtrades_exit_time", "closedtrades", "exit_time", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeExitTime(int(0))"},
-		{"closedtrades_max_runup", "closedtrades", "max_runup", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeMaxRunup(int(0))"},
-		{"closedtrades_max_drawdown", "closedtrades", "max_drawdown", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeMaxDrawdown(int(0))"},
-
-		// Closedtrades with identifier index
-		{"closedtrades_profit_identifier", "closedtrades", "profit", []ast.Expression{&ast.Identifier{Name: "tradeIdx"}}, "tradeAccessor.ClosedTradeProfit(int(tradeIdx))"},
-		{"closedtrades_entry_price_var", "closedtrades", "entry_price", []ast.Expression{&ast.Identifier{Name: "i"}}, "tradeAccessor.ClosedTradeEntryPrice(int(i))"},
-
-		// Opentrades properties
-		{"opentrades_profit_literal", "opentrades", "profit", []ast.Expression{&ast.Literal{Value: "2"}}, "tradeAccessor.OpenTradeProfit(int(2))"},
-		{"opentrades_entry_price", "opentrades", "entry_price", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeEntryPrice(int(0))"},
-		{"opentrades_size", "opentrades", "size", []ast.Expression{&ast.Literal{Value: "1"}}, "tradeAccessor.OpenTradeSize(int(1))"},
-		{"opentrades_commission", "opentrades", "commission", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeCommission(int(0))"},
-		{"opentrades_profit_percent", "opentrades", "profit_percent", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeProfitPercent(int(0))"},
-		{"opentrades_entry_bar_index", "opentrades", "entry_bar_index", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeEntryBarIndex(int(0))"},
-		{"opentrades_max_runup", "opentrades", "max_runup", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeMaxRunup(int(0))"},
-
-		// String properties (entry_id, exit_id, comments)
-		{"closedtrades_entry_id", "closedtrades", "entry_id", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeEntryID(int(0))"},
-		{"closedtrades_exit_id", "closedtrades", "exit_id", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeExitID(int(0))"},
-		{"closedtrades_entry_comment", "closedtrades", "entry_comment", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeEntryComment(int(0))"},
-		{"closedtrades_exit_comment", "closedtrades", "exit_comment", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeExitComment(int(0))"},
-		{"opentrades_entry_id", "opentrades", "entry_id", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeEntryID(int(0))"},
-		{"opentrades_entry_comment", "opentrades", "entry_comment", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeEntryComment(int(0))"},
+		{"closedtrades/numeric/nonzero_index", "closedtrades", "profit", []ast.Expression{&ast.Literal{Value: "5"}}, "tradeAccessor.ClosedTradeProfit(int(5))"},
+		{"closedtrades/exit_property/nonzero_index", "closedtrades", "exit_price", []ast.Expression{&ast.Literal{Value: "10"}}, "tradeAccessor.ClosedTradeExitPrice(int(10))"},
+		{"closedtrades/string_property", "closedtrades", "exit_id", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.ClosedTradeExitID(int(0))"},
+		{"opentrades/numeric/nonzero_index", "opentrades", "profit", []ast.Expression{&ast.Literal{Value: "2"}}, "tradeAccessor.OpenTradeProfit(int(2))"},
+		{"opentrades/numeric/size_nonzero_index", "opentrades", "size", []ast.Expression{&ast.Literal{Value: "1"}}, "tradeAccessor.OpenTradeSize(int(1))"},
+		{"opentrades/string_property", "opentrades", "entry_id", []ast.Expression{&ast.Literal{Value: "0"}}, "tradeAccessor.OpenTradeEntryID(int(0))"},
 	}
 
 	for _, tt := range tests {
@@ -189,6 +168,27 @@ func TestTradeCollectionMemberHandler_GenerateAccess_CodeGeneration(t *testing.T
 
 			if code != tt.wantCode {
 				t.Errorf("GenerateAccess() code = %q, want %q", code, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestTradeCollectionMemberHandler_GenerateAccess_RejectsExitPropertiesOnOpenTrades(t *testing.T) {
+	handler := NewTradeCollectionMemberHandler()
+	mockGen := &mockExpressionGenerator{}
+	arg := []ast.Expression{&ast.Literal{Value: "0"}}
+
+	exitProperties := []string{"exit_id", "exit_price", "exit_bar_index", "exit_comment", "exit_time"}
+
+	for _, prop := range exitProperties {
+		t.Run(prop, func(t *testing.T) {
+			_, err := handler.GenerateAccess("opentrades", prop, arg, mockGen)
+			if err == nil {
+				t.Errorf("GenerateAccess(opentrades, %q) should return error — open trades have no exit data", prop)
+				return
+			}
+			if !strings.Contains(err.Error(), "unknown trade property") {
+				t.Errorf("error = %q, want substring %q", err.Error(), "unknown trade property")
 			}
 		})
 	}
@@ -246,8 +246,7 @@ func TestTradeCollectionMemberHandler_ComplexArgumentExpressions(t *testing.T) {
 func TestTradeCollectionMemberHandler_PropertyMapping(t *testing.T) {
 	handler := NewTradeCollectionMemberHandler()
 
-	/* Verify all 18 properties in the property map generate valid code */
-	propertyTests := []struct {
+	closedTradesTests := []struct {
 		pineProperty string
 		goMethodPart string
 	}{
@@ -263,16 +262,16 @@ func TestTradeCollectionMemberHandler_PropertyMapping(t *testing.T) {
 		{"exit_price", "ExitPrice"},
 		{"exit_time", "ExitTime"},
 		{"max_drawdown", "MaxDrawdown"},
-		{"max_drawdown_percent", "MaxDrawdown"},
+		{"max_drawdown_percent", "MaxDrawdownPercent"},
 		{"max_runup", "MaxRunup"},
-		{"max_runup_percent", "MaxRunup"},
+		{"max_runup_percent", "MaxRunupPercent"},
 		{"profit", "Profit"},
 		{"profit_percent", "ProfitPercent"},
 		{"size", "Size"},
 	}
 
-	for _, tt := range propertyTests {
-		t.Run(tt.pineProperty, func(t *testing.T) {
+	for _, tt := range closedTradesTests {
+		t.Run("closedtrades/"+tt.pineProperty, func(t *testing.T) {
 			mockGen := &mockExpressionGenerator{}
 			code, err := handler.GenerateAccess("closedtrades", tt.pineProperty, []ast.Expression{&ast.Literal{Value: "0"}}, mockGen)
 
@@ -281,6 +280,41 @@ func TestTradeCollectionMemberHandler_PropertyMapping(t *testing.T) {
 			}
 
 			expectedCode := "tradeAccessor.ClosedTrade" + tt.goMethodPart + "(int(0))"
+			if code != expectedCode {
+				t.Errorf("Property %q mapped to %q, want %q", tt.pineProperty, code, expectedCode)
+			}
+		})
+	}
+
+	openTradesTests := []struct {
+		pineProperty string
+		goMethodPart string
+	}{
+		{"commission", "Commission"},
+		{"entry_bar_index", "EntryBarIndex"},
+		{"entry_comment", "EntryComment"},
+		{"entry_id", "EntryID"},
+		{"entry_price", "EntryPrice"},
+		{"entry_time", "EntryTime"},
+		{"max_drawdown", "MaxDrawdown"},
+		{"max_drawdown_percent", "MaxDrawdownPercent"},
+		{"max_runup", "MaxRunup"},
+		{"max_runup_percent", "MaxRunupPercent"},
+		{"profit", "Profit"},
+		{"profit_percent", "ProfitPercent"},
+		{"size", "Size"},
+	}
+
+	for _, tt := range openTradesTests {
+		t.Run("opentrades/"+tt.pineProperty, func(t *testing.T) {
+			mockGen := &mockExpressionGenerator{}
+			code, err := handler.GenerateAccess("opentrades", tt.pineProperty, []ast.Expression{&ast.Literal{Value: "0"}}, mockGen)
+
+			if err != nil {
+				t.Fatalf("GenerateAccess() error = %v", err)
+			}
+
+			expectedCode := "tradeAccessor.OpenTrade" + tt.goMethodPart + "(int(0))"
 			if code != expectedCode {
 				t.Errorf("Property %q mapped to %q, want %q", tt.pineProperty, code, expectedCode)
 			}
@@ -375,7 +409,6 @@ func (m *mockExpressionGenerator) Generate(expr ast.Expression) (string, error) 
 		return m.returnValue, nil
 	}
 
-	// Default behavior: simple string representation
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return e.Name, nil

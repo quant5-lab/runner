@@ -64,6 +64,24 @@ func TestBuiltinIdentifierHandler_IsStrategyRuntimeValue(t *testing.T) {
 		{"position_avg_price", "strategy", "position_avg_price", true},
 		{"position_size", "strategy", "position_size", true},
 		{"position_entry_name", "strategy", "position_entry_name", true},
+		{"equity", "strategy", "equity", true},
+		{"netprofit", "strategy", "netprofit", true},
+		{"closedtrades", "strategy", "closedtrades", true},
+		{"initial_capital", "strategy", "initial_capital", true},
+		{"grossprofit", "strategy", "grossprofit", true},
+		{"grossloss", "strategy", "grossloss", true},
+		{"wintrades", "strategy", "wintrades", true},
+		{"losstrades", "strategy", "losstrades", true},
+		{"eventrades", "strategy", "eventrades", true},
+		{"openprofit", "strategy", "openprofit", true},
+		{"opentrades", "strategy", "opentrades", true},
+		{"avg_trade", "strategy", "avg_trade", true},
+		{"avg_winning_trade", "strategy", "avg_winning_trade", true},
+		{"avg_losing_trade", "strategy", "avg_losing_trade", true},
+		{"max_drawdown", "strategy", "max_drawdown", true},
+		{"max_runup", "strategy", "max_runup", true},
+		{"max_drawdown_percent", "strategy", "max_drawdown_percent", true},
+		{"max_runup_percent", "strategy", "max_runup_percent", true},
 		{"strategy.long constant", "strategy", "long", false},
 		{"strategy.short constant", "strategy", "short", false},
 		{"non-strategy object", "other", "position_avg_price", false},
@@ -351,12 +369,21 @@ func TestBuiltinIdentifierHandler_GenerateStrategyRuntimeAccess(t *testing.T) {
 		{"equity", "equity", "strategy_equitySeries.Get(0)"},
 		{"netprofit", "netprofit", "strategy_netprofitSeries.Get(0)"},
 		{"closedtrades", "closedtrades", "strategy_closedtradesSeries.Get(0)"},
-		{"initial_capital", "initial_capital", "strat.GetInitialCapital()"},
-		{"grossprofit", "grossprofit", "strat.GetGrossProfit()"},
-		{"grossloss", "grossloss", "strat.GetGrossLoss()"},
-		{"wintrades", "wintrades", "float64(strat.GetWinningTradesCount())"},
-		{"losstrades", "losstrades", "float64(strat.GetLosingTradesCount())"},
-		{"eventrades", "eventrades", "float64(strat.GetEvenTradesCount())"},
+		{"initial_capital", "initial_capital", "strategy_initial_capitalSeries.Get(0)"},
+		{"grossprofit", "grossprofit", "strategy_grossprofitSeries.Get(0)"},
+		{"grossloss", "grossloss", "strategy_grosslossSeries.Get(0)"},
+		{"wintrades", "wintrades", "strategy_wintradesSeries.Get(0)"},
+		{"losstrades", "losstrades", "strategy_losstradesSeries.Get(0)"},
+		{"eventrades", "eventrades", "strategy_eventradesSeries.Get(0)"},
+		{"openprofit", "openprofit", "strategy_openprofitSeries.Get(0)"},
+		{"opentrades", "opentrades", "strategy_opentradesSeries.Get(0)"},
+		{"avg_trade", "avg_trade", "strategy_avg_tradeSeries.Get(0)"},
+		{"avg_winning_trade", "avg_winning_trade", "strategy_avg_winning_tradeSeries.Get(0)"},
+		{"avg_losing_trade", "avg_losing_trade", "strategy_avg_losing_tradeSeries.Get(0)"},
+		{"max_drawdown", "max_drawdown", "strategy_max_drawdownSeries.Get(0)"},
+		{"max_runup", "max_runup", "strategy_max_runupSeries.Get(0)"},
+		{"max_drawdown_percent", "max_drawdown_percent", "strategy_max_drawdown_percentSeries.Get(0)"},
+		{"max_runup_percent", "max_runup_percent", "strategy_max_runup_percentSeries.Get(0)"},
 		{"unknown property", "unknown", ""},
 	}
 
@@ -1253,6 +1280,94 @@ func TestTryResolveMemberExpression_TaTrAllScopes(t *testing.T) {
 			for _, part := range tt.wantParts {
 				if !strings.Contains(code, part) {
 					t.Errorf("ta.tr in %s missing %q, got: %s", tt.name, part, code)
+				}
+			}
+		})
+	}
+}
+
+func TestTryResolveMemberExpression_StrategyHistoricalSubscript(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		property     string
+		offset       int
+		scope        AccessScope
+		wantContains []string
+	}{
+		{
+			"equity[0] bar loop",
+			"equity", 0, BarLoopScope,
+			[]string{StrategyEquitySeriesName, "Get(0)"},
+		},
+		{
+			"equity[1] bar loop",
+			"equity", 1, BarLoopScope,
+			[]string{StrategyEquitySeriesName, "Get(1)"},
+		},
+		{
+			"equity[0] arrow",
+			"equity", 0, ArrowScope,
+			[]string{"ctx.LookupSeries", StrategyEquitySeriesName, "GetCurrent()"},
+		},
+		{
+			"equity[1] arrow",
+			"equity", 1, ArrowScope,
+			[]string{"ctx.LookupSeries", StrategyEquitySeriesName, "Get(1)"},
+		},
+		{
+			"closedtrades[2] bar loop",
+			"closedtrades", 2, BarLoopScope,
+			[]string{StrategyClosedTradesSeriesName, "Get(2)"},
+		},
+		{
+			"wintrades[1] bar loop",
+			"wintrades", 1, BarLoopScope,
+			[]string{StrategyWinTradesSeriesName, "Get(1)"},
+		},
+		{
+			"avg_trade[1] bar loop",
+			"avg_trade", 1, BarLoopScope,
+			[]string{StrategyAvgTradeSeriesName, "Get(1)"},
+		},
+		{
+			"max_drawdown[1] bar loop",
+			"max_drawdown", 1, BarLoopScope,
+			[]string{StrategyMaxDrawdownSeriesName, "Get(1)"},
+		},
+		{
+			"max_runup[1] arrow",
+			"max_runup", 1, ArrowScope,
+			[]string{"ctx.LookupSeries", StrategyMaxRunupSeriesName, "Get(1)"},
+		},
+		{
+			"avg_winning_trade[2] arrow",
+			"avg_winning_trade", 2, ArrowScope,
+			[]string{"ctx.LookupSeries", StrategyAvgWinningTradeSeriesName, "Get(2)"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: tt.property},
+					Computed: false,
+				},
+				Property: &ast.Literal{Value: tt.offset},
+				Computed: true,
+			}
+
+			code, resolved := handler.TryResolveMemberExpression(expr, tt.scope)
+			if !resolved {
+				t.Fatalf("strategy.%s[%d] in %v should be resolved", tt.property, tt.offset, tt.scope)
+			}
+
+			for _, want := range tt.wantContains {
+				if !contains(code, want) {
+					t.Errorf("strategy.%s[%d] in %v missing %q, got: %s", tt.property, tt.offset, tt.scope, want, code)
 				}
 			}
 		})

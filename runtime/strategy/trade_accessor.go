@@ -31,7 +31,7 @@ func (ta *TradeAccessor) ClosedTradeCommission(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.Commission
 }
 
 func (ta *TradeAccessor) ClosedTradeEntryBarIndex(index int) float64 {
@@ -95,7 +95,7 @@ func (ta *TradeAccessor) ClosedTradeExitID(index int) string {
 	if trade == nil {
 		return ""
 	}
-	return trade.EntryID
+	return trade.ExitID
 }
 
 func (ta *TradeAccessor) ClosedTradeExitPrice(index int) float64 {
@@ -119,7 +119,19 @@ func (ta *TradeAccessor) ClosedTradeMaxDrawdown(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.MaxDrawdown
+}
+
+func (ta *TradeAccessor) ClosedTradeMaxDrawdownPercent(index int) float64 {
+	trade := ta.GetClosedTrade(index)
+	if trade == nil {
+		return math.NaN()
+	}
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
+		return math.NaN()
+	}
+	return (trade.MaxDrawdown / basis) * 100.0
 }
 
 func (ta *TradeAccessor) ClosedTradeMaxRunup(index int) float64 {
@@ -127,7 +139,19 @@ func (ta *TradeAccessor) ClosedTradeMaxRunup(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.MaxRunup
+}
+
+func (ta *TradeAccessor) ClosedTradeMaxRunupPercent(index int) float64 {
+	trade := ta.GetClosedTrade(index)
+	if trade == nil {
+		return math.NaN()
+	}
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
+		return math.NaN()
+	}
+	return (trade.MaxRunup / basis) * 100.0
 }
 
 func (ta *TradeAccessor) ClosedTradeProfit(index int) float64 {
@@ -143,10 +167,11 @@ func (ta *TradeAccessor) ClosedTradeProfitPercent(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	if trade.EntryPrice == 0 {
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
 		return math.NaN()
 	}
-	return (trade.Profit / (trade.EntryPrice * trade.Size)) * 100.0
+	return (trade.Profit / basis) * 100.0
 }
 
 func (ta *TradeAccessor) ClosedTradeSize(index int) float64 {
@@ -165,7 +190,7 @@ func (ta *TradeAccessor) OpenTradeCommission(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.Commission
 }
 
 func (ta *TradeAccessor) OpenTradeEntryBarIndex(index int) float64 {
@@ -213,7 +238,19 @@ func (ta *TradeAccessor) OpenTradeMaxDrawdown(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.MaxDrawdown
+}
+
+func (ta *TradeAccessor) OpenTradeMaxDrawdownPercent(index int) float64 {
+	trade := ta.GetOpenTrade(index)
+	if trade == nil {
+		return math.NaN()
+	}
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
+		return math.NaN()
+	}
+	return (trade.MaxDrawdown / basis) * 100.0
 }
 
 func (ta *TradeAccessor) OpenTradeMaxRunup(index int) float64 {
@@ -221,7 +258,19 @@ func (ta *TradeAccessor) OpenTradeMaxRunup(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	return 0.0
+	return trade.MaxRunup
+}
+
+func (ta *TradeAccessor) OpenTradeMaxRunupPercent(index int) float64 {
+	trade := ta.GetOpenTrade(index)
+	if trade == nil {
+		return math.NaN()
+	}
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
+		return math.NaN()
+	}
+	return (trade.MaxRunup / basis) * 100.0
 }
 
 func (ta *TradeAccessor) OpenTradeProfit(index int) float64 {
@@ -237,10 +286,11 @@ func (ta *TradeAccessor) OpenTradeProfitPercent(index int) float64 {
 	if trade == nil {
 		return math.NaN()
 	}
-	if trade.EntryPrice == 0 {
+	basis := trade.EntryPrice * trade.Size
+	if basis == 0 {
 		return math.NaN()
 	}
-	return (trade.Profit / (trade.EntryPrice * trade.Size)) * 100.0
+	return (trade.Profit / basis) * 100.0
 }
 
 func (ta *TradeAccessor) OpenTradeSize(index int) float64 {

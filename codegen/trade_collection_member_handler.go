@@ -7,16 +7,18 @@ import (
 )
 
 type TradeCollectionMemberHandler struct {
-	propertyMap map[string]string
+	closedTradesProperties map[string]string
+	openTradesProperties   map[string]string
 }
 
 func NewTradeCollectionMemberHandler() *TradeCollectionMemberHandler {
 	return &TradeCollectionMemberHandler{
-		propertyMap: buildTradePropertyMap(),
+		closedTradesProperties: buildClosedTradesPropertyMap(),
+		openTradesProperties:   buildOpenTradesPropertyMap(),
 	}
 }
 
-func buildTradePropertyMap() map[string]string {
+func buildClosedTradesPropertyMap() map[string]string {
 	return map[string]string{
 		"commission":           "Commission",
 		"entry_bar_index":      "EntryBarIndex",
@@ -30,21 +32,51 @@ func buildTradePropertyMap() map[string]string {
 		"exit_price":           "ExitPrice",
 		"exit_time":            "ExitTime",
 		"max_drawdown":         "MaxDrawdown",
-		"max_drawdown_percent": "MaxDrawdown",
+		"max_drawdown_percent": "MaxDrawdownPercent",
 		"max_runup":            "MaxRunup",
-		"max_runup_percent":    "MaxRunup",
+		"max_runup_percent":    "MaxRunupPercent",
 		"profit":               "Profit",
 		"profit_percent":       "ProfitPercent",
 		"size":                 "Size",
 	}
 }
 
+func buildOpenTradesPropertyMap() map[string]string {
+	return map[string]string{
+		"commission":           "Commission",
+		"entry_bar_index":      "EntryBarIndex",
+		"entry_comment":        "EntryComment",
+		"entry_id":             "EntryID",
+		"entry_price":          "EntryPrice",
+		"entry_time":           "EntryTime",
+		"max_drawdown":         "MaxDrawdown",
+		"max_drawdown_percent": "MaxDrawdownPercent",
+		"max_runup":            "MaxRunup",
+		"max_runup_percent":    "MaxRunupPercent",
+		"profit":               "Profit",
+		"profit_percent":       "ProfitPercent",
+		"size":                 "Size",
+	}
+}
+
+func (h *TradeCollectionMemberHandler) propertiesFor(collection string) map[string]string {
+	if collection == "closedtrades" {
+		return h.closedTradesProperties
+	}
+	return h.openTradesProperties
+}
+
 func (h *TradeCollectionMemberHandler) CanHandle(object string, member string) bool {
-	if object != "closedtrades" && object != "opentrades" {
+	switch object {
+	case "closedtrades":
+		_, ok := h.closedTradesProperties[member]
+		return ok
+	case "opentrades":
+		_, ok := h.openTradesProperties[member]
+		return ok
+	default:
 		return false
 	}
-	_, exists := h.propertyMap[member]
-	return exists
 }
 
 func (h *TradeCollectionMemberHandler) GenerateAccess(
@@ -57,7 +89,8 @@ func (h *TradeCollectionMemberHandler) GenerateAccess(
 		return "", fmt.Errorf("strategy.%s.%s() requires exactly 1 argument (trade_num)", object, member)
 	}
 
-	methodSuffix, exists := h.propertyMap[member]
+	properties := h.propertiesFor(object)
+	methodSuffix, exists := properties[member]
 	if !exists {
 		return "", fmt.Errorf("unknown trade property: %s", member)
 	}

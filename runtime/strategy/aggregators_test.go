@@ -448,3 +448,170 @@ func TestAggregatorsWithMixedScenarios(t *testing.T) {
 		})
 	}
 }
+
+func TestAvgTrade(t *testing.T) {
+	tests := []struct {
+		name     string
+		trades   []Trade
+		expected float64
+	}{
+		{"empty", []Trade{}, 0},
+		{"all_winning", []Trade{{Profit: 100}, {Profit: 200}, {Profit: 300}}, 200},
+		{"all_losing", []Trade{{Profit: -100}, {Profit: -200}}, -150},
+		{"mixed", []Trade{{Profit: 300}, {Profit: -100}, {Profit: 200}, {Profit: -200}}, 50},
+		{"single_trade", []Trade{{Profit: 75}}, 75},
+		{"breakeven_only", []Trade{{Profit: 0}, {Profit: 0}}, 0},
+		{"fractional", []Trade{{Profit: 0.5}, {Profit: 1.5}}, 1.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := AvgTrade(tt.trades)
+			if result != tt.expected {
+				t.Errorf("AvgTrade = %.6f, want %.6f", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAvgWinningTrade(t *testing.T) {
+	tests := []struct {
+		name     string
+		trades   []Trade
+		expected float64
+	}{
+		{"empty", []Trade{}, 0},
+		{"no_wins", []Trade{{Profit: -100}, {Profit: 0}, {Profit: -50}}, 0},
+		{"single_win", []Trade{{Profit: 150}}, 150},
+		{"multiple_wins", []Trade{{Profit: 100}, {Profit: -50}, {Profit: 300}, {Profit: -25}}, 200},
+		{"all_winning", []Trade{{Profit: 50}, {Profit: 100}, {Profit: 150}}, 100},
+		{"wins_with_breakevens", []Trade{{Profit: 200}, {Profit: 0}, {Profit: 400}}, 300},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := AvgWinningTrade(tt.trades)
+			if result != tt.expected {
+				t.Errorf("AvgWinningTrade = %.6f, want %.6f", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAvgLosingTrade(t *testing.T) {
+	tests := []struct {
+		name     string
+		trades   []Trade
+		expected float64
+	}{
+		{"empty", []Trade{}, 0},
+		{"no_losses", []Trade{{Profit: 100}, {Profit: 0}, {Profit: 50}}, 0},
+		{"single_loss", []Trade{{Profit: -150}}, -150},
+		{"multiple_losses", []Trade{{Profit: 100}, {Profit: -50}, {Profit: 200}, {Profit: -150}}, -100},
+		{"all_losing", []Trade{{Profit: -50}, {Profit: -100}, {Profit: -150}}, -100},
+		{"losses_with_breakevens", []Trade{{Profit: -200}, {Profit: 0}, {Profit: -400}}, -300},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := AvgLosingTrade(tt.trades)
+			if result != tt.expected {
+				t.Errorf("AvgLosingTrade = %.6f, want %.6f", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCalcOpenProfit(t *testing.T) {
+	tests := []struct {
+		name         string
+		trades       []Trade
+		currentPrice float64
+		expected     float64
+	}{
+		{"no_trades", []Trade{}, 110.0, 0},
+		{"long_at_cost", []Trade{{Direction: Long, EntryPrice: 100, Size: 10}}, 100.0, 0},
+		{"long_profit", []Trade{{Direction: Long, EntryPrice: 100, Size: 10}}, 110.0, 100},
+		{"long_loss", []Trade{{Direction: Long, EntryPrice: 100, Size: 10}}, 90.0, -100},
+		{"short_profit", []Trade{{Direction: Short, EntryPrice: 100, Size: 5}}, 90.0, 50},
+		{"short_loss", []Trade{{Direction: Short, EntryPrice: 100, Size: 5}}, 110.0, -50},
+		{
+			"mixed_long_short",
+			[]Trade{
+				{Direction: Long, EntryPrice: 100, Size: 10},
+				{Direction: Short, EntryPrice: 100, Size: 5},
+			},
+			110.0,
+			50, // long: +100, short: -50
+		},
+		{"fractional_size", []Trade{{Direction: Long, EntryPrice: 100, Size: 0.5}}, 120.0, 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CalcOpenProfit(tt.trades, tt.currentPrice)
+			if result != tt.expected {
+				t.Errorf("CalcOpenProfit = %.6f, want %.6f", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAggregatorInvariants(t *testing.T) {
+	tests := []struct {
+		name   string
+		trades []Trade
+	}{
+		{"empty", []Trade{}},
+		{"all_winning", []Trade{{Profit: 100}, {Profit: 200}, {Profit: 300}}},
+		{"all_losing", []Trade{{Profit: -100}, {Profit: -200}}},
+		{"mixed", []Trade{{Profit: 300}, {Profit: -100}, {Profit: 0}, {Profit: 200}, {Profit: -50}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wins := CountWinningTrades(tt.trades)
+			losses := CountLosingTrades(tt.trades)
+
+			// AvgWinningTrade > 0 iff wins > 0
+			avgWin := AvgWinningTrade(tt.trades)
+			if wins > 0 && avgWin <= 0 {
+				t.Errorf("AvgWinningTrade must be > 0 when wins=%d, got %.2f", wins, avgWin)
+			}
+			if wins == 0 && avgWin != 0 {
+				t.Errorf("AvgWinningTrade must be 0 when no wins, got %.2f", avgWin)
+			}
+
+			// AvgLosingTrade < 0 iff losses > 0
+			avgLoss := AvgLosingTrade(tt.trades)
+			if losses > 0 && avgLoss >= 0 {
+				t.Errorf("AvgLosingTrade must be < 0 when losses=%d, got %.2f", losses, avgLoss)
+			}
+			if losses == 0 && avgLoss != 0 {
+				t.Errorf("AvgLosingTrade must be 0 when no losses, got %.2f", avgLoss)
+			}
+
+			// AvgTrade equals sum / count
+			if len(tt.trades) > 0 {
+				total := 0.0
+				for _, tr := range tt.trades {
+					total += tr.Profit
+				}
+				expected := total / float64(len(tt.trades))
+				if AvgTrade(tt.trades) != expected {
+					t.Errorf("AvgTrade invariant failed: got %.6f, want %.6f", AvgTrade(tt.trades), expected)
+				}
+			}
+
+			// GrossProfit + GrossLoss == sum of all profits
+			total := AggregateGrossProfit(tt.trades) + AggregateGrossLoss(tt.trades)
+			sum := 0.0
+			for _, tr := range tt.trades {
+				sum += tr.Profit
+			}
+			if total != sum {
+				t.Errorf("GrossProfit+GrossLoss invariant: got %.6f, want %.6f", total, sum)
+			}
+		})
+	}
+}

@@ -722,16 +722,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// StateManager for strategy.* runtime values (Series storage)
 	if g.hasStrategyRuntimeAccess {
 		code += g.ind() + "sm := strategy.NewStateManager(len(ctx.Data))\n"
-		code += g.ind() + fmt.Sprintf("%s := sm.PositionAvgPriceSeries()\n", StrategyPositionAvgPriceSeriesName)
-		code += g.ind() + fmt.Sprintf("%s := sm.PositionSizeSeries()\n", StrategyPositionSizeSeriesName)
-		code += g.ind() + fmt.Sprintf("%s := sm.EquitySeries()\n", StrategyEquitySeriesName)
-		code += g.ind() + fmt.Sprintf("%s := sm.NetProfitSeries()\n", StrategyNetProfitSeriesName)
-		code += g.ind() + fmt.Sprintf("%s := sm.ClosedTradesSeries()\n", StrategyClosedTradesSeriesName)
-		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyPositionAvgPriceSeriesName, StrategyPositionAvgPriceSeriesName)
-		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyPositionSizeSeriesName, StrategyPositionSizeSeriesName)
-		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyEquitySeriesName, StrategyEquitySeriesName)
-		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyNetProfitSeriesName, StrategyNetProfitSeriesName)
-		code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", StrategyClosedTradesSeriesName, StrategyClosedTradesSeriesName)
+		for _, binding := range strategySeriesBindings() {
+			code += g.ind() + fmt.Sprintf("%s := sm.%s()\n", binding.varName, binding.accessor)
+			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %s)\n", binding.varName, binding.varName)
+		}
+		code += g.ind() + "tradeAccessor := strategy.NewTradeAccessor(strat.GetTradeHistory())\n"
+		code += g.ind() + "_ = tradeAccessor\n"
 		code += "\n"
 	}
 
@@ -830,6 +826,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		for _, plotStmt := range g.plotCollector.GetPlots() {
 			code += g.ind() + plotStmt.code
 		}
+	}
+
+	if g.hasStrategyRuntimeAccess {
+		code += g.ind() + "strat.OnBarMetrics(bar.High, bar.Low)\n"
 	}
 
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
@@ -3279,6 +3279,7 @@ func (g *generator) generatePlaceholder() string {
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)\n"
+	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].High, ctx.Data[i].Low)\n"
 	g.indent--
 	code += g.ind() + "}\n"
 	return code
@@ -3896,6 +3897,7 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 						"equity":             true,
 						"netprofit":          true,
 						"closedtrades":       true,
+						"opentrades":         true,
 					}
 					if runtimeProps[prop.Name] {
 						return true
@@ -3905,6 +3907,9 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 		}
 		return hasStrategyRuntimeInExpression(e.Object)
 	case *ast.CallExpression:
+		if hasStrategyRuntimeInExpression(e.Callee) {
+			return true
+		}
 		for _, arg := range e.Arguments {
 			if hasStrategyRuntimeInExpression(arg) {
 				return true

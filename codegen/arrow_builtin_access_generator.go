@@ -102,24 +102,52 @@ func (g *ArrowBuiltinAccessGenerator) GenerateStrategyAccess(property string) st
 		return ""
 	}
 
-	seriesName := ""
 	switch property {
-	case "position_avg_price":
-		seriesName = StrategyPositionAvgPriceSeriesName
-	case "position_size":
-		seriesName = StrategyPositionSizeSeriesName
-	case "equity":
-		seriesName = StrategyEquitySeriesName
-	case "netprofit":
-		seriesName = StrategyNetProfitSeriesName
-	case "closedtrades":
-		seriesName = StrategyClosedTradesSeriesName
 	case "position_entry_name":
 		return `""`
+	case "position_avg_price":
+		return SeriesLookupIIFE(StrategyPositionAvgPriceSeriesName)
+	case "position_size":
+		return SeriesLookupIIFE(StrategyPositionSizeSeriesName)
+	case "equity":
+		return SeriesLookupIIFE(StrategyEquitySeriesName)
+	case "netprofit":
+		return SeriesLookupIIFE(StrategyNetProfitSeriesName)
+	case "closedtrades":
+		return SeriesLookupIIFE(StrategyClosedTradesSeriesName)
+	case "initial_capital":
+		return SeriesLookupIIFE(StrategyInitialCapitalSeriesName)
+	case "grossprofit":
+		return SeriesLookupIIFE(StrategyGrossProfitSeriesName)
+	case "grossloss":
+		return SeriesLookupIIFE(StrategyGrossLossSeriesName)
+	case "wintrades":
+		return SeriesLookupIIFE(StrategyWinTradesSeriesName)
+	case "losstrades":
+		return SeriesLookupIIFE(StrategyLossTradesSeriesName)
+	case "eventrades":
+		return SeriesLookupIIFE(StrategyEvenTradesSeriesName)
+	case "openprofit":
+		return SeriesLookupIIFE(StrategyOpenProfitSeriesName)
+	case "opentrades":
+		return SeriesLookupIIFE(StrategyOpenTradesSeriesName)
+	case "avg_trade":
+		return SeriesLookupIIFE(StrategyAvgTradeSeriesName)
+	case "avg_winning_trade":
+		return SeriesLookupIIFE(StrategyAvgWinningTradeSeriesName)
+	case "avg_losing_trade":
+		return SeriesLookupIIFE(StrategyAvgLosingTradeSeriesName)
+	case "max_drawdown":
+		return SeriesLookupIIFE(StrategyMaxDrawdownSeriesName)
+	case "max_runup":
+		return SeriesLookupIIFE(StrategyMaxRunupSeriesName)
+	case "max_drawdown_percent":
+		return SeriesLookupIIFE(StrategyMaxDrawdownPctSeriesName)
+	case "max_runup_percent":
+		return SeriesLookupIIFE(StrategyMaxRunupPctSeriesName)
 	default:
 		return "math.NaN()"
 	}
-	return SeriesLookupIIFE(seriesName)
 }
 
 func arrowBoundsCheckedExpr(offset int, expr string) string {

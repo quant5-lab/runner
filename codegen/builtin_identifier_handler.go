@@ -44,14 +44,53 @@ func (h *BuiltinIdentifierHandler) IsStrategyRuntimeValue(obj, prop string) bool
 	if obj != "strategy" {
 		return false
 	}
+	return h.strategyPropertySeriesName(prop) != "" || prop == "position_entry_name"
+}
+
+func (h *BuiltinIdentifierHandler) strategyPropertySeriesName(prop string) string {
 	switch prop {
-	case "position_avg_price", "position_size", "position_entry_name",
-		"equity", "netprofit", "closedtrades",
-		"initial_capital", "grossprofit", "grossloss",
-		"wintrades", "losstrades", "eventrades":
-		return true
+	case "position_avg_price":
+		return StrategyPositionAvgPriceSeriesName
+	case "position_size":
+		return StrategyPositionSizeSeriesName
+	case "equity":
+		return StrategyEquitySeriesName
+	case "netprofit":
+		return StrategyNetProfitSeriesName
+	case "closedtrades":
+		return StrategyClosedTradesSeriesName
+	case "initial_capital":
+		return StrategyInitialCapitalSeriesName
+	case "grossprofit":
+		return StrategyGrossProfitSeriesName
+	case "grossloss":
+		return StrategyGrossLossSeriesName
+	case "wintrades":
+		return StrategyWinTradesSeriesName
+	case "losstrades":
+		return StrategyLossTradesSeriesName
+	case "eventrades":
+		return StrategyEvenTradesSeriesName
+	case "openprofit":
+		return StrategyOpenProfitSeriesName
+	case "opentrades":
+		return StrategyOpenTradesSeriesName
+	case "avg_trade":
+		return StrategyAvgTradeSeriesName
+	case "avg_winning_trade":
+		return StrategyAvgWinningTradeSeriesName
+	case "avg_losing_trade":
+		return StrategyAvgLosingTradeSeriesName
+	case "max_drawdown":
+		return StrategyMaxDrawdownSeriesName
+	case "max_runup":
+		return StrategyMaxRunupSeriesName
+	case "max_drawdown_percent":
+		return StrategyMaxDrawdownPctSeriesName
+	case "max_runup_percent":
+		return StrategyMaxRunupPctSeriesName
 	default:
-		return false
+		return ""
 	}
 }
 
@@ -182,34 +221,13 @@ func (h *BuiltinIdentifierHandler) GenerateHistoricalAccess(name string, offset 
 }
 
 func (h *BuiltinIdentifierHandler) GenerateStrategyRuntimeAccess(property string) string {
-	switch property {
-	case "position_avg_price":
-		return StrategyPositionAvgPriceSeriesName + ".Get(0)"
-	case "position_size":
-		return StrategyPositionSizeSeriesName + ".Get(0)"
-	case "position_entry_name":
+	if property == "position_entry_name" {
 		return "strat.GetPositionEntryName()"
-	case "equity":
-		return StrategyEquitySeriesName + ".Get(0)"
-	case "netprofit":
-		return StrategyNetProfitSeriesName + ".Get(0)"
-	case "closedtrades":
-		return StrategyClosedTradesSeriesName + ".Get(0)"
-	case "initial_capital":
-		return "strat.GetInitialCapital()"
-	case "grossprofit":
-		return "strat.GetGrossProfit()"
-	case "grossloss":
-		return "strat.GetGrossLoss()"
-	case "wintrades":
-		return "float64(strat.GetWinningTradesCount())"
-	case "losstrades":
-		return "float64(strat.GetLosingTradesCount())"
-	case "eventrades":
-		return "float64(strat.GetEvenTradesCount())"
-	default:
-		return ""
 	}
+	if seriesName := h.strategyPropertySeriesName(property); seriesName != "" {
+		return seriesName + ".Get(0)"
+	}
+	return ""
 }
 
 func (h *BuiltinIdentifierHandler) IsColorIdentifier(name string) bool {
@@ -295,6 +313,17 @@ func (h *BuiltinIdentifierHandler) resolveNestedMemberExpression(expr *ast.Membe
 			return TrueRangeArrowIIFE(fmt.Sprintf("%d", offset)), true
 		}
 		return h.generateHistoricalTrueRange(offset), true
+	}
+
+	if baseObj.Name == "strategy" {
+		seriesName := h.strategyPropertySeriesName(baseProp.Name)
+		if seriesName != "" {
+			offset := h.extractOffset(expr.Property)
+			if scope == ArrowScope {
+				return SeriesLookupWithOffsetIIFE(seriesName, offset), true
+			}
+			return fmt.Sprintf("%s.Get(%d)", seriesName, offset), true
+		}
 	}
 
 	key := baseObj.Name + "." + baseProp.Name
