@@ -15,7 +15,7 @@ type ATRStateManager struct {
 	hasHistory      bool
 }
 
-func NewATRStateManager(cacheKey string, period int) *ATRStateManager {
+func NewATRStateManager(cacheKey string, period int, capacity int) *ATRStateManager {
 	return &ATRStateManager{
 		cacheKey:     cacheKey,
 		period:       period,
@@ -23,6 +23,7 @@ func NewATRStateManager(cacheKey string, period int) *ATRStateManager {
 		rmaStateManager: &RMAStateManager{
 			cacheKey: cacheKey + "_rma_tr",
 			period:   period,
+			storage:  NewSeriesStorage(capacity),
 			computed: 0,
 		},
 		computed:   0,
@@ -39,15 +40,19 @@ func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		isFirstBar := s.computed == 0 || !s.hasHistory
 		trueRange := s.trCalculator.CalculateAtBar(secCtx.Data, s.computed, s.prevClose, isFirstBar)
 
+		var atrValue float64
 		if s.computed == 0 {
-			s.rmaStateManager.prevRMA = trueRange
+			atrValue = trueRange
 		} else if s.computed < s.period {
-			s.rmaStateManager.prevRMA = (s.rmaStateManager.prevRMA*float64(s.computed) + trueRange) / float64(s.computed+1)
+			prevATR := s.rmaStateManager.storage.Get(s.computed - 1)
+			atrValue = (prevATR*float64(s.computed) + trueRange) / float64(s.computed+1)
 		} else {
 			alpha := 1.0 / float64(s.period)
-			s.rmaStateManager.prevRMA = alpha*trueRange + (1-alpha)*s.rmaStateManager.prevRMA
+			prevATR := s.rmaStateManager.storage.Get(s.computed - 1)
+			atrValue = alpha*trueRange + (1-alpha)*prevATR
 		}
 
+		s.rmaStateManager.storage.Set(s.computed, atrValue)
 		s.prevClose = secCtx.Data[s.computed].Close
 		s.hasHistory = true
 		s.computed++
@@ -57,5 +62,5 @@ func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		return 0.0, nil
 	}
 
-	return s.rmaStateManager.prevRMA, nil
+	return s.rmaStateManager.storage.Get(barIdx), nil
 }

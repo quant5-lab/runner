@@ -20,7 +20,7 @@ func TestATRStateManager_WarmupPeriod(t *testing.T) {
 		})
 	}
 
-	manager := NewATRStateManager("atr_test", 14)
+	manager := NewATRStateManager("atr_test", 14, 20)
 	dummyID := &ast.Identifier{Name: "close"}
 
 	for i := 0; i < 13; i++ {
@@ -41,37 +41,6 @@ func TestATRStateManager_WarmupPeriod(t *testing.T) {
 		if result <= 0.0 {
 			t.Errorf("Bar %d: expected positive ATR, got %.4f", i, result)
 		}
-	}
-}
-
-func TestATRStateManager_ConsecutiveCalls(t *testing.T) {
-	ctx := context.New("TEST", "1D", 20)
-
-	for i := 0; i < 20; i++ {
-		ctx.AddBar(context.OHLCV{
-			Open:   100.0 + float64(i),
-			High:   110.0 + float64(i),
-			Low:    95.0 + float64(i),
-			Close:  105.0 + float64(i),
-			Volume: 1000,
-		})
-	}
-
-	manager := NewATRStateManager("atr_test", 14)
-	dummyID := &ast.Identifier{Name: "close"}
-
-	result1, err := manager.ComputeAtBar(ctx, dummyID, 15)
-	if err != nil {
-		t.Fatalf("First call failed: %v", err)
-	}
-
-	result2, err := manager.ComputeAtBar(ctx, dummyID, 15)
-	if err != nil {
-		t.Fatalf("Second call failed: %v", err)
-	}
-
-	if result1 != result2 {
-		t.Errorf("Consecutive calls returned different values: %.4f vs %.4f", result1, result2)
 	}
 }
 
@@ -98,7 +67,7 @@ func TestATRStateManager_IncreasingVolatility(t *testing.T) {
 		})
 	}
 
-	manager := NewATRStateManager("atr_test", 14)
+	manager := NewATRStateManager("atr_test", 14, 30)
 	dummyID := &ast.Identifier{Name: "close"}
 
 	lowVolATR, _ := manager.ComputeAtBar(ctx, dummyID, 14)

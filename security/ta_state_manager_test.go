@@ -100,6 +100,7 @@ func TestEMAStateManager_ExponentialSmoothing(t *testing.T) {
 	manager := &EMAStateManager{
 		cacheKey:   "ema_close_3",
 		period:     3,
+		storage:    NewSeriesStorage(5),
 		multiplier: multiplier,
 		computed:   0,
 	}
@@ -134,6 +135,7 @@ func TestEMAStateManager_StatePreservation(t *testing.T) {
 	manager := &EMAStateManager{
 		cacheKey:   "ema_close_3",
 		period:     3,
+		storage:    NewSeriesStorage(4),
 		multiplier: 2.0 / 4.0,
 		computed:   0,
 	}
@@ -162,6 +164,7 @@ func TestRMAStateManager_AlphaSmoothing(t *testing.T) {
 	manager := &RMAStateManager{
 		cacheKey: "rma_close_3",
 		period:   3,
+		storage:  NewSeriesStorage(5),
 		computed: 0,
 	}
 
@@ -196,11 +199,13 @@ func TestRSIStateManager_DualRMAIntegration(t *testing.T) {
 		rmaGain: &RMAStateManager{
 			cacheKey: "rsi_close_3_gain",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		rmaLoss: &RMAStateManager{
 			cacheKey: "rsi_close_3_loss",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		computed: 0,
@@ -235,11 +240,13 @@ func TestRSIStateManager_AllGainsScenario(t *testing.T) {
 		rmaGain: &RMAStateManager{
 			cacheKey: "rsi_close_3_gain",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		rmaLoss: &RMAStateManager{
 			cacheKey: "rsi_close_3_loss",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		computed: 0,
@@ -274,11 +281,13 @@ func TestRSIStateManager_AllLossesScenario(t *testing.T) {
 		rmaGain: &RMAStateManager{
 			cacheKey: "rsi_close_3_gain",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		rmaLoss: &RMAStateManager{
 			cacheKey: "rsi_close_3_loss",
 			period:   3,
+			storage:  NewSeriesStorage(7),
 			computed: 0,
 		},
 		computed: 0,

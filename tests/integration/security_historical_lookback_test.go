@@ -264,3 +264,162 @@ plot(trend_changed ? 1 : 0, "changed")
 		t.Errorf("Strategy [1] comparison broken: only %d/%d trend changes detected", correctChanges, totalChanges)
 	}
 }
+
+func TestSecurityHistoricalLookback_EMA(t *testing.T) {
+	t.Parallel()
+	pineScript := `//@version=5
+indicator("EMA Historical", overlay=false)
+
+ema_1d = security(syminfo.tickerid, "1D", ta.ema(close, 5))
+prev_ema = ema_1d[1]
+
+plot(ema_1d, "current")
+plot(prev_ema, "previous")
+`
+
+	executor := util.NewPineExecutor(t)
+	output := executor.ExecuteScript(t, "ema-historical", pineScript)
+
+	current := executor.ExtractPlotValues(t, output, "current")
+	previous := executor.ExtractPlotValues(t, output, "previous")
+
+	if len(current) < 10 || len(previous) < 10 {
+		t.Fatalf("Insufficient data: current=%d, previous=%d bars", len(current), len(previous))
+	}
+
+	mismatchCount := 0
+	for i := 2; i < len(current) && i < len(previous); i++ {
+		if previous[i] != current[i-1] {
+			mismatchCount++
+		}
+	}
+
+	matchRate := float64(len(current)-2-mismatchCount) / float64(len(current)-2)
+	if matchRate < 0.9 {
+		t.Errorf("EMA [1] access broken: only %.0f%% of previous values match current[i-1]", matchRate*100)
+	}
+}
+
+func TestSecurityHistoricalLookback_RMA(t *testing.T) {
+	t.Parallel()
+	pineScript := `//@version=5
+indicator("RMA Historical", overlay=false)
+
+rma_1d = security(syminfo.tickerid, "1D", ta.rma(close, 7))
+prev_rma = rma_1d[1]
+
+plot(rma_1d, "current")
+plot(prev_rma, "previous")
+`
+
+	executor := util.NewPineExecutor(t)
+	output := executor.ExecuteScript(t, "rma-historical", pineScript)
+
+	current := executor.ExtractPlotValues(t, output, "current")
+	previous := executor.ExtractPlotValues(t, output, "previous")
+
+	if len(current) < 10 || len(previous) < 10 {
+		t.Fatalf("Insufficient data: current=%d, previous=%d bars", len(current), len(previous))
+	}
+
+	mismatchCount := 0
+	for i := 2; i < len(current) && i < len(previous); i++ {
+		if previous[i] != current[i-1] {
+			mismatchCount++
+		}
+	}
+
+	matchRate := float64(len(current)-2-mismatchCount) / float64(len(current)-2)
+	if matchRate < 0.9 {
+		t.Errorf("RMA [1] access broken: only %.0f%% of previous values match current[i-1]", matchRate*100)
+	}
+}
+
+func TestSecurityHistoricalLookback_ATR(t *testing.T) {
+	t.Parallel()
+	pineScript := `//@version=5
+indicator("ATR Historical", overlay=false)
+
+atr_1d = security(syminfo.tickerid, "1D", ta.atr(14))
+prev_atr = atr_1d[1]
+
+plot(atr_1d, "current")
+plot(prev_atr, "previous")
+`
+
+	executor := util.NewPineExecutor(t)
+	output := executor.ExecuteScript(t, "atr-historical", pineScript)
+
+	current := executor.ExtractPlotValues(t, output, "current")
+	previous := executor.ExtractPlotValues(t, output, "previous")
+
+	if len(current) < 20 || len(previous) < 20 {
+		t.Fatalf("Insufficient data: current=%d, previous=%d bars", len(current), len(previous))
+	}
+
+	mismatchCount := 0
+	for i := 15; i < len(current) && i < len(previous); i++ {
+		if previous[i] != current[i-1] {
+			mismatchCount++
+		}
+	}
+
+	matchRate := float64(len(current)-15-mismatchCount) / float64(len(current)-15)
+	if matchRate < 0.9 {
+		t.Errorf("ATR [1] access broken: only %.0f%% of previous values match current[i-1]", matchRate*100)
+	}
+}
+
+func TestSecurityHistoricalLookback_TAMultipleOffsets(t *testing.T) {
+	t.Parallel()
+	pineScript := `//@version=5
+indicator("TA Multiple Offsets", overlay=false)
+
+ema_1d = security(syminfo.tickerid, "1D", ta.ema(close, 5))
+prev1 = ema_1d[1]
+prev2 = ema_1d[2]
+prev3 = ema_1d[3]
+
+plot(ema_1d, "current")
+plot(prev1, "prev1")
+plot(prev2, "prev2")
+plot(prev3, "prev3")
+`
+
+	executor := util.NewPineExecutor(t)
+	output := executor.ExecuteScript(t, "ta-multiple-offsets", pineScript)
+
+	current := executor.ExtractPlotValues(t, output, "current")
+	prev1 := executor.ExtractPlotValues(t, output, "prev1")
+	prev2 := executor.ExtractPlotValues(t, output, "prev2")
+	prev3 := executor.ExtractPlotValues(t, output, "prev3")
+
+	if len(current) < 10 {
+		t.Fatalf("Insufficient data: %d bars", len(current))
+	}
+
+	correctPrev1, correctPrev2, correctPrev3 := 0, 0, 0
+	total := 0
+	for i := 6; i < len(current); i++ {
+		total++
+		if prev1[i] == current[i-1] {
+			correctPrev1++
+		}
+		if prev2[i] == current[i-2] {
+			correctPrev2++
+		}
+		if prev3[i] == current[i-3] {
+			correctPrev3++
+		}
+	}
+
+	if float64(correctPrev1)/float64(total) < 0.9 {
+		t.Errorf("EMA [1] offset broken: %.0f%% match", float64(correctPrev1)/float64(total)*100)
+	}
+	if float64(correctPrev2)/float64(total) < 0.9 {
+		t.Errorf("EMA [2] offset broken: %.0f%% match", float64(correctPrev2)/float64(total)*100)
+	}
+	if float64(correctPrev3)/float64(total) < 0.9 {
+		t.Errorf("EMA [3] offset broken: %.0f%% match", float64(correctPrev3)/float64(total)*100)
+	}
+}
