@@ -23,6 +23,7 @@ func NewBuiltinNamespaceResolver() *BuiltinNamespaceResolver {
 		"dividends": r.resolveDividends,
 		"earnings":  r.resolveEarnings,
 		"math":      r.resolveMath,
+		"strategy":  r.resolveStrategy,
 	}
 	return r
 }
@@ -265,6 +266,30 @@ func (r *BuiltinNamespaceResolver) resolveMath(prop string) (NamespaceResolution
 		return NamespaceResolution{Code: "1.618033988749895"}, true
 	case "rphi":
 		return NamespaceResolution{Code: "0.618033988749895"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+/* resolveStrategy handles strategy.* flat constants; strategy.entry/close are call sites, not namespaced constants. */
+func (r *BuiltinNamespaceResolver) resolveStrategy(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "cash":
+		return NamespaceResolution{Code: `"cash"`, GoType: GoString}, true
+	case "fixed":
+		return NamespaceResolution{Code: `"fixed"`, GoType: GoString}, true
+	case "percent_of_equity":
+		return NamespaceResolution{Code: `"percent_of_equity"`, GoType: GoString}, true
+	case "long":
+		return NamespaceResolution{Code: `"long"`, GoType: GoString}, true
+	case "short":
+		return NamespaceResolution{Code: `"short"`, GoType: GoString}, true
+	case "both":
+		return NamespaceResolution{Code: `"both"`, GoType: GoString}, true
+	case "account_currency":
+		return NamespaceResolution{Code: `"USD"`, GoType: GoString}, true
+	case "margin_liquidation_price":
+		return NamespaceResolution{Code: "math.NaN()"}, true
 	default:
 		return NamespaceResolution{}, false
 	}

@@ -2,19 +2,16 @@ package codegen
 
 import "github.com/quant5-lab/runner/ast"
 
-// StrategyConfigExtractor extracts configuration from strategy() declarations.
 type StrategyConfigExtractor struct {
 	propertyParser *PropertyParser
 }
 
-// NewStrategyConfigExtractor creates an extractor.
 func NewStrategyConfigExtractor() *StrategyConfigExtractor {
 	return &StrategyConfigExtractor{
 		propertyParser: NewPropertyParser(),
 	}
 }
 
-// ExtractFromCall parses strategy() call arguments into config.
 func (e *StrategyConfigExtractor) ExtractFromCall(call *ast.CallExpression) *StrategyConfig {
 	config := NewStrategyConfig()
 
@@ -59,5 +56,27 @@ func (e *StrategyConfigExtractor) extractFromObject(obj *ast.ObjectExpression, c
 
 	if val, ok := e.propertyParser.ParseInt(obj, "pyramiding"); ok {
 		config.Pyramiding = val
+	}
+
+	if val, ok := e.propertyParser.ParseIdentifier(obj, "commission_type"); ok {
+		config.CommissionType = normalizeCommissionType(val)
+	}
+
+	if val, ok := e.propertyParser.ParseFloat(obj, "commission_value"); ok {
+		config.CommissionValue = val
+	}
+}
+
+/* normalizeCommissionType maps Pine commission.* identifiers to runtime constants. */
+func normalizeCommissionType(identifier string) string {
+	switch identifier {
+	case "strategy.commission.percent", "commission.percent", "percent":
+		return "percent"
+	case "strategy.commission.cash_per_order", "commission.cash_per_order", "cash_per_order":
+		return "cash_per_order"
+	case "strategy.commission.cash_per_contract", "commission.cash_per_contract", "cash_per_contract":
+		return "cash_per_contract"
+	default:
+		return identifier
 	}
 }

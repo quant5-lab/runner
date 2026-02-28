@@ -1,0 +1,12 @@
+//@version=4
+strategy("Commission CashPerContract Test", overlay=true,
+         default_qty_type=strategy.fixed, default_qty_value=8,
+         initial_capital=10000,
+         commission_type=strategy.commission.cash_per_contract,
+         commission_value=2)
+
+if close > open
+    strategy.entry("Long", strategy.long)
+
+if close < open and strategy.position_size > 0
+    strategy.close("Long")

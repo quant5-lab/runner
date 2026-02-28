@@ -1,9 +1,10 @@
 package codegen
 
 const (
-	defaultInitialCapital = 10000.0
-	defaultQtyValue       = 1.0
-	defaultPyramiding     = 0
+	defaultInitialCapital  = 10000.0
+	defaultQtyValue        = 1.0
+	defaultPyramiding      = 0
+	defaultCommissionValue = 0.0
 )
 
 type StrategyConfig struct {
@@ -12,6 +13,8 @@ type StrategyConfig struct {
 	DefaultQtyValue float64
 	DefaultQtyType  string
 	Pyramiding      int
+	CommissionType  string
+	CommissionValue float64
 }
 
 func NewStrategyConfig() *StrategyConfig {
@@ -20,6 +23,7 @@ func NewStrategyConfig() *StrategyConfig {
 		InitialCapital:  defaultInitialCapital,
 		DefaultQtyValue: defaultQtyValue,
 		Pyramiding:      defaultPyramiding,
+		CommissionValue: defaultCommissionValue,
 	}
 }
 
@@ -41,5 +45,11 @@ func (c *StrategyConfig) MergeFrom(other *StrategyConfig) {
 	}
 	if other.Pyramiding >= 0 {
 		c.Pyramiding = other.Pyramiding
+	}
+	if other.CommissionType != "" {
+		c.CommissionType = other.CommissionType
+	}
+	if other.CommissionValue > 0 {
+		c.CommissionValue = other.CommissionValue
 	}
 }

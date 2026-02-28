@@ -101,7 +101,18 @@ func TestBuiltinNamespaceResolver_Resolve(t *testing.T) {
 		/* unknown namespace */
 		{"unknown.prop", "unknown", "prop", "", GoFloat64, false},
 		{"strategy.entry", "strategy", "entry", "", GoFloat64, false},
+		{"strategy.unknown", "strategy", "unknown_prop", "", GoFloat64, false},
 		{"ta.sma", "ta", "sma", "", GoFloat64, false},
+
+		/* strategy flat constants */
+		{"strategy.cash", "strategy", "cash", `"cash"`, GoString, true},
+		{"strategy.fixed", "strategy", "fixed", `"fixed"`, GoString, true},
+		{"strategy.percent_of_equity", "strategy", "percent_of_equity", `"percent_of_equity"`, GoString, true},
+		{"strategy.long", "strategy", "long", `"long"`, GoString, true},
+		{"strategy.short", "strategy", "short", `"short"`, GoString, true},
+		{"strategy.both", "strategy", "both", `"both"`, GoString, true},
+		{"strategy.account_currency", "strategy", "account_currency", `"USD"`, GoString, true},
+		{"strategy.margin_liquidation_price", "strategy", "margin_liquidation_price", `math.NaN()`, GoFloat64, true},
 
 		/* unknown property within valid namespace */
 		{"barstate.unknown", "barstate", "unknown_prop", "", GoFloat64, false},
@@ -162,9 +173,8 @@ func TestBuiltinNamespaceResolver_IsNamespace(t *testing.T) {
 		{"dividends", true},
 		{"earnings", true},
 		{"math", true},
+		{"strategy", true},
 		{"unknown", false},
-		{"close", false},
-		{"strategy", false},
 		{"ta", false},
 		{"Barstate", false},
 		{"TIMEFRAME", false},
@@ -194,6 +204,7 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 		"dividends": 3,
 		"earnings":  4,
 		"math":      4,
+		"strategy":  8,
 	}
 
 	namespacePropSets := map[string][]string{
@@ -206,6 +217,7 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 		"dividends": {"future_amount", "future_ex_date", "future_pay_date"},
 		"earnings":  {"future_eps", "future_period_end_time", "future_revenue", "future_time"},
 		"math":      {"pi", "e", "phi", "rphi"},
+		"strategy":  {"cash", "fixed", "percent_of_equity", "long", "short", "both", "account_currency", "margin_liquidation_price"},
 	}
 
 	for ns, props := range namespacePropSets {

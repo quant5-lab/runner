@@ -1,0 +1,11 @@
+//@version=4
+strategy("Cancel Order Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=10, initial_capital=10000)
+
+placeOrder = close > 103 and close < 106
+cancelOrder = close > 110
+
+if placeOrder
+    strategy.entry("Long", strategy.long, stop=120)
+
+if cancelOrder
+    strategy.cancel("Long")

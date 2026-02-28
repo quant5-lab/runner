@@ -382,6 +382,98 @@ func TestArgumentParser_ParseIdentifier(t *testing.T) {
 			},
 			expectValid: false,
 		},
+		// 3-level MemberExpression chains
+		{
+			name: "strategy.commission.percent (3-level chain)",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.commission.percent",
+			expectLiteral:    false,
+		},
+		{
+			name: "strategy.direction.long (3-level chain)",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "direction"},
+				},
+				Property: &ast.Identifier{Name: "long"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.direction.long",
+			expectLiteral:    false,
+		},
+		{
+			name: "3-level chain with literal property",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Literal{Value: "percent"},
+			},
+			expectValid: false,
+		},
+		// 4-level MemberExpression chains
+		{
+			name: "a.b.c.d (4-level chain)",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "a"},
+						Property: &ast.Identifier{Name: "b"},
+					},
+					Property: &ast.Identifier{Name: "c"},
+				},
+				Property: &ast.Identifier{Name: "d"},
+			},
+			expectValid:      true,
+			expectIdentifier: "a.b.c.d",
+			expectLiteral:    false,
+		},
+		{
+			name: "literal in object mid-chain breaks chain",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Literal{Value: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			expectValid: false,
+		},
+		// computed=true nodes — flattenMemberChain is type-only; Computed flag is not gated here
+		{
+			name: "computed=true outer still resolves via flattenMemberChain",
+			input: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "commission"},
+				Computed: true,
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.commission",
+			expectLiteral:    false,
+		},
+		{
+			name: "computed=true in 3-level chain still resolves",
+			input: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+					Computed: true,
+				},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			expectValid:      true,
+			expectIdentifier: "strategy.commission.percent",
+			expectLiteral:    false,
+		},
 	}
 
 	for _, tt := range tests {

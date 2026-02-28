@@ -29,6 +29,7 @@ type Trade struct {
 	ExitComment  string  `json:"exitComment"`
 	Size         float64 `json:"size"`
 	Profit       float64 `json:"profit"`
+	Commission   float64 `json:"commission"`
 	Direction    string  `json:"direction"`
 }
 
@@ -545,6 +546,224 @@ func TestEntryWhenComplex(t *testing.T) {
 			if len(result.Trades)+len(result.OpenTrades) < 1 {
 				t.Errorf("Expected at least 1 trade (complex when condition met), got %d trades + %d open",
 					len(result.Trades), len(result.OpenTrades))
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/*
+	TestOrderNet validates strategy.order net-position semantics through the full pipeline:
+
+Pine source → codegen → compiled binary → JSON output.
+The fixture opens long 15, then reduces by 5 three times ending flat.
+*/
+func TestOrderNet(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "order-net",
+		PineFile: "test-order-net.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 3 {
+				t.Errorf("Expected at least 3 closed partial trades, got %d", len(result.Trades))
+				return
+			}
+
+			for i, trade := range result.Trades {
+				if trade.Direction != "long" {
+					t.Errorf("Trade %d: expected direction 'long' (partial close of long), got %q", i, trade.Direction)
+				}
+				if trade.Size != 5 {
+					t.Errorf("Trade %d: expected size 5 per reduce order, got %.2f", i, trade.Size)
+				}
+			}
+
+			if len(result.OpenTrades) != 0 {
+				t.Errorf("Expected 0 open trades after 3×5 reduces of 15, got %d", len(result.OpenTrades))
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCommissionPercent verifies percentage-based commission flows through full pipeline */
+func TestCommissionPercent(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "commission-percent",
+		PineFile: "test-commission-percent.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 1 {
+				t.Fatalf("Expected at least 1 closed trade, got %d", len(result.Trades))
+			}
+
+			trade := result.Trades[0]
+			if trade.Commission == 0 {
+				t.Errorf("Expected non-zero commission for percent type, got %.4f", trade.Commission)
+			}
+
+			expectedEntry := 10 * trade.EntryPrice * 0.001
+			expectedExit := 10 * trade.ExitPrice * 0.001
+			expectedTotal := expectedEntry + expectedExit
+
+			tolerance := 0.01
+			if trade.Commission < expectedTotal-tolerance || trade.Commission > expectedTotal+tolerance {
+				t.Errorf("Commission %.4f outside expected range [%.4f, %.4f]",
+					trade.Commission, expectedTotal-tolerance, expectedTotal+tolerance)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCommissionCashPerOrder verifies fixed per-order commission */
+func TestCommissionCashPerOrder(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "commission-cash-per-order",
+		PineFile: "test-commission-cash-per-order.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 1 {
+				t.Fatalf("Expected at least 1 closed trade, got %d", len(result.Trades))
+			}
+
+			trade := result.Trades[0]
+			expectedTotal := 20.0
+			if trade.Commission != expectedTotal {
+				t.Errorf("Commission = %.2f, want %.2f", trade.Commission, expectedTotal)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCommissionCashPerContract verifies per-contract commission calculation */
+func TestCommissionCashPerContract(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "commission-cash-per-contract",
+		PineFile: "test-commission-cash-per-contract.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 1 {
+				t.Fatalf("Expected at least 1 closed trade, got %d", len(result.Trades))
+			}
+
+			trade := result.Trades[0]
+			expectedTotal := 2.0 * 8 * 2
+			if trade.Commission != expectedTotal {
+				t.Errorf("Commission = %.2f, want %.2f", trade.Commission, expectedTotal)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCommissionZero verifies strategies without commission config have zero commission */
+func TestCommissionZero(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "commission-zero",
+		PineFile: "test-close-all.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) < 1 {
+				t.Fatalf("Expected at least 1 closed trade, got %d", len(result.Trades))
+			}
+
+			trade := result.Trades[0]
+			if trade.Commission != 0 {
+				t.Errorf("Expected zero commission, got %.4f", trade.Commission)
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCancelOrder verifies strategy.cancel() removes pending order from order manager */
+func TestCancelOrder(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "cancel-order",
+		PineFile: "test-cancel-order.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) > 0 {
+				t.Errorf("Expected no closed trades (order cancelled before fill), got %d", len(result.Trades))
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestCancelAll verifies strategy.cancel_all() clears all pending orders */
+func TestCancelAll(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "cancel-all",
+		PineFile: "test-cancel-all.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			if len(result.Trades) > 0 {
+				t.Errorf("Expected no closed trades (orders cancelled before fill), got %d", len(result.Trades))
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestAllowEntryLong verifies strategy.risk.allow_entry_in(direction.long) blocks short entries */
+func TestAllowEntryLong(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "allow-entry-long",
+		PineFile: "test-allow-entry-long.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			for i, trade := range result.Trades {
+				if trade.Direction != "long" {
+					t.Errorf("Trade %d: expected only long trades, got %q", i, trade.Direction)
+				}
+			}
+			for i, trade := range result.OpenTrades {
+				if trade.Direction != "long" {
+					t.Errorf("OpenTrade %d: expected only long trades, got %q", i, trade.Direction)
+				}
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
+/* TestAllowEntryShort verifies strategy.risk.allow_entry_in(direction.short) blocks long entries */
+func TestAllowEntryShort(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "allow-entry-short",
+		PineFile: "test-allow-entry-short.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			for i, trade := range result.Trades {
+				if trade.Direction != "short" {
+					t.Errorf("Trade %d: expected only short trades, got %q", i, trade.Direction)
+				}
+			}
+			for i, trade := range result.OpenTrades {
+				if trade.Direction != "short" {
+					t.Errorf("OpenTrade %d: expected only short trades, got %q", i, trade.Direction)
+				}
 			}
 		},
 	}

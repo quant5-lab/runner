@@ -243,27 +243,41 @@ func (p *ArgumentParser) ParseIdentifier(expr ast.Expression) ParsedArgument {
 		}
 	}
 
-	/* MemberExpression: strategy.cash, syminfo.tickerid, etc. */
+	/* dot-chain and 3-level forms: strategy.commission.percent, syminfo.tickerid, etc. */
 	if mem, ok := expr.(*ast.MemberExpression); ok {
-		obj := ""
-		if id, ok := mem.Object.(*ast.Identifier); ok {
-			obj = id.Name
-		}
-		prop := ""
-		if id, ok := mem.Property.(*ast.Identifier); ok {
-			prop = id.Name
-		}
-		if obj != "" && prop != "" {
+		chain := flattenMemberChain(mem)
+		if chain != "" {
 			return ParsedArgument{
 				IsValid:    true,
 				IsLiteral:  false,
-				Identifier: obj + "." + prop,
+				Identifier: chain,
 				SourceExpr: expr,
 			}
 		}
 	}
 
 	return ParsedArgument{IsValid: false, SourceExpr: expr}
+}
+
+/* flattenMemberChain builds a dot-joined identifier string; returns "" on any non-Identifier node. */
+func flattenMemberChain(mem *ast.MemberExpression) string {
+	prop, ok := mem.Property.(*ast.Identifier)
+	if !ok {
+		return ""
+	}
+
+	switch obj := mem.Object.(type) {
+	case *ast.Identifier:
+		return obj.Name + "." + prop.Name
+	case *ast.MemberExpression:
+		prefix := flattenMemberChain(obj)
+		if prefix == "" {
+			return ""
+		}
+		return prefix + "." + prop.Name
+	default:
+		return ""
+	}
 }
 
 // ============================================================================

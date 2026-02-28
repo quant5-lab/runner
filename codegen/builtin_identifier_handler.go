@@ -297,13 +297,25 @@ func (h *BuiltinIdentifierHandler) resolveNamespace(obj, prop string, scope Acce
 
 func (h *BuiltinIdentifierHandler) resolveNestedMemberExpression(expr *ast.MemberExpression, scope AccessScope) (string, bool) {
 	objMember, ok := expr.Object.(*ast.MemberExpression)
-	if !ok || !expr.Computed {
+	if !ok {
 		return "", false
 	}
 
 	baseObj, baseOk := objMember.Object.(*ast.Identifier)
 	baseProp, basePropOk := objMember.Property.(*ast.Identifier)
 	if !baseOk || !basePropOk {
+		return "", false
+	}
+
+	/* strategy.commission.* / strategy.direction.* / strategy.oca.* — dot-notation constants */
+	if baseObj.Name == "strategy" {
+		if code, found := h.resolveStrategyNestedConstant(baseProp.Name, expr); found {
+			return code, true
+		}
+	}
+
+	/* ta.tr[n] and strategy.series[n] — subscript (computed) only */
+	if !expr.Computed {
 		return "", false
 	}
 
@@ -339,6 +351,59 @@ func (h *BuiltinIdentifierHandler) resolveNestedMemberExpression(expr *ast.Membe
 		return fmt.Sprintf("%s.Get(%d) == 1.0", seriesName, offset), true
 	}
 
+	return "", false
+}
+
+func (h *BuiltinIdentifierHandler) resolveStrategyNestedConstant(subNamespace string, expr *ast.MemberExpression) (string, bool) {
+	prop, ok := expr.Property.(*ast.Identifier)
+	if !ok {
+		return "", false
+	}
+
+	switch subNamespace {
+	case "commission":
+		return resolveCommissionConstant(prop.Name)
+	case "direction":
+		return resolveDirectionConstant(prop.Name)
+	case "oca":
+		return resolveOCAConstant(prop.Name)
+	}
+	return "", false
+}
+
+func resolveCommissionConstant(prop string) (string, bool) {
+	switch prop {
+	case "percent":
+		return `"percent"`, true
+	case "cash_per_order":
+		return `"cash_per_order"`, true
+	case "cash_per_contract":
+		return `"cash_per_contract"`, true
+	}
+	return "", false
+}
+
+func resolveDirectionConstant(prop string) (string, bool) {
+	switch prop {
+	case "long":
+		return `"long"`, true
+	case "short":
+		return `"short"`, true
+	case "all":
+		return `"all"`, true
+	}
+	return "", false
+}
+
+func resolveOCAConstant(prop string) (string, bool) {
+	switch prop {
+	case "cancel":
+		return `"cancel"`, true
+	case "reduce":
+		return `"reduce"`, true
+	case "none":
+		return `"none"`, true
+	}
 	return "", false
 }
 
@@ -396,10 +461,6 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 
 	if okProp && h.IsStrategyRuntimeValue(obj.Name, prop.Name) {
 		return h.generateStrategyAccess(prop.Name, scope), true
-	}
-
-	if okProp && obj.Name == "strategy" && (prop.Name == "long" || prop.Name == "short") {
-		return "", false
 	}
 
 	if okProp && h.namespaceResolver != nil {

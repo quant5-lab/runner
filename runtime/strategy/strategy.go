@@ -11,11 +11,19 @@ const (
 	Short = "short"
 )
 
+/* AllowedDirection constants — matches strategy.direction.* Pine namespace */
+const (
+	DirectionAll   = "all"
+	DirectionLong  = "long"
+	DirectionShort = "short"
+)
+
 /* OrderAction constants - TradingView order execution model */
 const (
 	OrderActionEntry    = "entry"
 	OrderActionClose    = "close"
 	OrderActionCloseAll = "close_all"
+	OrderActionOrder    = "order" // strategy.order: net-adds to position, ignores pyramiding
 )
 
 /* Commission type constants - matches strategy.commission.* Pine namespace */
@@ -129,6 +137,23 @@ func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBa
 	return om.CreateEntryOrder(id, direction, qty, createdBar, comment)
 }
 
+/* CreateNetOrder creates a pending strategy.order (net-position) order */
+func (om *OrderManager) CreateNetOrder(id, direction string, qty float64, createdBar int, comment string) Order {
+	om.removeOrderByID(id)
+
+	order := Order{
+		ID:           id,
+		Action:       OrderActionOrder,
+		Direction:    direction,
+		Qty:          qty,
+		Type:         "market",
+		CreatedBar:   createdBar,
+		EntryComment: comment,
+	}
+	om.orders = append(om.orders, order)
+	return order
+}
+
 func (om *OrderManager) removeOrderByID(id string) {
 	for i, order := range om.orders {
 		if order.ID == id {
@@ -157,6 +182,10 @@ func (om *OrderManager) RemoveOrder(id string) {
 			return
 		}
 	}
+}
+
+func (om *OrderManager) ClearAll() {
+	om.orders = om.orders[:0]
 }
 
 /* PositionTracker tracks current position */
@@ -230,31 +259,88 @@ func (th *TradeHistory) AddOpenTrade(trade Trade) {
 	th.openTrades = append(th.openTrades, trade)
 }
 
+func directionMultiplier(direction string) float64 {
+	if direction == Short {
+		return -1.0
+	}
+	return 1.0
+}
+
+func buildClosedTrade(open Trade, closeSize, profit, commission, metricsScale float64, exitID string, exitPrice float64, exitBar int, exitTime int64, exitComment string) Trade {
+	return Trade{
+		EntryID:      open.EntryID,
+		ExitID:       exitID,
+		Direction:    open.Direction,
+		Size:         closeSize,
+		EntryPrice:   open.EntryPrice,
+		EntryBar:     open.EntryBar,
+		EntryTime:    open.EntryTime,
+		EntryComment: open.EntryComment,
+		ExitPrice:    exitPrice,
+		ExitBar:      exitBar,
+		ExitTime:     exitTime,
+		ExitComment:  exitComment,
+		Profit:       profit,
+		MaxDrawdown:  open.MaxDrawdown * metricsScale,
+		MaxRunup:     open.MaxRunup * metricsScale,
+		Commission:   commission,
+	}
+}
+
 /* CloseTrade closes a trade by entry ID */
 func (th *TradeHistory) CloseTrade(entryID, exitID string, exitPrice float64, exitBar int, exitTime int64, exitComment string, exitCommission float64) *Trade {
 	for i, trade := range th.openTrades {
 		if trade.EntryID == entryID {
-			trade.ExitID = exitID
-			trade.ExitPrice = exitPrice
-			trade.ExitBar = exitBar
-			trade.ExitTime = exitTime
-			trade.ExitComment = exitComment
-			trade.Commission += exitCommission
-
-			// Calculate profit
-			priceDiff := exitPrice - trade.EntryPrice
-			multiplier := 1.0
-			if trade.Direction == Short {
-				multiplier = -1.0
-			}
-			trade.Profit = priceDiff * trade.Size * multiplier
-
-			th.closedTrades = append(th.closedTrades, trade)
+			profit := (exitPrice - trade.EntryPrice) * trade.Size * directionMultiplier(trade.Direction)
+			closed := buildClosedTrade(trade, trade.Size, profit, trade.Commission+exitCommission, 1.0, exitID, exitPrice, exitBar, exitTime, exitComment)
+			th.closedTrades = append(th.closedTrades, closed)
 			th.openTrades = append(th.openTrades[:i], th.openTrades[i+1:]...)
 			return &th.closedTrades[len(th.closedTrades)-1]
 		}
 	}
 	return nil
+}
+
+/*
+	PartialCloseTrades closes up to qty units from open trades in direction (FIFO).
+
+Returns (actual qty closed, newly closed trades). totalExitCommission is allocated proportionally.
+*/
+func (th *TradeHistory) PartialCloseTrades(direction, exitID string, qty, exitPrice float64, exitBar int, exitTime int64, exitComment string, totalExitCommission float64) (float64, []Trade) {
+	remaining := qty
+	var newlyClosed []Trade
+	i := 0
+	for i < len(th.openTrades) && remaining > 0 {
+		trade := th.openTrades[i]
+		if trade.Direction != direction {
+			i++
+			continue
+		}
+
+		multiplier := directionMultiplier(trade.Direction)
+
+		if trade.Size <= remaining {
+			exitCommission := totalExitCommission * (trade.Size / qty)
+			profit := (exitPrice - trade.EntryPrice) * trade.Size * multiplier
+			closed := buildClosedTrade(trade, trade.Size, profit, trade.Commission+exitCommission, 1.0, exitID, exitPrice, exitBar, exitTime, exitComment)
+			remaining -= trade.Size
+			th.closedTrades = append(th.closedTrades, closed)
+			newlyClosed = append(newlyClosed, closed)
+			th.openTrades = append(th.openTrades[:i], th.openTrades[i+1:]...)
+		} else {
+			entryProportion := remaining / trade.Size
+			exitCommission := totalExitCommission * (remaining / qty)
+			commission := trade.Commission*entryProportion + exitCommission
+			profit := (exitPrice - trade.EntryPrice) * remaining * multiplier
+			closed := buildClosedTrade(trade, remaining, profit, commission, entryProportion, exitID, exitPrice, exitBar, exitTime, exitComment)
+			th.closedTrades = append(th.closedTrades, closed)
+			newlyClosed = append(newlyClosed, closed)
+			th.openTrades[i].Size -= remaining
+			th.openTrades[i].Commission -= trade.Commission * entryProportion
+			remaining = 0
+		}
+	}
+	return qty - remaining, newlyClosed
 }
 
 /* GetOpenTrades returns open trades */
@@ -337,6 +423,7 @@ type Strategy struct {
 	pyramiding       int
 	commissionValue  float64
 	commissionType   string
+	allowedDirection string
 }
 
 func NewStrategy() *Strategy {
@@ -371,10 +458,30 @@ func (s *Strategy) CallWithPyramiding(strategyName string, initialCapital float6
 	s.pyramiding = pyramiding
 }
 
-/* SetCommission configures commission calculation for all trades */
 func (s *Strategy) SetCommission(value float64, commType string) {
 	s.commissionValue = value
 	s.commissionType = commType
+}
+
+/* SetAllowedDirection restricts entry direction; DirectionAll permits both */
+func (s *Strategy) SetAllowedDirection(direction string) {
+	s.allowedDirection = direction
+}
+
+func (s *Strategy) Cancel(id string) {
+	s.orderManager.RemoveOrder(id)
+}
+
+func (s *Strategy) CancelAll() {
+	s.orderManager.ClearAll()
+}
+
+func (s *Strategy) GetPositionEntryName() string {
+	openTrades := s.tradeHistory.GetOpenTrades()
+	if len(openTrades) == 0 {
+		return ""
+	}
+	return openTrades[len(openTrades)-1].EntryID
 }
 
 /* calcCommission computes commission for one side of a trade (entry or exit) */
@@ -393,6 +500,12 @@ func (s *Strategy) calcCommission(qty, price float64) float64 {
 func (s *Strategy) Entry(id, direction string, qty float64, comment string) error {
 	if !s.initialized {
 		return fmt.Errorf("strategy not initialized")
+	}
+
+	if s.allowedDirection != "" && s.allowedDirection != DirectionAll {
+		if direction != s.allowedDirection {
+			return nil
+		}
 	}
 
 	if s.pyramiding >= 0 {
@@ -418,6 +531,82 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 
 	s.orderManager.CreateOrder(id, direction, qty, s.currentBar, comment)
 	return nil
+}
+
+/*
+	Order places a net-position order: ignores pyramiding, nets arithmetically against current position.
+
+Long adds to position; Short reduces it (and may cross zero into a short position).
+*/
+func (s *Strategy) Order(id, direction string, qty float64, comment string) error {
+	if !s.initialized {
+		return fmt.Errorf("strategy not initialized")
+	}
+
+	if s.allowedDirection != "" && s.allowedDirection != DirectionAll {
+		if direction != s.allowedDirection {
+			return nil
+		}
+	}
+
+	s.orderManager.CreateNetOrder(id, direction, qty, s.currentBar, comment)
+	return nil
+}
+
+/* executeNetOrder fills a strategy.order at fillPrice by netting the position arithmetically (FIFO). */
+func (s *Strategy) executeNetOrder(id, direction string, qty, fillPrice float64, fillBar int, fillTime int64, comment string) {
+	currentSize := s.positionTracker.GetPositionSize()
+
+	dirSign := 1.0
+	if direction == Short {
+		dirSign = -1.0
+	}
+	delta := qty * dirSign
+	newSize := currentSize + delta
+
+	isReducing := (currentSize > 0 && delta < 0) || (currentSize < 0 && delta > 0)
+
+	if !isReducing {
+		s.openNetTrade(id, direction, qty, fillPrice, fillBar, fillTime, comment)
+		return
+	}
+
+	closeQty := math.Min(math.Abs(currentSize), math.Abs(delta))
+
+	// closeDirection is the direction of existing open trades, opposite of the incoming order
+	closeDirection := Long
+	if delta > 0 {
+		closeDirection = Short
+	}
+
+	exitCommission := s.calcCommission(closeQty, fillPrice)
+	_, newlyClosed := s.tradeHistory.PartialCloseTrades(closeDirection, id, closeQty, fillPrice, fillBar, fillTime, comment, exitCommission)
+	if len(newlyClosed) > 0 {
+		s.positionTracker.UpdatePosition(closeQty, fillPrice, direction)
+		for _, t := range newlyClosed {
+			s.equityCalculator.UpdateFromClosedTrade(t)
+		}
+	}
+
+	if math.Abs(delta) > math.Abs(currentSize)+1e-9 {
+		openQty := math.Abs(newSize)
+		s.openNetTrade(id, direction, openQty, fillPrice, fillBar, fillTime, comment)
+	}
+}
+
+func (s *Strategy) openNetTrade(id, direction string, qty, fillPrice float64, fillBar int, fillTime int64, comment string) {
+	entryCommission := s.calcCommission(qty, fillPrice)
+	s.positionTracker.UpdatePosition(qty, fillPrice, direction)
+	s.tradeHistory.AddOpenTrade(Trade{
+		EntryID:      id,
+		Direction:    direction,
+		Size:         qty,
+		EntryPrice:   fillPrice,
+		EntryBar:     fillBar,
+		EntryTime:    fillTime,
+		EntryComment: comment,
+		Commission:   entryCommission,
+	})
 }
 
 /* Close creates a pending close order - fills at next bar open per TradingView model */
@@ -587,6 +776,9 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 
 		case OrderActionCloseAll:
 			s.executeCloseAllOrder(openPrice, currentBar, openTime, order.ExitComment)
+
+		case OrderActionOrder:
+			s.executeNetOrder(order.ID, order.Direction, order.Qty, openPrice, currentBar, openTime, order.EntryComment)
 		}
 
 		s.orderManager.RemoveOrder(order.ID)

@@ -1373,3 +1373,96 @@ func TestTryResolveMemberExpression_StrategyHistoricalSubscript(t *testing.T) {
 		})
 	}
 }
+
+func TestBuiltinIdentifierHandler_StrategyNestedConstants(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		name         string
+		outerObj     string
+		innerProp    string
+		leafProp     string
+		expectedCode string
+		expectFound  bool
+	}{
+		{"strategy.commission.percent", "strategy", "commission", "percent", `"percent"`, true},
+		{"strategy.commission.cash_per_order", "strategy", "commission", "cash_per_order", `"cash_per_order"`, true},
+		{"strategy.commission.cash_per_contract", "strategy", "commission", "cash_per_contract", `"cash_per_contract"`, true},
+		{"strategy.direction.long", "strategy", "direction", "long", `"long"`, true},
+		{"strategy.direction.short", "strategy", "direction", "short", `"short"`, true},
+		{"strategy.direction.all", "strategy", "direction", "all", `"all"`, true},
+		{"strategy.oca.cancel", "strategy", "oca", "cancel", `"cancel"`, true},
+		{"strategy.oca.reduce", "strategy", "oca", "reduce", `"reduce"`, true},
+		{"strategy.oca.none", "strategy", "oca", "none", `"none"`, true},
+		{"unknown sub-namespace not resolved", "strategy", "unknown", "anything", "", false},
+		{"non-strategy 3-level not resolved", "ta", "commission", "percent", "", false},
+	}
+
+	/* constants are scope-independent — verify both scopes return identical results */
+	for _, scope := range []AccessScope{BarLoopScope, ArrowScope} {
+		scope := scope
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s/%v", tt.name, scope), func(t *testing.T) {
+				expr := &ast.MemberExpression{
+					Object: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: tt.outerObj},
+						Property: &ast.Identifier{Name: tt.innerProp},
+						Computed: false,
+					},
+					Property: &ast.Identifier{Name: tt.leafProp},
+					Computed: false,
+				}
+
+				code, found := handler.TryResolveMemberExpression(expr, scope)
+
+				if found != tt.expectFound {
+					t.Errorf("expected found=%v, got %v (code=%q)", tt.expectFound, found, code)
+				}
+				if tt.expectFound && code != tt.expectedCode {
+					t.Errorf("expected code %q, got %q", tt.expectedCode, code)
+				}
+			})
+		}
+	}
+}
+
+func TestBuiltinIdentifierHandler_StrategyFlatConstants(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+
+	tests := []struct {
+		prop         string
+		expectedCode string
+	}{
+		{"long", `"long"`},
+		{"short", `"short"`},
+		{"both", `"both"`},
+		{"cash", `"cash"`},
+		{"fixed", `"fixed"`},
+		{"percent_of_equity", `"percent_of_equity"`},
+		{"account_currency", `"USD"`},
+		{"margin_liquidation_price", "math.NaN()"},
+	}
+
+	/* constants are scope-independent */
+	for _, scope := range []AccessScope{BarLoopScope, ArrowScope} {
+		scope := scope
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("strategy.%s/%v", tt.prop, scope), func(t *testing.T) {
+				expr := &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: tt.prop},
+					Computed: false,
+				}
+
+				code, found := handler.TryResolveMemberExpression(expr, scope)
+
+				if !found {
+					t.Errorf("strategy.%s should be resolved in %v", tt.prop, scope)
+				}
+				if code != tt.expectedCode {
+					t.Errorf("strategy.%s in %v: expected %q, got %q", tt.prop, scope, tt.expectedCode, code)
+				}
+			})
+		}
+	}
+}

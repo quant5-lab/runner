@@ -61,6 +61,7 @@ type Trade struct {
 	ExitComment  string  `json:"exitComment,omitempty"`
 	Size         float64 `json:"size"`
 	Profit       float64 `json:"profit"`
+	Commission   float64 `json:"commission"`
 	Direction    string  `json:"direction"`
 }
 
@@ -256,6 +257,7 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 			ExitComment:  t.ExitComment,
 			Size:         t.Size,
 			Profit:       t.Profit,
+			Commission:   t.Commission,
 			Direction:    t.Direction,
 		}
 	}

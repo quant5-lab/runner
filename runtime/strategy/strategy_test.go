@@ -59,6 +59,40 @@ func TestOrderManagerWithComment(t *testing.T) {
 	}
 }
 
+/*
+	TestOrderManager_ClearAll verifies ClearAll empties the queue for all initial sizes
+
+and that the queue remains usable for new orders after clearing.
+*/
+func TestOrderManager_ClearAll(t *testing.T) {
+	tests := []struct {
+		name       string
+		orderCount int
+	}{
+		{"empty queue is no-op", 0},
+		{"single order removed", 1},
+		{"multiple orders all removed", 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			om := NewOrderManager()
+			for i := 0; i < tt.orderCount; i++ {
+				om.CreateOrder("o", Long, 10, 0, "")
+			}
+			om.ClearAll()
+
+			if pending := om.GetPendingOrders(999); len(pending) != 0 {
+				t.Errorf("expected empty queue after ClearAll, got %d orders", len(pending))
+			}
+
+			om.CreateOrder("post-clear", Long, 5, 0, "")
+			if pending := om.GetPendingOrders(999); len(pending) != 1 {
+				t.Errorf("expected 1 order after re-use, got %d", len(pending))
+			}
+		})
+	}
+}
+
 func TestPositionTracker(t *testing.T) {
 	pt := NewPositionTracker()
 
@@ -892,5 +926,1228 @@ func TestStrategyEvenTrades(t *testing.T) {
 	evenCount := s.GetEvenTradesCount()
 	if evenCount != 1 {
 		t.Errorf("EvenTrades: expected 1, got %d", evenCount)
+	}
+}
+
+/*
+	TestCommission_FullClose verifies entry+exit commission is correct for all commission types
+
+via both the Entry()/Close() and Order() execution paths.
+*/
+func TestCommission_FullClose(t *testing.T) {
+	tests := []struct {
+		commType       string
+		commRate       float64
+		qty            float64
+		entryPrice     float64
+		exitPrice      float64
+		wantCommission float64
+	}{
+		{CommissionPercent, 1.0, 10, 100, 110, 10*100*1.0/100 + 10*110*1.0/100},
+		{CommissionCashPerOrder, 5.0, 10, 100, 110, 5.0 + 5.0},
+		{CommissionCashPerContract, 2.0, 5, 100, 110, 5*2.0 + 5*2.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.commType, func(t *testing.T) {
+			t.Run("entry_close_path", func(t *testing.T) {
+				s := NewStrategy()
+				s.CallWithPyramiding("Test", 10000, 10)
+				s.SetCommission(tt.commRate, tt.commType)
+				s.Entry("e", Long, tt.qty, "")
+				s.OnBarUpdate(1, tt.entryPrice, 1000)
+				s.Close("e", tt.entryPrice, 1000, "")
+				s.OnBarUpdate(2, tt.exitPrice, 2000)
+				closed := s.GetTradeHistory().GetClosedTrades()
+				if len(closed) != 1 {
+					t.Fatalf("expected 1 closed trade, got %d", len(closed))
+				}
+				if closed[0].Commission != tt.wantCommission {
+					t.Errorf("commission: got %.4f, want %.4f", closed[0].Commission, tt.wantCommission)
+				}
+			})
+			t.Run("order_path", func(t *testing.T) {
+				s := NewStrategy()
+				s.Call("Test", 10000)
+				s.SetCommission(tt.commRate, tt.commType)
+				s.Order("buy", Long, tt.qty, "")
+				s.OnBarUpdate(1, tt.entryPrice, 1000)
+				s.Order("sell", Short, tt.qty, "")
+				s.OnBarUpdate(2, tt.exitPrice, 2000)
+				closed := s.GetTradeHistory().GetClosedTrades()
+				if len(closed) != 1 {
+					t.Fatalf("expected 1 closed trade, got %d", len(closed))
+				}
+				if closed[0].Commission != tt.wantCommission {
+					t.Errorf("commission: got %.4f, want %.4f", closed[0].Commission, tt.wantCommission)
+				}
+			})
+		})
+	}
+}
+
+func TestStrategyAllowedDirection_EntryFilter(t *testing.T) {
+	tests := []struct {
+		name             string
+		allowedDirection string
+		entryDirection   string
+		wantTradeCreated bool
+	}{
+		{"long-only allows long", DirectionLong, Long, true},
+		{"long-only blocks short", DirectionLong, Short, false},
+		{"short-only allows short", DirectionShort, Short, true},
+		{"short-only blocks long", DirectionShort, Long, false},
+		{"all allows long", DirectionAll, Long, true},
+		{"all allows short", DirectionAll, Short, true},
+		{"empty direction allows long", "", Long, true},
+		{"empty direction allows short", "", Short, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("Test", 10000, 10)
+			if tt.allowedDirection != "" {
+				s.SetAllowedDirection(tt.allowedDirection)
+			}
+
+			s.Entry("e", tt.entryDirection, 10, "")
+			s.OnBarUpdate(1, 100, 1000)
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			got := len(open) > 0
+			if got != tt.wantTradeCreated {
+				t.Errorf("wantTradeCreated=%v, got %v", tt.wantTradeCreated, got)
+			}
+		})
+	}
+}
+
+func TestStrategyGetPositionEntryName_NoPosition(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	name := s.GetPositionEntryName()
+	if name != "" {
+		t.Errorf("Expected empty string with no open trades, got %q", name)
+	}
+}
+
+func TestStrategyGetPositionEntryName_WithOpenTrade(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.Entry("myEntry", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	name := s.GetPositionEntryName()
+	if name != "myEntry" {
+		t.Errorf("Expected 'myEntry', got %q", name)
+	}
+}
+
+func TestStrategyGetPositionEntryName_MultipleOpenTrades(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 3)
+
+	s.Entry("first", Long, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Entry("second", Long, 5, "")
+	s.OnBarUpdate(2, 105, 2000)
+
+	name := s.GetPositionEntryName()
+	if name != "second" {
+		t.Errorf("Expected last entry 'second', got %q", name)
+	}
+}
+
+func TestStrategyGetPositionEntryName_AfterAllClosed(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.Entry("e", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.CloseAll(100, 1000, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	name := s.GetPositionEntryName()
+	if name != "" {
+		t.Errorf("Expected empty string after all closed, got %q", name)
+	}
+}
+
+func TestStrategyCancel_NonexistentOrder(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.Cancel("ghost")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("Cancel of non-existent order should not create trades")
+	}
+}
+
+func TestStrategyCancel_RemovesPendingOrder(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.Entry("myOrder", Long, 10, "")
+	s.Cancel("myOrder")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("Cancelled order should not produce an open trade")
+	}
+}
+
+func TestStrategyCancelAll_EmptyQueue(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.CancelAll()
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("CancelAll on empty queue should not panic or create trades")
+	}
+}
+
+func TestStrategyCancelAll_ClearsAllPendingOrders(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.Entry("order1", Long, 10, "")
+	s.Entry("order2", Long, 5, "")
+	s.CancelAll()
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("CancelAll should clear all pending orders")
+	}
+}
+
+/* TestStrategyOrder_NotInitialized verifies Order() is a no-op when strategy not initialized */
+func TestStrategyOrder_NotInitialized(t *testing.T) {
+	s := NewStrategy()
+
+	err := s.Order("buy", Long, 10, "")
+	if err == nil {
+		t.Error("Order() on uninitialized strategy should return error")
+	}
+	s.OnBarUpdate(1, 100, 1000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("Uninitialized Order() should not create trades")
+	}
+}
+
+/* TestStrategyOrder_FlatToLong verifies opening a long from flat position */
+func TestStrategyOrder_FlatToLong(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if s.GetPositionSize() != 10 {
+		t.Errorf("Position should be +10, got %.2f", s.GetPositionSize())
+	}
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 || open[0].Direction != Long || open[0].Size != 10 {
+		t.Errorf("Expected 1 long trade of size 10, got %v", open)
+	}
+}
+
+/* TestStrategyOrder_FlatToShort verifies opening a short from flat position */
+func TestStrategyOrder_FlatToShort(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("sell", Short, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if s.GetPositionSize() != -5 {
+		t.Errorf("Position should be -5, got %.2f", s.GetPositionSize())
+	}
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 || open[0].Direction != Short || open[0].Size != 5 {
+		t.Errorf("Expected 1 short trade of size 5, got %v", open)
+	}
+}
+
+/* TestStrategyOrder_IgnoresPyramiding verifies no pyramiding enforcement */
+func TestStrategyOrder_IgnoresPyramiding(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 0) // pyramiding=0 blocks Entry()
+
+	s.Order("buy1", Long, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	s.Order("buy2", Long, 5, "")
+	s.OnBarUpdate(2, 105, 2000)
+
+	if s.GetPositionSize() != 10 {
+		t.Errorf("Order() must ignore pyramiding: expected position +10, got %.2f", s.GetPositionSize())
+	}
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 2 {
+		t.Errorf("Expected 2 open trades (pyramiding ignored), got %d", len(open))
+	}
+}
+
+/* TestStrategyOrder_EntryPyramidingBlocksButOrderDoesNot verifies behavioral difference from Entry */
+func TestStrategyOrder_EntryPyramidingBlocksButOrderDoesNot(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 0)
+
+	s.Entry("e1", Long, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Entry("e2", Long, 5, "") // blocked by pyramiding
+	s.OnBarUpdate(2, 105, 2000)
+
+	if s.GetPositionSize() != 5 {
+		t.Errorf("Entry should be blocked at pyramiding=0: expected +5, got %.2f", s.GetPositionSize())
+	}
+
+	// Order() with same setup: must NOT be blocked
+	s2 := NewStrategy()
+	s2.CallWithPyramiding("Test", 10000, 0)
+
+	s2.Order("o1", Long, 5, "")
+	s2.OnBarUpdate(1, 100, 1000)
+	s2.Order("o2", Long, 5, "") // must NOT be blocked
+	s2.OnBarUpdate(2, 105, 2000)
+
+	if s2.GetPositionSize() != 10 {
+		t.Errorf("Order() must bypass pyramiding: expected +10, got %.2f", s2.GetPositionSize())
+	}
+}
+
+/* TestStrategyOrder_ReducesLongPosition verifies partial close of long via short order */
+func TestStrategyOrder_ReducesLongPosition(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 15, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	s.Order("sell1", Short, 5, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	if s.GetPositionSize() != 10 {
+		t.Errorf("Expected position +10 after partial short, got %.2f", s.GetPositionSize())
+	}
+	if len(s.GetTradeHistory().GetOpenTrades()) != 1 {
+		t.Errorf("Expected 1 open trade, got %d", len(s.GetTradeHistory().GetOpenTrades()))
+	}
+	if len(s.GetTradeHistory().GetClosedTrades()) != 1 {
+		t.Errorf("Expected 1 closed trade, got %d", len(s.GetTradeHistory().GetClosedTrades()))
+	}
+	closed := s.GetTradeHistory().GetClosedTrades()[0]
+	if closed.Size != 5 {
+		t.Errorf("Expected closed trade size 5, got %.2f", closed.Size)
+	}
+	if closed.Profit != 50 { // (110-100)*5
+		t.Errorf("Expected closed profit 50, got %.2f", closed.Profit)
+	}
+}
+
+/* TestStrategyOrder_ThreeReducingOrders verifies Pine docs example: 15-5-5-5=0 */
+func TestStrategyOrder_ThreeReducingOrders(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 15, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	s.Order("sell1", Short, 5, "")
+	s.OnBarUpdate(2, 110, 2000)
+	s.Order("sell2", Short, 5, "")
+	s.OnBarUpdate(3, 115, 3000)
+	s.Order("sell3", Short, 5, "")
+	s.OnBarUpdate(4, 120, 4000)
+
+	if s.GetPositionSize() != 0 {
+		t.Errorf("Expected position 0 after 3x5 reduces of 15, got %.2f", s.GetPositionSize())
+	}
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Errorf("Expected 0 open trades, got %d", len(s.GetTradeHistory().GetOpenTrades()))
+	}
+	if len(s.GetTradeHistory().GetClosedTrades()) != 3 {
+		t.Errorf("Expected 3 closed trades, got %d", len(s.GetTradeHistory().GetClosedTrades()))
+	}
+}
+
+/* TestStrategyOrder_ExactClose verifies full close of long position */
+func TestStrategyOrder_ExactClose(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Order("sell", Short, 10, "")
+	s.OnBarUpdate(2, 120, 2000)
+
+	if s.GetPositionSize() != 0 {
+		t.Errorf("Expected flat position, got %.2f", s.GetPositionSize())
+	}
+	closed := s.GetTradeHistory().GetClosedTrades()
+	if len(closed) != 1 {
+		t.Fatalf("Expected 1 closed trade, got %d", len(closed))
+	}
+	if closed[0].Profit != 200 { // (120-100)*10
+		t.Errorf("Expected profit 200, got %.2f", closed[0].Profit)
+	}
+}
+
+/* TestStrategyOrder_CrossZeroLongToShort verifies crossing zero from long to short */
+func TestStrategyOrder_CrossZeroLongToShort(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	// Short 15 against long 10 → closes 10 long, opens 5 short
+	s.Order("sell", Short, 15, "")
+	s.OnBarUpdate(2, 120, 2000)
+
+	if s.GetPositionSize() != -5 {
+		t.Errorf("Expected position -5 after cross-zero, got %.2f", s.GetPositionSize())
+	}
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 || open[0].Direction != Short || open[0].Size != 5 {
+		t.Errorf("Expected 1 short trade of size 5, got %v", open)
+	}
+	closed := s.GetTradeHistory().GetClosedTrades()
+	if len(closed) != 1 || closed[0].Size != 10 {
+		t.Errorf("Expected 1 closed long trade of size 10, got %v", closed)
+	}
+}
+
+/* TestStrategyOrder_CrossZeroShortToLong verifies crossing zero from short to long */
+func TestStrategyOrder_CrossZeroShortToLong(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("sell", Short, 8, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	// Buy 12 against short 8 → closes 8 short, opens 4 long
+	s.Order("buy", Long, 12, "")
+	s.OnBarUpdate(2, 90, 2000)
+
+	if s.GetPositionSize() != 4 {
+		t.Errorf("Expected position +4 after cross-zero, got %.2f", s.GetPositionSize())
+	}
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 || open[0].Direction != Long || open[0].Size != 4 {
+		t.Errorf("Expected 1 long trade of size 4, got %v", open)
+	}
+	closed := s.GetTradeHistory().GetClosedTrades()
+	if len(closed) != 1 || closed[0].Size != 8 {
+		t.Errorf("Expected 1 closed short trade of size 8, got %v", closed)
+	}
+	if closed[0].Profit != 80 { // (100-90)*8 short profit
+		t.Errorf("Expected short profit 80, got %.2f", closed[0].Profit)
+	}
+}
+
+/* TestStrategyOrder_FIFOPartialClose verifies FIFO ordering across multiple open trades */
+func TestStrategyOrder_FIFOPartialClose(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	// Open two separate long trades (requires pyramiding bypass via Order)
+	s.Order("buy1", Long, 10, "first")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Order("buy2", Long, 10, "second")
+	s.OnBarUpdate(2, 105, 2000)
+
+	s.Order("sell", Short, 12, "")
+	s.OnBarUpdate(3, 110, 3000)
+
+	if s.GetPositionSize() != 8 {
+		t.Errorf("Expected position +8, got %.2f", s.GetPositionSize())
+	}
+
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 {
+		t.Fatalf("Expected 1 open trade, got %d", len(open))
+	}
+	if open[0].EntryComment != "second" {
+		t.Errorf("Expected remaining open trade to be 'second' (FIFO), got %q", open[0].EntryComment)
+	}
+	if open[0].Size != 8 {
+		t.Errorf("Expected remaining open size 8, got %.2f", open[0].Size)
+	}
+
+	closed := s.GetTradeHistory().GetClosedTrades()
+	if len(closed) != 2 {
+		t.Fatalf("Expected 2 closed trades (buy1 full + buy2 partial), got %d", len(closed))
+	}
+	// FIFO: buy1 closed first (size 10), then buy2 partial (size 2)
+	if closed[0].EntryComment != "first" || closed[0].Size != 10 {
+		t.Errorf("Expected first closed trade 'first' size 10, got %q size %.2f", closed[0].EntryComment, closed[0].Size)
+	}
+	if closed[1].EntryComment != "second" || closed[1].Size != 2 {
+		t.Errorf("Expected second closed trade 'second' size 2, got %q size %.2f", closed[1].EntryComment, closed[1].Size)
+	}
+}
+
+/* TestStrategyOrder_NoAutoReversal verifies strategy.order does NOT auto-reverse like strategy.entry */
+func TestStrategyOrder_NoAutoReversal(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	// Enter long with Entry() — establishes position
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	// Order short 5 — should REDUCE long (not reverse like Entry would)
+	s.Order("sell", Short, 5, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	// Entry() would have reversed: closed all 10 long, opened 5 short → position -5
+	// Order() should net: 10 - 5 = +5 long
+	if s.GetPositionSize() != 5 {
+		t.Errorf("Order() must NOT auto-reverse: expected +5, got %.2f", s.GetPositionSize())
+	}
+}
+
+/* TestStrategyOrder_AddsToShortPosition verifies adding to short position */
+func TestStrategyOrder_AddsToShortPosition(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("sell1", Short, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Order("sell2", Short, 3, "")
+	s.OnBarUpdate(2, 105, 2000)
+
+	if s.GetPositionSize() != -8 {
+		t.Errorf("Expected position -8 after two short orders, got %.2f", s.GetPositionSize())
+	}
+	if len(s.GetTradeHistory().GetOpenTrades()) != 2 {
+		t.Errorf("Expected 2 open trades, got %d", len(s.GetTradeHistory().GetOpenTrades()))
+	}
+}
+
+/* TestStrategyOrder_CommentPropagates verifies comment reaches Trade.EntryComment */
+func TestStrategyOrder_CommentPropagates(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "my signal")
+	s.OnBarUpdate(1, 100, 1000)
+
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 {
+		t.Fatal("Expected 1 open trade")
+	}
+	if open[0].EntryComment != "my signal" {
+		t.Errorf("Expected comment 'my signal', got %q", open[0].EntryComment)
+	}
+}
+
+/* TestStrategyOrder_CancelRemovesOrder verifies Cancel() works on Order()-created pending orders */
+func TestStrategyOrder_CancelRemovesOrder(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.Cancel("buy")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("Cancelled Order() should not produce a trade")
+	}
+}
+
+/* TestStrategyOrder_AllowedDirectionRespected verifies direction restriction applies to Order() */
+func TestStrategyOrder_AllowedDirectionRespected(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+	s.SetAllowedDirection(DirectionLong)
+
+	s.Order("sell", Short, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("Order() should respect allowedDirection: short blocked when long-only")
+	}
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(2, 100, 2000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 1 {
+		t.Error("Order() should respect allowedDirection: long allowed when long-only")
+	}
+}
+
+/* TestStrategyOrder_EquityUpdatedOnClose verifies equity is correctly updated after net-order closes position */
+func TestStrategyOrder_EquityUpdatedOnClose(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Order("sell", Short, 10, "")
+	s.OnBarUpdate(2, 120, 2000)
+
+	expectedEquity := 10000.0 + 200.0 // (120-100)*10
+	if s.GetEquity(120) != expectedEquity {
+		t.Errorf("Expected equity %.2f, got %.2f", expectedEquity, s.GetEquity(120))
+	}
+}
+
+/* TestStrategyOrder_PartialCloseEquityUpdate verifies equity updates correctly on partial close */
+func TestStrategyOrder_PartialCloseEquityUpdate(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 10, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.Order("sell", Short, 6, "")
+	s.OnBarUpdate(2, 110, 2000)
+
+	realizedEquity := s.GetEquity(110)
+	if realizedEquity != 10100 {
+		t.Errorf("Expected equity 10100, got %.2f", realizedEquity)
+	}
+}
+
+/* TestStrategyOrder_MultiplePartialCloses verifies correct running position across sequential partial closes */
+func TestStrategyOrder_MultiplePartialCloses(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.Order("buy", Long, 9, "")
+	s.OnBarUpdate(1, 100, 1000)
+
+	s.Order("sell1", Short, 3, "")
+	s.OnBarUpdate(2, 110, 2000)
+	s.Order("sell2", Short, 3, "")
+	s.OnBarUpdate(3, 115, 3000)
+	s.Order("sell3", Short, 3, "")
+	s.OnBarUpdate(4, 120, 4000)
+
+	if s.GetPositionSize() != 0 {
+		t.Errorf("Expected flat position, got %.2f", s.GetPositionSize())
+	}
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Errorf("Expected 0 open trades, got %d", len(s.GetTradeHistory().GetOpenTrades()))
+	}
+	if len(s.GetTradeHistory().GetClosedTrades()) != 3 {
+		t.Errorf("Expected 3 partial-closed trades, got %d", len(s.GetTradeHistory().GetClosedTrades()))
+	}
+}
+
+/* TestCalcCommission verifies commission calculation for all types across qty and price variations. */
+func TestCalcCommission(t *testing.T) {
+	tests := []struct {
+		name     string
+		commType string
+		commRate float64
+		qty      float64
+		price    float64
+		want     float64
+	}{
+		{"percent_normal", CommissionPercent, 1.0, 10, 100, 10.0},
+		{"percent_half_rate", CommissionPercent, 0.5, 10, 100, 5.0},
+		{"percent_scales_with_price", CommissionPercent, 1.0, 1, 500, 5.0},
+		{"percent_scales_with_qty", CommissionPercent, 1.0, 5, 100, 5.0},
+		{"percent_zero_rate", CommissionPercent, 0.0, 10, 100, 0.0},
+		{"per_order_flat_small_qty", CommissionCashPerOrder, 5.0, 1, 100, 5.0},
+		{"per_order_flat_large_qty", CommissionCashPerOrder, 5.0, 100, 100, 5.0},
+		{"per_order_ignores_price", CommissionCashPerOrder, 3.0, 10, 1000, 3.0},
+		{"per_contract_scales_qty", CommissionCashPerContract, 2.0, 5, 100, 10.0},
+		{"per_contract_single_unit", CommissionCashPerContract, 2.0, 1, 100, 2.0},
+		{"per_contract_ignores_price", CommissionCashPerContract, 2.0, 5, 1000, 10.0},
+		{"per_contract_zero_qty", CommissionCashPerContract, 2.0, 0, 100, 0.0},
+		{"unknown_type_returns_zero", "invalid", 5.0, 10, 100, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.SetCommission(tt.commRate, tt.commType)
+			got := s.calcCommission(tt.qty, tt.price)
+			if got != tt.want {
+				t.Errorf("calcCommission(qty=%.2f, price=%.2f) = %.4f, want %.4f", tt.qty, tt.price, got, tt.want)
+			}
+		})
+	}
+}
+
+/*
+	TestDirectionMultiplier verifies the profit sign convention: long profits rise with price,
+
+short profits rise as price falls. Any non-Short string defaults to the long multiplier.
+*/
+func TestDirectionMultiplier(t *testing.T) {
+	tests := []struct {
+		direction string
+		want      float64
+	}{
+		{Long, 1.0},
+		{Short, -1.0},
+		{"", 1.0},
+		{"unknown", 1.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.direction, func(t *testing.T) {
+			if got := directionMultiplier(tt.direction); got != tt.want {
+				t.Errorf("directionMultiplier(%q) = %.1f, want %.1f", tt.direction, got, tt.want)
+			}
+		})
+	}
+}
+
+/*
+	TestBuildClosedTrade verifies that all entry fields propagate from the open trade,
+
+all exit fields are applied correctly, and metricsScale proportions MaxDrawdown/MaxRunup.
+*/
+func TestBuildClosedTrade(t *testing.T) {
+	open := Trade{
+		EntryID:      "entry1",
+		Direction:    Long,
+		Size:         10,
+		EntryPrice:   100,
+		EntryBar:     1,
+		EntryTime:    1000,
+		EntryComment: "entry comment",
+		Commission:   5.0,
+		MaxDrawdown:  20.0,
+		MaxRunup:     30.0,
+	}
+	const exitID = "exit1"
+	const exitComment = "exit comment"
+	const exitPrice = 110.0
+	const exitBar = 2
+	const exitTime = int64(2000)
+
+	tests := []struct {
+		name         string
+		closeSize    float64
+		profit       float64
+		commission   float64
+		metricsScale float64
+		wantMaxDD    float64
+		wantMaxRU    float64
+	}{
+		{"full close preserves metrics at scale 1.0", 10, 100, 15, 1.0, 20.0, 30.0},
+		{"half close scales metrics by 0.5", 5, 50, 7.5, 0.5, 10.0, 15.0},
+		{"30 pct close scales metrics by 0.3", 3, 30, 4.5, 0.3, 6.0, 9.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			closed := buildClosedTrade(open, tt.closeSize, tt.profit, tt.commission, tt.metricsScale, exitID, exitPrice, exitBar, exitTime, exitComment)
+
+			if closed.EntryID != open.EntryID {
+				t.Errorf("EntryID: got %q, want %q", closed.EntryID, open.EntryID)
+			}
+			if closed.Direction != open.Direction {
+				t.Errorf("Direction: got %q, want %q", closed.Direction, open.Direction)
+			}
+			if closed.EntryPrice != open.EntryPrice {
+				t.Errorf("EntryPrice: got %.2f, want %.2f", closed.EntryPrice, open.EntryPrice)
+			}
+			if closed.EntryBar != open.EntryBar {
+				t.Errorf("EntryBar: got %d, want %d", closed.EntryBar, open.EntryBar)
+			}
+			if closed.EntryTime != open.EntryTime {
+				t.Errorf("EntryTime: got %d, want %d", closed.EntryTime, open.EntryTime)
+			}
+			if closed.EntryComment != open.EntryComment {
+				t.Errorf("EntryComment: got %q, want %q", closed.EntryComment, open.EntryComment)
+			}
+			if closed.ExitID != exitID {
+				t.Errorf("ExitID: got %q, want %q", closed.ExitID, exitID)
+			}
+			if closed.ExitPrice != exitPrice {
+				t.Errorf("ExitPrice: got %.2f, want %.2f", closed.ExitPrice, exitPrice)
+			}
+			if closed.ExitBar != exitBar {
+				t.Errorf("ExitBar: got %d, want %d", closed.ExitBar, exitBar)
+			}
+			if closed.ExitTime != exitTime {
+				t.Errorf("ExitTime: got %d, want %d", closed.ExitTime, exitTime)
+			}
+			if closed.ExitComment != exitComment {
+				t.Errorf("ExitComment: got %q, want %q", closed.ExitComment, exitComment)
+			}
+			if closed.Size != tt.closeSize {
+				t.Errorf("Size: got %.2f, want %.2f", closed.Size, tt.closeSize)
+			}
+			if closed.Profit != tt.profit {
+				t.Errorf("Profit: got %.4f, want %.4f", closed.Profit, tt.profit)
+			}
+			if closed.Commission != tt.commission {
+				t.Errorf("Commission: got %.4f, want %.4f", closed.Commission, tt.commission)
+			}
+			if closed.MaxDrawdown != tt.wantMaxDD {
+				t.Errorf("MaxDrawdown: got %.4f, want %.4f", closed.MaxDrawdown, tt.wantMaxDD)
+			}
+			if closed.MaxRunup != tt.wantMaxRU {
+				t.Errorf("MaxRunup: got %.4f, want %.4f", closed.MaxRunup, tt.wantMaxRU)
+			}
+		})
+	}
+}
+
+/*
+	TestTradeHistory_PartialCloseTrades verifies FIFO close algorithm: qty distribution, commission
+
+proportioning, and profit calculation for all close patterns (full, partial, multi-trade, short).
+*/
+func TestTradeHistory_PartialCloseTrades(t *testing.T) {
+	type closedWant struct{ size, commission, profit float64 }
+	type openWant struct{ size, commission float64 }
+	tests := []struct {
+		name                string
+		setup               []Trade
+		direction           string
+		qty                 float64
+		exitPrice           float64
+		totalExitCommission float64
+		wantQtyClosed       float64
+		wantNewlyClosedLen  int
+		wantClosed          []closedWant
+		wantOpen            []openWant
+	}{
+		{
+			name:      "full_close_single_long",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 20}},
+			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 15,
+			wantQtyClosed: 10, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{10, 35, 100}},
+		},
+		{
+			name:      "partial_close_single_long_1_of_10",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 10}},
+			direction: Long, qty: 1, exitPrice: 110, totalExitCommission: 1,
+			wantQtyClosed: 1, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{1, 2, 10}},
+			wantOpen:   []openWant{{9, 9}},
+		},
+		{
+			name:      "partial_close_single_long_4_of_10",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 20}},
+			direction: Long, qty: 4, exitPrice: 110, totalExitCommission: 8,
+			wantQtyClosed: 4, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{4, 16, 40}},
+			wantOpen:   []openWant{{6, 12}},
+		},
+		{
+			name:      "partial_close_single_long_9_of_10",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 10}},
+			direction: Long, qty: 9, exitPrice: 110, totalExitCommission: 9,
+			wantQtyClosed: 9, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{9, 18, 90}},
+			wantOpen:   []openWant{{1, 1}},
+		},
+		{
+			name:      "full_close_single_short",
+			setup:     []Trade{{EntryID: "s1", Direction: Short, Size: 8, EntryPrice: 100, Commission: 16}},
+			direction: Short, qty: 8, exitPrice: 90, totalExitCommission: 16,
+			wantQtyClosed: 8, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{8, 32, 80}},
+		},
+		{
+			name:      "partial_close_single_short_6_of_10",
+			setup:     []Trade{{EntryID: "s1", Direction: Short, Size: 10, EntryPrice: 100, Commission: 20}},
+			direction: Short, qty: 6, exitPrice: 90, totalExitCommission: 12,
+			wantQtyClosed: 6, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{6, 24, 60}},
+			wantOpen:   []openWant{{4, 8}},
+		},
+		{
+			name: "fifo_two_trades_full_close",
+			setup: []Trade{
+				{EntryID: "t1", Direction: Long, Size: 5, EntryPrice: 100, Commission: 10},
+				{EntryID: "t2", Direction: Long, Size: 5, EntryPrice: 105, Commission: 10},
+			},
+			direction: Long, qty: 10, exitPrice: 115, totalExitCommission: 20,
+			wantQtyClosed: 10, wantNewlyClosedLen: 2,
+			wantClosed: []closedWant{{5, 20, 75}, {5, 20, 50}},
+		},
+		{
+			name: "fifo_first_full_second_partial",
+			setup: []Trade{
+				{EntryID: "t1", Direction: Long, Size: 6, EntryPrice: 100, Commission: 12},
+				{EntryID: "t2", Direction: Long, Size: 4, EntryPrice: 105, Commission: 8},
+			},
+			direction: Long, qty: 8, exitPrice: 110, totalExitCommission: 8,
+			wantQtyClosed: 8, wantNewlyClosedLen: 2,
+			wantClosed: []closedWant{{6, 18, 60}, {2, 6, 10}},
+			wantOpen:   []openWant{{2, 4}},
+		},
+		{
+			name: "fifo_three_trades_spanning_all",
+			setup: []Trade{
+				{EntryID: "t1", Direction: Long, Size: 3, EntryPrice: 100, Commission: 6},
+				{EntryID: "t2", Direction: Long, Size: 3, EntryPrice: 102, Commission: 6},
+				{EntryID: "t3", Direction: Long, Size: 4, EntryPrice: 104, Commission: 8},
+			},
+			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 10,
+			wantQtyClosed: 10, wantNewlyClosedLen: 3,
+			wantClosed: []closedWant{{3, 9, 30}, {3, 9, 24}, {4, 12, 24}},
+		},
+		{
+			name:      "no_matching_direction",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 20}},
+			direction: Short, qty: 5, exitPrice: 110, totalExitCommission: 10,
+			wantQtyClosed: 0, wantNewlyClosedLen: 0,
+			wantOpen: []openWant{{10, 20}},
+		},
+		{
+			name:      "qty_exceeds_available_capped",
+			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 5, EntryPrice: 100, Commission: 10}},
+			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 10,
+			wantQtyClosed: 5, wantNewlyClosedLen: 1,
+			wantClosed: []closedWant{{5, 15, 50}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := NewTradeHistory()
+			for _, trade := range tt.setup {
+				th.AddOpenTrade(trade)
+			}
+
+			qtyClosed, newlyClosed := th.PartialCloseTrades(tt.direction, "exit", tt.qty, tt.exitPrice, 1, 1000, "", tt.totalExitCommission)
+
+			if qtyClosed != tt.wantQtyClosed {
+				t.Errorf("qtyClosed: got %.2f, want %.2f", qtyClosed, tt.wantQtyClosed)
+			}
+			if len(newlyClosed) != tt.wantNewlyClosedLen {
+				t.Errorf("newlyClosed count: got %d, want %d", len(newlyClosed), tt.wantNewlyClosedLen)
+			}
+
+			closedTrades := th.GetClosedTrades()
+			if len(closedTrades) != len(tt.wantClosed) {
+				t.Fatalf("closed count: got %d, want %d", len(closedTrades), len(tt.wantClosed))
+			}
+			for i, want := range tt.wantClosed {
+				if closedTrades[i].Size != want.size {
+					t.Errorf("closed[%d].Size: got %.2f, want %.2f", i, closedTrades[i].Size, want.size)
+				}
+				if closedTrades[i].Commission != want.commission {
+					t.Errorf("closed[%d].Commission: got %.4f, want %.4f", i, closedTrades[i].Commission, want.commission)
+				}
+				if closedTrades[i].Profit != want.profit {
+					t.Errorf("closed[%d].Profit: got %.4f, want %.4f", i, closedTrades[i].Profit, want.profit)
+				}
+			}
+
+			openTrades := th.GetOpenTrades()
+			if len(openTrades) != len(tt.wantOpen) {
+				t.Fatalf("open count: got %d, want %d", len(openTrades), len(tt.wantOpen))
+			}
+			for i, want := range tt.wantOpen {
+				if openTrades[i].Size != want.size {
+					t.Errorf("open[%d].Size: got %.2f, want %.2f", i, openTrades[i].Size, want.size)
+				}
+				if openTrades[i].Commission != want.commission {
+					t.Errorf("open[%d].Commission: got %.4f, want %.4f", i, openTrades[i].Commission, want.commission)
+				}
+			}
+		})
+	}
+}
+
+/*
+	TestCommission_PartialClose verifies commission split for partial closes across all commission types
+
+and multiple close ratios, including the conservation invariant:
+closed.Commission + remaining.Commission = entryCommission + exitCommission.
+*/
+func TestCommission_PartialClose(t *testing.T) {
+	tests := []struct {
+		name              string
+		commType          string
+		commRate          float64
+		openQty           float64
+		entryPrice        float64
+		closeQty          float64
+		exitPrice         float64
+		wantClosedComm    float64
+		wantRemainingComm float64
+	}{
+		/* CashPerContract */
+		{"cpc_1_of_10", CommissionCashPerContract, 2.0, 10, 100, 1, 110, 4.0, 18.0},
+		{"cpc_4_of_10", CommissionCashPerContract, 2.0, 10, 100, 4, 110, 16.0, 12.0},
+		{"cpc_half", CommissionCashPerContract, 2.0, 10, 100, 5, 110, 20.0, 10.0},
+		{"cpc_9_of_10", CommissionCashPerContract, 2.0, 10, 100, 9, 110, 36.0, 2.0},
+		/* CashPerOrder: flat fee split proportionally by closeQty/openQty */
+		{"cpo_4_of_10", CommissionCashPerOrder, 5.0, 10, 100, 4, 110, 7.0, 3.0},
+		{"cpo_half", CommissionCashPerOrder, 5.0, 10, 100, 5, 110, 7.5, 2.5},
+		/* Percent */
+		{"pct_4_of_10", CommissionPercent, 1.0, 10, 100, 4, 110, 8.4, 6.0},
+		{"pct_half", CommissionPercent, 1.0, 10, 100, 5, 110, 10.5, 5.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", 10000)
+			s.SetCommission(tt.commRate, tt.commType)
+
+			s.Order("buy", Long, tt.openQty, "")
+			s.OnBarUpdate(1, tt.entryPrice, 1000)
+			s.Order("sell", Short, tt.closeQty, "")
+			s.OnBarUpdate(2, tt.exitPrice, 2000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("expected 1 closed trade, got %d", len(closed))
+			}
+			if closed[0].Commission != tt.wantClosedComm {
+				t.Errorf("closed commission: got %.4f, want %.4f", closed[0].Commission, tt.wantClosedComm)
+			}
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != 1 {
+				t.Fatalf("expected 1 remaining open trade, got %d", len(open))
+			}
+			if open[0].Commission != tt.wantRemainingComm {
+				t.Errorf("remaining commission: got %.4f, want %.4f", open[0].Commission, tt.wantRemainingComm)
+			}
+
+			/* Conservation: closed + remaining = total entry + exit commissions */
+			totalEntry := s.calcCommission(tt.openQty, tt.entryPrice)
+			totalExit := s.calcCommission(tt.closeQty, tt.exitPrice)
+			if closed[0].Commission+open[0].Commission != totalEntry+totalExit {
+				t.Errorf("conservation violated: closed+remaining=%.4f, entry+exit=%.4f",
+					closed[0].Commission+open[0].Commission, totalEntry+totalExit)
+			}
+		})
+	}
+}
+
+/*
+	TestCommission_FIFOClose verifies commission distribution when a close order spans multiple open
+
+trades in FIFO order, for all commission types.
+*/
+func TestCommission_FIFOClose(t *testing.T) {
+	type tradeInput struct{ qty, entryPrice float64 }
+	type closedWant struct{ size, commission float64 }
+	type openWant struct{ size, commission float64 }
+	tests := []struct {
+		name       string
+		commType   string
+		commRate   float64
+		trades     []tradeInput
+		closeQty   float64
+		exitPrice  float64
+		wantClosed []closedWant
+		wantOpen   []openWant
+	}{
+		{
+			name:     "cpc_first_full_second_partial",
+			commType: CommissionCashPerContract, commRate: 1.0,
+			trades:   []tradeInput{{6, 100}, {4, 105}},
+			closeQty: 8, exitPrice: 110,
+			wantClosed: []closedWant{{6, 12}, {2, 4}},
+			wantOpen:   []openWant{{2, 2}},
+		},
+		{
+			name:     "cpc_both_trades_full_close",
+			commType: CommissionCashPerContract, commRate: 1.0,
+			trades:   []tradeInput{{5, 100}, {5, 105}},
+			closeQty: 10, exitPrice: 115,
+			wantClosed: []closedWant{{5, 10}, {5, 10}},
+		},
+		{
+			name:     "cpo_first_full_second_partial",
+			commType: CommissionCashPerOrder, commRate: 5.0,
+			trades:   []tradeInput{{6, 100}, {4, 105}},
+			closeQty: 8, exitPrice: 110,
+			wantClosed: []closedWant{{6, 8.75}, {2, 3.75}},
+			wantOpen:   []openWant{{2, 2.5}},
+		},
+		{
+			name:     "pct_first_full_second_partial",
+			commType: CommissionPercent, commRate: 2.0,
+			trades:   []tradeInput{{6, 100}, {4, 100}},
+			closeQty: 8, exitPrice: 100,
+			/* uniform price — avoids float64 precision loss in percent commission proportioning */
+			wantClosed: []closedWant{{6, 24}, {2, 8}},
+			wantOpen:   []openWant{{2, 4}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", 10000)
+			s.SetCommission(tt.commRate, tt.commType)
+
+			for i, trade := range tt.trades {
+				s.Order("buy"+string(rune('1'+i)), Long, trade.qty, "trade"+string(rune('1'+i)))
+				s.OnBarUpdate(i+1, trade.entryPrice, int64(1000*(i+1)))
+			}
+			baseBar := len(tt.trades) + 1
+			s.Order("sell", Short, tt.closeQty, "")
+			s.OnBarUpdate(baseBar, tt.exitPrice, int64(1000*baseBar))
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != len(tt.wantClosed) {
+				t.Fatalf("closed count: got %d, want %d", len(closed), len(tt.wantClosed))
+			}
+			for i, want := range tt.wantClosed {
+				if closed[i].Size != want.size {
+					t.Errorf("closed[%d].Size: got %.2f, want %.2f", i, closed[i].Size, want.size)
+				}
+				if closed[i].Commission != want.commission {
+					t.Errorf("closed[%d].Commission: got %.4f, want %.4f", i, closed[i].Commission, want.commission)
+				}
+			}
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != len(tt.wantOpen) {
+				t.Fatalf("open count: got %d, want %d", len(open), len(tt.wantOpen))
+			}
+			for i, want := range tt.wantOpen {
+				if open[i].Size != want.size {
+					t.Errorf("open[%d].Size: got %.2f, want %.2f", i, open[i].Size, want.size)
+				}
+				if open[i].Commission != want.commission {
+					t.Errorf("open[%d].Commission: got %.4f, want %.4f", i, open[i].Commission, want.commission)
+				}
+			}
+		})
+	}
+}
+
+/*
+	TestCommission_ShortFullClose verifies commission symmetry on short positions: the commission
+
+formula is direction-agnostic and produces the same structure as long-side commission.
+*/
+func TestCommission_ShortFullClose(t *testing.T) {
+	tests := []struct {
+		commType       string
+		commRate       float64
+		qty            float64
+		entryPrice     float64
+		exitPrice      float64
+		wantCommission float64
+	}{
+		{CommissionPercent, 1.0, 8, 100, 90, 8*100*1.0/100 + 8*90*1.0/100},
+		{CommissionCashPerOrder, 5.0, 8, 100, 90, 5.0 + 5.0},
+		{CommissionCashPerContract, 2.0, 8, 100, 90, 8*2.0 + 8*2.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.commType, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", 10000)
+			s.SetCommission(tt.commRate, tt.commType)
+
+			s.Order("sell", Short, tt.qty, "")
+			s.OnBarUpdate(1, tt.entryPrice, 1000)
+			s.Order("buy", Long, tt.qty, "")
+			s.OnBarUpdate(2, tt.exitPrice, 2000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("expected 1 closed trade, got %d", len(closed))
+			}
+			if closed[0].Commission != tt.wantCommission {
+				t.Errorf("commission: got %.4f, want %.4f", closed[0].Commission, tt.wantCommission)
+			}
+		})
+	}
+}
+
+/*
+	TestStrategyAllowedDirection_DirectionChange verifies that SetAllowedDirection can be called
+
+multiple times to update the restriction mid-strategy, and the new restriction takes effect
+immediately on the next call. Each phase uses a flat position to avoid reversal interaction.
+*/
+func TestStrategyAllowedDirection_DirectionChange(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("Test", 10000, 10)
+
+	s.SetAllowedDirection(DirectionLong)
+	s.Entry("shortBlocked", Short, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Fatal("phase 1: short entry must be blocked when direction=long")
+	}
+	s.Entry("longAccepted", Long, 5, "")
+	s.OnBarUpdate(2, 100, 2000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 1 {
+		t.Fatal("phase 1: long entry must be accepted when direction=long")
+	}
+	s.CloseAll(100, 2000, "")
+	s.OnBarUpdate(3, 100, 3000)
+
+	s.SetAllowedDirection(DirectionShort)
+	s.Entry("longBlocked", Long, 5, "")
+	s.OnBarUpdate(4, 100, 4000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("phase 2: long entry must be blocked when direction=short")
+	}
+	s.Entry("shortAccepted", Short, 5, "")
+	s.OnBarUpdate(5, 100, 5000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 1 {
+		t.Error("phase 2: short entry must be accepted when direction=short")
+	}
+	s.CloseAll(100, 5000, "")
+	s.OnBarUpdate(6, 100, 6000)
+
+	s.SetAllowedDirection(DirectionAll)
+	s.Entry("longAll", Long, 5, "")
+	s.OnBarUpdate(7, 100, 7000)
+	if len(s.GetTradeHistory().GetOpenTrades()) != 1 {
+		t.Error("phase 3: long entry must be accepted when direction=all")
+	}
+}
+
+/*
+	TestStrategyAllowedDirection_OrderFilter verifies that Order() enforces the allowed direction
+
+filter across all direction combinations — parallel coverage to TestStrategyAllowedDirection_EntryFilter.
+*/
+func TestStrategyAllowedDirection_OrderFilter(t *testing.T) {
+	tests := []struct {
+		name             string
+		allowedDirection string
+		orderDirection   string
+		wantTradeCreated bool
+	}{
+		{"long-only allows long", DirectionLong, Long, true},
+		{"long-only blocks short", DirectionLong, Short, false},
+		{"short-only allows short", DirectionShort, Short, true},
+		{"short-only blocks long", DirectionShort, Long, false},
+		{"all allows long", DirectionAll, Long, true},
+		{"all allows short", DirectionAll, Short, true},
+		{"empty direction allows long", "", Long, true},
+		{"empty direction allows short", "", Short, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", 10000)
+			if tt.allowedDirection != "" {
+				s.SetAllowedDirection(tt.allowedDirection)
+			}
+
+			s.Order("e", tt.orderDirection, 10, "")
+			s.OnBarUpdate(1, 100, 1000)
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			got := len(open) > 0
+			if got != tt.wantTradeCreated {
+				t.Errorf("wantTradeCreated=%v, got %v (direction=%s, allowed=%q)", tt.wantTradeCreated, got, tt.orderDirection, tt.allowedDirection)
+			}
+		})
 	}
 }
