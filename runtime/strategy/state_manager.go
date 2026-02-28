@@ -29,13 +29,8 @@ type StateManager struct {
 	maxDrawdownPctSeries   *series.Series
 	maxRunupPctSeries      *series.Series
 
-	peakEquity     float64
-	troughEquity   float64
-	maxDrawdown    float64
-	maxRunup       float64
-	maxDrawdownPct float64
-	maxRunupPct    float64
-	initialized    bool
+	intrabarCalc *IntrabarEquityCalculator
+	ddRunupTrack *DrawdownRunupTracker
 }
 
 // NewStateManager creates manager with Series buffers for given bar count
@@ -61,31 +56,52 @@ func NewStateManager(barCount int) *StateManager {
 		maxRunupSeries:         series.NewSeries(barCount),
 		maxDrawdownPctSeries:   series.NewSeries(barCount),
 		maxRunupPctSeries:      series.NewSeries(barCount),
+		intrabarCalc:           NewIntrabarEquityCalculator(),
+		ddRunupTrack:           NewDrawdownRunupTracker(),
 	}
 }
 
 // SampleCurrentBar captures current strategy state into all Series at cursor position
-func (sm *StateManager) SampleCurrentBar(strat *Strategy, currentPrice float64) {
+func (sm *StateManager) SampleCurrentBar(strat *Strategy, closePrice, highPrice, lowPrice float64) {
 	avgPrice := strat.GetPositionAvgPrice()
 	if avgPrice == 0 {
 		avgPrice = math.NaN()
 	}
 
-	equity := strat.GetEquity(currentPrice)
-	if !sm.initialized {
-		sm.peakEquity = equity
-		sm.troughEquity = equity
-		sm.initialized = true
-	}
+	equityClose := strat.GetEquity(closePrice)
 
-	maxDrawdown, maxRunup, maxDrawdownPct, maxRunupPct := sm.updateDrawdownRunup(equity)
+	openTrades := strat.GetTradeHistory().GetOpenTrades()
+	realizedProfit := strat.GetNetProfit()
+	initialCapital := strat.GetInitialCapital()
+
+	equityAdverse := sm.intrabarCalc.CalculateAdverseEquity(
+		openTrades,
+		realizedProfit,
+		initialCapital,
+		highPrice,
+		lowPrice,
+	)
+
+	equityFavorable := sm.intrabarCalc.CalculateFavorableEquity(
+		openTrades,
+		realizedProfit,
+		initialCapital,
+		highPrice,
+		lowPrice,
+	)
+
+	maxDrawdown, maxRunup, maxDrawdownPct, maxRunupPct := sm.ddRunupTrack.UpdateWithIntrabar(
+		equityClose,
+		equityAdverse,
+		equityFavorable,
+	)
 
 	closedTrades := strat.GetTradeHistory().GetClosedTrades()
 
 	sm.positionAvgPriceSeries.Set(avgPrice)
 	sm.positionSizeSeries.Set(strat.GetPositionSize())
-	sm.equitySeries.Set(equity)
-	sm.netProfitSeries.Set(strat.GetNetProfit())
+	sm.equitySeries.Set(equityClose)
+	sm.netProfitSeries.Set(realizedProfit)
 	sm.closedTradesSeries.Set(float64(len(closedTrades)))
 	sm.initialCapitalSeries.Set(strat.GetInitialCapital())
 	sm.grossProfitSeries.Set(AggregateGrossProfit(closedTrades))
@@ -93,7 +109,7 @@ func (sm *StateManager) SampleCurrentBar(strat *Strategy, currentPrice float64) 
 	sm.winTradesSeries.Set(float64(CountWinningTrades(closedTrades)))
 	sm.lossTradesSeries.Set(float64(CountLosingTrades(closedTrades)))
 	sm.evenTradesSeries.Set(float64(CountEvenTrades(closedTrades)))
-	sm.openProfitSeries.Set(strat.GetOpenProfit(currentPrice))
+	sm.openProfitSeries.Set(strat.GetOpenProfit(closePrice))
 	sm.openTradesSeries.Set(float64(strat.GetOpenTradesCount()))
 	sm.avgTradeSeries.Set(AvgTrade(closedTrades))
 	sm.avgWinningTradeSeries.Set(AvgWinningTrade(closedTrades))
@@ -102,34 +118,6 @@ func (sm *StateManager) SampleCurrentBar(strat *Strategy, currentPrice float64) 
 	sm.maxRunupSeries.Set(maxRunup)
 	sm.maxDrawdownPctSeries.Set(maxDrawdownPct)
 	sm.maxRunupPctSeries.Set(maxRunupPct)
-}
-
-func (sm *StateManager) updateDrawdownRunup(equity float64) (maxDrawdown, maxRunup, maxDrawdownPct, maxRunupPct float64) {
-	if equity > sm.peakEquity {
-		sm.peakEquity = equity
-	}
-	if equity < sm.troughEquity {
-		sm.troughEquity = equity
-	}
-
-	drawdown := sm.peakEquity - equity
-	runup := equity - sm.troughEquity
-
-	if drawdown > sm.maxDrawdown {
-		sm.maxDrawdown = drawdown
-		if sm.peakEquity != 0 {
-			sm.maxDrawdownPct = drawdown / sm.peakEquity * 100
-		}
-	}
-
-	if runup > sm.maxRunup {
-		sm.maxRunup = runup
-		if sm.troughEquity != 0 {
-			sm.maxRunupPct = runup / math.Abs(sm.troughEquity) * 100
-		}
-	}
-
-	return sm.maxDrawdown, sm.maxRunup, sm.maxDrawdownPct, sm.maxRunupPct
 }
 
 // AdvanceCursors moves all Series forward to next bar

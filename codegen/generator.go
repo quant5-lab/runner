@@ -800,7 +800,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	/* Sample strategy state before Pine statements execute (ForwardSeriesBuffer paradigm) */
 	if g.hasStrategyRuntimeAccess {
-		code += g.ind() + "sm.SampleCurrentBar(strat, bar.Close)\n"
+		code += g.ind() + "sm.SampleCurrentBar(strat, bar.Close, bar.High, bar.Low)\n"
 	}
 	code += "\n"
 
@@ -3899,12 +3899,27 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 			if obj.Name == "strategy" {
 				if prop, ok := e.Property.(*ast.Identifier); ok {
 					runtimeProps := map[string]bool{
-						"position_avg_price": true,
-						"position_size":      true,
-						"equity":             true,
-						"netprofit":          true,
-						"closedtrades":       true,
-						"opentrades":         true,
+						"position_avg_price":   true,
+						"position_size":        true,
+						"equity":               true,
+						"netprofit":            true,
+						"closedtrades":         true,
+						"opentrades":           true,
+						"max_drawdown":         true,
+						"max_runup":            true,
+						"max_drawdown_percent": true,
+						"max_runup_percent":    true,
+						"initial_capital":      true,
+						"grossprofit":          true,
+						"grossloss":            true,
+						"wintrades":            true,
+						"losstrades":           true,
+						"eventrades":           true,
+						"openprofit":           true,
+						"avg_trade":            true,
+						"avg_winning_trade":    true,
+						"avg_losing_trade":     true,
+						"position_entry_name":  true,
 					}
 					if runtimeProps[prop.Name] {
 						return true

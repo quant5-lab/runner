@@ -106,7 +106,7 @@ func TestStateManagerTradeStatSeries(t *testing.T) {
 			strat := NewStrategy()
 			strat.CallWithPyramiding("Test", 10000, 0)
 			tt.setup(strat)
-			sm.SampleCurrentBar(strat, tt.price)
+			sm.SampleCurrentBar(strat, tt.price, tt.price+5.0, tt.price-5.0)
 
 			if sm.ClosedTradesSeries().Get(0) != tt.wantClosedTrades {
 				t.Errorf("ClosedTrades = %.0f, want %.0f", sm.ClosedTradesSeries().Get(0), tt.wantClosedTrades)
@@ -173,7 +173,7 @@ func TestStateManagerAvgTradeSeries(t *testing.T) {
 			strat := NewStrategy()
 			strat.CallWithPyramiding("Test", 10000, 5)
 			tt.setup(strat)
-			sm.SampleCurrentBar(strat, tt.price)
+			sm.SampleCurrentBar(strat, tt.price, tt.price+5.0, tt.price-5.0)
 
 			if sm.AvgTradeSeries().Get(0) != tt.wantAvgTrade {
 				t.Errorf("AvgTrade = %.6f, want %.6f", sm.AvgTradeSeries().Get(0), tt.wantAvgTrade)
@@ -195,7 +195,7 @@ func TestStateManagerInitialCapitalConstant(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		price := 100.0 + float64(i)
-		sm.SampleCurrentBar(strat, price)
+		sm.SampleCurrentBar(strat, price, price+5.0, price-5.0)
 		ic := sm.InitialCapitalSeries().Get(0)
 		if ic != 25000 {
 			t.Errorf("Bar %d: InitialCapital = %.2f, want 25000", i, ic)
@@ -216,7 +216,7 @@ func TestStateManagerMaxDrawdownNonDecreasing(t *testing.T) {
 	var prevMaxDrawdown float64
 
 	for i, price := range prices {
-		sm.SampleCurrentBar(strat, price)
+		sm.SampleCurrentBar(strat, price, price+5.0, price-5.0)
 		md := sm.MaxDrawdownSeries().Get(0)
 
 		if md < 0 {
@@ -242,7 +242,7 @@ func TestStateManagerMaxRunupNonDecreasing(t *testing.T) {
 	var prevMaxRunup float64
 
 	for i, price := range prices {
-		sm.SampleCurrentBar(strat, price)
+		sm.SampleCurrentBar(strat, price, price+5.0, price-5.0)
 		mr := sm.MaxRunupSeries().Get(0)
 
 		if mr < 0 {
@@ -264,27 +264,34 @@ func TestStateManagerDrawdownPeakTracking(t *testing.T) {
 	strat.Entry("L", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 
-	sm.SampleCurrentBar(strat, 105.0)
-	if sm.MaxDrawdownSeries().Get(0) != 0 {
-		t.Errorf("No drawdown at new peak: got %.2f", sm.MaxDrawdownSeries().Get(0))
+	sm.SampleCurrentBar(strat, 105.0, 110.0, 100.0)
+	firstDD := sm.MaxDrawdownSeries().Get(0)
+	expectedFirstDD := (10000.0 + (110.0-100.0)*10) - (10000.0 + (100.0-100.0)*10)
+	if firstDD != expectedFirstDD {
+		t.Errorf("First bar intrabar drawdown: got %.2f, want %.2f", firstDD, expectedFirstDD)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 100.0)
-	if sm.MaxDrawdownSeries().Get(0) != 50 {
-		t.Errorf("Drawdown from peak: got %.2f, want 50", sm.MaxDrawdownSeries().Get(0))
+	sm.SampleCurrentBar(strat, 100.0, 105.0, 95.0)
+	peakEquity := 10000.0 + (110.0-100.0)*10
+	adverseEquity := 10000.0 + (95.0-100.0)*10
+	expectedDD := peakEquity - adverseEquity
+	if sm.MaxDrawdownSeries().Get(0) != expectedDD {
+		t.Errorf("Drawdown from peak: got %.2f, want %.2f", sm.MaxDrawdownSeries().Get(0), expectedDD)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 90.0)
-	if sm.MaxDrawdownSeries().Get(0) != 150 {
-		t.Errorf("Deeper drawdown: got %.2f, want 150", sm.MaxDrawdownSeries().Get(0))
+	sm.SampleCurrentBar(strat, 90.0, 95.0, 85.0)
+	adverseEquity = 10000.0 + (85.0-100.0)*10
+	expectedDD = peakEquity - adverseEquity
+	if sm.MaxDrawdownSeries().Get(0) != expectedDD {
+		t.Errorf("Deeper drawdown: got %.2f, want %.2f", sm.MaxDrawdownSeries().Get(0), expectedDD)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 110.0)
-	if sm.MaxDrawdownSeries().Get(0) != 150 {
-		t.Errorf("MaxDrawdown must persist after recovery: got %.2f, want 150", sm.MaxDrawdownSeries().Get(0))
+	sm.SampleCurrentBar(strat, 110.0, 115.0, 105.0)
+	if sm.MaxDrawdownSeries().Get(0) != expectedDD {
+		t.Errorf("MaxDrawdown must persist after recovery: got %.2f, want %.2f", sm.MaxDrawdownSeries().Get(0), expectedDD)
 	}
 }
 
@@ -296,27 +303,35 @@ func TestStateManagerRunupTroughTracking(t *testing.T) {
 	strat.Entry("L", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 
-	sm.SampleCurrentBar(strat, 95.0)
-	if sm.MaxRunupSeries().Get(0) != 0 {
-		t.Errorf("No runup at new trough: got %.2f", sm.MaxRunupSeries().Get(0))
+	sm.SampleCurrentBar(strat, 95.0, 100.0, 90.0)
+	firstRU := sm.MaxRunupSeries().Get(0)
+	troughEquity := 10000.0 + (90.0-100.0)*10
+	favorableEquity := 10000.0 + (100.0-100.0)*10
+	expectedFirstRU := favorableEquity - troughEquity
+	if firstRU != expectedFirstRU {
+		t.Errorf("First bar intrabar runup: got %.2f, want %.2f", firstRU, expectedFirstRU)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 100.0)
-	if sm.MaxRunupSeries().Get(0) != 50 {
-		t.Errorf("Runup from trough: got %.2f, want 50", sm.MaxRunupSeries().Get(0))
+	sm.SampleCurrentBar(strat, 100.0, 105.0, 95.0)
+	favorableEquity = 10000.0 + (105.0-100.0)*10
+	expectedRU := favorableEquity - troughEquity
+	if sm.MaxRunupSeries().Get(0) != expectedRU {
+		t.Errorf("Runup from trough: got %.2f, want %.2f", sm.MaxRunupSeries().Get(0), expectedRU)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 110.0)
-	if sm.MaxRunupSeries().Get(0) != 150 {
-		t.Errorf("Larger runup: got %.2f, want 150", sm.MaxRunupSeries().Get(0))
+	sm.SampleCurrentBar(strat, 110.0, 115.0, 105.0)
+	favorableEquity = 10000.0 + (115.0-100.0)*10
+	expectedRU = favorableEquity - troughEquity
+	if sm.MaxRunupSeries().Get(0) != expectedRU {
+		t.Errorf("Larger runup: got %.2f, want %.2f", sm.MaxRunupSeries().Get(0), expectedRU)
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 90.0)
-	if sm.MaxRunupSeries().Get(0) != 150 {
-		t.Errorf("MaxRunup must persist after decline: got %.2f, want 150", sm.MaxRunupSeries().Get(0))
+	sm.SampleCurrentBar(strat, 90.0, 95.0, 85.0)
+	if sm.MaxRunupSeries().Get(0) != expectedRU {
+		t.Errorf("MaxRunup must persist after decline: got %.2f, want %.2f", sm.MaxRunupSeries().Get(0), expectedRU)
 	}
 }
 
@@ -328,11 +343,14 @@ func TestStateManagerMaxDrawdownPercent(t *testing.T) {
 	strat.Entry("L", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
 
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 110.0, 100.0)
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 95.0)
-	expectedPct := 100.0 / 10050.0 * 100.0
+	sm.SampleCurrentBar(strat, 95.0, 100.0, 90.0)
+	peakEquity := 10000.0 + (110.0-100.0)*10
+	adverseEquity := 10000.0 + (90.0-100.0)*10
+	expectedDrawdown := peakEquity - adverseEquity
+	expectedPct := expectedDrawdown / peakEquity * 100.0
 	got := sm.MaxDrawdownPctSeries().Get(0)
 	if math.Abs(got-expectedPct) > 0.001 {
 		t.Errorf("MaxDrawdownPct = %.6f, want %.6f", got, expectedPct)
@@ -382,7 +400,7 @@ func TestStateManagerOpenPositionSeries(t *testing.T) {
 			strat := NewStrategy()
 			strat.CallWithPyramiding("Test", 10000, 5)
 			tt.setup(strat)
-			sm.SampleCurrentBar(strat, tt.price)
+			sm.SampleCurrentBar(strat, tt.price, tt.price+5.0, tt.price-5.0)
 
 			if sm.OpenProfitSeries().Get(0) != tt.wantOpenProfit {
 				t.Errorf("OpenProfit = %.2f, want %.2f", sm.OpenProfitSeries().Get(0), tt.wantOpenProfit)
@@ -400,12 +418,12 @@ func TestStateManagerHistoricalAccessExtendedSeries(t *testing.T) {
 	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.OnBarUpdate(0, 100.0, 1000)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 105.0, 95.0)
 	sm.AdvanceCursors()
 
 	strat.Entry("L", Long, 10, "")
 	strat.OnBarUpdate(1, 110.0, 1001)
-	sm.SampleCurrentBar(strat, 110.0)
+	sm.SampleCurrentBar(strat, 110.0, 115.0, 105.0)
 
 	if sm.GrossProfitSeries().Get(0) != 0 {
 		t.Errorf("Bar1[0] GrossProfit = %.2f, want 0", sm.GrossProfitSeries().Get(0))
@@ -428,10 +446,10 @@ func TestStateManagerAllSeriesAdvanceUniformly(t *testing.T) {
 
 	prices := []float64{100, 105, 95, 110, 100}
 	for _, price := range prices {
-		sm.SampleCurrentBar(strat, price)
+		sm.SampleCurrentBar(strat, price, price+5.0, price-5.0)
 		sm.AdvanceCursors()
 	}
-	sm.SampleCurrentBar(strat, 108.0)
+	sm.SampleCurrentBar(strat, 108.0, 113.0, 103.0)
 
 	equityBar0 := sm.EquitySeries().Get(5)
 	if equityBar0 != 10000 {
