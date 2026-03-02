@@ -21,6 +21,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(NewMetaFunctionHandler())
 	router.RegisterHandler(&PlotFunctionHandler{})
 	router.RegisterHandler(NewStrategyActionHandler())
+	router.RegisterHandler(NewCurrencyConverterHandler())
 	router.RegisterHandler(NewTradeCollectionCallHandler())
 	router.RegisterHandler(&MathCallHandler{})
 	router.RegisterHandler(NewValueCallHandler())

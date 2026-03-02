@@ -23,6 +23,7 @@ func (h *StrategyActionHandler) CanHandle(funcName string) bool {
 	switch funcName {
 	case "strategy.entry", "strategy.close", "strategy.close_all", "strategy.exit",
 		"strategy.order", "strategy.cancel", "strategy.cancel_all",
+		"strategy.default_entry_qty",
 		"strategy.risk.allow_entry_in",
 		"strategy.risk.max_cons_loss_days", "strategy.risk.max_drawdown",
 		"strategy.risk.max_intraday_filled_orders", "strategy.risk.max_intraday_loss",
@@ -51,6 +52,8 @@ func (h *StrategyActionHandler) GenerateCode(g *generator, call *ast.CallExpress
 		return h.generateCancel(g, call)
 	case "strategy.cancel_all":
 		return h.generateCancelAll(g, call)
+	case "strategy.default_entry_qty":
+		return h.generateDefaultEntryQty(g, call)
 	case "strategy.risk.allow_entry_in":
 		return h.generateAllowEntryIn(g, call)
 	case "strategy.risk.max_cons_loss_days",
@@ -230,6 +233,19 @@ func (h *StrategyActionHandler) generateCancelAll(g *generator, call *ast.CallEx
 	}
 
 	return cancelAllCode, nil
+}
+
+func (h *StrategyActionHandler) generateDefaultEntryQty(g *generator, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", nil
+	}
+
+	fillPriceExpr, err := g.generateExpression(call.Arguments[0])
+	if err != nil {
+		return "", err
+	}
+
+	return "strat.DefaultEntryQty(" + fillPriceExpr + ")", nil
 }
 
 func (h *StrategyActionHandler) generateAllowEntryIn(g *generator, call *ast.CallExpression) (string, error) {

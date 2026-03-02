@@ -2151,3 +2151,152 @@ func TestStrategyAllowedDirection_OrderFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestStrategy_SetDefaultQty(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+
+	s.SetDefaultQty(50, QtyTypePercentOfEquity)
+
+	if s.defaultQtyValue != 50 {
+		t.Errorf("defaultQtyValue = %v, expected 50", s.defaultQtyValue)
+	}
+	if s.defaultQtyType != QtyTypePercentOfEquity {
+		t.Errorf("defaultQtyType = %q, expected %q", s.defaultQtyType, QtyTypePercentOfEquity)
+	}
+}
+
+func TestStrategy_DefaultEntryQty(t *testing.T) {
+	tests := []struct {
+		name       string
+		qtyType    string
+		qtyValue   float64
+		fillPrice  float64
+		initialCap float64
+		expected   float64
+	}{
+		{
+			name:       "fixed type returns qty value directly",
+			qtyType:    QtyTypeFixed,
+			qtyValue:   10,
+			fillPrice:  100,
+			initialCap: 10000,
+			expected:   10,
+		},
+		{
+			name:       "cash type divides by fill price",
+			qtyType:    QtyTypeCash,
+			qtyValue:   1000,
+			fillPrice:  50,
+			initialCap: 10000,
+			expected:   20,
+		},
+		{
+			name:       "percent_of_equity uses current equity",
+			qtyType:    QtyTypePercentOfEquity,
+			qtyValue:   10,
+			fillPrice:  50,
+			initialCap: 10000,
+			expected:   20,
+		},
+		{
+			name:       "zero fill price returns zero",
+			qtyType:    QtyTypeCash,
+			qtyValue:   1000,
+			fillPrice:  0,
+			initialCap: 10000,
+			expected:   0,
+		},
+		{
+			name:       "negative fill price returns zero",
+			qtyType:    QtyTypeCash,
+			qtyValue:   1000,
+			fillPrice:  -50,
+			initialCap: 10000,
+			expected:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCap)
+			s.SetDefaultQty(tt.qtyValue, tt.qtyType)
+
+			result := s.DefaultEntryQty(tt.fillPrice)
+
+			if result != tt.expected {
+				t.Errorf("DefaultEntryQty(%v) = %v, expected %v", tt.fillPrice, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStrategy_DefaultEntryQty_DynamicEquity(t *testing.T) {
+	s := NewStrategy()
+	s.Call("Test", 10000)
+	s.SetDefaultQty(10, QtyTypePercentOfEquity)
+
+	result1 := s.DefaultEntryQty(100)
+	expected1 := 10.0
+	if result1 != expected1 {
+		t.Errorf("initial equity: got %v, want %v", result1, expected1)
+	}
+
+	s.Entry("long", Long, 5, "")
+	s.OnBarUpdate(1, 100, 1000)
+	s.OnBarUpdate(2, 120, 2000)
+
+	result2 := s.DefaultEntryQty(120)
+	if result2 == result1 {
+		t.Errorf("qty should change with equity, both=%v", result1)
+	}
+}
+
+func TestStrategy_ConvertToAccount(t *testing.T) {
+	s := NewStrategy()
+
+	tests := []struct {
+		name  string
+		input float64
+	}{
+		{"positive value", 100},
+		{"negative value", -50},
+		{"zero", 0},
+		{"large value", 1e10},
+		{"small value", 1e-10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.ConvertToAccount(tt.input)
+			if result != tt.input {
+				t.Errorf("ConvertToAccount(%v) = %v, want %v", tt.input, result, tt.input)
+			}
+		})
+	}
+}
+
+func TestStrategy_ConvertToSymbol(t *testing.T) {
+	s := NewStrategy()
+
+	tests := []struct {
+		name  string
+		input float64
+	}{
+		{"positive value", 200},
+		{"negative value", -100},
+		{"zero", 0},
+		{"large value", 1e12},
+		{"small value", 1e-12},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.ConvertToSymbol(tt.input)
+			if result != tt.input {
+				t.Errorf("ConvertToSymbol(%v) = %v, want %v", tt.input, result, tt.input)
+			}
+		})
+	}
+}

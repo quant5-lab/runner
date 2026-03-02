@@ -411,19 +411,23 @@ func (ec *EquityCalculator) GetNetProfit() float64 {
 
 /* Strategy implements strategy operations */
 type Strategy struct {
-	context          interface{} // Context with OHLCV data
-	orderManager     *OrderManager
-	positionTracker  *PositionTracker
-	tradeHistory     *TradeHistory
-	equityCalculator *EquityCalculator
-	reversalHandler  *PositionReversalHandler
-	initialized      bool
-	currentBar       int
-	currentPrice     float64
-	pyramiding       int
-	commissionValue  float64
-	commissionType   string
-	allowedDirection string
+	context           interface{} // Context with OHLCV data
+	orderManager      *OrderManager
+	positionTracker   *PositionTracker
+	tradeHistory      *TradeHistory
+	equityCalculator  *EquityCalculator
+	reversalHandler   *PositionReversalHandler
+	defaultQtyCalc    *DefaultQtyCalculator
+	currencyConverter *CurrencyConverter
+	initialized       bool
+	currentBar        int
+	currentPrice      float64
+	pyramiding        int
+	commissionValue   float64
+	commissionType    string
+	defaultQtyValue   float64
+	defaultQtyType    string
+	allowedDirection  string
 }
 
 func NewStrategy() *Strategy {
@@ -434,13 +438,15 @@ func NewStrategy() *Strategy {
 	rh := NewPositionReversalHandler(th, pt, ec)
 
 	return &Strategy{
-		orderManager:     om,
-		positionTracker:  pt,
-		tradeHistory:     th,
-		equityCalculator: ec,
-		reversalHandler:  rh,
-		initialized:      false,
-		pyramiding:       -1,
+		orderManager:      om,
+		positionTracker:   pt,
+		tradeHistory:      th,
+		equityCalculator:  ec,
+		reversalHandler:   rh,
+		defaultQtyCalc:    NewDefaultQtyCalculator(),
+		currencyConverter: NewCurrencyConverter(),
+		initialized:       false,
+		pyramiding:        -1,
 	}
 }
 
@@ -461,6 +467,23 @@ func (s *Strategy) CallWithPyramiding(strategyName string, initialCapital float6
 func (s *Strategy) SetCommission(value float64, commType string) {
 	s.commissionValue = value
 	s.commissionType = commType
+}
+
+func (s *Strategy) SetDefaultQty(value float64, qtyType string) {
+	s.defaultQtyValue = value
+	s.defaultQtyType = qtyType
+}
+
+func (s *Strategy) DefaultEntryQty(fillPrice float64) float64 {
+	return s.defaultQtyCalc.CalculateQty(s.defaultQtyType, s.defaultQtyValue, fillPrice, s.Equity())
+}
+
+func (s *Strategy) ConvertToAccount(value float64) float64 {
+	return s.currencyConverter.ToAccount(value)
+}
+
+func (s *Strategy) ConvertToSymbol(value float64) float64 {
+	return s.currencyConverter.ToSymbol(value)
 }
 
 /* SetAllowedDirection restricts entry direction; DirectionAll permits both */

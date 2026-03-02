@@ -566,6 +566,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.strategyConfig.CommissionType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetCommission(%.10g, %q)\n", g.strategyConfig.CommissionValue, g.strategyConfig.CommissionType)
 	}
+	if g.strategyConfig.DefaultQtyType != "" {
+		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
+	}
 	code += "\n"
 
 	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
@@ -3281,6 +3284,9 @@ func (g *generator) generatePlaceholder() string {
 	code += g.ind() + fmt.Sprintf("strat.CallWithPyramiding(%q, %.0f, %d)\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital, g.strategyConfig.Pyramiding)
 	if g.strategyConfig.CommissionType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetCommission(%.10g, %q)\n", g.strategyConfig.CommissionValue, g.strategyConfig.CommissionType)
+	}
+	if g.strategyConfig.DefaultQtyType != "" {
+		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
