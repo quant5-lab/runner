@@ -1,0 +1,11 @@
+//@version=5
+indicator("BBW Arrow Mixed", overlay=false)
+
+directWidth = ta.bbw(close, 20, 2.0)
+
+arrowWidth(period) => ta.bbw(close, period, 2.0)
+indirectWidth = arrowWidth(20)
+
+plot(directWidth, "Direct", color=color.blue)
+plot(indirectWidth, "Arrow", color=color.red)
+plot(directWidth - indirectWidth, "Difference", color=color.gray)

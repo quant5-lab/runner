@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/codegen/series_naming"
 )
 
 type ArrowFunctionTACallGenerator struct {
@@ -60,8 +61,16 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return a.generatePivotCall(funcName, call)
 	}
 
+	if a.iifeRegistry.IsRegisteredDualPeriod(funcName) {
+		return a.generateDualPeriodTACall(funcName, call)
+	}
+
 	if a.tupleRegistry.IsRegistered(funcName) {
 		return a.generateTupleIIFE(funcName, call)
+	}
+
+	if funcName == "ta.bbw" || funcName == "bbw" {
+		return a.generateBBWCall(call)
 	}
 
 	accessor, periodExpr, err := a.extractTAArguments(funcName, call)
@@ -180,6 +189,69 @@ func (a *ArrowFunctionTACallGenerator) generatePivotCall(funcName string, call *
 	code, ok := a.iifeRegistry.GenerateDualPeriod(funcName, accessor, leftPeriod, rightPeriod, sourceHash)
 	if !ok {
 		return "", fmt.Errorf("pivot function %s requires dual-period IIFE generator", funcName)
+	}
+
+	return code, nil
+}
+
+func (a *ArrowFunctionTACallGenerator) generateDualPeriodTACall(funcName string, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 3 {
+		return "", fmt.Errorf("%s requires 3 arguments (source, shortPeriod, longPeriod)", funcName)
+	}
+
+	accessor, err := a.accessorFactory.CreateAccessorForExpression(call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for %s: %w", funcName, err)
+	}
+
+	leftPeriod, err := a.extractPeriodExpression(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("failed to extract first period for %s: %w", funcName, err)
+	}
+
+	rightPeriod, err := a.extractPeriodExpression(call.Arguments[2])
+	if err != nil {
+		return "", fmt.Errorf("failed to extract second period for %s: %w", funcName, err)
+	}
+
+	hasher := &ExpressionHasher{}
+	sourceHash := hasher.Hash(call.Arguments[0])
+
+	code, ok := a.iifeRegistry.GenerateDualPeriod(funcName, accessor, leftPeriod, rightPeriod, sourceHash)
+	if !ok {
+		return "", fmt.Errorf("dual-period IIFE generator for %s not found", funcName)
+	}
+
+	return code, nil
+}
+
+func (a *ArrowFunctionTACallGenerator) generateBBWCall(call *ast.CallExpression) (string, error) {
+	accessor, periodExpr, err := a.extractTAArguments("ta.bbw", call)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract BBW arguments: %w", err)
+	}
+
+	multExtractor := NewBBWMultExtractor(a.exprGen)
+	multResult, err := multExtractor.Extract(call)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract mult: %w", err)
+	}
+
+	generator := a.createBBWGenerator(multResult)
+
+	sourceHash := ""
+	if len(call.Arguments) > 0 {
+		hasher := &ExpressionHasher{}
+		sourceHash = hasher.Hash(call.Arguments[0])
+	}
+
+	code := generator.Generate(accessor, periodExpr, sourceHash)
+
+	if preambleAccessor, ok := accessor.(interface{ GetPreamble() string }); ok {
+		preamble := preambleAccessor.GetPreamble()
+		if preamble != "" {
+			return fmt.Sprintf("func() float64 { %s\nreturn %s }()", preamble, code), nil
+		}
 	}
 
 	return code, nil
@@ -369,4 +441,20 @@ func (b *TupleArgumentBuilder) isSourceArgument(argIndex int, spec *TupleIndicat
 
 func (a *ArrowFunctionParameterAccessor) GetBaseOffset() int {
 	return 0
+}
+
+func (a *ArrowFunctionTACallGenerator) createBBWGenerator(multResult *BBWMultResult) *BBWIIFEGenerator {
+	if multResult.IsLiteral {
+		return &BBWIIFEGenerator{
+			namingStrategy: series_naming.NewWindowBasedNamer(),
+			multLiteral:    multResult.Literal,
+			useLiteralMult: true,
+		}
+	}
+
+	return &BBWIIFEGenerator{
+		namingStrategy: series_naming.NewWindowBasedNamer(),
+		multExpression: multResult.Expression,
+		useLiteralMult: false,
+	}
 }

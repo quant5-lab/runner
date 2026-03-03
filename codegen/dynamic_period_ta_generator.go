@@ -18,6 +18,8 @@ var dynamicPeriodDispatch = map[string]DynamicPeriodEmitter{
 	"ta.highest": DynamicHighestEmitter{},
 	"ta.lowest":  DynamicLowestEmitter{},
 	"ta.atr":     DynamicATREmitter{},
+	"ta.cci":     DynamicCCIEmitter{},
+	"ta.cog":     DynamicCOGEmitter{},
 }
 
 type DynamicPeriodTAGenerator struct {
@@ -41,6 +43,32 @@ func (g *DynamicPeriodTAGenerator) Generate(
 	emitter, ok := dynamicPeriodDispatch[functionName]
 	if !ok {
 		return "", fmt.Errorf("%s does not support runtime dynamic periods", functionName)
+	}
+
+	periodExpr := g.renderPeriodExpression(periodResult.DynamicExpr)
+	sourceAccessor := g.extractSourceAccessor(sourceExpr)
+
+	code := g.gen.ind() + "{\n"
+	g.gen.indent++
+	code += g.gen.ind() + fmt.Sprintf("period := int(%s)\n", periodExpr)
+	code += emitter.EmitCalculation(g.gen, varName, sourceAccessor)
+	g.gen.indent--
+	code += g.gen.ind() + "}\n"
+
+	return code, nil
+}
+
+/* GenerateWithEmitter produces runtime-dynamic period code using a caller-supplied emitter.
+ * Use when the emitter requires construction-time parameters not expressible in the shared
+ * EmitCalculation signature (e.g. DynamicBBWEmitter captures mult). */
+func (g *DynamicPeriodTAGenerator) GenerateWithEmitter(
+	varName string,
+	emitter DynamicPeriodEmitter,
+	sourceExpr ast.Expression,
+	periodResult PeriodEvaluationResult,
+) (string, error) {
+	if !periodResult.IsRuntimeDynamic() {
+		return "", nil
 	}
 
 	periodExpr := g.renderPeriodExpression(periodResult.DynamicExpr)

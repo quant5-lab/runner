@@ -62,6 +62,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})
 	gen.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
 	gen.compositeIndicatorRegistry.Register("mfi", &MFIHandler{})
+	gen.compositeIndicatorRegistry.Register("ta.tsi", &TsiHandler{})
+	gen.compositeIndicatorRegistry.Register("tsi", &TsiHandler{})
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.constEvaluator = validation.NewWarmupAnalyzer()

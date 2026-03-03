@@ -54,6 +54,7 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 
 	r.RegisterDualPeriodWithBareAlias("ta.pivothigh", &PivotHighIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterDualPeriodWithBareAlias("ta.pivotlow", &PivotLowIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterDualPeriodWithBareAlias("ta.tsi", &TSIIIFEGenerator{namingStrategy: statefulNamer})
 
 	r.RegisterWithBareAlias("ta.max", &MaxIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.min", &MinIIFEGenerator{namingStrategy: windowNamer})
@@ -71,6 +72,13 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	r.RegisterWithBareAlias("ta.roc", &RocIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.cmo", &CmoIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.wpr", &WprIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.cci", &CCIIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.bbw", &BBWIIFEGenerator{
+		namingStrategy: windowNamer,
+		multLiteral:    2.0,
+		useLiteralMult: true,
+	})
+	r.RegisterWithBareAlias("ta.cog", &COGIIFEGenerator{namingStrategy: windowNamer})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {
@@ -93,6 +101,11 @@ func (r *InlineTAIIFERegistry) RegisterDualPeriodWithBareAlias(namespacedName st
 	if i := strings.LastIndex(namespacedName, "."); i >= 0 {
 		r.RegisterDualPeriod(namespacedName[i+1:], generator)
 	}
+}
+
+func (r *InlineTAIIFERegistry) IsRegisteredDualPeriod(funcName string) bool {
+	_, ok := r.dualPeriodGenerators[funcName]
+	return ok
 }
 
 func (r *InlineTAIIFERegistry) IsSupported(funcName string) bool {
@@ -407,6 +420,20 @@ func (g *LinregIIFEGenerator) GenerateWithOffset(accessor AccessGenerator, perio
 		WithWarmupCheckPeriodExpression(period, accessor.GetBaseOffset()).
 		WithBody(body).
 		Build()
+}
+
+type TSIIIFEGenerator struct{ namingStrategy series_naming.Strategy }
+
+func (g *TSIIIFEGenerator) GenerateDualPeriod(accessor AccessGenerator, leftPeriod, rightPeriod PeriodExpression, sourceHash string) string {
+	context := NewArrowFunctionIndicatorContext()
+	periodPart := leftPeriod.AsSeriesNamePart() + "_" + rightPeriod.AsSeriesNamePart()
+	varName := g.namingStrategy.GenerateName("tsi", periodPart, sourceHash)
+
+	builder := NewTSIIndicatorBuilder(varName, leftPeriod, rightPeriod, accessor, context)
+	statefulCode := builder.Build()
+	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", varName)
+
+	return fmt.Sprintf("func() float64 {\n%s\n\treturn %s\n}()", statefulCode, seriesAccess)
 }
 
 type PivotHighIIFEGenerator struct{ namingStrategy series_naming.Strategy }

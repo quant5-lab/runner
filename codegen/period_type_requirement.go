@@ -59,6 +59,9 @@ func (r *PeriodRequirementRepository) registerBuiltinSpecs() {
 		"ta.lowest":  1,
 		"ta.bb":      1,
 		"ta.macd":    1,
+		"ta.cci":     1,
+		"ta.bbw":     1,
+		"ta.cog":     1,
 	}
 
 	for fn, pos := range simpleIntIndicators {

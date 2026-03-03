@@ -30,6 +30,17 @@ func buildTACacheKey(funcName, sourceName string, period int) string {
 	return fmt.Sprintf("%s_%s_%d", funcName, sourceName, period)
 }
 
+func extractSourceOnlyArgument(call *ast.CallExpression, funcName string) (*ast.Identifier, error) {
+	if len(call.Arguments) < 1 {
+		return nil, newInsufficientArgumentsError(funcName, 1, 0)
+	}
+	sourceID, ok := call.Arguments[0].(*ast.Identifier)
+	if !ok {
+		return nil, newInvalidArgumentTypeError(funcName, 0, "identifier")
+	}
+	return sourceID, nil
+}
+
 func extractPeriodArgument(call *ast.CallExpression, funcName string) (int, error) {
 	if len(call.Arguments) < 1 {
 		return 0, newMissingArgumentError(funcName, "period")

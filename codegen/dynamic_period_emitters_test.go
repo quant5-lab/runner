@@ -9,6 +9,7 @@ func TestDynamicPeriodEmitter_DispatchCompleteness(t *testing.T) {
 	expectedFunctions := []string{
 		"ta.sma", "ta.ema", "ta.rsi", "ta.stdev",
 		"ta.highest", "ta.lowest", "ta.atr",
+		"ta.cci", "ta.cog",
 	}
 
 	for _, fn := range expectedFunctions {
@@ -39,6 +40,9 @@ func TestDynamicPeriodEmitter_WarmupThresholdClassification(t *testing.T) {
 			"STDEV":   DynamicSTDEVEmitter{},
 			"Highest": DynamicHighestEmitter{},
 			"Lowest":  DynamicLowestEmitter{},
+			"CCI":     DynamicCCIEmitter{},
+			"COG":     DynamicCOGEmitter{},
+			"BBW":     DynamicBBWEmitter{mult: 2.0},
 		}
 		for name, emitter := range emitters {
 			code := emitter.EmitCalculation(g, "test", "closeSeries")
@@ -89,6 +93,9 @@ func TestDynamicPeriodEmitter_VarNamePropagation(t *testing.T) {
 		"Highest": DynamicHighestEmitter{},
 		"Lowest":  DynamicLowestEmitter{},
 		"ATR":     DynamicATREmitter{},
+		"CCI":     DynamicCCIEmitter{},
+		"COG":     DynamicCOGEmitter{},
+		"BBW":     DynamicBBWEmitter{mult: 2.0},
 	}
 
 	for name, emitter := range allEmitters {
@@ -114,6 +121,9 @@ func TestDynamicPeriodEmitter_SourceAccessorUsage(t *testing.T) {
 			"STDEV":   DynamicSTDEVEmitter{},
 			"Highest": DynamicHighestEmitter{},
 			"Lowest":  DynamicLowestEmitter{},
+			"CCI":     DynamicCCIEmitter{},
+			"COG":     DynamicCOGEmitter{},
+			"BBW":     DynamicBBWEmitter{mult: 2.0},
 		}
 		for name, emitter := range emitters {
 			code := emitter.EmitCalculation(g, "test", "mySrcSeries")
@@ -397,6 +407,9 @@ func TestDynamicPeriodEmitter_InvalidPeriodGuard(t *testing.T) {
 		"Highest": DynamicHighestEmitter{},
 		"Lowest":  DynamicLowestEmitter{},
 		"ATR":     DynamicATREmitter{},
+		"CCI":     DynamicCCIEmitter{},
+		"COG":     DynamicCOGEmitter{},
+		"BBW":     DynamicBBWEmitter{mult: 2.0},
 	}
 
 	for name, emitter := range allEmitters {
@@ -409,6 +422,120 @@ func TestDynamicPeriodEmitter_InvalidPeriodGuard(t *testing.T) {
 			}
 			if !strings.Contains(code, "testSeries.Set(math.NaN())") {
 				t.Errorf("%s must emit NaN for invalid period", name)
+			}
+		})
+	}
+}
+
+func TestDynamicPeriodEmitter_CCIAlgorithm(t *testing.T) {
+	g := newMinimalGenerator()
+	code := DynamicCCIEmitter{}.EmitCalculation(g, "myCci", "closeSeries")
+
+	requiredComponents := []struct {
+		pattern string
+		desc    string
+	}{
+		{"sma := 0.0", "SMA accumulator"},
+		{"for j := 0; j < period; j++ { sma +=", "SMA loop"},
+		{"sma /= float64(period)", "SMA mean calculation"},
+		{"dev := 0.0", "deviation accumulator"},
+		{"if v > sma { dev += v - sma } else { dev += sma - v }", "mean absolute deviation"},
+		{"dev /= float64(period)", "average deviation"},
+		{"if dev == 0.0", "zero deviation guard"},
+		{"myCciSeries.Set(0.0)", "zero fallback"},
+		{"closeSeries.Get(0) - sma", "CCI numerator formula"},
+		{"0.015 * dev", "CCI constant scaling"},
+	}
+
+	for _, rc := range requiredComponents {
+		t.Run(rc.desc, func(t *testing.T) {
+			if !strings.Contains(code, rc.pattern) {
+				t.Errorf("CCI emitter missing %s: %q\nGot:\n%s", rc.desc, rc.pattern, code)
+			}
+		})
+	}
+
+	t.Run("sma_precedes_deviation_two_pass", func(t *testing.T) {
+		smaIdx := strings.Index(code, "sma := 0.0")
+		devIdx := strings.Index(code, "dev := 0.0")
+		if smaIdx >= devIdx {
+			t.Error("CCI must compute SMA before mean absolute deviation (two-pass)")
+		}
+	})
+}
+
+func TestDynamicPeriodEmitter_COGAlgorithm(t *testing.T) {
+	g := newMinimalGenerator()
+	code := DynamicCOGEmitter{}.EmitCalculation(g, "myCog", "closeSeries")
+
+	requiredComponents := []struct {
+		pattern string
+		desc    string
+	}{
+		{"num, den := 0.0, 0.0", "numerator and denominator accumulators"},
+		{"for j := 0; j < period; j++", "loop over period"},
+		{"num += v * float64(j+1)", "weighted accumulation"},
+		{"den += v", "sum accumulation"},
+		{"if den == 0.0", "zero denominator guard"},
+		{"myCogSeries.Set(0.0)", "zero denominator fallback assignment"},
+		{"-num / den", "COG negative ratio formula"},
+	}
+
+	for _, rc := range requiredComponents {
+		t.Run(rc.desc, func(t *testing.T) {
+			if !strings.Contains(code, rc.pattern) {
+				t.Errorf("COG emitter missing %s: %q\nGot:\n%s", rc.desc, rc.pattern, code)
+			}
+		})
+	}
+}
+
+func TestDynamicPeriodEmitter_BBWAlgorithm(t *testing.T) {
+	g := newMinimalGenerator()
+	code := DynamicBBWEmitter{mult: 2.0}.EmitCalculation(g, "myBbw", "closeSeries")
+
+	requiredComponents := []struct {
+		pattern string
+		desc    string
+	}{
+		{"sma := 0.0", "SMA accumulator"},
+		{"sma /= float64(period)", "SMA mean"},
+		{"variance := 0.0", "variance accumulator"},
+		{"variance += d * d", "squared deviation accumulation"},
+		{"sd := math.Sqrt(variance / float64(period))", "population standard deviation"},
+		{"if sma == 0.0", "zero SMA guard"},
+		{"myBbwSeries.Set(0.0)", "zero SMA fallback assignment"},
+		{"sd / sma", "bandwidth ratio numerator over SMA"},
+	}
+
+	for _, rc := range requiredComponents {
+		t.Run(rc.desc, func(t *testing.T) {
+			if !strings.Contains(code, rc.pattern) {
+				t.Errorf("BBW emitter missing %s: %q\nGot:\n%s", rc.desc, rc.pattern, code)
+			}
+		})
+	}
+}
+
+func TestDynamicBBWEmitter_MultCapture(t *testing.T) {
+	g := newMinimalGenerator()
+
+	cases := []struct {
+		name    string
+		mult    float64
+		wantStr string
+	}{
+		{"mult_2", 2.0, "2.0 * 2 * sd / sma"},
+		{"mult_3", 3.0, "2.0 * 3 * sd / sma"},
+		{"mult_fractional", 2.5, "2.0 * 2.5 * sd / sma"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code := DynamicBBWEmitter{mult: tc.mult}.EmitCalculation(g, "b", "closeSeries")
+			g.indent = 0
+			if !strings.Contains(code, tc.wantStr) {
+				t.Errorf("BBW with mult=%g should generate %q, got:\n%s", tc.mult, tc.wantStr, code)
 			}
 		})
 	}

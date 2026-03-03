@@ -71,6 +71,11 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&RocHandler{},
 			&CmoHandler{},
 			&WprHandler{},
+			&SwmaHandler{},
+			&CciHandler{},
+			&BbwHandler{},
+			&CogHandler{},
+			&TsiHandler{},
 		},
 	}
 }

@@ -128,6 +128,38 @@ func (e *TAArgumentExtractor) Extract(call *ast.CallExpression, funcName string)
 	}, nil
 }
 
+/* ExtractSourceOnly prepares components for fixed-period TA indicators that take only a source argument (e.g. ta.swma). */
+func (e *TAArgumentExtractor) ExtractSourceOnly(call *ast.CallExpression, funcName string) (*TAArgumentComponents, error) {
+	if len(call.Arguments) < 1 {
+		return nil, fmt.Errorf("%s requires at least 1 argument", funcName)
+	}
+
+	sourceExpr := call.Arguments[0]
+	sourceInfo := e.classifier.ClassifyAST(sourceExpr)
+	accessGen := CreateAccessGenerator(sourceInfo)
+	needsNaN := sourceInfo.IsSeriesVariable()
+	preamble := ""
+
+	if e.requiresExpressionAccessor(sourceExpr, sourceInfo) {
+		preambleCode, err := e.registerNestedTempVars(sourceExpr)
+		if err != nil {
+			return nil, err
+		}
+		preamble += preambleCode
+		accessGen = NewSeriesExpressionAccessor(sourceExpr, e.generator.symbolTable, e.generator.tempVarMgr.GetVarNameForCall)
+		needsNaN = true
+	}
+
+	return &TAArgumentComponents{
+		SourceExpr:    sourceExpr,
+		Period:        0,
+		SourceInfo:    sourceInfo,
+		AccessGen:     accessGen,
+		NeedsNaNCheck: needsNaN,
+		Preamble:      preamble,
+	}, nil
+}
+
 func (e *TAArgumentExtractor) isTrBuiltin(expr ast.Expression) bool {
 	if id, ok := expr.(*ast.Identifier); ok && id.Name == "tr" {
 		return true
@@ -222,6 +254,26 @@ func (e *TAArgumentExtractor) registerNestedTempVars(expr ast.Expression) (strin
 	}
 
 	return code, nil
+}
+
+/* ExtractConstantPeriodAt evaluates a compile-time constant period from an arbitrary argument position.
+ * For parameters typed as Pine Script "simple int" — rejects runtime-dynamic expressions.
+ * Use when a function has multiple period parameters (e.g. ta.tsi shortLength + longLength). */
+func (e *TAArgumentExtractor) ExtractConstantPeriodAt(call *ast.CallExpression, argPosition int, funcName string) (int, error) {
+	if len(call.Arguments) <= argPosition {
+		return 0, fmt.Errorf("%s requires argument at position %d", funcName, argPosition)
+	}
+	result := e.extractPeriodResult(call.Arguments[argPosition], funcName)
+	if result.IsFailed() {
+		return 0, fmt.Errorf("%s: %s", funcName, result.FailureReason)
+	}
+	if result.IsRuntimeDynamic() {
+		return 0, fmt.Errorf("%s period at position %d must be compile-time constant (Pine Script 'simple int')", funcName, argPosition)
+	}
+	if result.StaticValue <= 0 {
+		return 0, fmt.Errorf("%s period at position %d must be positive, got %d", funcName, argPosition, result.StaticValue)
+	}
+	return result.StaticValue, nil
 }
 
 func (e *TAArgumentExtractor) extractPeriodResult(periodArg ast.Expression, funcName string) PeriodEvaluationResult {

@@ -1,0 +1,7 @@
+//@version=5
+indicator("BBW Arrow Mult Literal", overlay=false)
+
+calcWidth(src, period) => ta.bbw(src, period, 2.5)
+
+width = calcWidth(close, 20)
+plot(width, "BBW 2.5x")

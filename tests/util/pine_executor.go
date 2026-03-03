@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -160,8 +161,8 @@ func (e *PineExecutor) executePipeline(t *testing.T, name, script, dataFilePath,
 	var rawOutput struct {
 		Indicators map[string]struct {
 			Data []struct {
-				Time  int64   `json:"time"`
-				Value float64 `json:"value"`
+				Time  int64    `json:"time"`
+				Value *float64 `json:"value"`
 			} `json:"data"`
 		} `json:"indicators"`
 		Strategy struct {
@@ -182,7 +183,11 @@ func (e *PineExecutor) executePipeline(t *testing.T, name, script, dataFilePath,
 	for title, indicator := range rawOutput.Indicators {
 		plot := StrategyPlot{Title: title}
 		for _, d := range indicator.Data {
-			plot.Data = append(plot.Data, PlotPoint{Time: d.Time, Value: d.Value})
+			v := math.NaN()
+			if d.Value != nil {
+				v = *d.Value
+			}
+			plot.Data = append(plot.Data, PlotPoint{Time: d.Time, Value: v})
 		}
 		output.Plots = append(output.Plots, plot)
 	}

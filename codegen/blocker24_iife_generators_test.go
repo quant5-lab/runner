@@ -230,3 +230,84 @@ func TestArrowCtxSeriesAccessor_PreambleAndAccess(t *testing.T) {
 		t.Errorf("Current access should use Get(0), got: %s", currentAccess)
 	}
 }
+
+/* TestTSIIIFEGenerator_GenerateDualPeriod verifies double-EMA chain code generation */
+func TestTSIIIFEGenerator_GenerateDualPeriod(t *testing.T) {
+	gen := &TSIIIFEGenerator{namingStrategy: series_naming.NewStatefulIndicatorNamer()}
+	accessor := NewArrowFunctionParameterAccessor("src")
+	shortPeriod := NewConstantPeriod(5)
+	longPeriod := NewConstantPeriod(13)
+
+	code := gen.GenerateDualPeriod(accessor, shortPeriod, longPeriod, "testhash")
+
+	t.Run("iife_wrapping", func(t *testing.T) {
+		if !strings.Contains(code, "func() float64") {
+			t.Errorf("TSI must be wrapped in IIFE func() float64")
+		}
+		if !strings.Contains(code, "}()") {
+			t.Errorf("TSI IIFE must be closed with }()")
+		}
+	})
+
+	t.Run("internal_series_created", func(t *testing.T) {
+		if !strings.Contains(code, "arrowCtx.GetOrCreateSeries(") {
+			t.Errorf("TSI must use arrowCtx for stateful series storage")
+		}
+		for _, suffix := range []string{"_mom_abs", "_ema1_mom", "_ema1_abs", "_ema2_mom", "_ema2_abs"} {
+			if !strings.Contains(code, suffix) {
+				t.Errorf("TSI must create internal series with suffix %q", suffix)
+			}
+		}
+	})
+
+	t.Run("double_ema_smoothing", func(t *testing.T) {
+		firstAlpha := strings.Index(code, "alpha")
+		if firstAlpha < 0 {
+			t.Fatal("TSI must use EMA alpha")
+		}
+		secondAlpha := strings.Index(code[firstAlpha+1:], "alpha")
+		if secondAlpha < 0 {
+			t.Error("TSI double-EMA requires alpha to appear at least twice (two EMA passes)")
+		}
+	})
+
+	t.Run("formula_components", func(t *testing.T) {
+		if !strings.Contains(code, "100.0") {
+			t.Errorf("TSI formula must scale by 100")
+		}
+		if !strings.Contains(code, "math.Abs") {
+			t.Errorf("TSI must compute absolute momentum via math.Abs")
+		}
+	})
+}
+
+/* TestInlineTAIIFERegistry_TSIRegistration verifies ta.tsi and tsi are registered as dual-period */
+func TestInlineTAIIFERegistry_TSIRegistration(t *testing.T) {
+	registry := NewInlineTAIIFERegistry()
+
+	t.Run("ta_dot_tsi_is_dual_period", func(t *testing.T) {
+		if !registry.IsRegisteredDualPeriod("ta.tsi") {
+			t.Error("ta.tsi must be registered as dual-period generator")
+		}
+	})
+
+	t.Run("tsi_bare_alias_is_dual_period", func(t *testing.T) {
+		if !registry.IsRegisteredDualPeriod("tsi") {
+			t.Error("tsi (bare alias) must be registered as dual-period generator")
+		}
+	})
+
+	t.Run("ta_dot_tsi_is_supported", func(t *testing.T) {
+		if !registry.IsSupported("ta.tsi") {
+			t.Error("ta.tsi must be supported (IsSupported covers dual-period too)")
+		}
+	})
+
+	t.Run("single_period_functions_not_dual_period", func(t *testing.T) {
+		for _, fn := range []string{"ta.sma", "ta.ema", "ta.cci", "ta.cog"} {
+			if registry.IsRegisteredDualPeriod(fn) {
+				t.Errorf("%q should not be registered as dual-period", fn)
+			}
+		}
+	})
+}

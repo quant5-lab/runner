@@ -1,0 +1,14 @@
+//@version=5
+indicator("BBW Arrow Tuple", overlay=false)
+
+bandwidths(src, period) =>
+    narrow = ta.bbw(src, period, 1.5)
+    standard = ta.bbw(src, period, 2.0)
+    wide = ta.bbw(src, period, 2.5)
+    [narrow, standard, wide]
+
+[n, s, w] = bandwidths(close, 20)
+
+plot(n, "Narrow 1.5x", color=color.blue)
+plot(s, "Standard 2.0x", color=color.gray)
+plot(w, "Wide 2.5x", color=color.orange)

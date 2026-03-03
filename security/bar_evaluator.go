@@ -1,6 +1,7 @@
 package security
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/quant5-lab/runner/ast"
@@ -206,6 +207,16 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateATRAtBar(call, secCtx, barIdx)
 	case "ta.stdev":
 		return e.evaluateSTDEVAtBar(call, secCtx, barIdx)
+	case "ta.swma":
+		return e.evaluateSWMAAtBar(call, secCtx, barIdx)
+	case "ta.cci":
+		return e.evaluateCCIAtBar(call, secCtx, barIdx)
+	case "ta.bbw":
+		return e.evaluateBBWAtBar(call, secCtx, barIdx)
+	case "ta.cog":
+		return e.evaluateCOGAtBar(call, secCtx, barIdx)
+	case "ta.tsi":
+		return e.evaluateTSIAtBar(call, secCtx, barIdx)
 	case "ta.pivothigh":
 		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
 	case "ta.pivotlow":
@@ -290,6 +301,154 @@ func (e *StreamingBarEvaluator) evaluateSTDEVAtBar(call *ast.CallExpression, sec
 	stateManager := e.getOrCreateTAState(cacheKey, period, secCtx)
 
 	return stateManager.ComputeAtBar(secCtx, sourceID, barIdx)
+}
+
+func (e *StreamingBarEvaluator) evaluateSWMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, err := extractSourceOnlyArgument(call, "swma")
+	if err != nil {
+		return 0.0, err
+	}
+	if barIdx < 3 {
+		return math.NaN(), nil
+	}
+	weights := [4]float64{1.0 / 6.0, 2.0 / 6.0, 2.0 / 6.0, 1.0 / 6.0}
+	result := 0.0
+	for i := 0; i < 4; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-3+i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		result += v * weights[i]
+	}
+	return result, nil
+}
+
+func (e *StreamingBarEvaluator) evaluateCCIAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
+	if err != nil {
+		return 0.0, err
+	}
+	if barIdx < period-1 {
+		return math.NaN(), nil
+	}
+	sma := 0.0
+	for i := 0; i < period; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-period+1+i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		sma += v
+	}
+	sma /= float64(period)
+	dev := 0.0
+	for i := 0; i < period; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-period+1+i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		d := v - sma
+		if d < 0 {
+			d = -d
+		}
+		dev += d
+	}
+	dev /= float64(period)
+	if dev == 0.0 {
+		return 0.0, nil
+	}
+	cur, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx)
+	if err != nil {
+		return math.NaN(), err
+	}
+	return (cur - sma) / (0.015 * dev), nil
+}
+
+func (e *StreamingBarEvaluator) evaluateBBWAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
+	if err != nil {
+		return 0.0, err
+	}
+	mult := 2.0
+	if len(call.Arguments) >= 3 {
+		if v, err2 := extractNumberLiteral(call.Arguments[2]); err2 == nil {
+			mult = v
+		}
+	}
+	if barIdx < period-1 {
+		return math.NaN(), nil
+	}
+	sma := 0.0
+	for i := 0; i < period; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-period+1+i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		sma += v
+	}
+	sma /= float64(period)
+	sd := 0.0
+	for i := 0; i < period; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-period+1+i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		d := v - sma
+		sd += d * d
+	}
+	sd = math.Sqrt(sd / float64(period))
+	if sma == 0.0 {
+		return 0.0, nil
+	}
+	return 2.0 * mult * sd / sma, nil
+}
+
+func (e *StreamingBarEvaluator) evaluateCOGAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	sourceID, period, err := extractTAArguments(call, e.inputConstantsMap)
+	if err != nil {
+		return 0.0, err
+	}
+	if barIdx < period-1 {
+		return math.NaN(), nil
+	}
+	num, den := 0.0, 0.0
+	for i := 0; i < period; i++ {
+		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-i)
+		if err != nil {
+			return math.NaN(), err
+		}
+		num += v * float64(i+1)
+		den += v
+	}
+	if den == 0.0 {
+		return 0.0, nil
+	}
+	return -num / den, nil
+}
+
+func (e *StreamingBarEvaluator) evaluateTSIAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	if len(call.Arguments) < 3 {
+		return 0.0, newInsufficientArgumentsError("tsi", 3, len(call.Arguments))
+	}
+	sourceID, ok := call.Arguments[0].(*ast.Identifier)
+	if !ok {
+		return 0.0, newInvalidArgumentTypeError("tsi", 0, "identifier")
+	}
+	shortLength, err := extractNumberLiteral(call.Arguments[1])
+	if err != nil {
+		return 0.0, err
+	}
+	longLength, err := extractNumberLiteral(call.Arguments[2])
+	if err != nil {
+		return 0.0, err
+	}
+
+	cacheKey := fmt.Sprintf("tsi_%s_%d_%d", sourceID.Name, int(shortLength), int(longLength))
+	if state, exists := e.taStateCache[cacheKey]; exists {
+		return state.ComputeAtBar(secCtx, sourceID, barIdx)
+	}
+	state := NewTSIStateManager(cacheKey, int(shortLength), int(longLength))
+	e.taStateCache[cacheKey] = state
+	return state.ComputeAtBar(secCtx, sourceID, barIdx)
 }
 
 func (e *StreamingBarEvaluator) getOrCreateTAState(cacheKey string, period int, secCtx *context.Context) TAStateManager {

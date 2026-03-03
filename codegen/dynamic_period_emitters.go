@@ -180,3 +180,87 @@ func (DynamicATREmitter) EmitCalculation(g *generator, varName, _ string) string
 		return code
 	})
 }
+
+type DynamicCCIEmitter struct{}
+
+func (DynamicCCIEmitter) EmitCalculation(g *generator, varName, sourceAccessor string) string {
+	return emitWarmupGuard(g, varName, "period-1", func() string {
+		code := g.ind() + "sma := 0.0\n"
+		code += g.ind() + fmt.Sprintf("for j := 0; j < period; j++ { sma += %s.Get(j) }\n", sourceAccessor)
+		code += g.ind() + "sma /= float64(period)\n"
+		code += g.ind() + "dev := 0.0\n"
+		code += g.ind() + "for j := 0; j < period; j++ {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("v := %s.Get(j)\n", sourceAccessor)
+		code += g.ind() + "if v > sma { dev += v - sma } else { dev += sma - v }\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + "dev /= float64(period)\n"
+		code += g.ind() + "if dev == 0.0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set((%s.Get(0) - sma) / (0.015 * dev))\n", varName, sourceAccessor)
+		g.indent--
+		code += g.ind() + "}\n"
+		return code
+	})
+}
+
+type DynamicCOGEmitter struct{}
+
+func (DynamicCOGEmitter) EmitCalculation(g *generator, varName, sourceAccessor string) string {
+	return emitWarmupGuard(g, varName, "period-1", func() string {
+		code := g.ind() + "num, den := 0.0, 0.0\n"
+		code += g.ind() + "for j := 0; j < period; j++ {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("v := %s.Get(j)\n", sourceAccessor)
+		code += g.ind() + "num += v * float64(j+1)\n"
+		code += g.ind() + "den += v\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + "if den == 0.0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(-num / den)\n", varName)
+		g.indent--
+		code += g.ind() + "}\n"
+		return code
+	})
+}
+
+/* DynamicBBWEmitter captures mult at construction time so it is available during dynamic-period
+ * code emission — mult is always compile-time constant (Pine Script simple float) while length
+ * may be a runtime series. This avoids altering the shared DynamicPeriodEmitter interface. */
+type DynamicBBWEmitter struct{ mult float64 }
+
+func (e DynamicBBWEmitter) EmitCalculation(g *generator, varName, sourceAccessor string) string {
+	return emitWarmupGuard(g, varName, "period-1", func() string {
+		code := g.ind() + "sma := 0.0\n"
+		code += g.ind() + fmt.Sprintf("for j := 0; j < period; j++ { sma += %s.Get(j) }\n", sourceAccessor)
+		code += g.ind() + "sma /= float64(period)\n"
+		code += g.ind() + "variance := 0.0\n"
+		code += g.ind() + "for j := 0; j < period; j++ {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("d := %s.Get(j) - sma\n", sourceAccessor)
+		code += g.ind() + "variance += d * d\n"
+		g.indent--
+		code += g.ind() + "}\n"
+		code += g.ind() + "sd := math.Sqrt(variance / float64(period))\n"
+		code += g.ind() + "if sma == 0.0 {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
+		g.indent--
+		code += g.ind() + "} else {\n"
+		g.indent++
+		code += g.ind() + fmt.Sprintf("%sSeries.Set(2.0 * %g * sd / sma)\n", varName, e.mult)
+		g.indent--
+		code += g.ind() + "}\n"
+		return code
+	})
+}

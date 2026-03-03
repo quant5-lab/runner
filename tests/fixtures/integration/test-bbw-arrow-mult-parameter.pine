@@ -1,0 +1,10 @@
+//@version=5
+indicator("BBW Arrow Mult Parameter", overlay=false)
+
+calcWidth(src, period, multiplier) => ta.bbw(src, period, multiplier)
+
+narrowBand = calcWidth(close, 20, 1.0)
+wideBand = calcWidth(close, 20, 3.0)
+
+plot(narrowBand, "Narrow 1.0x", color=color.green)
+plot(wideBand, "Wide 3.0x", color=color.red)
