@@ -38,6 +38,10 @@ func (g *ArrowBuiltinAccessGenerator) GenerateCurrentAccess(name string) string 
 		return fmt.Sprintf("ctx.Data[ctx.BarIndex].%s", field)
 	}
 
+	if spec, ok := LookupVolumeIndicator(name); ok {
+		return SeriesLookupIIFE(spec.SeriesName)
+	}
+
 	switch name {
 	case "tr":
 		return arrowTrueRangeIIFE()
@@ -67,6 +71,10 @@ func (g *ArrowBuiltinAccessGenerator) GenerateHistoricalAccess(name string, offs
 
 	if name == "tr" {
 		return TrueRangeArrowIIFE(fmt.Sprintf("%d", offset))
+	}
+
+	if spec, ok := LookupVolumeIndicator(name); ok {
+		return SeriesLookupWithOffsetIIFE(spec.SeriesName, offset)
 	}
 
 	if g.registry.IsDerivedPrice(name) {

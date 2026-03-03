@@ -99,7 +99,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 			"bar_index", "last_bar_index", "last_bar_time", "timenow",
 			"time_close", "time_tradingday",
 		),
-		sessionMemberKeys,
+		append(sessionMemberKeys, VolumeIndicatorMemberKeys()...),
 	)
 	detected := usageDetector.Detect(program)
 	gen.hasBarIndexUsage = detected["bar_index"]
@@ -120,6 +120,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 			detected["session.isfirstbar_regular"],
 			detected["session.islastbar_regular"],
 		),
+		NewVolumeIndicatorLifecycle(detected),
 	)
 	gen.seriesInitCoercer = NewSeriesInitCoercer()
 

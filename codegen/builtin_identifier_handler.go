@@ -327,6 +327,16 @@ func (h *BuiltinIdentifierHandler) resolveNestedMemberExpression(expr *ast.Membe
 		return h.generateHistoricalTrueRange(offset), true
 	}
 
+	if baseObj.Name == "ta" {
+		if spec, ok := LookupVolumeIndicator(baseProp.Name); ok {
+			offset := h.extractOffset(expr.Property)
+			if scope == ArrowScope {
+				return SeriesLookupWithOffsetIIFE(spec.SeriesName, offset), true
+			}
+			return fmt.Sprintf("%s.Get(%d)", spec.SeriesName, offset), true
+		}
+	}
+
 	if baseObj.Name == "strategy" {
 		seriesName := h.strategyPropertySeriesName(baseProp.Name)
 		if seriesName != "" {
@@ -459,6 +469,12 @@ func (h *BuiltinIdentifierHandler) TryResolveMemberExpression(expr *ast.MemberEx
 		return h.generateBuiltinAccess("tr", scope), true
 	}
 
+	if okProp && obj.Name == "ta" {
+		if spec, ok := LookupVolumeIndicator(prop.Name); ok {
+			return h.generateVolumeIndicatorAccess(spec.SeriesName, scope), true
+		}
+	}
+
 	if okProp && h.IsStrategyRuntimeValue(obj.Name, prop.Name) {
 		return h.generateStrategyAccess(prop.Name, scope), true
 	}
@@ -549,4 +565,15 @@ func (h *BuiltinIdentifierHandler) generateHistoricalTrueRange(offset int) strin
 			"}()",
 		offset, offset,
 	)
+}
+
+// generateVolumeIndicatorAccess emits the correct Series read expression for a
+// ta.* volume built-in variable across all three access scopes.
+func (h *BuiltinIdentifierHandler) generateVolumeIndicatorAccess(seriesName string, scope AccessScope) string {
+	switch scope {
+	case ArrowScope:
+		return SeriesLookupIIFE(seriesName)
+	default:
+		return fmt.Sprintf("%s.GetCurrent()", seriesName)
+	}
 }

@@ -23,6 +23,7 @@ type VarLookupFunc func(varName string, secBarIdx int) (*series.Series, int, boo
 
 type StreamingBarEvaluator struct {
 	taStateCache      map[string]TAStateManager
+	volumeStateCache  map[string]*volumeIndicatorState
 	fixnanEvaluator   *FixnanEvaluator
 	varRegistry       *VariableRegistry
 	secBarMapper      *BarIndexMapper
@@ -32,7 +33,8 @@ type StreamingBarEvaluator struct {
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
-		taStateCache: make(map[string]TAStateManager),
+		taStateCache:     make(map[string]TAStateManager),
+		volumeStateCache: make(map[string]*volumeIndicatorState),
 		fixnanEvaluator: NewFixnanEvaluator(
 			NewMapStateStorage(),
 			NewSequentialWarmupStrategy(),
@@ -535,8 +537,13 @@ func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression,
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
 	if propID, ok := expr.Property.(*ast.Identifier); ok {
-		if objID, ok := expr.Object.(*ast.Identifier); ok && objID.Name == "ta" && propID.Name == "tr" {
-			return e.evaluateTrueRangeAtBar(secCtx, barIdx)
+		if objID, ok := expr.Object.(*ast.Identifier); ok && objID.Name == "ta" {
+			if propID.Name == "tr" {
+				return e.evaluateTrueRangeAtBar(secCtx, barIdx)
+			}
+			if _, known := volumeIndicatorFactories[propID.Name]; known {
+				return e.evaluateVolumeIndicatorAtBar(propID.Name, secCtx, barIdx)
+			}
 		}
 		return 0.0, newUnsupportedExpressionError(expr)
 	}
@@ -561,9 +568,31 @@ func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberEx
 		return evaluateOHLCVAtBar(obj, secCtx, targetIdx)
 	case *ast.CallExpression:
 		return e.evaluateTACallAtBar(obj, secCtx, targetIdx)
+	case *ast.MemberExpression:
+		if innerProp, ok := obj.Property.(*ast.Identifier); ok {
+			if innerObj, ok := obj.Object.(*ast.Identifier); ok && innerObj.Name == "ta" {
+				if _, known := volumeIndicatorFactories[innerProp.Name]; known {
+					return e.evaluateVolumeIndicatorAtBar(innerProp.Name, secCtx, targetIdx)
+				}
+			}
+		}
+		return 0.0, newUnsupportedExpressionError(expr)
 	default:
 		return 0.0, newUnsupportedExpressionError(expr)
 	}
+}
+
+func (e *StreamingBarEvaluator) evaluateVolumeIndicatorAtBar(propName string, secCtx *context.Context, barIdx int) (float64, error) {
+	state, cached := e.volumeStateCache[propName]
+	if !cached {
+		var err error
+		state, err = newVolumeState(propName, len(secCtx.Data))
+		if err != nil {
+			return 0.0, err
+		}
+		e.volumeStateCache[propName] = state
+	}
+	return state.computeAtBar(secCtx, barIdx)
 }
 
 func (e *StreamingBarEvaluator) evaluateTrueRangeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
