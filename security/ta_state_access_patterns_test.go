@@ -101,6 +101,28 @@ func TestTAStateManager_IdempotentRepeatedAccess(t *testing.T) {
 			},
 		},
 		{
+			name: "RSI_repeated_access_idempotent",
+			createManager: func() TAStateManager {
+				return &RSIStateManager{
+					cacheKey: "rsi_close_2",
+					period:   2,
+					rmaGain: &RMAStateManager{
+						cacheKey: "rsi_close_2_gain",
+						period:   2,
+						storage:  NewSeriesStorage(5),
+						computed: 0,
+					},
+					rmaLoss: &RMAStateManager{
+						cacheKey: "rsi_close_2_loss",
+						period:   2,
+						storage:  NewSeriesStorage(5),
+						computed: 0,
+					},
+					computed: 0,
+				}
+			},
+		},
+		{
 			name: "ATR_repeated_access_idempotent",
 			createManager: func() TAStateManager {
 				return NewATRStateManager("atr_test", 2, 5)

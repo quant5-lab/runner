@@ -189,54 +189,67 @@ func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 }
 
 func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+	for s.computed <= barIdx {
+		if s.computed < s.period {
+			s.computed++
+			continue
+		}
+
+		storageIdx := s.computed - s.period
+
+		var prevSource float64
+		if s.computed > 0 {
+			val, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed-1)
+			if err != nil {
+				return math.NaN(), err
+			}
+			prevSource = val
+		}
+
+		currentSource, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		if err != nil {
+			return math.NaN(), err
+		}
+
+		change := currentSource - prevSource
+		gain := 0.0
+		loss := 0.0
+
+		if change > 0 {
+			gain = change
+		} else {
+			loss = -change
+		}
+
+		var avgGain, avgLoss float64
+		if storageIdx == 0 {
+			avgGain = gain
+			avgLoss = loss
+		} else if storageIdx < s.period {
+			prevAvgGain := s.rmaGain.storage.Get(storageIdx - 1)
+			prevAvgLoss := s.rmaLoss.storage.Get(storageIdx - 1)
+			avgGain = (prevAvgGain*float64(storageIdx) + gain) / float64(storageIdx+1)
+			avgLoss = (prevAvgLoss*float64(storageIdx) + loss) / float64(storageIdx+1)
+		} else {
+			alpha := 1.0 / float64(s.period)
+			prevAvgGain := s.rmaGain.storage.Get(storageIdx - 1)
+			prevAvgLoss := s.rmaLoss.storage.Get(storageIdx - 1)
+			avgGain = alpha*gain + (1-alpha)*prevAvgGain
+			avgLoss = alpha*loss + (1-alpha)*prevAvgLoss
+		}
+
+		s.rmaGain.storage.Set(storageIdx, avgGain)
+		s.rmaLoss.storage.Set(storageIdx, avgLoss)
+		s.computed++
+	}
+
 	if barIdx < s.period {
 		return math.NaN(), nil
 	}
 
-	var prevSource float64
-	if barIdx > 0 {
-		val, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-1)
-		if err != nil {
-			return math.NaN(), err
-		}
-		prevSource = val
-	}
-
-	currentSource, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx)
-	if err != nil {
-		return math.NaN(), err
-	}
-
-	change := currentSource - prevSource
-	gain := 0.0
-	loss := 0.0
-
-	if change > 0 {
-		gain = change
-	} else {
-		loss = -change
-	}
-
-	var avgGain, avgLoss float64
-	if s.computed == 0 {
-		avgGain = gain
-		avgLoss = loss
-	} else if s.computed < s.period {
-		prevAvgGain := s.rmaGain.storage.Get(s.computed - 1)
-		prevAvgLoss := s.rmaLoss.storage.Get(s.computed - 1)
-		avgGain = (prevAvgGain*float64(s.computed) + gain) / float64(s.computed+1)
-		avgLoss = (prevAvgLoss*float64(s.computed) + loss) / float64(s.computed+1)
-	} else {
-		alpha := 1.0 / float64(s.period)
-		prevAvgGain := s.rmaGain.storage.Get(s.computed - 1)
-		prevAvgLoss := s.rmaLoss.storage.Get(s.computed - 1)
-		avgGain = alpha*gain + (1-alpha)*prevAvgGain
-		avgLoss = alpha*loss + (1-alpha)*prevAvgLoss
-	}
-
-	s.rmaGain.storage.Set(s.computed, avgGain)
-	s.rmaLoss.storage.Set(s.computed, avgLoss)
-	s.computed++
+	storageIdx := barIdx - s.period
+	avgGain := s.rmaGain.storage.Get(storageIdx)
+	avgLoss := s.rmaLoss.storage.Get(storageIdx)
 
 	if avgLoss == 0 {
 		return 100.0, nil
