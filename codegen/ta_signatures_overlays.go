@@ -62,5 +62,28 @@ func RegisterOverlaySignatures() []TAFunctionMetadata {
 	}
 	signatures = appendWithBareAlias(signatures, "ta.cog", "close", cogOverloads)
 
+	kcwOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewScalarIntArgument(0),
+			NewScalarFloatArgument(1),
+		}),
+		NewSingleOverloadRule(3, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarFloatArgument(2),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.kcw", "close", kcwOverloads)
+
+	sarOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(3, []TAArgumentSpec{
+			NewImplicitOHLCArgument(),
+			NewScalarFloatArgument(0),
+			NewScalarFloatArgument(1),
+			NewScalarFloatArgument(2),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.sar", "", sarOverloads)
+
 	return signatures
 }

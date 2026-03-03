@@ -79,6 +79,19 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 		useLiteralMult: true,
 	})
 	r.RegisterWithBareAlias("ta.cog", &COGIIFEGenerator{namingStrategy: windowNamer})
+
+	r.RegisterWithBareAlias("ta.percentrank", &PercentrankIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.percentile_nearest_rank", &PercentileNearestRankIIFEGenerator{
+		namingStrategy: windowNamer,
+		pct:            50.0,
+	})
+	r.RegisterWithBareAlias("ta.percentile_linear_interpolation", &PercentileLinearInterpolationIIFEGenerator{
+		namingStrategy: windowNamer,
+		pct:            50.0,
+	})
+	r.RegisterWithBareAlias("ta.alma", &ALMAIIFEGenerator{namingStrategy: windowNamer})
+	r.RegisterWithBareAlias("ta.hma", &HMAIIFEGenerator{})
+	r.RegisterWithBareAlias("ta.kcw", &KCWIIFEGenerator{multExpr: "1.5"})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {

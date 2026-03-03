@@ -1,0 +1,10 @@
+//@version=5
+indicator("KCW Identifier Mult", overlay=false)
+
+myMult  = 2.0
+withVar = ta.kcw(close, 20, myMult)
+withLit = ta.kcw(close, 20, 2.0)
+
+plot(withVar,            "Variable Mult")
+plot(withLit,            "Literal Mult")
+plot(withVar - withLit,  "Difference")

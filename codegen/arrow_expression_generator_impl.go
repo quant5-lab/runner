@@ -106,6 +106,11 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 		return securityGen.Generate(call)
 	}
 
+	if funcName == "ta.kcw" || funcName == "kcw" {
+		taHandler := NewArrowFunctionTACallGenerator(e.gen, e)
+		return taHandler.Generate(call)
+	}
+
 	code, handled, err := e.inlineTAGenerator.GenerateInlineTACall(call)
 	if err != nil {
 		return "", err

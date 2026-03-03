@@ -1,0 +1,6 @@
+//@version=5
+indicator("ALMA Basic", overlay=false)
+
+a = ta.alma(close, 20, 0.85, 6)
+
+plot(a, "ALMA")

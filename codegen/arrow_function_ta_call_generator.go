@@ -73,6 +73,10 @@ func (a *ArrowFunctionTACallGenerator) Generate(call *ast.CallExpression) (strin
 		return a.generateBBWCall(call)
 	}
 
+	if funcName == "ta.kcw" || funcName == "kcw" {
+		return a.generateKCWCall(call)
+	}
+
 	accessor, periodExpr, err := a.extractTAArguments(funcName, call)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract TA arguments: %w", err)
@@ -255,6 +259,75 @@ func (a *ArrowFunctionTACallGenerator) generateBBWCall(call *ast.CallExpression)
 	}
 
 	return code, nil
+}
+
+func (a *ArrowFunctionTACallGenerator) generateKCWCall(call *ast.CallExpression) (string, error) {
+	resolved, err := a.signatureResolver.ResolveCall("ta.kcw", call)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve KCW signature: %w", err)
+	}
+
+	var sourceExpr ast.Expression
+	if resolved.NeedsDefaultSource {
+		sourceExpr = &ast.Identifier{Name: resolved.DefaultSourceName}
+	} else {
+		sourceExpr = resolved.SourceExpr
+	}
+
+	accessor, err := a.accessorFactory.CreateAccessorForExpression(sourceExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to create KCW source accessor: %w", err)
+	}
+
+	periodExpr, err := a.extractPeriodExpression(resolved.LengthExpr)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract KCW period: %w", err)
+	}
+
+	multArgIdx := 2
+	if resolved.NeedsDefaultSource {
+		multArgIdx = 1
+	}
+	multExpr := a.extractKCWMultFromArg(call, multArgIdx)
+
+	gen := &KCWIIFEGenerator{multExpr: multExpr}
+
+	hasher := &ExpressionHasher{}
+	sourceHash := hasher.Hash(sourceExpr)
+	if multArgIdx < len(call.Arguments) {
+		sourceHash = sourceHash + "_" + hasher.Hash(call.Arguments[multArgIdx])
+	}
+
+	code := gen.Generate(accessor, periodExpr, sourceHash)
+
+	if preambleAccessor, ok := accessor.(interface{ GetPreamble() string }); ok {
+		preamble := preambleAccessor.GetPreamble()
+		if preamble != "" {
+			return fmt.Sprintf("func() float64 { %s\nreturn %s }()", preamble, code), nil
+		}
+	}
+
+	return code, nil
+}
+
+func (a *ArrowFunctionTACallGenerator) extractKCWMultFromArg(call *ast.CallExpression, argIdx int) string {
+	if argIdx >= len(call.Arguments) {
+		return "1.5"
+	}
+	multArg := call.Arguments[argIdx]
+	switch m := multArg.(type) {
+	case *ast.Literal:
+		if v, ok := m.Value.(float64); ok {
+			return fmt.Sprintf("%g", v)
+		}
+	case *ast.Identifier:
+		return m.Name
+	default:
+		if rendered, err := a.exprGen.Generate(multArg); err == nil {
+			return rendered
+		}
+	}
+	return "1.5"
 }
 
 func (a *ArrowFunctionTACallGenerator) extractTAArguments(funcName string, call *ast.CallExpression) (AccessGenerator, PeriodExpression, error) {

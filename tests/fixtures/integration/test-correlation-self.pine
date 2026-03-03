@@ -1,0 +1,8 @@
+//@version=5
+indicator("Correlation Self", overlay=false)
+
+selfCorr     = ta.correlation(close, close,  20)
+closeVolCorr = ta.correlation(close, volume, 20)
+
+plot(selfCorr,     "Self Corr")
+plot(closeVolCorr, "Close-Vol Corr")

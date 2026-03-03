@@ -1,0 +1,11 @@
+//@version=5
+indicator("KCW Arrow Mixed", overlay=false)
+
+directWidth = ta.kcw(close, 20, 1.5)
+
+calcWidth(src) => ta.kcw(src, 20, 1.5)
+arrowWidth = calcWidth(close)
+
+plot(directWidth,              "Direct")
+plot(arrowWidth,               "Arrow")
+plot(directWidth - arrowWidth, "Difference")

@@ -76,6 +76,14 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&BbwHandler{},
 			&CogHandler{},
 			&TsiHandler{},
+			&PercentrankHandler{},
+			&PercentileNearestRankHandler{},
+			&PercentileLinearInterpolationHandler{},
+			&CorrelationHandler{},
+			&AlmaHandler{},
+			&HmaHandler{},
+			&KcwHandler{},
+			&SarHandler{},
 		},
 	}
 }

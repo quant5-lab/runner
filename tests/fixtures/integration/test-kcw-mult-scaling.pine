@@ -1,0 +1,8 @@
+//@version=5
+indicator("KCW Mult Scaling", overlay=false)
+
+unit   = ta.kcw(close, 20, 1.0)
+double = ta.kcw(close, 20, 2.0)
+
+plot(unit,   "Unit 1.0x")
+plot(double, "Double 2.0x")

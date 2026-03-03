@@ -3,6 +3,32 @@ package codegen
 func RegisterStatisticsSignatures() []TAFunctionMetadata {
 	signatures := make([]TAFunctionMetadata, 0)
 
+	percentrankOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(2, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.percentrank", "close", percentrankOverloads)
+
+	pnrOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(3, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarFloatArgument(2),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.percentile_nearest_rank", "close", pnrOverloads)
+
+	pliOverloads := []TAOverloadRule{
+		NewSingleOverloadRule(3, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarFloatArgument(2),
+		}),
+	}
+	signatures = appendWithBareAlias(signatures, "ta.percentile_linear_interpolation", "close", pliOverloads)
+
 	changeOverloads := []TAOverloadRule{
 		NewSingleOverloadRule(1, []TAArgumentSpec{
 			NewSeriesArgument(0, ""),
