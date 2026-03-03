@@ -9,7 +9,6 @@ import (
 )
 
 func TestTSIStateManager_FlatSourceZeroTSI(t *testing.T) {
-	/* Flat source: zero momentum → TSI = 0 after warmup */
 	ctx := &context.Context{
 		Data: make([]context.OHLCV, 40),
 	}
@@ -104,7 +103,6 @@ func TestTSIStateManager_SequentialComputation(t *testing.T) {
 }
 
 func TestTSIStateManager_ResultInBounds(t *testing.T) {
-	/* TSI is bounded [-100, 100] */
 	ctx := &context.Context{
 		Data: make([]context.OHLCV, 60),
 	}
@@ -133,27 +131,51 @@ func TestTSIStateManager_ResultInBounds(t *testing.T) {
 	}
 }
 
-func TestTSIStateManager_StateReuse(t *testing.T) {
+func TestTSIStateManager_StatePreservation(t *testing.T) {
 	ctx := &context.Context{
-		Data: make([]context.OHLCV, 40),
+		Data: make([]context.OHLCV, 50),
 	}
 	for i := range ctx.Data {
-		ctx.Data[i] = context.OHLCV{Close: float64(100 + i)}
+		phase := float64(100 + i*2)
+		if i >= 20 {
+			phase = float64(100 + 20*2 - (i - 20))
+		}
+		ctx.Data[i] = context.OHLCV{Close: phase}
 	}
 
 	manager := NewTSIStateManager("tsi_close_5_13", 5, 13)
 	sourceID := &ast.Identifier{Name: "close"}
 
-	v1, _ := manager.ComputeAtBar(ctx, sourceID, 25)
-	v2, _ := manager.ComputeAtBar(ctx, sourceID, 25)
+	warmup := 5 + 13 - 1
 
-	if v1 != v2 {
-		t.Errorf("State reuse failed: first=%.6f, second=%.6f", v1, v2)
+	valBar20First, err := manager.ComputeAtBar(ctx, sourceID, 20)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(20) first call failed: %v", err)
+	}
+	if math.IsNaN(valBar20First) {
+		t.Fatalf("bar 20 should be post-warmup (%d), got NaN", warmup)
+	}
+
+	valBar30, err := manager.ComputeAtBar(ctx, sourceID, 30)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(30) failed: %v", err)
+	}
+
+	valBar20Second, err := manager.ComputeAtBar(ctx, sourceID, 20)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(20) second call failed: %v", err)
+	}
+
+	if valBar20First != valBar20Second {
+		t.Errorf("Historical value changed: first=%.6f, after forward=%.6f", valBar20First, valBar20Second)
+	}
+
+	if math.Abs(valBar20First-valBar30) < 0.01 {
+		t.Errorf("Phase-change source should produce divergent TSI: bar20=%.6f, bar30=%.6f", valBar20First, valBar30)
 	}
 }
 
 func TestTSIStateManager_IsolatedState(t *testing.T) {
-	/* Two managers with same params but different cacheKeys must not share state */
 	ctx := &context.Context{
 		Data: make([]context.OHLCV, 40),
 	}
@@ -175,5 +197,49 @@ func TestTSIStateManager_IsolatedState(t *testing.T) {
 
 	if math.Abs(v1-v2) > 0.0001 {
 		t.Errorf("Same params and data should produce same TSI: m1=%.6f, m2=%.6f", v1, v2)
+	}
+}
+
+func TestTSIStateManager_NonSequentialAccess(t *testing.T) {
+	ctx := &context.Context{
+		Data: make([]context.OHLCV, 40),
+	}
+	for i := range ctx.Data {
+		oscillation := float64(100 + 10*((i%5)-2))
+		ctx.Data[i] = context.OHLCV{Close: oscillation}
+	}
+
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13)
+	sourceID := &ast.Identifier{Name: "close"}
+
+	warmup := 5 + 13 - 1
+
+	valBar35, err := manager.ComputeAtBar(ctx, sourceID, 35)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(35) failed: %v", err)
+	}
+
+	accessPattern := []int{25, 30, 20, 35, 28}
+	results := make(map[int]float64)
+
+	for _, barIdx := range accessPattern {
+		v, err := manager.ComputeAtBar(ctx, sourceID, barIdx)
+		if err != nil {
+			t.Fatalf("ComputeAtBar(%d) failed: %v", barIdx, err)
+		}
+		if barIdx >= warmup && math.IsNaN(v) {
+			t.Errorf("bar %d (post-warmup): got NaN", barIdx)
+		}
+		results[barIdx] = v
+	}
+
+	if results[35] != valBar35 {
+		t.Errorf("Non-sequential access changed bar 35: initial=%.6f, after pattern=%.6f", valBar35, results[35])
+	}
+
+	val25First := results[25]
+	val25Second, _ := manager.ComputeAtBar(ctx, sourceID, 25)
+	if val25First != val25Second {
+		t.Errorf("Repeated non-sequential access changed bar 25: first=%.6f, second=%.6f", val25First, val25Second)
 	}
 }

@@ -7,62 +7,75 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-/* TSIStateManager streams TSI via double-smoothed EMA chains: ema2/ema2Abs * 100 */
 type TSIStateManager struct {
-	cacheKey    string
-	shortPeriod int
-	longPeriod  int
-	ema1Mom     *emaState
-	ema1Abs     *emaState
-	ema2Mom     *emaState
-	ema2Abs     *emaState
-	prevSource  float64
-	computed    int
+	cacheKey     string
+	shortPeriod  int
+	longPeriod   int
+	ema1Mom      *streamingEMAWithStorage
+	ema1Abs      *streamingEMAWithStorage
+	ema2Mom      *streamingEMAWithStorage
+	ema2Abs      *streamingEMAWithStorage
+	tsiResults   TASeriesStorage
+	sourceBuffer TASeriesStorage
+	computed     int
 }
 
-type emaState struct {
-	prevEMA    float64
+type streamingEMAWithStorage struct {
+	storage    TASeriesStorage
 	multiplier float64
 	period     int
 	count      int
 }
 
-func newEMAState(period int) *emaState {
-	return &emaState{
+func newStreamingEMAWithStorage(period int, capacity int) *streamingEMAWithStorage {
+	return &streamingEMAWithStorage{
+		storage:    NewSeriesStorage(capacity),
 		multiplier: 2.0 / float64(period+1),
 		period:     period,
+		count:      0,
 	}
 }
 
-/* SMA-seeded EMA — matches EMAStateManager; NaN until seeded. */
-func (e *emaState) update(val float64) float64 {
-	if math.IsNaN(val) {
-		return math.NaN()
+func (e *streamingEMAWithStorage) updateAndStore(barIdx int, inputValue float64) float64 {
+	if math.IsNaN(inputValue) {
+		result := math.NaN()
+		e.storage.Set(barIdx, result)
+		return result
 	}
+
 	e.count++
+	var emaValue float64
+
 	if e.count == 1 {
-		e.prevEMA = val
+		emaValue = inputValue
 	} else if e.count <= e.period {
-		e.prevEMA = (e.prevEMA*float64(e.count-1) + val) / float64(e.count)
+		prevEMA := e.storage.Get(barIdx - 1)
+		emaValue = (prevEMA*float64(e.count-1) + inputValue) / float64(e.count)
 	} else {
-		e.prevEMA = val*e.multiplier + e.prevEMA*(1-e.multiplier)
+		prevEMA := e.storage.Get(barIdx - 1)
+		emaValue = inputValue*e.multiplier + prevEMA*(1-e.multiplier)
 	}
+
+	e.storage.Set(barIdx, emaValue)
+
 	if e.count < e.period {
 		return math.NaN()
 	}
-	return e.prevEMA
+	return emaValue
 }
 
 func NewTSIStateManager(cacheKey string, shortPeriod, longPeriod int) *TSIStateManager {
 	return &TSIStateManager{
-		cacheKey:    cacheKey,
-		shortPeriod: shortPeriod,
-		longPeriod:  longPeriod,
-		ema1Mom:     newEMAState(longPeriod),
-		ema1Abs:     newEMAState(longPeriod),
-		ema2Mom:     newEMAState(shortPeriod),
-		ema2Abs:     newEMAState(shortPeriod),
-		computed:    0,
+		cacheKey:     cacheKey,
+		shortPeriod:  shortPeriod,
+		longPeriod:   longPeriod,
+		ema1Mom:      newStreamingEMAWithStorage(longPeriod, 5000),
+		ema1Abs:      newStreamingEMAWithStorage(longPeriod, 5000),
+		ema2Mom:      newStreamingEMAWithStorage(shortPeriod, 5000),
+		ema2Abs:      newStreamingEMAWithStorage(shortPeriod, 5000),
+		tsiResults:   NewSeriesStorage(5000),
+		sourceBuffer: NewSeriesStorage(5000),
+		computed:     0,
 	}
 }
 
@@ -72,39 +85,39 @@ func (s *TSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		if err != nil {
 			return math.NaN(), err
 		}
+		s.sourceBuffer.Set(s.computed, sourceVal)
 
-		var mom float64
+		var momentum float64
 		if s.computed == 0 {
-			mom = math.NaN()
+			momentum = math.NaN()
 		} else {
-			mom = sourceVal - s.prevSource
-		}
-		s.prevSource = sourceVal
-
-		var momAbs float64
-		if math.IsNaN(mom) {
-			momAbs = math.NaN()
-		} else {
-			momAbs = math.Abs(mom)
+			prevSource := s.sourceBuffer.Get(s.computed - 1)
+			momentum = sourceVal - prevSource
 		}
 
-		e1m := s.ema1Mom.update(mom)
-		e1a := s.ema1Abs.update(momAbs)
-		s.ema2Mom.update(e1m)
-		s.ema2Abs.update(e1a)
+		momentumAbs := math.NaN()
+		if !math.IsNaN(momentum) {
+			momentumAbs = math.Abs(momentum)
+		}
 
+		ema1MomValue := s.ema1Mom.updateAndStore(s.computed, momentum)
+		ema1AbsValue := s.ema1Abs.updateAndStore(s.computed, momentumAbs)
+		ema2MomValue := s.ema2Mom.updateAndStore(s.computed, ema1MomValue)
+		ema2AbsValue := s.ema2Abs.updateAndStore(s.computed, ema1AbsValue)
+
+		warmup := s.longPeriod + s.shortPeriod - 1
+		var tsiValue float64
+		if s.computed < warmup {
+			tsiValue = math.NaN()
+		} else if ema2AbsValue == 0.0 {
+			tsiValue = 0.0
+		} else {
+			tsiValue = 100.0 * ema2MomValue / ema2AbsValue
+		}
+
+		s.tsiResults.Set(s.computed, tsiValue)
 		s.computed++
 	}
 
-	warmup := s.longPeriod + s.shortPeriod - 1
-	if barIdx < warmup {
-		return math.NaN(), nil
-	}
-
-	e2a := s.ema2Abs.prevEMA
-	if e2a == 0.0 {
-		return 0.0, nil
-	}
-
-	return 100.0 * s.ema2Mom.prevEMA / e2a, nil
+	return s.tsiResults.Get(barIdx), nil
 }

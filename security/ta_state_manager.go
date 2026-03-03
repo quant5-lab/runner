@@ -15,7 +15,7 @@ type TAStateManager interface {
 type SMAStateManager struct {
 	cacheKey string
 	period   int
-	buffer   []float64
+	storage  TASeriesStorage
 	computed int
 }
 
@@ -47,7 +47,7 @@ func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager
 		return &SMAStateManager{
 			cacheKey: cacheKey,
 			period:   period,
-			buffer:   make([]float64, period),
+			storage:  NewSeriesStorage(capacity),
 			computed: 0,
 		}
 	}
@@ -97,41 +97,36 @@ func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager
 	}
 
 	if contains(cacheKey, "stdev") {
-		return NewSTDEVStateManager(cacheKey, period)
+		return NewSTDEVStateManager(cacheKey, period, capacity)
 	}
 
 	panic(fmt.Sprintf("unknown TA function in cache key: %s", cacheKey))
 }
 
 func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	/* Fill buffer up to requested bar */
 	for s.computed <= barIdx {
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
-		if err != nil {
-			return math.NaN(), err
+		if s.computed < s.period-1 {
+			s.storage.Set(s.computed, math.NaN())
+			s.computed++
+			continue
 		}
 
-		idx := s.computed % s.period
-		s.buffer[idx] = sourceVal
+		sum := 0.0
+		for i := 0; i < s.period; i++ {
+			barOffset := s.computed - s.period + 1 + i
+			val, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
+			if err != nil {
+				return math.NaN(), err
+			}
+			sum += val
+		}
+
+		smaValue := sum / float64(s.period)
+		s.storage.Set(s.computed, smaValue)
 		s.computed++
 	}
 
-	if barIdx < s.period-1 {
-		return math.NaN(), nil
-	}
-
-	/* Compute SMA using the last `period` bars ending at barIdx */
-	sum := 0.0
-	for i := 0; i < s.period; i++ {
-		barOffset := barIdx - s.period + 1 + i
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
-		if err != nil {
-			return math.NaN(), err
-		}
-		sum += sourceVal
-	}
-
-	return sum / float64(s.period), nil
+	return s.storage.Get(barIdx), nil
 }
 
 func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {

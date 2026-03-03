@@ -19,7 +19,7 @@ func TestSTDEVStateManager_PopulationStandardDeviation(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
 	sourceID := &ast.Identifier{Name: "close"}
 
 	tests := []struct {
@@ -65,7 +65,7 @@ func TestSTDEVStateManager_ZeroVariance(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
 	sourceID := &ast.Identifier{Name: "close"}
 
 	value, err := manager.ComputeAtBar(ctx, sourceID, 2)
@@ -92,7 +92,7 @@ func TestSTDEVStateManager_RollingWindowCorrectness(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
 	sourceID := &ast.Identifier{Name: "close"}
 
 	tests := []struct {
@@ -128,7 +128,7 @@ func TestSTDEVStateManager_DifferentSources(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_high_3", 3)
+	manager := NewSTDEVStateManager("stdev_high_3", 3, 10)
 	sourceID := &ast.Identifier{Name: "high"}
 
 	value, err := manager.ComputeAtBar(ctx, sourceID, 2)
@@ -140,5 +140,45 @@ func TestSTDEVStateManager_DifferentSources(t *testing.T) {
 	expected := 0.8165
 	if math.Abs(value-expected) > 0.001 {
 		t.Errorf("expected %.4f, got %.4f", expected, value)
+	}
+}
+
+func TestSTDEVStateManager_StatePreservation(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100},
+			{Close: 105},
+			{Close: 110},
+			{Close: 95},
+			{Close: 100},
+			{Close: 115},
+			{Close: 90},
+		},
+	}
+
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
+	sourceID := &ast.Identifier{Name: "close"}
+
+	valBar3First, err := manager.ComputeAtBar(ctx, sourceID, 3)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(3) first call failed: %v", err)
+	}
+
+	valBar5, err := manager.ComputeAtBar(ctx, sourceID, 5)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(5) failed: %v", err)
+	}
+
+	valBar3Second, err := manager.ComputeAtBar(ctx, sourceID, 3)
+	if err != nil {
+		t.Fatalf("ComputeAtBar(3) second call failed: %v", err)
+	}
+
+	if valBar3First != valBar3Second {
+		t.Errorf("Historical value changed: first=%.4f, after forward=%.4f", valBar3First, valBar3Second)
+	}
+
+	if math.Abs(valBar3First-valBar5) < 0.01 {
+		t.Errorf("Different bars should produce different STDEV: bar3=%.4f, bar5=%.4f", valBar3First, valBar5)
 	}
 }

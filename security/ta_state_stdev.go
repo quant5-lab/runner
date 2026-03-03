@@ -7,62 +7,46 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-// STDEVStateManager computes population standard deviation over rolling window.
-// Uses two-pass algorithm: calculate mean, then variance from squared deviations.
 type STDEVStateManager struct {
 	cacheKey string
 	period   int
-	buffer   []float64
+	storage  TASeriesStorage
 	computed int
 }
 
-// NewSTDEVStateManager creates manager for standard deviation calculation.
-func NewSTDEVStateManager(cacheKey string, period int) *STDEVStateManager {
+func NewSTDEVStateManager(cacheKey string, period int, capacity int) *STDEVStateManager {
 	return &STDEVStateManager{
 		cacheKey: cacheKey,
 		period:   period,
-		buffer:   make([]float64, period),
+		storage:  NewSeriesStorage(capacity),
 		computed: 0,
 	}
 }
 
-// ComputeAtBar calculates population standard deviation for bars ending at barIdx.
-// Returns NaN during warmup period (first period-1 bars).
-// Algorithm: sqrt(sum((x - mean)^2) / N) where N is period.
 func (s *STDEVStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	if err := s.warmupBufferUpTo(secCtx, sourceID, barIdx); err != nil {
-		return math.NaN(), err
-	}
-
-	if barIdx < s.period-1 {
-		return math.NaN(), nil
-	}
-
-	mean, err := s.calculateMeanForWindow(secCtx, sourceID, barIdx)
-	if err != nil {
-		return math.NaN(), err
-	}
-
-	variance, err := s.calculateVarianceForWindow(secCtx, sourceID, barIdx, mean)
-	if err != nil {
-		return math.NaN(), err
-	}
-
-	return math.Sqrt(variance), nil
-}
-
-func (s *STDEVStateManager) warmupBufferUpTo(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) error {
 	for s.computed <= barIdx {
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
-		if err != nil {
-			return err
+		if s.computed < s.period-1 {
+			s.storage.Set(s.computed, math.NaN())
+			s.computed++
+			continue
 		}
 
-		idx := s.computed % s.period
-		s.buffer[idx] = sourceVal
+		mean, err := s.calculateMeanForWindow(secCtx, sourceID, s.computed)
+		if err != nil {
+			return math.NaN(), err
+		}
+
+		variance, err := s.calculateVarianceForWindow(secCtx, sourceID, s.computed, mean)
+		if err != nil {
+			return math.NaN(), err
+		}
+
+		stdevValue := math.Sqrt(variance)
+		s.storage.Set(s.computed, stdevValue)
 		s.computed++
 	}
-	return nil
+
+	return s.storage.Get(barIdx), nil
 }
 
 func (s *STDEVStateManager) calculateMeanForWindow(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {

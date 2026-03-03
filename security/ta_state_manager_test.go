@@ -22,7 +22,7 @@ func TestSMAStateManager_CircularBufferBehavior(t *testing.T) {
 	manager := &SMAStateManager{
 		cacheKey: "sma_close_3",
 		period:   3,
-		buffer:   make([]float64, 3),
+		storage:  NewSeriesStorage(10),
 		computed: 0,
 	}
 
@@ -64,7 +64,7 @@ func TestSMAStateManager_IncrementalComputation(t *testing.T) {
 	manager := &SMAStateManager{
 		cacheKey: "sma_close_2",
 		period:   2,
-		buffer:   make([]float64, 2),
+		storage:  NewSeriesStorage(10),
 		computed: 0,
 	}
 
@@ -82,6 +82,40 @@ func TestSMAStateManager_IncrementalComputation(t *testing.T) {
 
 	if manager.computed != 3 {
 		t.Errorf("expected computed=3, got %d", manager.computed)
+	}
+}
+
+func TestSMAStateManager_StatePreservation(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100},
+			{Close: 102},
+			{Close: 104},
+			{Close: 106},
+			{Close: 108},
+			{Close: 110},
+		},
+	}
+
+	manager := &SMAStateManager{
+		cacheKey: "sma_close_3",
+		period:   3,
+		storage:  NewSeriesStorage(10),
+		computed: 0,
+	}
+
+	sourceID := &ast.Identifier{Name: "close"}
+
+	valBar3First, _ := manager.ComputeAtBar(ctx, sourceID, 3)
+	valBar5, _ := manager.ComputeAtBar(ctx, sourceID, 5)
+	valBar3Second, _ := manager.ComputeAtBar(ctx, sourceID, 3)
+
+	if valBar3First != valBar3Second {
+		t.Errorf("Historical value changed: first=%.4f, after forward=%.4f", valBar3First, valBar3Second)
+	}
+
+	if valBar3First == valBar5 {
+		t.Errorf("Different bars should produce different SMA: bar3=%.4f, bar5=%.4f", valBar3First, valBar5)
 	}
 }
 
