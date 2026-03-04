@@ -100,9 +100,18 @@ func (h *SecurityInlineHandler) generateStreamingEvaluation(exprArg ast.Expressi
 	}
 
 	var code strings.Builder
-	code.WriteString("\t\tif secBarEvaluator == nil {\n")
-	code.WriteString("\t\t\tsecBarEvaluator = security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n")
-	code.WriteString("\t\t}\n")
+
+	initializer := NewSecurityEvaluatorInitializer(g.symbolTable, g)
+	indentLevel := 0
+	indentFunc := func() string {
+		return strings.Repeat("\t", 2+indentLevel)
+	}
+	incrementIndent := func() { indentLevel++ }
+	decrementIndent := func() { indentLevel-- }
+
+	initCode := initializer.EmitInitialization(indentFunc, incrementIndent, decrementIndent)
+	code.WriteString(initCode)
+
 	code.WriteString(fmt.Sprintf("\t\tsecValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON))
 	code.WriteString("\t\tif err != nil { return math.NaN() }\n")
 	code.WriteString("\t\treturn secValue\n")

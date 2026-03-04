@@ -252,6 +252,68 @@ plot(dailyOpen, "Daily Open", color=color.green)
 	}
 }
 
+func TestSecurity_UserVariablesInExpression(t *testing.T) {
+	testDir := t.TempDir()
+
+	strategy := `//@version=6
+strategy("Security User Variables", overlay=true)
+
+threshold = ta.sma(close, 20)
+upper = ta.sma(close, 20) + 2 * ta.stdev(close, 20)
+
+signal_above = request.security(syminfo.tickerid, "1D", close > threshold, lookahead=barmerge.lookahead_off)
+price_distance = request.security(syminfo.tickerid, "1D", (close - threshold) / threshold * 100, lookahead=barmerge.lookahead_off)
+
+if signal_above
+    strategy.entry("Long", strategy.long)
+
+plot(signal_above ? 1 : 0, "Signal", color=color.green)
+plot(price_distance, "Distance %", color=color.blue)
+`
+	strategyPath := filepath.Join(testDir, "test_strategy.pine")
+	if err := os.WriteFile(strategyPath, []byte(strategy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hourlyData := generateTestOHLCV(240, 3600)
+	hourlyPath := filepath.Join(testDir, "TEST_1h.json")
+	if err := os.WriteFile(hourlyPath, []byte(hourlyData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dailyData := generateTestOHLCV(10, 86400)
+	dailyPath := filepath.Join(testDir, "TEST_1D.json")
+	if err := os.WriteFile(dailyPath, []byte(dailyData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cwd, _ := os.Getwd()
+	projectRoot := filepath.Dir(filepath.Dir(cwd))
+
+	result := compileAndRun(t, strategyPath, hourlyPath, testDir, projectRoot, "TEST", testDir)
+
+	signal, ok := result.Indicators["Signal"]
+	if !ok {
+		t.Fatalf("Expected 'Signal' indicator")
+	}
+
+	distance, ok := result.Indicators["Distance %"]
+	if !ok {
+		t.Fatalf("Expected 'Distance %%' indicator")
+	}
+
+	signalCount := countNonNull(signal.Data)
+	distanceCount := countNonNull(distance.Data)
+
+	if signalCount < 100 {
+		t.Errorf("User variable in security: only %d signal values, expected >100", signalCount)
+	}
+
+	if distanceCount < 100 {
+		t.Errorf("User variable in security: only %d distance values, expected >100", distanceCount)
+	}
+}
+
 /* ========== HELPER FUNCTIONS ========== */
 
 func generateTestOHLCVWithStartDate(bars int, intervalSec int, startUnix int64) string {
