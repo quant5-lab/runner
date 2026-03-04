@@ -5,4 +5,4 @@ Generate: ✅
 Compile: ✅
 Execute: ✅ (0 trades — series initial value 0.0 vs PineScript na causes nz() fixed point)
 
-Blocker: ~~#1~~ resolved
+Blocker: ~~#1~~ resolved | #6 (self-referencing series init → 0 trades)
