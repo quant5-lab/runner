@@ -85,6 +85,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&KcwHandler{},
 			&SarHandler{},
 			&TrHandler{},
+			&PivotPointLevelsHandler{},
 		},
 	}
 }

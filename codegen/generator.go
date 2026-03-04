@@ -70,6 +70,8 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.compositeIndicatorRegistry.Register("kcw", &KcwHandler{})
 	gen.compositeIndicatorRegistry.Register("ta.sar", &SarHandler{})
 	gen.compositeIndicatorRegistry.Register("sar", &SarHandler{})
+	gen.compositeIndicatorRegistry.Register("ta.pivot_point_levels", &PivotPointLevelsHandler{})
+	gen.compositeIndicatorRegistry.Register("pivot_point_levels", &PivotPointLevelsHandler{})
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.constEvaluator = validation.NewWarmupAnalyzer()
@@ -660,6 +662,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				}
 				continue
 			}
+			if varType == "array_series" {
+				code += g.ind() + fmt.Sprintf("var %sArraySeries *series.ArraySeries\n", varName)
+				continue
+			}
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
 			if g.symbolTable != nil {
 				g.symbolTable.Register(varName, VariableTypeSeries)
@@ -733,6 +739,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			if varType == "function" || varType == "string" {
 				continue
 			}
+			if varType == "array_series" {
+				code += g.ind() + fmt.Sprintf("%sArraySeries = series.NewArraySeries(len(ctx.Data))\n", varName)
+				continue
+			}
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
 		}
 	}
@@ -759,7 +769,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
-			if varType == "function" || varType == "string" {
+			if varType == "function" || varType == "string" || varType == "array_series" {
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %sSeries)\n", varName, varName)
@@ -900,6 +910,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
 			continue
 		}
+		if varType == "array_series" {
+			code += g.ind() + fmt.Sprintf("_ = %sArraySeries\n", varName)
+			continue
+		}
 		/* Skip input constants - they don't have Series versions */
 		if g.inputHandler != nil && g.inputHandler.IsInputConstant(varName) {
 			continue
@@ -931,6 +945,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 	for varName, varType := range g.variables {
 		if varType == "function" || varType == "string" {
+			continue
+		}
+		if varType == "array_series" {
+			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sArraySeries.Next() }\n", iterVar, varName)
 			continue
 		}
 		if g.inputHandler != nil && g.inputHandler.IsInputConstant(varName) {
@@ -3079,6 +3097,9 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 						offset = v
 					}
 				}
+			}
+			if g.variables[varName] == "array_series" {
+				return fmt.Sprintf("%sArraySeries.Get(%d)", varName, offset)
 			}
 			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}
