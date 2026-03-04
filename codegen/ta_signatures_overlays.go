@@ -35,6 +35,12 @@ func RegisterOverlaySignatures() []TAFunctionMetadata {
 			NewScalarIntArgument(1),
 			NewScalarFloatArgument(2),
 		}),
+		NewSingleOverloadRule(4, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarFloatArgument(2),
+			NewScalarBoolArgument(3),
+		}),
 	}
 	signatures = appendTupleWithBareAlias(signatures, "ta.kc", "close", kcOverloads)
 
@@ -71,6 +77,12 @@ func RegisterOverlaySignatures() []TAFunctionMetadata {
 			NewSeriesArgument(0, ""),
 			NewScalarIntArgument(1),
 			NewScalarFloatArgument(2),
+		}),
+		NewSingleOverloadRule(4, []TAArgumentSpec{
+			NewSeriesArgument(0, ""),
+			NewScalarIntArgument(1),
+			NewScalarFloatArgument(2),
+			NewScalarBoolArgument(3),
 		}),
 	}
 	signatures = appendWithBareAlias(signatures, "ta.kcw", "close", kcwOverloads)

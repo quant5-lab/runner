@@ -1,0 +1,18 @@
+//@version=5
+strategy("KC Tuple [Alorse]", overlay=true, pyramiding=0, currency=currency.USD, default_qty_type=strategy.percent_of_equity, initial_capital=1000, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.01)
+
+mult = input.float(2.0, step=0.1, title="Multiplier")
+
+[upper, basis, lower] = ta.kc(close, 20, mult)
+
+longEntry  = ta.crossover(close, basis)
+shortEntry = ta.crossunder(close, basis)
+
+strategy.entry("Long",  strategy.long,  when=longEntry)
+strategy.close("Long",  when=shortEntry)
+strategy.entry("Short", strategy.short, when=shortEntry)
+strategy.close("Short", when=longEntry)
+
+plot(upper, title="Upper", color=color.blue)
+plot(basis, title="Basis", color=color.orange)
+plot(lower, title="Lower", color=color.blue)

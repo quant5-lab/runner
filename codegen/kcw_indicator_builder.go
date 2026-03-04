@@ -2,17 +2,18 @@ package codegen
 
 import "fmt"
 
-// KCWIndicatorBuilder generates Keltner Channel Width code:
-// KCW = 2 * mult * ATR(length) / EMA(source, length)
+// KCWIndicatorBuilder: 2 * mult * range(length) / EMA(source, length)
+// where range = ATR(length) when useTrueRange=true, or SMA(high-low, length) otherwise.
 //
 // Requires two intermediate series:
 //   - _varName_ema: EMA(source, length)
-//   - _varName_atr: ATR(length)
+//   - _varName_atr: ATR(length) or SMA(high-low, length)
 type KCWIndicatorBuilder struct {
 	resultVarName  string
 	period         PeriodExpression
 	sourceAccessor AccessGenerator
 	multExpr       string
+	useTrueRange   bool
 	context        StatefulIndicatorContext
 	indenter       CodeIndenter
 	internalSeries []string
@@ -23,6 +24,7 @@ func NewKCWIndicatorBuilder(
 	period PeriodExpression,
 	sourceAccessor AccessGenerator,
 	multExpr string,
+	useTrueRange bool,
 	context StatefulIndicatorContext,
 ) *KCWIndicatorBuilder {
 	return &KCWIndicatorBuilder{
@@ -30,6 +32,7 @@ func NewKCWIndicatorBuilder(
 		period:         period,
 		sourceAccessor: sourceAccessor,
 		multExpr:       multExpr,
+		useTrueRange:   useTrueRange,
 		context:        context,
 		indenter:       NewCodeIndenter(),
 		internalSeries: make([]string, 0),
@@ -51,10 +54,14 @@ func (b *KCWIndicatorBuilder) Build() string {
 	atrName := b.trackedInternal("atr")
 
 	emaBuilder := NewStatefulIndicatorBuilder("ema", emaName, b.period, b.sourceAccessor, false, b.context)
-	atrBuilder := NewStatefulIndicatorBuilder("rma", atrName, b.period, NewTrueRangeAccessGenerator(), false, b.context)
 
 	code := emaBuilder.BuildEMA()
-	code += atrBuilder.BuildRMA()
+	if b.useTrueRange {
+		atrBuilder := NewStatefulIndicatorBuilder("rma", atrName, b.period, NewTrueRangeAccessGenerator(), false, b.context)
+		code += atrBuilder.BuildRMA()
+	} else {
+		code += buildHighLowSMA(atrName, b.period, b.context)
+	}
 	code += b.generateFinalFormula(emaName, atrName)
 
 	return code
@@ -64,15 +71,8 @@ func (b *KCWIndicatorBuilder) generateFinalFormula(emaName, atrName string) stri
 	emaAccess := b.context.GenerateSeriesAccess(emaName, 0)
 	atrAccess := b.context.GenerateSeriesAccess(atrName, 0)
 
-	warmupExpr := ""
-	if b.period.IsConstant() {
-		warmupExpr = fmt.Sprintf("%d", b.period.AsInt()-1)
-	} else {
-		warmupExpr = fmt.Sprintf("%s-1", b.period.AsIntCast())
-	}
-
 	b.indenter.IncreaseIndent()
-	code := b.indenter.Line(fmt.Sprintf("if ctx.BarIndex < %s {", warmupExpr))
+	code := b.indenter.Line(fmt.Sprintf("if ctx.BarIndex < %s {", warmupBarExpr(b.period)))
 	b.indenter.IncreaseIndent()
 	code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.resultVarName, "math.NaN()"))
 	b.indenter.DecreaseIndent()

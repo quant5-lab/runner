@@ -6,8 +6,9 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-// KcwHandler generates Keltner Channel Width code.
-// Implements CompositeIndicatorMetadata because KCW requires 2 intermediate series.
+/* KcwHandler generates Keltner Channel Width:
+ * 2 * mult * range(length) / EMA(source, length)
+ * where range = ATR(length) when useTrueRange=true, or SMA(high-low, length) otherwise */
 type KcwHandler struct{}
 
 func (h *KcwHandler) CanHandle(funcName string) bool {
@@ -42,11 +43,27 @@ func (h *KcwHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		NewConstantPeriod(comp.PeriodResult.StaticValue),
 		comp.AccessGen,
 		multExpr,
+		extractUseTrueRangeArg(call, 3),
 		context,
 	)
 	code := g.indentCode(builder.Build())
 
 	return comp.Preamble + code, nil
+}
+
+func extractUseTrueRangeArg(call *ast.CallExpression, argIndex int) bool {
+	if len(call.Arguments) <= argIndex {
+		return true
+	}
+	lit, ok := call.Arguments[argIndex].(*ast.Literal)
+	if !ok {
+		return true
+	}
+	boolVal, ok := lit.Value.(bool)
+	if !ok {
+		return true
+	}
+	return boolVal
 }
 
 func kcwMultExpr(g *generator, call *ast.CallExpression) (string, error) {
@@ -63,9 +80,9 @@ func (h *KcwHandler) GetInternalSeriesNames(varName string, call *ast.CallExpres
 	}, nil
 }
 
-// KCWIIFEGenerator generates KCW code for arrow function context.
 type KCWIIFEGenerator struct {
-	multExpr string
+	multExpr     string
+	useTrueRange bool
 }
 
 func (g *KCWIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
@@ -76,7 +93,7 @@ func (g *KCWIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 	context := NewArrowFunctionIndicatorContext()
 	resultName := fmt.Sprintf("kcw_%s", sourceHash)
 
-	builder := NewKCWIndicatorBuilder(resultName, period, accessor, g.multExpr, context)
+	builder := NewKCWIndicatorBuilder(resultName, period, accessor, g.multExpr, g.useTrueRange, context)
 	statefulCode := builder.Build()
 	seriesAccess := fmt.Sprintf("arrowCtx.GetOrCreateSeries(%q).Get(0)", resultName)
 

@@ -177,11 +177,12 @@ across all edge cases: first bar, gaps, overlaps, extreme values.
 */
 func TestBarEvaluator_TrueRangeCalculation(t *testing.T) {
 	tests := []struct {
-		name     string
-		ctx      *context.Context
-		barIdx   int
-		expected float64
-		desc     string
+		name      string
+		ctx       *context.Context
+		barIdx    int
+		expected  float64
+		expectNaN bool
+		desc      string
 	}{
 		{
 			name: "first_bar_no_previous_close",
@@ -190,9 +191,9 @@ func TestBarEvaluator_TrueRangeCalculation(t *testing.T) {
 					{High: 110, Low: 90, Close: 100},
 				},
 			},
-			barIdx:   0,
-			expected: 20.0, // high - low
-			desc:     "First bar uses high-low only",
+			barIdx:    0,
+			expectNaN: true,
+			desc:      "First bar returns NaN (ta.tr variable = ta.tr(false))",
 		},
 		{
 			name: "gap_up_from_previous_close",
@@ -271,8 +272,155 @@ func TestBarEvaluator_TrueRangeCalculation(t *testing.T) {
 				t.Fatalf("%s: unexpected error: %v", tt.desc, err)
 			}
 
-			if math.Abs(value-tt.expected) > 0.01 {
+			if tt.expectNaN {
+				if !math.IsNaN(value) {
+					t.Errorf("%s: expected NaN, got %.2f", tt.desc, value)
+				}
+			} else if math.Abs(value-tt.expected) > 0.01 {
 				t.Errorf("%s: expected %.2f, got %.2f", tt.desc, tt.expected, value)
+			}
+		})
+	}
+}
+
+/*
+TestBarEvaluator_TrFunctionCall validates ta.tr(handle_na) function call evaluation.
+
+The handleNA parameter controls first-bar behaviour:
+  - ta.tr(false) or ta.tr() → NaN on bar 0 (default; PineScript ta.tr variable semantics)
+  - ta.tr(true)             → High-Low on bar 0 (ATR seed semantics; no prevClose gap correction)
+
+For all bars after the first, both variants return identical full true-range values.
+*/
+func TestBarEvaluator_TrFunctionCall(t *testing.T) {
+	twoBarCtx := &context.Context{
+		Data: []context.OHLCV{
+			{High: 110, Low: 90, Close: 100},
+			{High: 130, Low: 120, Close: 125},
+		},
+	}
+	oneBarCtx := &context.Context{
+		Data: []context.OHLCV{
+			{High: 110, Low: 90, Close: 100},
+		},
+	}
+
+	makeTRCall := func(handleNA bool) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "tr"},
+			},
+			Arguments: []ast.Expression{
+				&ast.Literal{Value: handleNA},
+			},
+		}
+	}
+
+	tests := []struct {
+		name      string
+		ctx       *context.Context
+		barIdx    int
+		handleNA  bool
+		expectNaN bool
+		expected  float64
+	}{
+		{
+			name: "handleNA_false_first_bar_yields_NaN",
+			ctx:  oneBarCtx, barIdx: 0, handleNA: false,
+			expectNaN: true,
+		},
+		{
+			name: "handleNA_true_first_bar_yields_HL",
+			ctx:  oneBarCtx, barIdx: 0, handleNA: true,
+			expected: 20.0,
+		},
+		{
+			name: "handleNA_false_normal_bar_yields_true_range",
+			ctx:  twoBarCtx, barIdx: 1, handleNA: false,
+			expected: 30.0, // max(130-120=10, |130-100|=30, |120-100|=20) = 30
+		},
+		{
+			name: "handleNA_true_normal_bar_yields_same_true_range",
+			ctx:  twoBarCtx, barIdx: 1, handleNA: true,
+			expected: 30.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evaluator := NewStreamingBarEvaluator()
+			call := makeTRCall(tt.handleNA)
+
+			value, err := evaluator.evaluateTRFuncAtBar(call, tt.ctx, tt.barIdx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.expectNaN {
+				if !math.IsNaN(value) {
+					t.Errorf("expected NaN, got %.4f", value)
+				}
+			} else if math.Abs(value-tt.expected) > 0.001 {
+				t.Errorf("expected %.4f, got %.4f", tt.expected, value)
+			}
+		})
+	}
+}
+
+/*
+TestBarEvaluator_TrVariableEqualsHandleNAFalse verifies that the ta.tr variable
+(member-expression access) is semantically equivalent to ta.tr(false): both yield
+NaN on the first bar and identical full true-range values on all subsequent bars.
+*/
+func TestBarEvaluator_TrVariableEqualsHandleNAFalse(t *testing.T) {
+	tests := []struct {
+		name   string
+		ctx    *context.Context
+		barIdx int
+	}{
+		{
+			name:   "first_bar",
+			ctx:    &context.Context{Data: []context.OHLCV{{High: 110, Low: 90, Close: 100}}},
+			barIdx: 0,
+		},
+		{
+			name: "second_bar_gap_up",
+			ctx: &context.Context{Data: []context.OHLCV{
+				{High: 110, Low: 90, Close: 100},
+				{High: 130, Low: 120, Close: 125},
+			}},
+			barIdx: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evaluator := NewStreamingBarEvaluator()
+
+			memberExpr := &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "tr"},
+			}
+			varValue, err := evaluator.evaluateMemberExpressionAtBar(memberExpr, tt.ctx, tt.barIdx)
+			if err != nil {
+				t.Fatalf("member expr error: %v", err)
+			}
+
+			funcCall := &ast.CallExpression{
+				Callee: memberExpr,
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: false},
+				},
+			}
+			funcValue, err := evaluator.evaluateTRFuncAtBar(funcCall, tt.ctx, tt.barIdx)
+			if err != nil {
+				t.Fatalf("func call error: %v", err)
+			}
+
+			bothNaN := math.IsNaN(varValue) && math.IsNaN(funcValue)
+			if !bothNaN && varValue != funcValue {
+				t.Errorf("ta.tr variable (%.4f) != ta.tr(false) (%.4f)", varValue, funcValue)
 			}
 		})
 	}

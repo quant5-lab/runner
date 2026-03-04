@@ -91,7 +91,7 @@ func (r *InlineTAIIFERegistry) registerDefaults() {
 	})
 	r.RegisterWithBareAlias("ta.alma", &ALMAIIFEGenerator{namingStrategy: windowNamer})
 	r.RegisterWithBareAlias("ta.hma", &HMAIIFEGenerator{})
-	r.RegisterWithBareAlias("ta.kcw", &KCWIIFEGenerator{multExpr: "1.5"})
+	r.RegisterWithBareAlias("ta.kcw", &KCWIIFEGenerator{multExpr: "1.5", useTrueRange: true})
 }
 
 func (r *InlineTAIIFERegistry) Register(name string, generator InlineTAIIFEGenerator) {

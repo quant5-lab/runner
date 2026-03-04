@@ -84,6 +84,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&HmaHandler{},
 			&KcwHandler{},
 			&SarHandler{},
+			&TrHandler{},
 		},
 	}
 }

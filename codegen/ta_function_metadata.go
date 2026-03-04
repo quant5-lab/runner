@@ -67,6 +67,26 @@ func (m TAFunctionMetadata) MinArgCount() int {
 	return min
 }
 
+/*
+HasOverloadWithSourceAt returns true when there is an overload for the given arg count
+whose first non-OHLC argument is a series. Used by the resolver to distinguish
+"caller provided explicit source" from "use default source".
+*/
+func (m TAFunctionMetadata) HasOverloadWithSourceAt(argCount int) bool {
+	for _, overload := range m.Overloads {
+		if !overload.Matches(argCount) {
+			continue
+		}
+		for _, arg := range overload.Arguments {
+			if arg.Classification == TAArgImplicitOHLC {
+				continue
+			}
+			return arg.Classification.IsSeries()
+		}
+	}
+	return false
+}
+
 func (m TAFunctionMetadata) MaxArgCount() int {
 	if len(m.Overloads) == 0 {
 		return 0

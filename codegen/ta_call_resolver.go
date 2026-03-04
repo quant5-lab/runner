@@ -40,7 +40,9 @@ func (r *TACallResolver) Resolve(functionName string, call *ast.CallExpression) 
 		resolved.SetOHLCRequired()
 	}
 
-	needsDefaultSource := providedArgCount < metadata.MaxArgCount() && metadata.DefaultSource != ""
+	needsDefaultSource := !metadata.HasOverloadWithSourceAt(providedArgCount) &&
+		providedArgCount < metadata.MaxArgCount() &&
+		metadata.DefaultSource != ""
 
 	if needsDefaultSource {
 		resolved.ApplyDefaultSource(metadata.DefaultSource)

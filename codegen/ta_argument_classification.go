@@ -7,6 +7,7 @@ const (
 	TAArgSeriesOptional
 	TAArgScalarInt
 	TAArgScalarFloat
+	TAArgScalarBool
 	TAArgImplicitOHLC
 )
 
@@ -15,7 +16,7 @@ func (c TAArgumentClassification) IsSeries() bool {
 }
 
 func (c TAArgumentClassification) IsScalar() bool {
-	return c == TAArgScalarInt || c == TAArgScalarFloat
+	return c == TAArgScalarInt || c == TAArgScalarFloat || c == TAArgScalarBool
 }
 
 func (c TAArgumentClassification) RequiresHistoricalAccess() bool {

@@ -12,7 +12,7 @@ func NewTrueRangeCalculator() *TrueRangeCalculator {
 	return &TrueRangeCalculator{}
 }
 
-func (c *TrueRangeCalculator) CalculateAtBar(bars []context.OHLCV, barIdx int, prevClose float64, isFirstBar bool) float64 {
+func (c *TrueRangeCalculator) CalculateAtBar(bars []context.OHLCV, barIdx int, prevClose float64, isFirstBar bool, handleNA bool) float64 {
 	if barIdx < 0 || barIdx >= len(bars) {
 		return math.NaN()
 	}
@@ -20,7 +20,10 @@ func (c *TrueRangeCalculator) CalculateAtBar(bars []context.OHLCV, barIdx int, p
 	bar := bars[barIdx]
 
 	if isFirstBar {
-		return bar.High - bar.Low
+		if handleNA {
+			return bar.High - bar.Low
+		}
+		return math.NaN()
 	}
 
 	highLowRange := bar.High - bar.Low

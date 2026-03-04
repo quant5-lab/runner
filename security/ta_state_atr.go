@@ -38,7 +38,7 @@ func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		}
 
 		isFirstBar := s.computed == 0 || !s.hasHistory
-		trueRange := s.trCalculator.CalculateAtBar(secCtx.Data, s.computed, s.prevClose, isFirstBar)
+		trueRange := s.trCalculator.CalculateAtBar(secCtx.Data, s.computed, s.prevClose, isFirstBar, true)
 
 		var atrValue float64
 		if s.computed == 0 {

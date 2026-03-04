@@ -290,7 +290,7 @@ func (a *ArrowFunctionTACallGenerator) generateKCWCall(call *ast.CallExpression)
 	}
 	multExpr := a.extractKCWMultFromArg(call, multArgIdx)
 
-	gen := &KCWIIFEGenerator{multExpr: multExpr}
+	gen := &KCWIIFEGenerator{multExpr: multExpr, useTrueRange: extractUseTrueRangeArg(call, 3)}
 
 	hasher := &ExpressionHasher{}
 	sourceHash := hasher.Hash(sourceExpr)

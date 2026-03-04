@@ -539,16 +539,15 @@ func (h *BuiltinIdentifierHandler) extractOffset(expr ast.Expression) int {
 
 func (h *BuiltinIdentifierHandler) generateTrueRangeCalculation(barAccessor string) string {
 	return fmt.Sprintf(
-		"func() float64 { if ctx.BarIndex < 1 { return %s.High - %s.Low }; "+
+		"func() float64 { if ctx.BarIndex < 1 { return math.NaN() }; "+
 			"prevClose := ctx.Data[ctx.BarIndex-1].Close; "+
 			"return math.Max(%s.High - %s.Low, math.Max(math.Abs(%s.High - prevClose), math.Abs(%s.Low - prevClose))) }()",
-		barAccessor, barAccessor,
 		barAccessor, barAccessor, barAccessor, barAccessor,
 	)
 }
 
 func (h *BuiltinIdentifierHandler) generateTrueRangeCalculationSeries() string {
-	return "func() float64 { if ctx.BarIndex < 1 { return highSeries.GetCurrent() - lowSeries.GetCurrent() }; " +
+	return "func() float64 { if ctx.BarIndex < 1 { return math.NaN() }; " +
 		"prevClose := closeSeries.Get(1); " +
 		"return math.Max(highSeries.GetCurrent() - lowSeries.GetCurrent(), math.Max(math.Abs(highSeries.GetCurrent() - prevClose), math.Abs(lowSeries.GetCurrent() - prevClose))) }()"
 }
@@ -558,7 +557,7 @@ func (h *BuiltinIdentifierHandler) generateHistoricalTrueRange(offset int) strin
 		"func() float64 { "+
 			"if i-%d < 0 { return math.NaN() }; "+
 			"barIdx := i-%d; "+
-			"if barIdx < 1 { return ctx.Data[barIdx].High - ctx.Data[barIdx].Low }; "+
+			"if barIdx < 1 { return math.NaN() }; "+
 			"prevClose := ctx.Data[barIdx-1].Close; "+
 			"currentBar := ctx.Data[barIdx]; "+
 			"return math.Max(currentBar.High - currentBar.Low, math.Max(math.Abs(currentBar.High - prevClose), math.Abs(currentBar.Low - prevClose))) "+

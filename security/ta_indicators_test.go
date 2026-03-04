@@ -7,141 +7,172 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-func TestTrueRangeCalculator_FirstBar(t *testing.T) {
-	calc := NewTrueRangeCalculator()
+/*
+TestTrueRangeCalculator_FirstBarPolicy verifies the two first-bar policies.
 
-	bars := []context.OHLCV{
-		{Open: 100, High: 105, Low: 95, Close: 102},
+When isFirstBar=true there is no prevClose available.  The handleNA parameter
+governs what is returned in that situation:
+
+  - handleNA=true  → High-Low  (ATR seed: preserve a usable numeric value)
+  - handleNA=false → NaN       (ta.tr variable: signal "not enough data")
+*/
+func TestTrueRangeCalculator_FirstBarPolicy(t *testing.T) {
+	calc := NewTrueRangeCalculator()
+	bars := []context.OHLCV{{High: 110, Low: 90, Close: 100}}
+
+	tests := []struct {
+		name      string
+		handleNA  bool
+		expectNaN bool
+		expected  float64
+	}{
+		{
+			name:     "handleNA_true_yields_HL_range",
+			handleNA: true, expectNaN: false, expected: 20.0,
+		},
+		{
+			name:     "handleNA_false_yields_NaN",
+			handleNA: false, expectNaN: true,
+		},
 	}
 
-	tr := calc.CalculateAtBar(bars, 0, 0, true)
-	expected := 10.0
-
-	if tr != expected {
-		t.Errorf("First bar TR: expected %.2f, got %.2f", expected, tr)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calc.CalculateAtBar(bars, 0, 0, true, tt.handleNA)
+			if tt.expectNaN {
+				if !math.IsNaN(got) {
+					t.Errorf("handleNA=false: expected NaN on first bar, got %.4f", got)
+				}
+			} else if math.Abs(got-tt.expected) > 0.001 {
+				t.Errorf("handleNA=true: expected %.4f (High-Low), got %.4f", tt.expected, got)
+			}
+		})
 	}
 }
 
-func TestTrueRangeCalculator_TrueRangeComponents(t *testing.T) {
+/*
+TestTrueRangeCalculator_Algorithm verifies the three-component true-range
+formula: max(High-Low, |High-prevClose|, |Low-prevClose|).
+
+These cases are independent of the first-bar / handleNA policy because they
+all supply isFirstBar=false with an explicit prevClose.  handleNA is provided
+in both variants to prove the parameter has no effect on non-first bars.
+*/
+func TestTrueRangeCalculator_Algorithm(t *testing.T) {
 	calc := NewTrueRangeCalculator()
 
 	tests := []struct {
 		name      string
-		bars      []context.OHLCV
+		bar       context.OHLCV
 		prevClose float64
 		expected  float64
-		desc      string
+		dominant  string
 	}{
 		{
-			name: "HL_highest",
-			bars: []context.OHLCV{
-				{High: 110, Low: 100},
-			},
-			prevClose: 102,
-			expected:  10.0,
-			desc:      "high-low (10) > abs(high-prevClose) (8) > abs(low-prevClose) (2)",
+			name: "HL_dominates",
+			bar:  context.OHLCV{High: 110, Low: 100}, prevClose: 102,
+			expected: 10.0, dominant: "High-Low=10 > |High-pC|=8 > |Low-pC|=2",
 		},
 		{
-			name: "HC_highest",
-			bars: []context.OHLCV{
-				{High: 108, Low: 100},
-			},
-			prevClose: 90,
-			expected:  18.0,
-			desc:      "abs(high-prevClose) (18) > high-low (8) > abs(low-prevClose) (10)",
+			name: "HC_dominates_gap_up",
+			bar:  context.OHLCV{High: 108, Low: 100}, prevClose: 90,
+			expected: 18.0, dominant: "|High-pC|=18 > High-Low=8 > |Low-pC|=10",
 		},
 		{
-			name: "LC_highest",
-			bars: []context.OHLCV{
-				{High: 108, Low: 98},
-			},
-			prevClose: 110,
-			expected:  12.0,
-			desc:      "abs(low-prevClose) (12) > high-low (10) > abs(high-prevClose) (2)",
+			name: "LC_dominates_gap_down",
+			bar:  context.OHLCV{High: 108, Low: 98}, prevClose: 110,
+			expected: 12.0, dominant: "|Low-pC|=12 > High-Low=10 > |High-pC|=2",
 		},
 		{
-			name: "gap_up",
-			bars: []context.OHLCV{
-				{High: 125, Low: 120},
-			},
-			prevClose: 100,
-			expected:  25.0,
-			desc:      "gap up: abs(high-prevClose) (25) captures gap",
+			name: "large_gap_up",
+			bar:  context.OHLCV{High: 125, Low: 120}, prevClose: 100,
+			expected: 25.0, dominant: "|High-pC|=25 captures large gap up",
 		},
 		{
-			name: "gap_down",
-			bars: []context.OHLCV{
-				{High: 85, Low: 80},
-			},
-			prevClose: 100,
-			expected:  20.0,
-			desc:      "gap down: abs(low-prevClose) (20) captures gap",
+			name: "large_gap_down",
+			bar:  context.OHLCV{High: 85, Low: 80}, prevClose: 100,
+			expected: 20.0, dominant: "|Low-pC|=20 captures large gap down",
+		},
+		{
+			name: "equal_high_low_doji",
+			bar:  context.OHLCV{High: 100, Low: 100}, prevClose: 100,
+			expected: 0.0, dominant: "all components zero — perfect doji",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tr := calc.CalculateAtBar(tt.bars, 0, tt.prevClose, false)
-			if math.Abs(tr-tt.expected) > 0.01 {
-				t.Errorf("%s: expected %.2f, got %.2f", tt.desc, tt.expected, tr)
+	for _, handleNA := range []bool{false, true} {
+		for _, tt := range tests {
+			tt := tt
+			handleNA := handleNA
+			name := tt.name
+			if handleNA {
+				name += "/handleNA_true"
+			} else {
+				name += "/handleNA_false"
 			}
-		})
+			t.Run(name, func(t *testing.T) {
+				bars := []context.OHLCV{tt.bar}
+				got := calc.CalculateAtBar(bars, 0, tt.prevClose, false, handleNA)
+				if math.Abs(got-tt.expected) > 0.001 {
+					t.Errorf("%s: expected %.4f, got %.4f", tt.dominant, tt.expected, got)
+				}
+			})
+		}
 	}
 }
 
-func TestTrueRangeCalculator_BoundaryConditions(t *testing.T) {
+/*
+TestTrueRangeCalculator_BoundsGuard verifies that out-of-range bar indices
+always return NaN regardless of isFirstBar or handleNA values.
+*/
+func TestTrueRangeCalculator_BoundsGuard(t *testing.T) {
 	calc := NewTrueRangeCalculator()
+	bars := []context.OHLCV{{High: 105, Low: 95, Close: 100}}
 
 	tests := []struct {
-		name      string
-		bars      []context.OHLCV
-		barIdx    int
-		prevClose float64
-		isFirst   bool
-		expectNaN bool
-		desc      string
+		name   string
+		barIdx int
 	}{
-		{
-			name:      "out_of_bounds_positive",
-			bars:      []context.OHLCV{{High: 105, Low: 95}},
-			barIdx:    10,
-			prevClose: 100,
-			isFirst:   false,
-			expectNaN: true,
-			desc:      "index beyond data length",
-		},
-		{
-			name:      "negative_index",
-			bars:      []context.OHLCV{{High: 105, Low: 95}},
-			barIdx:    -1,
-			prevClose: 100,
-			isFirst:   false,
-			expectNaN: true,
-			desc:      "negative bar index",
-		},
-		{
-			name:      "zero_range",
-			bars:      []context.OHLCV{{High: 100, Low: 100}},
-			barIdx:    0,
-			prevClose: 100,
-			isFirst:   true,
-			expectNaN: false,
-			desc:      "no price movement within bar",
-		},
+		{"negative_index", -1},
+		{"one_past_end", 1},
+		{"far_out_of_bounds", 999},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tr := calc.CalculateAtBar(tt.bars, tt.barIdx, tt.prevClose, tt.isFirst)
-			if tt.expectNaN {
-				if !math.IsNaN(tr) {
-					t.Errorf("%s: expected NaN, got %.2f", tt.desc, tr)
+		for _, isFirst := range []bool{false, true} {
+			for _, handleNA := range []bool{false, true} {
+				isFirst, handleNA := isFirst, handleNA
+				name := tt.name
+				if isFirst {
+					name += "/isFirst"
 				}
-			} else {
-				if math.IsNaN(tr) {
-					t.Errorf("%s: expected valid value, got NaN", tt.desc)
+				if handleNA {
+					name += "/handleNA"
 				}
+				t.Run(name, func(t *testing.T) {
+					got := calc.CalculateAtBar(bars, tt.barIdx, 100, isFirst, handleNA)
+					if !math.IsNaN(got) {
+						t.Errorf("OOB index %d: expected NaN, got %.4f", tt.barIdx, got)
+					}
+				})
 			}
-		})
+		}
+	}
+}
+
+/*
+TestTrueRangeCalculator_ZeroRange verifies that a bar with High==Low produces
+0.0 when prevClose is also equal (no gap, no intra-bar range).
+*/
+func TestTrueRangeCalculator_ZeroRange(t *testing.T) {
+	calc := NewTrueRangeCalculator()
+	bars := []context.OHLCV{{High: 100, Low: 100}}
+
+	got := calc.CalculateAtBar(bars, 0, 100.0, false, false)
+	if math.IsNaN(got) {
+		t.Fatal("zero-range bar with prevClose equal: expected 0.0, got NaN")
+	}
+	if got != 0.0 {
+		t.Errorf("zero-range bar: expected 0.0, got %.4f", got)
 	}
 }

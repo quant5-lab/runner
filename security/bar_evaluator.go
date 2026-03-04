@@ -246,6 +246,8 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateKCWAtBar(call, secCtx, barIdx)
 	case "ta.sar":
 		return e.evaluateSARAtBar(call, secCtx, barIdx)
+	case "ta.tr", "tr":
+		return e.evaluateTRFuncAtBar(call, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedFunctionError(funcName)
 	}
@@ -615,6 +617,14 @@ func (e *StreamingBarEvaluator) evaluateVolumeIndicatorAtBar(propName string, se
 }
 
 func (e *StreamingBarEvaluator) evaluateTrueRangeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
+	return e.computeTrueRangeAtBar(secCtx, barIdx, false)
+}
+
+func (e *StreamingBarEvaluator) evaluateTRFuncAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	return e.computeTrueRangeAtBar(secCtx, barIdx, extractTRHandleNAArg(call))
+}
+
+func (e *StreamingBarEvaluator) computeTrueRangeAtBar(secCtx *context.Context, barIdx int, handleNA bool) (float64, error) {
 	if barIdx < 0 || barIdx >= len(secCtx.Data) {
 		return 0.0, newBarIndexOutOfRangeError(barIdx, len(secCtx.Data))
 	}
@@ -626,8 +636,22 @@ func (e *StreamingBarEvaluator) evaluateTrueRangeAtBar(secCtx *context.Context, 
 		prevClose = secCtx.Data[barIdx-1].Close
 	}
 
-	trCalculator := NewTrueRangeCalculator()
-	return trCalculator.CalculateAtBar(secCtx.Data, barIdx, prevClose, isFirstBar), nil
+	return NewTrueRangeCalculator().CalculateAtBar(secCtx.Data, barIdx, prevClose, isFirstBar, handleNA), nil
+}
+
+func extractTRHandleNAArg(call *ast.CallExpression) bool {
+	if len(call.Arguments) < 1 {
+		return false
+	}
+	lit, ok := call.Arguments[0].(*ast.Literal)
+	if !ok {
+		return false
+	}
+	boolVal, ok := lit.Value.(bool)
+	if !ok {
+		return false
+	}
+	return boolVal
 }
 
 func (e *StreamingBarEvaluator) evaluateWMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
@@ -900,6 +924,7 @@ func (e *StreamingBarEvaluator) evaluateKCWAtBar(call *ast.CallExpression, secCt
 			mult = v
 		}
 	}
+	useTrueRange := extractKCWUseTrueRangeArg(call)
 
 	emaCacheKey := buildTACacheKey("ema", sourceID.Name, period)
 	emaState := e.getOrCreateTAState(emaCacheKey, period, secCtx)
@@ -908,15 +933,50 @@ func (e *StreamingBarEvaluator) evaluateKCWAtBar(call *ast.CallExpression, secCt
 		return math.NaN(), err
 	}
 
-	atrCacheKey := buildTACacheKey("atr", "hlc", period)
-	atrState := e.getOrCreateTAState(atrCacheKey, period, secCtx)
-	dummyID := &ast.Identifier{Name: "close"}
-	atrVal, err := atrState.ComputeAtBar(secCtx, dummyID, barIdx)
-	if err != nil || math.IsNaN(atrVal) {
-		return math.NaN(), err
+	var rangeVal float64
+	if useTrueRange {
+		atrCacheKey := buildTACacheKey("atr", "hlc", period)
+		atrState := e.getOrCreateTAState(atrCacheKey, period, secCtx)
+		dummyID := &ast.Identifier{Name: "close"}
+		rangeVal, err = atrState.ComputeAtBar(secCtx, dummyID, barIdx)
+		if err != nil || math.IsNaN(rangeVal) {
+			return math.NaN(), err
+		}
+	} else {
+		rangeVal, err = e.computeHighLowSMAAtBar(secCtx, barIdx, period)
+		if err != nil || math.IsNaN(rangeVal) {
+			return math.NaN(), err
+		}
 	}
 
-	return 2.0 * mult * atrVal / emaVal, nil
+	return 2.0 * mult * rangeVal / emaVal, nil
+}
+
+func extractKCWUseTrueRangeArg(call *ast.CallExpression) bool {
+	if len(call.Arguments) < 4 {
+		return true
+	}
+	lit, ok := call.Arguments[3].(*ast.Literal)
+	if !ok {
+		return true
+	}
+	boolVal, ok := lit.Value.(bool)
+	if !ok {
+		return true
+	}
+	return boolVal
+}
+
+func (e *StreamingBarEvaluator) computeHighLowSMAAtBar(secCtx *context.Context, barIdx int, period int) (float64, error) {
+	if barIdx < period-1 {
+		return math.NaN(), nil
+	}
+	sum := 0.0
+	for i := 0; i < period; i++ {
+		bar := secCtx.Data[barIdx-i]
+		sum += bar.High - bar.Low
+	}
+	return sum / float64(period), nil
 }
 
 func (e *StreamingBarEvaluator) evaluateSARAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {

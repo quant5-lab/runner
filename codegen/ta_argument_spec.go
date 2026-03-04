@@ -32,6 +32,13 @@ func NewScalarFloatArgument(position int) TAArgumentSpec {
 	}
 }
 
+func NewScalarBoolArgument(position int) TAArgumentSpec {
+	return TAArgumentSpec{
+		Position:       position,
+		Classification: TAArgScalarBool,
+	}
+}
+
 func NewImplicitOHLCArgument() TAArgumentSpec {
 	return TAArgumentSpec{
 		Position:       -1,

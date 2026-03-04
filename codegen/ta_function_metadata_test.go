@@ -397,3 +397,166 @@ func TestNewTAFunctionMetadata_DefaultIsTupleFalse(t *testing.T) {
 		t.Error("NewTAFunctionMetadata should default IsTuple to false")
 	}
 }
+
+/* TestTAFunctionMetadata_HasOverloadWithSourceAt covers the source-detection helper
+ * that guards the needsDefaultSource heuristic in the resolver.
+ *
+ * A function "has an overload with source at N" when there exists an N-arg overload
+ * whose first non-OHLC argument is classified as a series.
+ */
+func TestTAFunctionMetadata_HasOverloadWithSourceAt(t *testing.T) {
+	tests := []struct {
+		name      string
+		overloads []TAOverloadRule
+		argCount  int
+		want      bool
+	}{
+		{
+			name:      "no_overloads_returns_false",
+			overloads: []TAOverloadRule{},
+			argCount:  2,
+			want:      false,
+		},
+		{
+			name: "arg_count_not_present_returns_false",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+				}),
+			},
+			argCount: 3,
+			want:     false,
+		},
+		{
+			name: "overload_starts_with_series_returns_true",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+				}),
+			},
+			argCount: 2,
+			want:     true,
+		},
+		{
+			name: "overload_starts_with_scalar_returns_false",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewScalarIntArgument(0),
+					NewScalarFloatArgument(1),
+				}),
+			},
+			argCount: 2,
+			want:     false,
+		},
+		{
+			name: "implicit_ohlc_skipped_then_series_returns_true",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(1, []TAArgumentSpec{
+					NewImplicitOHLCArgument(),
+					NewScalarIntArgument(0),
+				}),
+			},
+			argCount: 1,
+			want:     false,
+		},
+		{
+			name: "implicit_ohlc_skipped_then_scalar_returns_false",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(1, []TAArgumentSpec{
+					NewImplicitOHLCArgument(),
+					NewScalarFloatArgument(0),
+				}),
+			},
+			argCount: 1,
+			want:     false,
+		},
+		{
+			name: "kcw_pattern_2arg_no_source",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewScalarIntArgument(0),
+					NewScalarFloatArgument(1),
+				}),
+				NewSingleOverloadRule(3, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+				}),
+				NewSingleOverloadRule(4, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+					NewScalarBoolArgument(3),
+				}),
+			},
+			argCount: 2,
+			want:     false,
+		},
+		{
+			name: "kcw_pattern_3arg_has_source",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewScalarIntArgument(0),
+					NewScalarFloatArgument(1),
+				}),
+				NewSingleOverloadRule(3, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+				}),
+				NewSingleOverloadRule(4, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+					NewScalarBoolArgument(3),
+				}),
+			},
+			argCount: 3,
+			want:     true,
+		},
+		{
+			name: "kcw_pattern_4arg_has_source",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(2, []TAArgumentSpec{
+					NewScalarIntArgument(0),
+					NewScalarFloatArgument(1),
+				}),
+				NewSingleOverloadRule(3, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+				}),
+				NewSingleOverloadRule(4, []TAArgumentSpec{
+					NewSeriesArgument(0, ""),
+					NewScalarIntArgument(1),
+					NewScalarFloatArgument(2),
+					NewScalarBoolArgument(3),
+				}),
+			},
+			argCount: 4,
+			want:     true,
+		},
+		{
+			name: "bool_first_arg_is_scalar_not_series",
+			overloads: []TAOverloadRule{
+				NewSingleOverloadRule(1, []TAArgumentSpec{
+					NewScalarBoolArgument(0),
+				}),
+			},
+			argCount: 1,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metadata := NewTAFunctionMetadata("test.func", "close", tt.overloads)
+			got := metadata.HasOverloadWithSourceAt(tt.argCount)
+			if got != tt.want {
+				t.Errorf("HasOverloadWithSourceAt(%d) = %v, want %v", tt.argCount, got, tt.want)
+			}
+		})
+	}
+}

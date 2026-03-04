@@ -30,8 +30,8 @@ func BarIndexArrowIIFE(indexCode string) string {
 }
 
 func TrueRangeArrowIIFE(indexCode string) string {
-	innerBody := "curBar := ctx.Data[barIdx]; " +
-		"if barIdx < 1 { return curBar.High - curBar.Low }; " +
+	innerBody := "if barIdx < 1 { return math.NaN() }; " +
+		"curBar := ctx.Data[barIdx]; " +
 		"prevClose := ctx.Data[barIdx-1].Close; " +
 		"return math.Max(curBar.High - curBar.Low, math.Max(math.Abs(curBar.High - prevClose), math.Abs(curBar.Low - prevClose)))"
 	return boundsCheckedArrowIIFE(indexCode, innerBody)

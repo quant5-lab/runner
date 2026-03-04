@@ -17,7 +17,7 @@ func RegisterVolatilitySignatures() []TAFunctionMetadata {
 		}),
 		NewSingleOverloadRule(1, []TAArgumentSpec{
 			NewImplicitOHLCArgument(),
-			NewScalarIntArgument(0),
+			NewScalarBoolArgument(0),
 		}),
 	}
 	signatures = appendWithBareAlias(signatures, "ta.tr", "", trOverloads)

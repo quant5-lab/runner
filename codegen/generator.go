@@ -175,6 +175,7 @@ type generator struct {
 	indent                   int
 	userDefinedFunctions     string
 	taFunctions              []taFunctionCall
+	tupleTAFunctions         []tupleTAFunctionCall
 	inSecurityContext        bool
 	inArrowFunctionBody      bool
 	loopContextStack         *LoopContextStack
@@ -419,6 +420,12 @@ type taFunctionCall struct {
 	call     *ast.CallExpression
 }
 
+type tupleTAFunctionCall struct {
+	varNames []string
+	funcName string
+	call     *ast.CallExpression
+}
+
 func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if program == nil || len(program.Body) == 0 {
 		return g.generatePlaceholder(), nil
@@ -548,7 +555,21 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
 			for _, declarator := range varDecl.Declarations {
-				if _, ok := declarator.ID.(*ast.ArrayPattern); ok {
+				if ap, ok := declarator.ID.(*ast.ArrayPattern); ok {
+					if callExpr, ok := declarator.Init.(*ast.CallExpression); ok {
+						funcName := g.extractFunctionName(callExpr.Callee)
+						if g.tupleIndicatorHandler.IsCustomHandler(funcName) && len(ap.Elements) > 0 {
+							varNames := make([]string, len(ap.Elements))
+							for i, el := range ap.Elements {
+								varNames[i] = el.Name
+							}
+							g.tupleTAFunctions = append(g.tupleTAFunctions, tupleTAFunctionCall{
+								varNames: varNames,
+								funcName: funcName,
+								call:     callExpr,
+							})
+						}
+					}
 					continue
 				}
 
@@ -591,6 +612,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	/* Declare internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
 		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", seriesName)
+		}
+	}
+	for _, tupleFunc := range g.tupleTAFunctions {
+		seriesNames := g.tupleIndicatorHandler.InternalSeriesNamesFor(tupleFunc.funcName, tupleFunc.varNames[0], tupleFunc.call)
 		for _, seriesName := range seriesNames {
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", seriesName)
 		}
@@ -690,6 +717,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	/* Initialize internal series for composite indicators using metadata discovery */
 	for _, taFunc := range g.taFunctions {
 		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", seriesName)
+		}
+	}
+	for _, tupleFunc := range g.tupleTAFunctions {
+		seriesNames := g.tupleIndicatorHandler.InternalSeriesNamesFor(tupleFunc.funcName, tupleFunc.varNames[0], tupleFunc.call)
 		for _, seriesName := range seriesNames {
 			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", seriesName)
 		}
@@ -915,6 +948,12 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	// Advance internal series for composite indicators
 	for _, taFunc := range g.taFunctions {
 		seriesNames := g.compositeIndicatorRegistry.GetInternalSeriesNames(taFunc.funcName, taFunc.varName, taFunc.call)
+		for _, seriesName := range seriesNames {
+			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, seriesName)
+		}
+	}
+	for _, tupleFunc := range g.tupleTAFunctions {
+		seriesNames := g.tupleIndicatorHandler.InternalSeriesNamesFor(tupleFunc.funcName, tupleFunc.varNames[0], tupleFunc.call)
 		for _, seriesName := range seriesNames {
 			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sSeries.Next() }\n", iterVar, seriesName)
 		}

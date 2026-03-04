@@ -166,8 +166,8 @@ func arrowBoundsCheckedExpr(offset int, expr string) string {
 
 func arrowTrueRangeIIFE() string {
 	return "func() float64 { " +
+		"if ctx.BarIndex < 1 { return math.NaN() }; " +
 		"curBar := ctx.Data[ctx.BarIndex]; " +
-		"if ctx.BarIndex < 1 { return curBar.High - curBar.Low }; " +
 		"prevClose := ctx.Data[ctx.BarIndex-1].Close; " +
 		"return math.Max(curBar.High - curBar.Low, math.Max(math.Abs(curBar.High - prevClose), math.Abs(curBar.Low - prevClose))) " +
 		"}()"

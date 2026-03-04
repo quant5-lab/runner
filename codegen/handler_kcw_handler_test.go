@@ -277,3 +277,199 @@ func TestKcwHandler_SourceExpressions(t *testing.T) {
 		})
 	}
 }
+
+/* TestExtractUseTrueRangeArg covers all paths through the bool-extraction helper.
+ *
+ * Invariants:
+ *   - Missing arg → true  (ATR is the PineScript default)
+ *   - Non-literal arg → true  (conservative fallback)
+ *   - Non-bool literal → true  (conservative fallback)
+ *   - Explicit true → true
+ *   - Explicit false → false
+ */
+func TestExtractUseTrueRangeArg(t *testing.T) {
+	boolLiteral := func(v bool) *ast.Literal { return &ast.Literal{Value: v} }
+	intLiteral := func(v float64) *ast.Literal { return &ast.Literal{Value: v} }
+
+	tests := []struct {
+		name     string
+		args     []ast.Expression
+		argIndex int
+		want     bool
+	}{
+		{
+			name:     "no_args_returns_true",
+			args:     nil,
+			argIndex: 3,
+			want:     true,
+		},
+		{
+			name:     "arg_index_beyond_length_returns_true",
+			args:     []ast.Expression{boolLiteral(false)},
+			argIndex: 3,
+			want:     true,
+		},
+		{
+			name:     "explicit_false_at_index_returns_false",
+			args:     []ast.Expression{nil, nil, nil, boolLiteral(false)},
+			argIndex: 3,
+			want:     false,
+		},
+		{
+			name:     "explicit_true_at_index_returns_true",
+			args:     []ast.Expression{nil, nil, nil, boolLiteral(true)},
+			argIndex: 3,
+			want:     true,
+		},
+		{
+			name:     "non_literal_arg_returns_true",
+			args:     []ast.Expression{nil, nil, nil, &ast.Identifier{Name: "useATR"}},
+			argIndex: 3,
+			want:     true,
+		},
+		{
+			name:     "numeric_literal_not_bool_returns_true",
+			args:     []ast.Expression{nil, nil, nil, intLiteral(0)},
+			argIndex: 3,
+			want:     true,
+		},
+		{
+			name:     "index_zero_explicit_false",
+			args:     []ast.Expression{boolLiteral(false)},
+			argIndex: 0,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpression{Arguments: tt.args}
+			got := extractUseTrueRangeArg(call, tt.argIndex)
+			if got != tt.want {
+				t.Errorf("extractUseTrueRangeArg(argIndex=%d) = %v, want %v", tt.argIndex, got, tt.want)
+			}
+		})
+	}
+}
+
+/* TestKcwHandler_UseTrueRangeCodegenBehavior verifies that the useTrueRange flag
+ * selects the correct range-measurement sub-algorithm in generated code.
+ *
+ * useTrueRange=true  → RMA (Wilder smoothing) of True Range (ATR semantics)
+ * useTrueRange=false → windowed SMA of (High – Low), no gap adjustment
+ *
+ * The two paths are mutually exclusive: code distinguishing markers must appear
+ * in exactly one branch and must NOT appear in the other.
+ */
+func TestKcwHandler_UseTrueRangeCodegenBehavior(t *testing.T) {
+	handler := &KcwHandler{}
+
+	baseArgs := func(useTrueRange bool) []ast.Expression {
+		return []ast.Expression{
+			&ast.Identifier{Name: "close"},
+			&ast.Literal{Value: 20.0},
+			&ast.Literal{Value: 1.5},
+			&ast.Literal{Value: useTrueRange},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		useTrueRange   bool
+		mustContain    []string
+		mustNotContain []string
+	}{
+		{
+			name:         "use_true_range_generates_atr_rma_path",
+			useTrueRange: true,
+			mustContain: []string{
+				// True Range inline lambda — only in ATR (RMA) path
+				"math.Max(h-l",
+				"math.Abs(h-pc)",
+				// Wilder smoothing alpha = 1/period — RMA only; EMA uses 2/(period+1)
+				"1.0 / float64(",
+			},
+			mustNotContain: []string{
+				"_hlSum",
+				"ctx.Data[ctx.BarIndex-_j].High - ctx.Data[ctx.BarIndex-_j].Low",
+			},
+		},
+		{
+			name:         "use_high_low_sma_generates_loop_without_true_range",
+			useTrueRange: false,
+			mustContain: []string{
+				"_hlSum",
+				"ctx.Data[ctx.BarIndex-_j].High - ctx.Data[ctx.BarIndex-_j].Low",
+				"_hlSum / float64(",
+			},
+			mustNotContain: []string{
+				// True Range lambda absent in H-L SMA mode
+				"math.Max(h-l",
+				// RMA alpha (1/period) absent; EMA uses 2/(period+1), not "1.0 / float64("
+				"1.0 / float64(",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+			call := &ast.CallExpression{Arguments: baseArgs(tt.useTrueRange)}
+
+			code, err := handler.GenerateCode(gen, "k", call)
+			if err != nil {
+				t.Fatalf("GenerateCode() error = %v", err)
+			}
+
+			for _, want := range tt.mustContain {
+				if !strings.Contains(code, want) {
+					t.Errorf("expected %q in generated code\nGot:\n%s", want, code)
+				}
+			}
+			for _, banned := range tt.mustNotContain {
+				if strings.Contains(code, banned) {
+					t.Errorf("must NOT contain %q in generated code\nGot:\n%s", banned, code)
+				}
+			}
+		})
+	}
+}
+
+/* TestKcwHandler_UseTrueRangeDefaultIsTrue verifies that omitting the 4th argument
+ * produces the same code as explicitly passing true — ATR path is the default.
+ */
+func TestKcwHandler_UseTrueRangeDefaultIsTrue(t *testing.T) {
+	handler := &KcwHandler{}
+	gen := newTestGenerator()
+
+	argsDefault := []ast.Expression{
+		&ast.Identifier{Name: "close"},
+		&ast.Literal{Value: 14.0},
+	}
+	argsExplicitTrue := []ast.Expression{
+		&ast.Identifier{Name: "close"},
+		&ast.Literal{Value: 14.0},
+		&ast.Literal{Value: 1.5},
+		&ast.Literal{Value: true},
+	}
+
+	codeDefault, err := handler.GenerateCode(gen, "k", &ast.CallExpression{Arguments: argsDefault})
+	if err != nil {
+		t.Fatalf("default args: GenerateCode() error = %v", err)
+	}
+
+	gen2 := newTestGenerator()
+	codeExplicit, err := handler.GenerateCode(gen2, "k", &ast.CallExpression{Arguments: argsExplicitTrue})
+	if err != nil {
+		t.Fatalf("explicit true: GenerateCode() error = %v", err)
+	}
+
+	for _, code := range []string{codeDefault, codeExplicit} {
+		if !strings.Contains(code, "math.Max(h-l") {
+			t.Error("default/true useTrueRange must generate ATR (True Range lambda)")
+		}
+		if strings.Contains(code, "_hlSum") {
+			t.Error("default/true useTrueRange must NOT generate SMA-HL loop")
+		}
+	}
+}
