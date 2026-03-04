@@ -5,4 +5,4 @@ Generate: ❌ (label.new codegen fails — unknown function label)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
-Blocker: ~~#6~~ (8-digit RGBA hex now supported), #15 (label/line drawing objects), ~~#8~~ (input.symbol now handled)
+Blocker: #10 (label/line drawing objects). Resolved: 8-digit RGBA hex, input.symbol

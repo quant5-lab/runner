@@ -4,6 +4,6 @@ Generate: ✅ Success
 Compile: ❌ Fails
 Execute: ❌ Not reached
 Error: "undefined: bar_indexSeries"
-Blocker: Codegen doesn't create bar_indexSeries variable for historical access
+Blocker: #3 — Codegen doesn't create bar_indexSeries variable for historical access
 Note: bar_index used in conditional expressions needs Series wrapper for [N] access
 Related: Patterns like "bar_index == 0 ? 1 : 0" fail compilation

@@ -1,6 +1,6 @@
-Remaining blockers: array type syntax (#12), ~~input.color (#15)~~, drawing objects line.*/label.* (#13)
+Remaining blockers: array type syntax (#7), drawing objects line.*/label.* (#10). Resolved: input.color
 
 Parse: ❌ (unexpected token "[" at line 75 — array type declaration `line[]`)
-Generate: ❌ Not reached (also blocked by #13 line.*/label.*, ~~#15 input.color~~)
+Generate: ❌ Not reached (also blocked by #10 line.*/label.*)
 Compile: ❌ Not reached
 Execute: ❌ Not reached

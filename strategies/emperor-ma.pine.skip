@@ -12,3 +12,5 @@ Execute: ❌ Not reached
 
 Arrow functions with complex local variables and parameters fail to emit
 series declarations and parameter-to-series promotion for nested scopes.
+
+Blocker: #2 (arrow function for-loop scope resolution)

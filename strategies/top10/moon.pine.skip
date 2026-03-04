@@ -5,4 +5,4 @@ Generate: ✅
 Compile: ❌ (undefined: valuewhen_*Series, non-boolean condition in if statement)
 Execute: ❌ Not reached
 
-Blocker: ~~#2~~ resolved (`undefined: timeSeries` fixed by calendar builtins). #5 (valuewhen codegen emits undefined series vars, non-boolean conditions)
+Blocker: #5 (valuewhen codegen emits undefined series vars, non-boolean conditions). Resolved: UDF/arrow scope calendar builtins

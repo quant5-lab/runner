@@ -5,7 +5,7 @@ Compile: ✅ Success (Binary created)
 Execute: ✅ Success (Runs without errors)
 Result: 0 trades on AAPL/BTCUSDT/SBERP 1h data
 
-Blocker: ta.vwap() function not implemented in runtime
+Blocker: #5 (ta.vwap() signature declared, no handler/runtime implementation)
 Workaround: Manual VWAP calculation using math.sum() with 100-bar rolling window
 Issue: Strategy parameters too strict for synthetic test data
 - VWAP bands ±1% too narrow
