@@ -1,0 +1,8 @@
+//@version=5
+indicator("Nested TA Conditional Test", overlay=false)
+
+// Test nested conditionals with stateful TA functions in test position
+mode = close > ta.sma(close, 20)
+signal = (mode ? ta.rsi(close, 14) > 50 : ta.rsi(close, 14) < 50) ? 1 : 0
+
+plot(signal, "Signal", color=color.green)

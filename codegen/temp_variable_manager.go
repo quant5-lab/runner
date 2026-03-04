@@ -30,6 +30,7 @@ type TempVariableManager struct {
 	varToCallInfo   map[string]CallInfo
 	conditionalVars map[string]*ast.ConditionalExpression
 	orderedVars     []string
+	emissionTracker *TempVarEmissionTracker
 }
 
 // NewTempVariableManager creates manager with generator context
@@ -39,6 +40,7 @@ func NewTempVariableManager(g *generator) *TempVariableManager {
 		callToVar:       make(map[*ast.CallExpression]string),
 		varToCallInfo:   make(map[string]CallInfo),
 		conditionalVars: make(map[string]*ast.ConditionalExpression),
+		emissionTracker: NewTempVarEmissionTracker(),
 	}
 }
 
@@ -258,6 +260,7 @@ func (m *TempVariableManager) GenerateCalculationsForStatement(stmtIdx int) (str
 			return "", err
 		}
 		code += calcCode
+		m.emissionTracker.MarkAsEmitted(varName)
 	}
 
 	return code, nil
@@ -308,12 +311,17 @@ func (m *TempVariableManager) GetVarNameForCall(call *ast.CallExpression) string
 	return m.callToVar[call]
 }
 
+func (m *TempVariableManager) WasAlreadyEmitted(varName string) bool {
+	return m.emissionTracker.WasEmitted(varName)
+}
+
 // Reset clears all state (for testing or multiple strategy generation)
 func (m *TempVariableManager) Reset() {
 	m.callToVar = make(map[*ast.CallExpression]string)
 	m.varToCallInfo = make(map[string]CallInfo)
 	m.conditionalVars = make(map[string]*ast.ConditionalExpression)
 	m.orderedVars = nil
+	m.emissionTracker.Reset()
 }
 
 func (m *TempVariableManager) RegisterConditional(hash string, cond *ast.ConditionalExpression) string {

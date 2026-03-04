@@ -1,0 +1,12 @@
+//@version=5
+indicator("Composite Indicator Ternary Test", overlay=false)
+
+// Test composite indicators (RSI, MFI) in ternary - covers alpha.pine pattern
+useRSI = input.bool(true, "Use RSI")
+threshold = 50.0
+
+// Pattern from alpha.pine: conditional chooses indicator, result used in ternary test
+indicatorValue = useRSI ? ta.rsi(close, 14) : ta.mfi(hlc3, 14)
+trend = indicatorValue >= threshold ? 1 : -1
+
+plot(trend, "Trend", color=color.orange)

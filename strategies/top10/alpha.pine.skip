@@ -2,7 +2,7 @@ AlphaTrend Strategy (v5) — ATR-based trend follower with MFI/RSI filter
 
 Parse: ✅
 Generate: ✅
-Compile: ❌ (variable redeclaration: composite indicator preamble emitted twice in ternary branches; non-boolean condition in ternary IIFE)
-Execute: ❌ Not reached
+Compile: ✅
+Execute: ✅ (0 trades — series initial value 0.0 vs PineScript na causes nz() fixed point)
 
-Blocker: #1 (composite indicator preamble duplication in ternary branches)
+Blocker: ~~#1~~ resolved

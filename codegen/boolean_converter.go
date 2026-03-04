@@ -123,6 +123,10 @@ func (bc *BooleanConverter) ConvertBoolSeriesForIfStatement(expr ast.Expression,
 		return generatedCode
 	}
 
+	if _, ok := expr.(*ast.ConditionalExpression); ok {
+		return bc.notEqualZeroTransform.Transform(generatedCode)
+	}
+
 	if call, isCall := expr.(*ast.CallExpression); isCall {
 		if bc.IsBooleanFunction(call) {
 			return generatedCode

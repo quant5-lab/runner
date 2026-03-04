@@ -2188,6 +2188,8 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 	tempVarCode := ""
 	if len(nestedCalls) > 0 {
+		deduplicator := NewTempVarInlineDeduplicator(g.tempVarMgr)
+
 		for i := len(nestedCalls) - 1; i >= 0; i-- {
 			callInfo := nestedCalls[i]
 
@@ -2216,6 +2218,10 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 			}
 
 			tempVarName := g.tempVarMgr.GetOrCreate(callInfo)
+
+			if !deduplicator.ShouldEmitCalculation(callInfo) {
+				continue
+			}
 
 			tempCode, err := g.generateVariableFromCall(tempVarName, callInfo.Call)
 			if err != nil {
