@@ -469,7 +469,7 @@ func (e *StreamingBarEvaluator) evaluateTSIAtBar(call *ast.CallExpression, secCt
 	if state, exists := e.taStateCache[cacheKey]; exists {
 		return state.ComputeAtBar(secCtx, sourceID, barIdx)
 	}
-	state := NewTSIStateManager(cacheKey, int(shortLength), int(longLength))
+	state := NewTSIStateManager(cacheKey, int(shortLength), int(longLength), len(secCtx.Data))
 	e.taStateCache[cacheKey] = state
 	return state.ComputeAtBar(secCtx, sourceID, barIdx)
 }

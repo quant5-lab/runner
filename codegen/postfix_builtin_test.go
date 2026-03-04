@@ -325,7 +325,8 @@ x = ta.sma(close, 20)
 indicator("Test")
 x = request.security(syminfo.tickerid, "1D", ta.sma(close, 20))
 `,
-			mustHave: []string{"security", "ta.sma", "ctx.Data"},
+			// TA inside security() is evaluated at runtime by the bar evaluator, not hoisted inline.
+			mustHave: []string{"secKey", "EvaluateAtBar", "secBarEvaluator"},
 		},
 		{
 			name: "plain identifier",

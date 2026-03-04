@@ -213,11 +213,11 @@ plot(ema10_1d, "EMA")
 	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "inline_ta_check", pineScript)
 
-	if !strings.Contains(generatedCode, "ta.sma") {
+	if !strings.Contains(generatedCode, `Name: "sma"`) {
 		t.Error("Expected inline SMA generation (not runtime lookup)")
 	}
 
-	if !strings.Contains(generatedCode, "ta.ema") {
+	if !strings.Contains(generatedCode, `Name: "ema"`) {
 		t.Error("Expected inline EMA generation (not runtime lookup)")
 	}
 

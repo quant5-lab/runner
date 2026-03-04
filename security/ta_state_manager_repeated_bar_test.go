@@ -4,147 +4,96 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
-	"github.com/quant5-lab/runner/runtime/context"
 )
 
-func TestTAStateManager_RepeatedCallsEquivalentToSequential(t *testing.T) {
-	tests := []struct {
-		name          string
-		createManager func() (TAStateManager, TAStateManager)
-		dataSize      int
-		period        int
-	}{
-		{
-			name: "EMA_catch_up_loop",
-			createManager: func() (TAStateManager, TAStateManager) {
-				m1 := &EMAStateManager{
-					cacheKey:   "ema_close_3",
-					period:     3,
-					storage:    NewSeriesStorage(8),
-					multiplier: 2.0 / 4.0,
-					computed:   0,
-				}
-				m2 := &EMAStateManager{
-					cacheKey:   "ema_close_3",
-					period:     3,
-					storage:    NewSeriesStorage(8),
-					multiplier: 2.0 / 4.0,
-					computed:   0,
-				}
-				return m1, m2
-			},
-			dataSize: 8,
-			period:   3,
-		},
-		{
-			name: "RMA_catch_up_loop",
-			createManager: func() (TAStateManager, TAStateManager) {
-				m1 := &RMAStateManager{
-					cacheKey: "rma_close_3",
-					period:   3,
-					storage:  NewSeriesStorage(8),
-					computed: 0,
-				}
-				m2 := &RMAStateManager{
-					cacheKey: "rma_close_3",
-					period:   3,
-					storage:  NewSeriesStorage(8),
-					computed: 0,
-				}
-				return m1, m2
-			},
-			dataSize: 8,
-			period:   3,
-		},
-		{
-			name: "RSI_catch_up_loop",
-			createManager: func() (TAStateManager, TAStateManager) {
-				m1 := &RSIStateManager{
-					cacheKey: "rsi_close_3",
-					period:   3,
-					rmaGain: &RMAStateManager{
-						cacheKey: "rsi_close_3_gain",
-						period:   3,
-						storage:  NewSeriesStorage(8),
-						computed: 0,
-					},
-					rmaLoss: &RMAStateManager{
-						cacheKey: "rsi_close_3_loss",
-						period:   3,
-						storage:  NewSeriesStorage(8),
-						computed: 0,
-					},
-					computed: 0,
-				}
-				m2 := &RSIStateManager{
-					cacheKey: "rsi_close_3",
-					period:   3,
-					rmaGain: &RMAStateManager{
-						cacheKey: "rsi_close_3_gain",
-						period:   3,
-						storage:  NewSeriesStorage(8),
-						computed: 0,
-					},
-					rmaLoss: &RMAStateManager{
-						cacheKey: "rsi_close_3_loss",
-						period:   3,
-						storage:  NewSeriesStorage(8),
-						computed: 0,
-					},
-					computed: 0,
-				}
-				return m1, m2
-			},
-			dataSize: 8,
-			period:   3,
-		},
-		{
-			name: "ATR_catch_up_loop",
-			createManager: func() (TAStateManager, TAStateManager) {
-				return NewATRStateManager("atr_test_1", 3, 8),
-					NewATRStateManager("atr_test_2", 3, 8)
-			},
-			dataSize: 8,
-			period:   3,
-		},
-	}
-
-	for _, tt := range tests {
+// TestTAStateManager_RepeatedBarIdempotency verifies that calling ComputeAtBar
+// for the same barIdx multiple times returns the identical value without
+// mutating cursor state.
+func TestTAStateManager_RepeatedBarIdempotency(t *testing.T) {
+	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &context.Context{
-				Data: []context.OHLCV{
-					{Close: 100.0, High: 102.0, Low: 98.0},
-					{Close: 102.0, High: 104.0, Low: 100.0},
-					{Close: 99.0, High: 103.0, Low: 97.0},
-					{Close: 103.0, High: 105.0, Low: 101.0},
-					{Close: 101.0, High: 104.0, Low: 99.0},
-					{Close: 105.0, High: 107.0, Low: 103.0},
-					{Close: 104.0, High: 106.0, Low: 102.0},
-					{Close: 108.0, High: 110.0, Low: 106.0},
-				},
+			ctx := createContextWithBars(30)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 30)
+			src := &ast.Identifier{Name: "close"}
+
+			targetBar := 20
+			first, err := m.ComputeAtBar(ctx, src, targetBar)
+			if err != nil {
+				t.Fatalf("first call bar %d: %v", targetBar, err)
 			}
 
-			managerRepeated, managerSequential := tt.createManager()
-			sourceID := &ast.Identifier{Name: "close"}
-
-			firstValidBar := tt.period
-			testBars := []int{firstValidBar + 1, firstValidBar + 2, firstValidBar + 4}
-
-			_, _ = managerRepeated.ComputeAtBar(ctx, sourceID, firstValidBar)
-			_, _ = managerRepeated.ComputeAtBar(ctx, sourceID, firstValidBar)
-			_, _ = managerRepeated.ComputeAtBar(ctx, sourceID, firstValidBar)
-
-			for _, targetBar := range testBars {
-				repeatedVal, err1 := managerRepeated.ComputeAtBar(ctx, sourceID, targetBar)
-				sequentialVal, err2 := managerSequential.ComputeAtBar(ctx, sourceID, targetBar)
-
-				if err1 != nil || err2 != nil {
-					t.Fatalf("ComputeAtBar(%d) failed: repeated=%v, sequential=%v", targetBar, err1, err2)
+			for rep := 1; rep <= 5; rep++ {
+				v, err := m.ComputeAtBar(ctx, src, targetBar)
+				if err != nil {
+					t.Fatalf("rep %d bar %d: %v", rep, targetBar, err)
 				}
+				if !floatEq(v, first) {
+					t.Errorf("rep %d: value mutated %.6f → %.6f", rep, first, v)
+				}
+			}
+		})
+	}
+}
 
-				if repeatedVal != sequentialVal {
-					t.Errorf("Bar %d: repeated-then-forward (%.6f) != sequential (%.6f)",
-						targetBar, repeatedVal, sequentialVal)
+// TestTAStateManager_HistoricalAnchorStableAfterAdvance verifies that a value
+// computed at an anchor bar remains identical after advancing the cursor past
+// that bar and re-querying it multiple times.
+func TestTAStateManager_HistoricalAnchorStableAfterAdvance(t *testing.T) {
+	for _, tt := range allTATypes {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(50)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 50)
+			src := &ast.Identifier{Name: "close"}
+
+			anchor := 15
+			first, err := m.ComputeAtBar(ctx, src, anchor)
+			if err != nil {
+				t.Fatalf("anchor bar %d: %v", anchor, err)
+			}
+
+			_, _ = m.ComputeAtBar(ctx, src, 45)
+
+			for rep := 1; rep <= 3; rep++ {
+				v, err := m.ComputeAtBar(ctx, src, anchor)
+				if err != nil {
+					t.Fatalf("rep %d anchor bar %d: %v", rep, anchor, err)
+				}
+				if !floatEq(v, first) {
+					t.Errorf("rep %d: anchor value changed after advance %.6f → %.6f", rep, first, v)
+				}
+			}
+		})
+	}
+}
+
+// TestTAStateManager_FullHistoricalConsistency computes all bars sequentially,
+// saves the results, then re-queries every bar and verifies no value changed.
+// This guards against any cursor-arithmetic regression across the full history.
+func TestTAStateManager_FullHistoricalConsistency(t *testing.T) {
+	dataSize := 30
+
+	for _, tt := range allTATypes {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(dataSize)
+			m := NewTAStateManager(tt.cacheKey, tt.period, dataSize)
+			src := &ast.Identifier{Name: "close"}
+
+			saved := make([]float64, dataSize)
+			for i := 0; i < dataSize; i++ {
+				v, err := m.ComputeAtBar(ctx, src, i)
+				if err != nil {
+					t.Fatalf("bar %d: %v", i, err)
+				}
+				saved[i] = v
+			}
+
+			for i := 0; i < dataSize; i++ {
+				v, err := m.ComputeAtBar(ctx, src, i)
+				if err != nil {
+					t.Fatalf("re-query bar %d: %v", i, err)
+				}
+				if !floatEq(v, saved[i]) {
+					t.Errorf("bar %d: historical value changed %.6f → %.6f", i, saved[i], v)
 				}
 			}
 		})

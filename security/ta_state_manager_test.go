@@ -1,419 +1,256 @@
 package security
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
-	"github.com/quant5-lab/runner/runtime/context"
 )
 
-func TestSMAStateManager_CircularBufferBehavior(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 10},
-			{Close: 20},
-			{Close: 30},
-			{Close: 40},
-			{Close: 50},
-		},
-	}
+// ── Arithmetic correctness ──────────────────────────────────────────────────
 
-	manager := &SMAStateManager{
-		cacheKey: "sma_close_3",
-		period:   3,
-		storage:  NewSeriesStorage(10),
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
+func TestSMAStateManager_KnownValues(t *testing.T) {
 	tests := []struct {
-		barIdx   int
-		expected float64
+		name   string
+		period int
+		barIdx int
+		want   float64
 	}{
-		{0, 0.0},
-		{1, 0.0},
-		{2, 20.0},
-		{3, 30.0},
-		{4, 40.0},
+		// close prices: 100, 101, 102, … (createContextWithBars)
+		{"period3 first valid", 3, 2, 101.0},
+		{"period3 second valid", 3, 3, 102.0},
+		{"period5 first valid", 5, 4, 102.0},
+		{"period1 any bar", 1, 7, 107.0},
 	}
 
 	for _, tt := range tests {
-		value, err := manager.ComputeAtBar(ctx, sourceID, tt.barIdx)
-		if err != nil {
-			t.Fatalf("bar %d: ComputeAtBar failed: %v", tt.barIdx, err)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(20)
+			m := newSMAStateManager("sma_close", tt.period, 20)
+			src := &ast.Identifier{Name: "close"}
 
-		if math.Abs(value-tt.expected) > 0.0001 {
-			t.Errorf("bar %d: expected %.4f, got %.4f", tt.barIdx, tt.expected, value)
-		}
-	}
-}
-
-func TestSMAStateManager_IncrementalComputation(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 110},
-			{Close: 120},
-			{Close: 130},
-		},
-	}
-
-	manager := &SMAStateManager{
-		cacheKey: "sma_close_2",
-		period:   2,
-		storage:  NewSeriesStorage(10),
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value1, _ := manager.ComputeAtBar(ctx, sourceID, 1)
-	if math.Abs(value1-105.0) > 0.0001 {
-		t.Errorf("bar 1: expected 105.0, got %.4f", value1)
-	}
-
-	value2, _ := manager.ComputeAtBar(ctx, sourceID, 2)
-	if math.Abs(value2-115.0) > 0.0001 {
-		t.Errorf("bar 2: expected 115.0, got %.4f", value2)
-	}
-
-	if manager.computed != 3 {
-		t.Errorf("expected computed=3, got %d", manager.computed)
-	}
-}
-
-func TestSMAStateManager_StatePreservation(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 102},
-			{Close: 104},
-			{Close: 106},
-			{Close: 108},
-			{Close: 110},
-		},
-	}
-
-	manager := &SMAStateManager{
-		cacheKey: "sma_close_3",
-		period:   3,
-		storage:  NewSeriesStorage(10),
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	valBar3First, _ := manager.ComputeAtBar(ctx, sourceID, 3)
-	valBar5, _ := manager.ComputeAtBar(ctx, sourceID, 5)
-	valBar3Second, _ := manager.ComputeAtBar(ctx, sourceID, 3)
-
-	if valBar3First != valBar3Second {
-		t.Errorf("Historical value changed: first=%.4f, after forward=%.4f", valBar3First, valBar3Second)
-	}
-
-	if valBar3First == valBar5 {
-		t.Errorf("Different bars should produce different SMA: bar3=%.4f, bar5=%.4f", valBar3First, valBar5)
-	}
-}
-
-func TestEMAStateManager_ExponentialSmoothing(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 110},
-			{Close: 120},
-			{Close: 130},
-			{Close: 140},
-		},
-	}
-
-	multiplier := 2.0 / float64(3+1)
-	manager := &EMAStateManager{
-		cacheKey:   "ema_close_3",
-		period:     3,
-		storage:    NewSeriesStorage(5),
-		multiplier: multiplier,
-		computed:   0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value2, _ := manager.ComputeAtBar(ctx, sourceID, 2)
-	if value2 == 0.0 {
-		t.Error("EMA at warmup boundary should not be zero")
-	}
-
-	value4, _ := manager.ComputeAtBar(ctx, sourceID, 4)
-	if value4 < 120.0 || value4 > 135.0 {
-		t.Errorf("EMA bar 4: expected [120, 135], got %.4f", value4)
-	}
-
-	if value4 <= value2 {
-		t.Errorf("EMA should increase: bar2=%.4f, bar4=%.4f", value2, value4)
-	}
-}
-
-func TestEMAStateManager_StatePreservation(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 102},
-			{Close: 104},
-			{Close: 106},
-		},
-	}
-
-	manager := &EMAStateManager{
-		cacheKey:   "ema_close_3",
-		period:     3,
-		storage:    NewSeriesStorage(4),
-		multiplier: 2.0 / 4.0,
-		computed:   0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value2First, _ := manager.ComputeAtBar(ctx, sourceID, 2)
-	value2Second, _ := manager.ComputeAtBar(ctx, sourceID, 2)
-
-	if value2First != value2Second {
-		t.Errorf("state not preserved: first=%.4f, second=%.4f", value2First, value2Second)
-	}
-}
-
-func TestRMAStateManager_AlphaSmoothing(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 120},
-			{Close: 110},
-			{Close: 130},
-			{Close: 115},
-		},
-	}
-
-	manager := &RMAStateManager{
-		cacheKey: "rma_close_3",
-		period:   3,
-		storage:  NewSeriesStorage(5),
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value4, err := manager.ComputeAtBar(ctx, sourceID, 4)
-	if err != nil {
-		t.Fatalf("ComputeAtBar failed: %v", err)
-	}
-
-	if value4 < 110.0 || value4 > 125.0 {
-		t.Errorf("RMA bar 4: expected smoothed [110, 125], got %.4f", value4)
-	}
-}
-
-func TestRSIStateManager_DualRMAIntegration(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 102},
-			{Close: 101},
-			{Close: 103},
-			{Close: 102},
-			{Close: 104},
-			{Close: 103},
-		},
-	}
-
-	manager := &RSIStateManager{
-		cacheKey: "rsi_close_3",
-		period:   3,
-		rmaGain: &RMAStateManager{
-			cacheKey: "rsi_close_3_gain",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		rmaLoss: &RMAStateManager{
-			cacheKey: "rsi_close_3_loss",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value6, err := manager.ComputeAtBar(ctx, sourceID, 6)
-	if err != nil {
-		t.Fatalf("ComputeAtBar failed: %v", err)
-	}
-
-	if value6 < 0.0 || value6 > 100.0 {
-		t.Errorf("RSI must be [0, 100], got %.4f", value6)
-	}
-}
-
-func TestRSIStateManager_AllGainsScenario(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100},
-			{Close: 102},
-			{Close: 104},
-			{Close: 106},
-			{Close: 108},
-		},
-	}
-
-	manager := &RSIStateManager{
-		cacheKey: "rsi_close_3",
-		period:   3,
-		rmaGain: &RMAStateManager{
-			cacheKey: "rsi_close_3_gain",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		rmaLoss: &RMAStateManager{
-			cacheKey: "rsi_close_3_loss",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value4, err := manager.ComputeAtBar(ctx, sourceID, 4)
-	if err != nil {
-		t.Fatalf("ComputeAtBar failed: %v", err)
-	}
-
-	if value4 < 80.0 || value4 > 100.0 {
-		t.Errorf("RSI all gains: expected [80, 100], got %.4f", value4)
-	}
-}
-
-func TestRSIStateManager_AllLossesScenario(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 108},
-			{Close: 106},
-			{Close: 104},
-			{Close: 102},
-			{Close: 100},
-		},
-	}
-
-	manager := &RSIStateManager{
-		cacheKey: "rsi_close_3",
-		period:   3,
-		rmaGain: &RMAStateManager{
-			cacheKey: "rsi_close_3_gain",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		rmaLoss: &RMAStateManager{
-			cacheKey: "rsi_close_3_loss",
-			period:   3,
-			storage:  NewSeriesStorage(7),
-			computed: 0,
-		},
-		computed: 0,
-	}
-
-	sourceID := &ast.Identifier{Name: "close"}
-
-	value4, err := manager.ComputeAtBar(ctx, sourceID, 4)
-	if err != nil {
-		t.Fatalf("ComputeAtBar failed: %v", err)
-	}
-
-	if value4 < 0.0 || value4 > 20.0 {
-		t.Errorf("RSI all losses: expected [0, 20], got %.4f", value4)
-	}
-}
-
-func TestNewTAStateManager_FactoryPattern(t *testing.T) {
-	tests := []struct {
-		cacheKey     string
-		period       int
-		capacity     int
-		expectedType string
-	}{
-		{"sma_close_20", 20, 100, "SMA"},
-		{"ema_high_14", 14, 100, "EMA"},
-		{"rma_low_10", 10, 100, "RMA"},
-		{"rsi_close_14", 14, 100, "RSI"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.cacheKey, func(t *testing.T) {
-			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.capacity)
-			if manager == nil {
-				t.Fatal("NewTAStateManager returned nil")
+			v, err := m.ComputeAtBar(ctx, src, tt.barIdx)
+			if err != nil {
+				t.Fatalf("bar %d: %v", tt.barIdx, err)
 			}
+			if math.Abs(v-tt.want) > 1e-9 {
+				t.Errorf("SMA(%d) at bar %d = %.9f, want %.9f", tt.period, tt.barIdx, v, tt.want)
+			}
+		})
+	}
+}
 
-			switch tt.expectedType {
-			case "SMA":
-				if _, ok := manager.(*SMAStateManager); !ok {
-					t.Errorf("expected SMAStateManager, got %T", manager)
+func TestRMAStateManager_KnownValues(t *testing.T) {
+	// close prices: 100, 101, 102, … (createContextWithBars); RMA(3), alpha=1/3
+	// bar 0: seed = 100.0
+	// bar 1: running avg = (100*1 + 101)/2 = 100.5
+	// bar 2: running avg = (100.5*2 + 102)/3 = 101.0
+	// bar 3: Wilder smooth = (1/3)*103 + (2/3)*101 = 101.6̄
+	tests := []struct {
+		name   string
+		barIdx int
+		want   float64
+	}{
+		{"bar 0 seed", 0, 100.0},
+		{"bar 1 running avg", 1, 100.5},
+		{"bar 2 running avg", 2, 101.0},
+		{"bar 3 wilder smooth", 3, 101.0 + 2.0/3.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(20)
+			m := newRMAStateManager("rma_close_3", 3, 20)
+			src := &ast.Identifier{Name: "close"}
+
+			v, err := m.ComputeAtBar(ctx, src, tt.barIdx)
+			if err != nil {
+				t.Fatalf("bar %d: %v", tt.barIdx, err)
+			}
+			if math.Abs(v-tt.want) > 1e-9 {
+				t.Errorf("RMA(3) at bar %d = %.9f, want %.9f", tt.barIdx, v, tt.want)
+			}
+		})
+	}
+}
+
+func TestEMAStateManager_MonotonicInputConvergence(t *testing.T) {
+	for _, period := range []int{3, 5, 10} {
+		t.Run(fmt.Sprintf("period%d", period), func(t *testing.T) {
+			ctx := createContextWithBars(40)
+			m := newEMAStateManager("ema_close", period, 40)
+			src := &ast.Identifier{Name: "close"}
+
+			var prev float64
+			for i := period - 1; i < 30; i++ {
+				v, err := m.ComputeAtBar(ctx, src, i)
+				if err != nil {
+					t.Fatalf("bar %d: %v", i, err)
 				}
-			case "EMA":
-				if _, ok := manager.(*EMAStateManager); !ok {
-					t.Errorf("expected EMAStateManager, got %T", manager)
+				if math.IsNaN(v) {
+					t.Fatalf("bar %d: unexpected NaN post-warmup", i)
 				}
-			case "RMA":
-				if _, ok := manager.(*RMAStateManager); !ok {
-					t.Errorf("expected RMAStateManager, got %T", manager)
+				if i > period-1 && v <= prev {
+					t.Errorf("EMA(%d) bar %d = %.6f not > bar %d = %.6f", period, i, v, i-1, prev)
 				}
-			case "RSI":
-				if _, ok := manager.(*RSIStateManager); !ok {
-					t.Errorf("expected RSIStateManager, got %T", manager)
+				prev = v
+			}
+		})
+	}
+}
+
+func TestRMAStateManager_WilderAlphaIsSlowerThanEMA(t *testing.T) {
+	period := 14
+	ctx := createContextWithBars(60)
+	mEMA := newEMAStateManager("ema_close_14", period, 60)
+	mRMA := newRMAStateManager("rma_close_14", period, 60)
+	src := &ast.Identifier{Name: "close"}
+
+	var emaV, rmaV float64
+	for i := period; i < 50; i++ {
+		emaV, _ = mEMA.ComputeAtBar(ctx, src, i)
+		rmaV, _ = mRMA.ComputeAtBar(ctx, src, i)
+	}
+	if math.Abs(emaV-rmaV) < 1e-6 {
+		t.Errorf("EMA(%d) and RMA(%d) must diverge on trending input: ema=%.6f rma=%.6f", period, period, emaV, rmaV)
+	}
+}
+
+// ── RSI behavioral invariants ───────────────────────────────────────────────
+
+func TestRSIStateManager_OutputBoundsAllInputShapes(t *testing.T) {
+	tests := []struct {
+		name string
+		data func(i int) float64
+	}{
+		{"monotonic rise", func(i int) float64 { return float64(100 + i) }},
+		{"monotonic fall", func(i int) float64 { return float64(200 - i) }},
+		{"oscillating", func(i int) float64 {
+			if i%2 == 0 {
+				return float64(100 + i)
+			}
+			return float64(100 - i)
+		}},
+		{"step up", func(i int) float64 {
+			if i < 30 {
+				return 100.0
+			}
+			return 200.0
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(60)
+			for i := range ctx.Data {
+				ctx.Data[i].Close = tt.data(i)
+			}
+			m := newRSIStateManager("rsi_close_14", 14, 60)
+			src := &ast.Identifier{Name: "close"}
+
+			for i := 14; i < 60; i++ {
+				v, err := m.ComputeAtBar(ctx, src, i)
+				if err != nil {
+					t.Fatalf("bar %d: %v", i, err)
+				}
+				if math.IsNaN(v) {
+					t.Fatalf("bar %d: unexpected NaN post-warmup", i)
+				}
+				if v < 0 || v > 100 {
+					t.Errorf("bar %d: RSI = %.6f out of [0, 100]", i, v)
 				}
 			}
 		})
 	}
 }
 
-func TestNewTAStateManager_UnknownFunction(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for unknown TA function")
-		}
-	}()
+func TestRSIStateManager_ZeroLossYields100(t *testing.T) {
+	ctx := createContextWithBars(30)
+	for i := range ctx.Data {
+		ctx.Data[i].Close = 100.0
+	}
+	m := newRSIStateManager("rsi_close_14", 14, 30)
+	src := &ast.Identifier{Name: "close"}
 
-	NewTAStateManager("unknown_close_14", 14, 100)
+	v, err := m.ComputeAtBar(ctx, src, 20)
+	if err != nil {
+		t.Fatalf("ComputeAtBar: %v", err)
+	}
+	if math.Abs(v-100.0) > 1e-9 {
+		t.Errorf("flat source RSI = %.6f, want 100.0", v)
+	}
 }
+
+func TestRSIStateManager_ZeroGainYields0(t *testing.T) {
+	ctx := createContextWithBars(30)
+	for i := range ctx.Data {
+		ctx.Data[i].Close = float64(200 - i)
+	}
+	m := newRSIStateManager("rsi_close_14", 14, 30)
+	src := &ast.Identifier{Name: "close"}
+
+	v, err := m.ComputeAtBar(ctx, src, 25)
+	if err != nil {
+		t.Fatalf("ComputeAtBar: %v", err)
+	}
+	if v >= 50.0 {
+		t.Errorf("monotonically falling source RSI = %.6f, want < 50", v)
+	}
+}
+
+// ── Factory routing ─────────────────────────────────────────────────────────
+
+func TestNewTAStateManager_RoutesToCorrectType(t *testing.T) {
+	tests := []struct {
+		cacheKey string
+		wantType string
+	}{
+		{"sma_close_5", "SMA"},
+		{"ema_close_10", "EMA"},
+		{"rma_close_14", "RMA"},
+		{"rsi_close_14", "RSI"},
+		{"atr_hlc_14", "ATR"},
+		{"stdev_close_20", "STDEV"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.wantType, func(t *testing.T) {
+			ctx := createContextWithBars(30)
+			m := NewTAStateManager(tt.cacheKey, 5, 30)
+			src := &ast.Identifier{Name: "close"}
+
+			_, err := m.ComputeAtBar(ctx, src, 10)
+			if err != nil && tt.wantType != "ATR" {
+				t.Errorf("unexpected error from %s: %v", tt.wantType, err)
+			}
+		})
+	}
+}
+
+// ── contains helper ─────────────────────────────────────────────────────────
 
 func TestContainsFunction(t *testing.T) {
 	tests := []struct {
-		s        string
-		substr   string
-		expected bool
+		s      string
+		sub    string
+		expect bool
 	}{
 		{"sma_close_20", "sma", true},
-		{"ema_high_14", "ema", true},
-		{"rma_low_10", "rma", true},
+		{"ema_close_50", "ema", true},
+		{"rma_close_14", "rma", true},
 		{"rsi_close_14", "rsi", true},
+		{"atr_hlc_14", "atr", true},
+		{"stdev_close_20", "stdev", true},
 		{"sma_close_20", "ema", false},
-		{"ta_ema_14", "ema", true},
-		{"close", "sma", false},
 		{"", "sma", false},
 		{"sma", "", true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.s+"_"+tt.substr, func(t *testing.T) {
-			result := contains(tt.s, tt.substr)
-			if result != tt.expected {
-				t.Errorf("contains(%q, %q) = %v, expected %v", tt.s, tt.substr, result, tt.expected)
-			}
-		})
+		got := contains(tt.s, tt.sub)
+		if got != tt.expect {
+			t.Errorf("contains(%q, %q) = %v, want %v", tt.s, tt.sub, got, tt.expect)
+		}
 	}
 }

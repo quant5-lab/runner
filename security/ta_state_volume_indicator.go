@@ -5,18 +5,18 @@ import (
 	"math"
 
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/series"
 )
 
 // volumeFormula computes one bar's contribution to a cumulative volume indicator.
-// prevValue is NaN on the very first bar for indicators that seed at 0; for nvi/pvi
-// it is pre-seeded to 1000 by the factory.
+// prevValue is the seed on the very first bar for indicators that seed at 0;
+// for nvi/pvi it is pre-seeded to 1000 by the factory.
 type volumeFormula func(bar, prevBar context.OHLCV, prevValue float64, isFirstBar bool) float64
 
-// volumeIndicatorState accumulates a single ta.* volume variable bar-by-bar inside a
-// security() context.  It mirrors the TAStateManager contract without requiring a
+// volumeIndicatorState mirrors the TAStateManager contract without requiring a
 // source Identifier — volume indicators are computed exclusively from OHLCV.
 type volumeIndicatorState struct {
-	values   *SeriesStorage
+	buf      *series.Series
 	computed int
 	seed     float64
 	formula  volumeFormula
@@ -24,38 +24,41 @@ type volumeIndicatorState struct {
 
 func newVolumeIndicatorState(capacity int, seed float64, formula volumeFormula) *volumeIndicatorState {
 	return &volumeIndicatorState{
-		values:   NewSeriesStorage(capacity),
-		computed: 0,
-		seed:     seed,
-		formula:  formula,
+		buf:     series.NewSeries(capacity),
+		seed:    seed,
+		formula: formula,
 	}
 }
 
 func (s *volumeIndicatorState) computeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
+		if s.computed > 0 {
+			s.buf.Next()
+		}
+
 		bar := secCtx.Data[s.computed]
-		var prevBar context.OHLCV
 		isFirstBar := s.computed == 0
+
+		var prevBar context.OHLCV
 		if !isFirstBar {
 			prevBar = secCtx.Data[s.computed-1]
 		}
 
 		prev := s.seed
 		if !isFirstBar {
-			prev = s.values.Get(s.computed - 1)
+			prev = s.buf.Get(1)
 			if math.IsNaN(prev) {
 				prev = s.seed
 			}
 		}
 
-		val := s.formula(bar, prevBar, prev, isFirstBar)
-		s.values.Set(s.computed, val)
+		s.buf.Set(s.formula(bar, prevBar, prev, isFirstBar))
 		s.computed++
 	}
-	return s.values.Get(barIdx), nil
+
+	return s.buf.Get(s.buf.Position() - barIdx), nil
 }
 
-// volumeIndicatorFactories maps ta.* property names to state factory functions.
 var volumeIndicatorFactories = map[string]func(capacity int) *volumeIndicatorState{
 	"obv":     newOBVState,
 	"accdist": newAccdistState,
@@ -74,8 +77,6 @@ func newVolumeState(propName string, capacity int) (*volumeIndicatorState, error
 	}
 	return factory(capacity), nil
 }
-
-// ── individual indicator factories ───────────────────────────────────────────
 
 func newOBVState(capacity int) *volumeIndicatorState {
 	return newVolumeIndicatorState(capacity, 0, func(bar, prevBar context.OHLCV, prev float64, isFirstBar bool) float64 {

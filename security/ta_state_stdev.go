@@ -5,12 +5,13 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/series"
 )
 
 type STDEVStateManager struct {
 	cacheKey string
 	period   int
-	storage  TASeriesStorage
+	buf      *series.Series
 	computed int
 }
 
@@ -18,42 +19,42 @@ func NewSTDEVStateManager(cacheKey string, period int, capacity int) *STDEVState
 	return &STDEVStateManager{
 		cacheKey: cacheKey,
 		period:   period,
-		storage:  NewSeriesStorage(capacity),
-		computed: 0,
+		buf:      series.NewSeries(max(capacity, 1)),
 	}
 }
 
 func (s *STDEVStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
+		if s.computed > 0 {
+			s.buf.Next()
+		}
+
 		if s.computed < s.period-1 {
-			s.storage.Set(s.computed, math.NaN())
-			s.computed++
-			continue
+			s.buf.Set(math.NaN())
+		} else {
+			mean, err := s.calculateMeanForWindow(secCtx, sourceID, s.computed)
+			if err != nil {
+				return math.NaN(), err
+			}
+
+			variance, err := s.calculateVarianceForWindow(secCtx, sourceID, s.computed, mean)
+			if err != nil {
+				return math.NaN(), err
+			}
+
+			s.buf.Set(math.Sqrt(variance))
 		}
 
-		mean, err := s.calculateMeanForWindow(secCtx, sourceID, s.computed)
-		if err != nil {
-			return math.NaN(), err
-		}
-
-		variance, err := s.calculateVarianceForWindow(secCtx, sourceID, s.computed, mean)
-		if err != nil {
-			return math.NaN(), err
-		}
-
-		stdevValue := math.Sqrt(variance)
-		s.storage.Set(s.computed, stdevValue)
 		s.computed++
 	}
 
-	return s.storage.Get(barIdx), nil
+	return s.buf.Get(s.buf.Position() - barIdx), nil
 }
 
 func (s *STDEVStateManager) calculateMeanForWindow(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
 	sum := 0.0
 	for i := 0; i < s.period; i++ {
-		barOffset := barIdx - s.period + 1 + i
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
+		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-s.period+1+i)
 		if err != nil {
 			return 0, err
 		}
@@ -65,8 +66,7 @@ func (s *STDEVStateManager) calculateMeanForWindow(secCtx *context.Context, sour
 func (s *STDEVStateManager) calculateVarianceForWindow(secCtx *context.Context, sourceID *ast.Identifier, barIdx int, mean float64) (float64, error) {
 	variance := 0.0
 	for i := 0; i < s.period; i++ {
-		barOffset := barIdx - s.period + 1 + i
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
+		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-s.period+1+i)
 		if err != nil {
 			return 0, err
 		}

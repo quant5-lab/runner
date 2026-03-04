@@ -2186,8 +2186,16 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
 	nestedCalls := g.exprAnalyzer.FindNestedCalls(initExpr)
 
+	// TA calls nested inside request.security() are evaluated at runtime by the bar
+	// evaluator — generating them inline in the main context is both incorrect (wrong
+	// symbol) and causes duplicate-declaration compile errors.
+	initIsSecurityCall := false
+	if callExpr, ok := initExpr.(*ast.CallExpression); ok {
+		initIsSecurityCall = IsSecurityFunction(g.extractFunctionName(callExpr.Callee))
+	}
+
 	tempVarCode := ""
-	if len(nestedCalls) > 0 {
+	if !initIsSecurityCall && len(nestedCalls) > 0 {
 		deduplicator := NewTempVarInlineDeduplicator(g.tempVarMgr)
 
 		for i := len(nestedCalls) - 1; i >= 0; i-- {

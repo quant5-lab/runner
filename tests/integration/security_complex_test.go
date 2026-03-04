@@ -21,11 +21,11 @@ plot(combined, "Combined", color=color.blue)
 	exec := util.NewPineExecutor(t)
 	generatedCode, _ := exec.GenerateCode(t, "ta_combo", pineScript)
 
-	if !strings.Contains(generatedCode, "ta.sma") {
+	if !strings.Contains(generatedCode, `Name: "sma"`) {
 		t.Error("Expected inline SMA generation in security context")
 	}
 
-	if !strings.Contains(generatedCode, "ta.ema") {
+	if !strings.Contains(generatedCode, `Name: "ema"`) {
 		t.Error("Expected inline EMA generation in security context")
 	}
 
