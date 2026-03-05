@@ -59,6 +59,54 @@ func extractPeriodArgument(call *ast.CallExpression, funcName string) (int, erro
 	return int(periodFloat), nil
 }
 
+func extractChangeArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (*ast.Identifier, int, error) {
+	if len(call.Arguments) < 1 {
+		return nil, 0, newInsufficientArgumentsError("change", 1, 0)
+	}
+	sourceID, ok := call.Arguments[0].(*ast.Identifier)
+	if !ok {
+		return nil, 0, newInvalidArgumentTypeError("change", 0, "identifier")
+	}
+	if len(call.Arguments) < 2 {
+		return sourceID, 1, nil
+	}
+	length, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
+	if err != nil {
+		return nil, 0, err
+	}
+	return sourceID, int(length), nil
+}
+
+func extractLinregArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (*ast.Identifier, int, int, error) {
+	sourceID, length, err := extractTAArguments(call, inputConstantsMap...)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	offset := 0
+	if len(call.Arguments) >= 3 {
+		v, err2 := extractNumberLiteral(call.Arguments[2], inputConstantsMap...)
+		if err2 != nil {
+			return nil, 0, 0, err2
+		}
+		offset = int(v)
+	}
+	return sourceID, length, offset, nil
+}
+
+func extractTwoExpressionArguments(call *ast.CallExpression, funcName string) (ast.Expression, ast.Expression, error) {
+	if len(call.Arguments) < 2 {
+		return nil, nil, newInsufficientArgumentsError(funcName, 2, len(call.Arguments))
+	}
+	return call.Arguments[0], call.Arguments[1], nil
+}
+
+func extractSingleExpressionArgument(call *ast.CallExpression, funcName string) (ast.Expression, error) {
+	if len(call.Arguments) < 1 {
+		return nil, newInsufficientArgumentsError(funcName, 1, 0)
+	}
+	return call.Arguments[0], nil
+}
+
 func extractValuewhenArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (ast.Expression, ast.Expression, int, error) {
 	funcName := extractCallFunctionName(call.Callee)
 

@@ -25,17 +25,19 @@ type VarLookupFunc func(varName string, secBarIdx int) (*series.Series, int, boo
 type StreamingBarEvaluator struct {
 	taStateCache      map[string]TAStateManager
 	volumeStateCache  map[string]*volumeIndicatorState
+	barsSinceCache    map[*ast.CallExpression]*BarsSinceStateManager
 	fixnanEvaluator   *FixnanEvaluator
 	varRegistry       *VariableRegistry
 	secBarMapper      *BarIndexMapper
 	varLookup         VarLookupFunc
-	inputConstantsMap map[string]float64 // input() constants for extractNumberLiteral
+	inputConstantsMap map[string]float64
 }
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
 		taStateCache:     make(map[string]TAStateManager),
 		volumeStateCache: make(map[string]*volumeIndicatorState),
+		barsSinceCache:   make(map[*ast.CallExpression]*BarsSinceStateManager),
 		fixnanEvaluator: NewFixnanEvaluator(
 			NewMapStateStorage(),
 			NewSequentialWarmupStrategy(),
@@ -248,6 +250,62 @@ func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, se
 		return e.evaluateSARAtBar(call, secCtx, barIdx)
 	case "ta.tr", "tr":
 		return e.evaluateTRFuncAtBar(call, secCtx, barIdx)
+	case "ta.change":
+		return e.evaluateChangeAtBar(call, secCtx, barIdx)
+	case "ta.mom":
+		return e.evaluateMomAtBar(call, secCtx, barIdx)
+	case "ta.roc":
+		return e.evaluateRocAtBar(call, secCtx, barIdx)
+	case "ta.crossover":
+		return e.evaluateCrossoverAtBar(call, secCtx, barIdx)
+	case "ta.crossunder":
+		return e.evaluateCrossunderAtBar(call, secCtx, barIdx)
+	case "ta.cross":
+		return e.evaluateCrossAtBar(call, secCtx, barIdx)
+	case "ta.falling":
+		return e.evaluateFallingAtBar(call, secCtx, barIdx)
+	case "ta.rising":
+		return e.evaluateRisingAtBar(call, secCtx, barIdx)
+	case "ta.barssince", "ta.barsince", "barssince":
+		return e.evaluateBarsSinceAtBar(call, secCtx, barIdx)
+	case "ta.cum":
+		return e.evaluateCumAtBar(call, secCtx, barIdx)
+	case "ta.highest":
+		return e.evaluateHighestAtBar(call, secCtx, barIdx)
+	case "ta.lowest":
+		return e.evaluateLowestAtBar(call, secCtx, barIdx)
+	case "ta.sum":
+		return e.evaluateSumAtBar(call, secCtx, barIdx)
+	case "ta.range":
+		return e.evaluateRangeAtBar(call, secCtx, barIdx)
+	case "ta.dev":
+		return e.evaluateDevAtBar(call, secCtx, barIdx)
+	case "ta.variance":
+		return e.evaluateVarianceAtBar(call, secCtx, barIdx)
+	case "ta.median":
+		return e.evaluateMedianAtBar(call, secCtx, barIdx)
+	case "ta.mode":
+		return e.evaluateModeAtBar(call, secCtx, barIdx)
+	case "ta.cmo":
+		return e.evaluateCMOAtBar(call, secCtx, barIdx)
+	case "ta.wpr":
+		return e.evaluateWPRAtBar(call, secCtx, barIdx)
+	case "ta.mfi":
+		return e.evaluateMFIAtBar(call, secCtx, barIdx)
+	case "ta.vwma":
+		return e.evaluateVWMAAtBar(call, secCtx, barIdx)
+	case "ta.linreg":
+		return e.evaluateLinregAtBar(call, secCtx, barIdx)
+	case "ta.highestbars":
+		return e.evaluateHighestBarsAtBar(call, secCtx, barIdx)
+	case "ta.lowestbars":
+		return e.evaluateLowestBarsAtBar(call, secCtx, barIdx)
+	case "math.max":
+		return e.evaluateMathMaxAtBar(call, secCtx, barIdx)
+	case "math.min":
+		return e.evaluateMathMinAtBar(call, secCtx, barIdx)
+	case "math.abs":
+		return e.evaluateMathAbsAtBar(call, secCtx, barIdx)
 	default:
 		return 0.0, newUnsupportedFunctionError(funcName)
 	}
