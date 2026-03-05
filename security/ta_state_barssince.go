@@ -13,10 +13,10 @@ type BarsSinceStateManager struct {
 	buf       *series.Series
 	computed  int
 	condExpr  ast.Expression
-	evaluator *StreamingBarEvaluator
+	evaluator BarEvaluator
 }
 
-func NewBarsSinceStateManager(condExpr ast.Expression, evaluator *StreamingBarEvaluator, capacity int) *BarsSinceStateManager {
+func NewBarsSinceStateManager(condExpr ast.Expression, evaluator BarEvaluator, capacity int) *BarsSinceStateManager {
 	return &BarsSinceStateManager{
 		buf:       series.NewSeries(max(capacity, 1)),
 		condExpr:  condExpr,

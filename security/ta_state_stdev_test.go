@@ -19,7 +19,7 @@ func TestSTDEVStateManager_PopulationStandardDeviation(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	tests := []struct {
@@ -65,7 +65,7 @@ func TestSTDEVStateManager_ZeroVariance(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	value, err := manager.ComputeAtBar(ctx, sourceID, 2)
@@ -92,7 +92,7 @@ func TestSTDEVStateManager_RollingWindowCorrectness(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	tests := []struct {
@@ -128,7 +128,7 @@ func TestSTDEVStateManager_DifferentSources(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_high_3", 3, 10)
+	manager := NewSTDEVStateManager("stdev_high_3", 3, 10, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "high"}
 
 	value, err := manager.ComputeAtBar(ctx, sourceID, 2)
@@ -156,7 +156,7 @@ func TestSTDEVStateManager_StatePreservation(t *testing.T) {
 		},
 	}
 
-	manager := NewSTDEVStateManager("stdev_close_3", 3, 10)
+	manager := NewSTDEVStateManager("stdev_close_3", 3, 10, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	valBar3First, err := manager.ComputeAtBar(ctx, sourceID, 3)

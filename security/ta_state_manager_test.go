@@ -27,7 +27,7 @@ func TestSMAStateManager_KnownValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(20)
-			m := newSMAStateManager("sma_close", tt.period, 20)
+			m := newSMAStateManager("sma_close", tt.period, 20, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			v, err := m.ComputeAtBar(ctx, src, tt.barIdx)
@@ -61,7 +61,7 @@ func TestRMAStateManager_KnownValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(20)
-			m := newRMAStateManager("rma_close_3", 3, 20)
+			m := newRMAStateManager("rma_close_3", 3, 20, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			v, err := m.ComputeAtBar(ctx, src, tt.barIdx)
@@ -79,7 +79,7 @@ func TestEMAStateManager_MonotonicInputConvergence(t *testing.T) {
 	for _, period := range []int{3, 5, 10} {
 		t.Run(fmt.Sprintf("period%d", period), func(t *testing.T) {
 			ctx := createContextWithBars(40)
-			m := newEMAStateManager("ema_close", period, 40)
+			m := newEMAStateManager("ema_close", period, 40, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			var prev float64
@@ -103,8 +103,8 @@ func TestEMAStateManager_MonotonicInputConvergence(t *testing.T) {
 func TestRMAStateManager_WilderAlphaIsSlowerThanEMA(t *testing.T) {
 	period := 14
 	ctx := createContextWithBars(60)
-	mEMA := newEMAStateManager("ema_close_14", period, 60)
-	mRMA := newRMAStateManager("rma_close_14", period, 60)
+	mEMA := newEMAStateManager("ema_close_14", period, 60, NewStreamingBarEvaluator())
+	mRMA := newRMAStateManager("rma_close_14", period, 60, NewStreamingBarEvaluator())
 	src := &ast.Identifier{Name: "close"}
 
 	var emaV, rmaV float64
@@ -146,7 +146,7 @@ func TestRSIStateManager_OutputBoundsAllInputShapes(t *testing.T) {
 			for i := range ctx.Data {
 				ctx.Data[i].Close = tt.data(i)
 			}
-			m := newRSIStateManager("rsi_close_14", 14, 60)
+			m := newRSIStateManager("rsi_close_14", 14, 60, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			for i := 14; i < 60; i++ {
@@ -170,7 +170,7 @@ func TestRSIStateManager_ZeroLossYields100(t *testing.T) {
 	for i := range ctx.Data {
 		ctx.Data[i].Close = 100.0
 	}
-	m := newRSIStateManager("rsi_close_14", 14, 30)
+	m := newRSIStateManager("rsi_close_14", 14, 30, NewStreamingBarEvaluator())
 	src := &ast.Identifier{Name: "close"}
 
 	v, err := m.ComputeAtBar(ctx, src, 20)
@@ -187,7 +187,7 @@ func TestRSIStateManager_ZeroGainYields0(t *testing.T) {
 	for i := range ctx.Data {
 		ctx.Data[i].Close = float64(200 - i)
 	}
-	m := newRSIStateManager("rsi_close_14", 14, 30)
+	m := newRSIStateManager("rsi_close_14", 14, 30, NewStreamingBarEvaluator())
 	src := &ast.Identifier{Name: "close"}
 
 	v, err := m.ComputeAtBar(ctx, src, 25)
@@ -217,7 +217,7 @@ func TestNewTAStateManager_RoutesToCorrectType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.wantType, func(t *testing.T) {
 			ctx := createContextWithBars(30)
-			m := NewTAStateManager(tt.cacheKey, 5, 30)
+			m := NewTAStateManager(tt.cacheKey, 5, 30, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			_, err := m.ComputeAtBar(ctx, src, 10)

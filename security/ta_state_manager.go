@@ -12,27 +12,29 @@ import (
 // TAStateManager guarantees sequential state accumulation via a catch-up loop,
 // allowing arbitrary-barIdx queries via historical look-back inside security().
 type TAStateManager interface {
-	ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error)
+	ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error)
 }
 
 // ── SMA ────────────────────────────────────────────────────────────────────────
 
 type SMAStateManager struct {
-	cacheKey string
-	period   int
-	buf      *series.Series
-	computed int
+	cacheKey  string
+	period    int
+	buf       *series.Series
+	computed  int
+	evaluator BarEvaluator
 }
 
-func newSMAStateManager(cacheKey string, period, capacity int) *SMAStateManager {
+func newSMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *SMAStateManager {
 	return &SMAStateManager{
-		cacheKey: cacheKey,
-		period:   period,
-		buf:      series.NewSeries(max(capacity, 1)),
+		cacheKey:  cacheKey,
+		period:    period,
+		buf:       series.NewSeries(max(capacity, 1)),
+		evaluator: evaluator,
 	}
 }
 
-func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.buf.Next()
@@ -43,7 +45,7 @@ func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 		} else {
 			sum := 0.0
 			for i := 0; i < s.period; i++ {
-				val, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed-s.period+1+i)
+				val, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed-s.period+1+i)
 				if err != nil {
 					return math.NaN(), err
 				}
@@ -66,24 +68,26 @@ type EMAStateManager struct {
 	buf        *series.Series
 	multiplier float64
 	computed   int
+	evaluator  BarEvaluator
 }
 
-func newEMAStateManager(cacheKey string, period, capacity int) *EMAStateManager {
+func newEMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *EMAStateManager {
 	return &EMAStateManager{
 		cacheKey:   cacheKey,
 		period:     period,
 		buf:        series.NewSeries(max(capacity, 1)),
 		multiplier: 2.0 / float64(period+1),
+		evaluator:  evaluator,
 	}
 }
 
-func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.buf.Next()
 		}
 
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		sourceVal, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -114,27 +118,29 @@ func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 // ── RMA ────────────────────────────────────────────────────────────────────────
 
 type RMAStateManager struct {
-	cacheKey string
-	period   int
-	buf      *series.Series
-	computed int
+	cacheKey  string
+	period    int
+	buf       *series.Series
+	computed  int
+	evaluator BarEvaluator
 }
 
-func newRMAStateManager(cacheKey string, period, capacity int) *RMAStateManager {
+func newRMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *RMAStateManager {
 	return &RMAStateManager{
-		cacheKey: cacheKey,
-		period:   period,
-		buf:      series.NewSeries(max(capacity, 1)),
+		cacheKey:  cacheKey,
+		period:    period,
+		buf:       series.NewSeries(max(capacity, 1)),
+		evaluator: evaluator,
 	}
 }
 
-func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.buf.Next()
 		}
 
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		sourceVal, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -166,23 +172,25 @@ func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 // ── RSI ────────────────────────────────────────────────────────────────────────
 
 type RSIStateManager struct {
-	cacheKey string
-	period   int
-	gainBuf  *series.Series
-	lossBuf  *series.Series
-	computed int
+	cacheKey  string
+	period    int
+	gainBuf   *series.Series
+	lossBuf   *series.Series
+	computed  int
+	evaluator BarEvaluator
 }
 
-func newRSIStateManager(cacheKey string, period, capacity int) *RSIStateManager {
+func newRSIStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *RSIStateManager {
 	return &RSIStateManager{
-		cacheKey: cacheKey,
-		period:   period,
-		gainBuf:  series.NewSeries(max(capacity, 1)),
-		lossBuf:  series.NewSeries(max(capacity, 1)),
+		cacheKey:  cacheKey,
+		period:    period,
+		gainBuf:   series.NewSeries(max(capacity, 1)),
+		lossBuf:   series.NewSeries(max(capacity, 1)),
+		evaluator: evaluator,
 	}
 }
 
-func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed < s.period {
 			s.computed++
@@ -194,12 +202,12 @@ func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 			s.lossBuf.Next()
 		}
 
-		prevSource, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed-1)
+		prevSource, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed-1)
 		if err != nil {
 			return math.NaN(), err
 		}
 
-		currentSource, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		currentSource, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -252,20 +260,20 @@ func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Id
 
 // ── Factory ────────────────────────────────────────────────────────────────────
 
-func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager {
+func NewTAStateManager(cacheKey string, period int, capacity int, evaluator BarEvaluator) TAStateManager {
 	switch {
 	case contains(cacheKey, "sma"):
-		return newSMAStateManager(cacheKey, period, capacity)
+		return newSMAStateManager(cacheKey, period, capacity, evaluator)
 	case contains(cacheKey, "ema"):
-		return newEMAStateManager(cacheKey, period, capacity)
+		return newEMAStateManager(cacheKey, period, capacity, evaluator)
 	case contains(cacheKey, "rma"):
-		return newRMAStateManager(cacheKey, period, capacity)
+		return newRMAStateManager(cacheKey, period, capacity, evaluator)
 	case contains(cacheKey, "rsi"):
-		return newRSIStateManager(cacheKey, period, capacity)
+		return newRSIStateManager(cacheKey, period, capacity, evaluator)
 	case contains(cacheKey, "atr"):
 		return NewATRStateManager(cacheKey, period, capacity)
 	case contains(cacheKey, "stdev"):
-		return NewSTDEVStateManager(cacheKey, period, capacity)
+		return NewSTDEVStateManager(cacheKey, period, capacity, evaluator)
 	default:
 		panic(fmt.Sprintf("unknown TA function in cache key: %s", cacheKey))
 	}

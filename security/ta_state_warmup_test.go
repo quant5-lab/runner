@@ -46,7 +46,7 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(tt.dataPoints)
-			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.dataPoints)
+			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.dataPoints, NewStreamingBarEvaluator())
 			sourceID := &ast.Identifier{Name: "close"}
 
 			value, err := manager.ComputeAtBar(ctx, sourceID, tt.validateIdx)
@@ -91,7 +91,7 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(tt.period + 5)
-			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.period+5)
+			manager := NewTAStateManager(tt.cacheKey, tt.period, tt.period+5, NewStreamingBarEvaluator())
 			sourceID := &ast.Identifier{Name: "close"}
 
 			lastWarmupIdx := tt.period - 2
@@ -122,7 +122,7 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 func TestRSIStateManager_WarmupBoundary(t *testing.T) {
 	period := 7
 	ctx := createContextWithBars(period + 5)
-	manager := NewTAStateManager("rsi_close_7", period, period+5)
+	manager := NewTAStateManager("rsi_close_7", period, period+5, NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	valueBefore, _ := manager.ComputeAtBar(ctx, sourceID, period-1)
@@ -148,11 +148,11 @@ func TestTAStateManager_EmptyDataReturnsError(t *testing.T) {
 		name    string
 		manager TAStateManager
 	}{
-		{"SMA", NewTAStateManager("sma_close_20", 20, 0)},
-		{"EMA", NewTAStateManager("ema_close_20", 20, 0)},
-		{"RMA", NewTAStateManager("rma_close_20", 20, 0)},
-		{"RSI", NewTAStateManager("rsi_close_14", 14, 0)},
-		{"ATR", NewTAStateManager("atr_hlc_14", 14, 0)},
+		{"SMA", NewTAStateManager("sma_close_20", 20, 0, NewStreamingBarEvaluator())},
+		{"EMA", NewTAStateManager("ema_close_20", 20, 0, NewStreamingBarEvaluator())},
+		{"RMA", NewTAStateManager("rma_close_20", 20, 0, NewStreamingBarEvaluator())},
+		{"RSI", NewTAStateManager("rsi_close_14", 14, 0, NewStreamingBarEvaluator())},
+		{"ATR", NewTAStateManager("atr_hlc_14", 14, 0, NewStreamingBarEvaluator())},
 	}
 
 	for _, m := range managers {
@@ -190,7 +190,7 @@ func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewTAStateManager(tt.cacheKey, tt.period, 1)
+			manager := NewTAStateManager(tt.cacheKey, tt.period, 1, NewStreamingBarEvaluator())
 			value, err := manager.ComputeAtBar(ctx, sourceID, 0)
 			if err != nil {
 				t.Fatalf("ComputeAtBar failed: %v", err)
@@ -211,12 +211,12 @@ func TestTAStateManager_InvalidSourceReturnsError(t *testing.T) {
 		name    string
 		manager TAStateManager
 	}{
-		{"SMA", NewTAStateManager("sma_close_10", 10, 20)},
-		{"EMA", NewTAStateManager("ema_close_10", 10, 20)},
-		{"RMA", NewTAStateManager("rma_close_10", 10, 20)},
-		{"RSI", NewTAStateManager("rsi_close_10", 10, 20)},
-		{"ATR", NewTAStateManager("atr_hlc_10", 10, 20)},
-		{"STDEV", NewTAStateManager("stdev_close_10", 10, 20)},
+		{"SMA", NewTAStateManager("sma_close_10", 10, 20, NewStreamingBarEvaluator())},
+		{"EMA", NewTAStateManager("ema_close_10", 10, 20, NewStreamingBarEvaluator())},
+		{"RMA", NewTAStateManager("rma_close_10", 10, 20, NewStreamingBarEvaluator())},
+		{"RSI", NewTAStateManager("rsi_close_10", 10, 20, NewStreamingBarEvaluator())},
+		{"ATR", NewTAStateManager("atr_hlc_10", 10, 20, NewStreamingBarEvaluator())},
+		{"STDEV", NewTAStateManager("stdev_close_10", 10, 20, NewStreamingBarEvaluator())},
 	}
 
 	for _, m := range managers {
@@ -260,7 +260,7 @@ func TestTAStateManager_ConsecutiveNaNsNoGaps(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewTAStateManager(tt.cacheKey, period, dataSize)
+			manager := NewTAStateManager(tt.cacheKey, period, dataSize, NewStreamingBarEvaluator())
 
 			for i := 0; i < period-1; i++ {
 				value, err := manager.ComputeAtBar(ctx, sourceID, i)

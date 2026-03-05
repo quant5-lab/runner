@@ -8,7 +8,7 @@ import (
 	"github.com/quant5-lab/runner/runtime/series"
 )
 
-// SARStateManager ignores sourceID — uses High and Low from secCtx.Data directly.
+// SARStateManager ignores sourceExpr — uses High and Low from secCtx.Data directly.
 type SARStateManager struct {
 	cacheKey  string
 	start     float64
@@ -32,7 +32,7 @@ func NewSARStateManager(cacheKey string, start, inc, maxAF float64, capacity int
 	}
 }
 
-func (s *SARStateManager) ComputeAtBar(secCtx *context.Context, _ *ast.Identifier, barIdx int) (float64, error) {
+func (s *SARStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.buf.Next()

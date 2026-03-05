@@ -16,7 +16,7 @@ func TestTSIStateManager_FlatSourceZeroTSI(t *testing.T) {
 		ctx.Data[i] = context.OHLCV{Close: 100}
 	}
 
-	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data))
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	value, err := manager.ComputeAtBar(ctx, sourceID, 30)
@@ -50,7 +50,7 @@ func TestTSIStateManager_WarmupPeriod(t *testing.T) {
 				ctx.Data[i] = context.OHLCV{Close: float64(100 + i)}
 			}
 
-			manager := NewTSIStateManager("tsi_test", tt.short, tt.long, barCount)
+			manager := NewTSIStateManager("tsi_test", tt.short, tt.long, barCount, NewStreamingBarEvaluator())
 			sourceID := &ast.Identifier{Name: "close"}
 			warmup := tt.short + tt.long - 1
 
@@ -83,7 +83,7 @@ func TestTSIStateManager_SequentialComputation(t *testing.T) {
 		ctx.Data[i] = context.OHLCV{Close: float64(100 + i)}
 	}
 
-	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data))
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	var lastValid float64
@@ -114,7 +114,7 @@ func TestTSIStateManager_ResultInBounds(t *testing.T) {
 		}
 	}
 
-	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data))
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	for i := 0; i < len(ctx.Data); i++ {
@@ -143,7 +143,7 @@ func TestTSIStateManager_StatePreservation(t *testing.T) {
 		ctx.Data[i] = context.OHLCV{Close: phase}
 	}
 
-	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data))
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	warmup := 5 + 13 - 1
@@ -183,8 +183,8 @@ func TestTSIStateManager_IsolatedState(t *testing.T) {
 		ctx.Data[i] = context.OHLCV{Close: float64(100 + i)}
 	}
 
-	m1 := NewTSIStateManager("key_a", 5, 13, len(ctx.Data))
-	m2 := NewTSIStateManager("key_b", 5, 13, len(ctx.Data))
+	m1 := NewTSIStateManager("key_a", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
+	m2 := NewTSIStateManager("key_b", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 
 	closeID := &ast.Identifier{Name: "close"}
 
@@ -209,7 +209,7 @@ func TestTSIStateManager_NonSequentialAccess(t *testing.T) {
 		ctx.Data[i] = context.OHLCV{Close: oscillation}
 	}
 
-	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data))
+	manager := NewTSIStateManager("tsi_close_5_13", 5, 13, len(ctx.Data), NewStreamingBarEvaluator())
 	sourceID := &ast.Identifier{Name: "close"}
 
 	warmup := 5 + 13 - 1

@@ -8,10 +8,10 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-func collectOHLCVWindow(sourceID *ast.Identifier, secCtx *context.Context, barIdx, length int) ([]float64, error) {
+func collectExpressionWindow(evaluator BarEvaluator, sourceExpr ast.Expression, secCtx *context.Context, barIdx, length int) ([]float64, error) {
 	vals := make([]float64, length)
 	for i := 0; i < length; i++ {
-		v, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-length+1+i)
+		v, err := evaluator.EvaluateAtBar(sourceExpr, secCtx, barIdx-length+1+i)
 		if err != nil {
 			return nil, err
 		}
@@ -33,14 +33,14 @@ func windowMean(vals []float64) float64 {
 }
 
 func (e *StreamingBarEvaluator) evaluateHighestAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -54,14 +54,14 @@ func (e *StreamingBarEvaluator) evaluateHighestAtBar(call *ast.CallExpression, s
 }
 
 func (e *StreamingBarEvaluator) evaluateLowestAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -75,14 +75,14 @@ func (e *StreamingBarEvaluator) evaluateLowestAtBar(call *ast.CallExpression, se
 }
 
 func (e *StreamingBarEvaluator) evaluateSumAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -90,14 +90,14 @@ func (e *StreamingBarEvaluator) evaluateSumAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateRangeAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -114,14 +114,14 @@ func (e *StreamingBarEvaluator) evaluateRangeAtBar(call *ast.CallExpression, sec
 }
 
 func (e *StreamingBarEvaluator) evaluateDevAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -138,7 +138,7 @@ func (e *StreamingBarEvaluator) evaluateDevAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateVarianceAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -155,7 +155,7 @@ func (e *StreamingBarEvaluator) evaluateVarianceAtBar(call *ast.CallExpression, 
 		}
 	}
 
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -176,14 +176,14 @@ func (e *StreamingBarEvaluator) evaluateVarianceAtBar(call *ast.CallExpression, 
 }
 
 func (e *StreamingBarEvaluator) evaluateMedianAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -198,14 +198,14 @@ func (e *StreamingBarEvaluator) evaluateMedianAtBar(call *ast.CallExpression, se
 }
 
 func (e *StreamingBarEvaluator) evaluateModeAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -225,7 +225,7 @@ func (e *StreamingBarEvaluator) evaluateModeAtBar(call *ast.CallExpression, secC
 }
 
 func (e *StreamingBarEvaluator) evaluateCMOAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -234,11 +234,11 @@ func (e *StreamingBarEvaluator) evaluateCMOAtBar(call *ast.CallExpression, secCt
 	}
 	sumGain, sumLoss := 0.0, 0.0
 	for i := 0; i < length; i++ {
-		curr, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-i)
+		curr, err := e.EvaluateAtBar(sourceExpr, secCtx, barIdx-i)
 		if err != nil {
 			return math.NaN(), err
 		}
-		prev, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-i-1)
+		prev, err := e.EvaluateAtBar(sourceExpr, secCtx, barIdx-i-1)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -282,7 +282,7 @@ func (e *StreamingBarEvaluator) evaluateWPRAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateMFIAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -292,11 +292,11 @@ func (e *StreamingBarEvaluator) evaluateMFIAtBar(call *ast.CallExpression, secCt
 	posFlow, negFlow := 0.0, 0.0
 	for i := 0; i < length; i++ {
 		idx := barIdx - i
-		curr, err := evaluateOHLCVAtBar(sourceID, secCtx, idx)
+		curr, err := e.EvaluateAtBar(sourceExpr, secCtx, idx)
 		if err != nil {
 			return math.NaN(), err
 		}
-		prev, err := evaluateOHLCVAtBar(sourceID, secCtx, idx-1)
+		prev, err := e.EvaluateAtBar(sourceExpr, secCtx, idx-1)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -314,7 +314,7 @@ func (e *StreamingBarEvaluator) evaluateMFIAtBar(call *ast.CallExpression, secCt
 }
 
 func (e *StreamingBarEvaluator) evaluateVWMAAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
@@ -324,7 +324,7 @@ func (e *StreamingBarEvaluator) evaluateVWMAAtBar(call *ast.CallExpression, secC
 	weightedSum, volumeSum := 0.0, 0.0
 	for i := 0; i < length; i++ {
 		idx := barIdx - i
-		val, err := evaluateOHLCVAtBar(sourceID, secCtx, idx)
+		val, err := e.EvaluateAtBar(sourceExpr, secCtx, idx)
 		if err != nil {
 			return math.NaN(), err
 		}
@@ -339,14 +339,14 @@ func (e *StreamingBarEvaluator) evaluateVWMAAtBar(call *ast.CallExpression, secC
 }
 
 func (e *StreamingBarEvaluator) evaluateLinregAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, offset, err := extractLinregArguments(call, e.inputConstantsMap)
+	sourceExpr, length, offset, err := extractLinregArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -369,14 +369,14 @@ func (e *StreamingBarEvaluator) evaluateLinregAtBar(call *ast.CallExpression, se
 }
 
 func (e *StreamingBarEvaluator) evaluateHighestBarsAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -392,14 +392,14 @@ func (e *StreamingBarEvaluator) evaluateHighestBarsAtBar(call *ast.CallExpressio
 }
 
 func (e *StreamingBarEvaluator) evaluateLowestBarsAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, length, err := extractTAArguments(call, e.inputConstantsMap)
+	sourceExpr, length, err := extractTAArguments(call, e.inputConstantsMap)
 	if err != nil {
 		return 0.0, err
 	}
 	if barIdx < length-1 {
 		return math.NaN(), nil
 	}
-	vals, err := collectOHLCVWindow(sourceID, secCtx, barIdx, length)
+	vals, err := collectExpressionWindow(e, sourceExpr, secCtx, barIdx, length)
 	if err != nil {
 		return math.NaN(), err
 	}

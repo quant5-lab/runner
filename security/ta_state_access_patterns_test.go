@@ -27,7 +27,7 @@ func TestTAStateManager_NonSequentialAccess(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(40)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 40)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 40, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			anchor := 20
@@ -59,7 +59,7 @@ func TestTAStateManager_ColdJumpCatchUp(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(50)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 50)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			if _, err := m.ComputeAtBar(ctx, src, 40); err != nil {
@@ -92,7 +92,7 @@ func TestTAStateManager_PartialCatchUp(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(30)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 30)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 30, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			earlyBar := tt.period + 1
@@ -118,7 +118,7 @@ func TestTAStateManager_MultipleHistoricalLookbacks(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(50)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 50)
+			m := NewTAStateManager(tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			if _, err := m.ComputeAtBar(ctx, src, 45); err != nil {

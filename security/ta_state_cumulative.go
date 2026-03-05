@@ -9,23 +9,25 @@ import (
 )
 
 type CUMStateManager struct {
-	buf      *series.Series
-	computed int
+	buf       *series.Series
+	computed  int
+	evaluator BarEvaluator
 }
 
-func NewCUMStateManager(capacity int) *CUMStateManager {
+func NewCUMStateManager(capacity int, evaluator BarEvaluator) *CUMStateManager {
 	return &CUMStateManager{
-		buf: series.NewSeries(max(capacity, 1)),
+		buf:       series.NewSeries(max(capacity, 1)),
+		evaluator: evaluator,
 	}
 }
 
-func (s *CUMStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *CUMStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.buf.Next()
 		}
 
-		val, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		val, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
 		if err != nil {
 			return math.NaN(), err
 		}

@@ -25,7 +25,7 @@ func NewATRStateManager(cacheKey string, period int, capacity int) *ATRStateMana
 	}
 }
 
-func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed >= len(secCtx.Data) {
 			break

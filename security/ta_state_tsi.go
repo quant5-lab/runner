@@ -70,9 +70,10 @@ type TSIStateManager struct {
 	sourceBuf   *series.Series
 	resultBuf   *series.Series
 	computed    int
+	evaluator   BarEvaluator
 }
 
-func NewTSIStateManager(cacheKey string, shortPeriod, longPeriod, capacity int) *TSIStateManager {
+func NewTSIStateManager(cacheKey string, shortPeriod, longPeriod, capacity int, evaluator BarEvaluator) *TSIStateManager {
 	return &TSIStateManager{
 		cacheKey:    cacheKey,
 		shortPeriod: shortPeriod,
@@ -83,17 +84,18 @@ func NewTSIStateManager(cacheKey string, shortPeriod, longPeriod, capacity int) 
 		ema2Abs:     newStreamingEMA(shortPeriod, capacity),
 		sourceBuf:   series.NewSeries(capacity),
 		resultBuf:   series.NewSeries(capacity),
+		evaluator:   evaluator,
 	}
 }
 
-func (s *TSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
+func (s *TSIStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
 	for s.computed <= barIdx {
 		if s.computed > 0 {
 			s.sourceBuf.Next()
 			s.resultBuf.Next()
 		}
 
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
+		sourceVal, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
 		if err != nil {
 			return math.NaN(), err
 		}
