@@ -3166,40 +3166,10 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 	return "0.0"
 }
 
+var defaultSeriesOffsetShifter = SeriesOffsetShifter{}
+
 func (g *generator) convertSeriesAccessToPrev(seriesCode string) string {
-	// Convert current bar access to previous bar access
-	// bar.Close → ctx.Data[i-1].Close
-	// sma20Series.Get(0) → sma20Series.Get(1)
-	// sma20Series.GetCurrent() → sma20Series.Get(1)
-
-	if seriesCode == "bar.Close" {
-		return "ctx.Data[i-1].Close"
-	}
-	if seriesCode == "bar.Open" {
-		return "ctx.Data[i-1].Open"
-	}
-	if seriesCode == "bar.High" {
-		return "ctx.Data[i-1].High"
-	}
-	if seriesCode == "bar.Low" {
-		return "ctx.Data[i-1].Low"
-	}
-	if seriesCode == "bar.Volume" {
-		return "ctx.Data[i-1].Volume"
-	}
-
-	// Handle Series.Get(0) → Series.Get(1)
-	if strings.HasSuffix(seriesCode, "Series.Get(0)") {
-		return strings.Replace(seriesCode, "Series.Get(0)", "Series.Get(1)", 1)
-	}
-
-	// Handle Series.GetCurrent() → Series.Get(1)
-	if strings.Contains(seriesCode, "Series.GetCurrent()") {
-		return strings.ReplaceAll(seriesCode, "Series.GetCurrent()", "Series.Get(1)")
-	}
-
-	// For constants (numeric values), return unchanged - they don't need previous bar access
-	return seriesCode
+	return defaultSeriesOffsetShifter.ShiftToPrevBar(seriesCode)
 }
 
 func (g *generator) convertSeriesAccessToOffset(seriesCode string, offsetVar string) string {

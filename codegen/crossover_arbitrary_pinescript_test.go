@@ -157,6 +157,51 @@ if ta.crossover(ta.sma(close, 10) + ta.wma(close, 20) - ta.stdev(close, 30), hig
 	}
 }
 
+func TestCrossover_HistoricalSubscriptArg(t *testing.T) {
+	pine := `//@version=5
+strategy("Test")
+if ta.crossover(close, close[2])
+    strategy.entry("long", strategy.long)
+`
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation with historical subscript arg, got: %v", err)
+	}
+}
+
+func TestCrossunder_HistoricalSubscriptArg(t *testing.T) {
+	pine := `//@version=5
+strategy("Test")
+if ta.crossunder(close, close[2])
+    strategy.entry("short", strategy.short)
+`
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation with historical subscript arg, got: %v", err)
+	}
+}
+
+func TestCross_HistoricalSubscriptArg(t *testing.T) {
+	pine := `//@version=5
+strategy("Test")
+if ta.cross(close, close[3])
+    strategy.entry("long", strategy.long)
+`
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation with historical subscript arg, got: %v", err)
+	}
+}
+
+func TestCrossover_BothArgsHistoricalSubscript(t *testing.T) {
+	pine := `//@version=5
+strategy("Test")
+ema10 = ta.ema(close, 10)
+if ta.crossover(ema10[1], ema10[2])
+    strategy.entry("long", strategy.long)
+`
+	if err := compilePine(pine); err != nil {
+		t.Fatalf("Expected successful compilation with both args as historical subscripts, got: %v", err)
+	}
+}
+
 /* Helper: compile PineScript using pine-gen binary */
 func compilePine(pine string) error {
 	tmpDir, err := os.MkdirTemp("", "crossover_test")

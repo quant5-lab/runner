@@ -1,0 +1,7 @@
+//@version=4
+strategy("Crossover Historical Subscript Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+if ta.crossover(close, close[2])
+    strategy.entry("Long", strategy.long)
+if ta.crossunder(close, close[2])
+    strategy.entry("Short", strategy.short)

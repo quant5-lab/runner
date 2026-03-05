@@ -748,6 +748,41 @@ func TestAllowEntryLong(t *testing.T) {
 	tc.ValidateTrades(t, result)
 }
 
+/* TestCrossoverHistoricalSubscript verifies crossover/crossunder with close[N] args produce trades */
+func TestCrossoverHistoricalSubscript(t *testing.T) {
+	tc := StrategyTestCase{
+		Name:     "crossover-historical-subscript",
+		PineFile: "test-crossover-historical-subscript.pine",
+		DataFile: "simple-bars.json",
+		ValidateTrades: func(t *testing.T, result *StrategyTestResult) {
+			allTrades := append(result.Trades, result.OpenTrades...)
+			if len(allTrades) < 1 {
+				t.Fatalf("Expected at least 1 trade from crossover/crossunder with close[2], got 0")
+			}
+
+			hasLong := false
+			hasShort := false
+			for _, trade := range allTrades {
+				if trade.Direction == "long" {
+					hasLong = true
+				}
+				if trade.Direction == "short" {
+					hasShort = true
+				}
+			}
+			if !hasLong {
+				t.Error("Expected at least 1 long trade from crossover(close, close[2])")
+			}
+			if !hasShort {
+				t.Error("Expected at least 1 short trade from crossunder(close, close[2])")
+			}
+		},
+	}
+
+	result := runStrategyTest(t, tc)
+	tc.ValidateTrades(t, result)
+}
+
 /* TestAllowEntryShort verifies strategy.risk.allow_entry_in(direction.short) blocks long entries */
 func TestAllowEntryShort(t *testing.T) {
 	tc := StrategyTestCase{

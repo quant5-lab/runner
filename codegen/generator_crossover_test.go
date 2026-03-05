@@ -17,9 +17,9 @@ Test hierarchy:
 - generator_crossover_test.go: Integration tests for helper functions and codegen structure
 - crossover_arbitrary_pinescript_test.go: E2E compilation tests for full pipeline
 
-Note: Some tests validate internal APIs (extractSeriesExpression, convertSeriesAccessToPrev).
-While these provide granular validation, they couple to implementation details.
-Consider unit tests in crossover_inline_handler_test.go for behavioral validation.
+Note: extractSeriesExpression is tested here as an internal API; this couples to implementation
+details. Prefer crossover_inline_handler_test.go for new behavioral tests.
+Offset shifting (convertSeriesAccessToPrev) is unit-tested in series_offset_shifter_test.go.
 */
 
 func TestExtractSeriesExpression(t *testing.T) {
@@ -110,78 +110,7 @@ func TestExtractSeriesExpression(t *testing.T) {
 	}
 }
 
-func TestConvertSeriesAccessToPrev(t *testing.T) {
-	gen := &generator{
-		imports:        make(map[string]bool),
-		variables:      make(map[string]string),
-		strategyConfig: NewStrategyConfig(),
-		taRegistry:     NewTAFunctionRegistry(),
-	}
-
-	tests := []struct {
-		name     string
-		series   string
-		expected string
-	}{
-		{
-			name:     "bar.Close to previous",
-			series:   "bar.Close",
-			expected: "ctx.Data[i-1].Close",
-		},
-		{
-			name:     "bar.Open to previous",
-			series:   "bar.Open",
-			expected: "ctx.Data[i-1].Open",
-		},
-		{
-			name:     "bar.High to previous",
-			series:   "bar.High",
-			expected: "ctx.Data[i-1].High",
-		},
-		{
-			name:     "bar.Low to previous",
-			series:   "bar.Low",
-			expected: "ctx.Data[i-1].Low",
-		},
-		{
-			name:     "bar.Volume to previous",
-			series:   "bar.Volume",
-			expected: "ctx.Data[i-1].Volume",
-		},
-		{
-			name:     "Series.Get(0) to Get(1)",
-			series:   "sma20Series.Get(0)",
-			expected: "sma20Series.Get(1)",
-		},
-		{
-			name:     "Series.GetCurrent() to Get(1)",
-			series:   "sma20Series.GetCurrent()",
-			expected: "sma20Series.Get(1)",
-		},
-		{
-			name:     "constant value unchanged",
-			series:   "30",
-			expected: "30",
-		},
-		{
-			name:     "user variable unchanged",
-			series:   "sma20",
-			expected: "sma20",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := gen.convertSeriesAccessToPrev(tt.series)
-			if result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
-			}
-		})
-	}
-}
-
 func TestCrossoverCodegenIntegration(t *testing.T) {
-	// Test ta.crossover with close and sma20
 	call := &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
@@ -216,7 +145,6 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 
 	t.Logf("Generated code:\n%s", code)
 
-	// Verify generated code structure (ForwardSeriesBuffer paradigm)
 	if !strings.Contains(code, "longCrossSeries.Set(0.0)") {
 		t.Error("Missing initial Series.Set(0.0) assignment")
 	}
@@ -241,7 +169,6 @@ func TestCrossoverCodegenIntegration(t *testing.T) {
 }
 
 func TestCrossunderCodegenIntegration(t *testing.T) {
-	// Test ta.crossunder with close and sma20
 	call := &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
@@ -272,7 +199,6 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 
 	t.Logf("Generated code:\n%s", code)
 
-	// Verify generated code structure (ForwardSeriesBuffer paradigm)
 	if !strings.Contains(code, "shortCrossSeries.Set(0.0)") {
 		t.Error("Missing initial Series.Set(0.0) assignment")
 	}
@@ -292,7 +218,6 @@ func TestCrossunderCodegenIntegration(t *testing.T) {
 }
 
 func TestCrossoverWithArithmetic(t *testing.T) {
-	// Test ta.crossover(close, sma20 * 1.02)
 	call := &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
@@ -302,7 +227,7 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 			&ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "close"},
 				Property: &ast.Literal{Value: 0},
-				Computed: true, // Mark as array subscript access
+				Computed: true,
 			},
 			&ast.BinaryExpression{
 				Operator: "*",
@@ -327,7 +252,6 @@ func TestCrossoverWithArithmetic(t *testing.T) {
 
 	t.Logf("Generated code:\n%s", code)
 
-	// Verify arithmetic expression in generated code (ForwardSeriesBuffer paradigm)
 	if !strings.Contains(code, "(sma20Series.GetCurrent() * 1.02)") {
 		t.Error("Missing arithmetic expression in crossover")
 	}
@@ -399,14 +323,12 @@ func TestBooleanTypeTracking(t *testing.T) {
 		t.Fatalf("generateProgram failed: %v", err)
 	}
 
-	// Verify ForwardSeriesBuffer paradigm (ALL variables are *series.Series)
 	if !strings.Contains(code, "var longCrossSeries *series.Series") {
 		t.Error("longCross should be declared as *series.Series")
 	}
 	if !strings.Contains(code, "var sma50Series *series.Series") {
 		t.Error("sma50 should be declared as *series.Series")
 	}
-	// Verify type tracking in g.variables map
 	if gen.variables["longCross"] != "bool" {
 		t.Errorf("longCross should be tracked as bool type, got: %s", gen.variables["longCross"])
 	}
