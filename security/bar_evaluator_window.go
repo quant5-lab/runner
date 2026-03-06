@@ -413,3 +413,21 @@ func (e *StreamingBarEvaluator) evaluateLowestBarsAtBar(call *ast.CallExpression
 	}
 	return float64(-loOffset), nil
 }
+
+func init() {
+	registerCallHandler("ta.highest", (*StreamingBarEvaluator).evaluateHighestAtBar)
+	registerCallHandler("ta.lowest", (*StreamingBarEvaluator).evaluateLowestAtBar)
+	registerCallHandler("ta.sum", (*StreamingBarEvaluator).evaluateSumAtBar)
+	registerCallHandler("ta.range", (*StreamingBarEvaluator).evaluateRangeAtBar)
+	registerCallHandler("ta.dev", (*StreamingBarEvaluator).evaluateDevAtBar)
+	registerCallHandler("ta.variance", (*StreamingBarEvaluator).evaluateVarianceAtBar)
+	registerCallHandler("ta.median", (*StreamingBarEvaluator).evaluateMedianAtBar)
+	registerCallHandler("ta.mode", (*StreamingBarEvaluator).evaluateModeAtBar)
+	registerCallHandler("ta.cmo", (*StreamingBarEvaluator).evaluateCMOAtBar)
+	registerCallHandler("ta.wpr", (*StreamingBarEvaluator).evaluateWPRAtBar)
+	registerCallHandler("ta.mfi", (*StreamingBarEvaluator).evaluateMFIAtBar)
+	registerCallHandler("ta.vwma", (*StreamingBarEvaluator).evaluateVWMAAtBar)
+	registerCallHandler("ta.linreg", (*StreamingBarEvaluator).evaluateLinregAtBar)
+	registerCallHandler("ta.highestbars", (*StreamingBarEvaluator).evaluateHighestBarsAtBar)
+	registerCallHandler("ta.lowestbars", (*StreamingBarEvaluator).evaluateLowestBarsAtBar)
+}

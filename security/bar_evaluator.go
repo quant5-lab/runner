@@ -99,12 +99,14 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 		return val, err
 	}
 
-	/* Handle bar_index builtin - returns security context bar index */
 	if id.Name == "bar_index" {
 		return float64(barIdx), nil
 	}
 
-	/* Check input constants first (compile-time constants from input()) */
+	if id.Name == "na" {
+		return math.NaN(), nil
+	}
+
 	if e.inputConstantsMap != nil {
 		if val, ok := e.inputConstantsMap[id.Name]; ok {
 			return val, nil
@@ -124,7 +126,6 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 		}
 	}
 
-	/* Try variable registry first (for security-context variables) */
 	if e.varRegistry != nil {
 		if varSeries, ok := e.varRegistry.Get(id.Name); ok {
 			if e.secBarMapper != nil {
@@ -143,7 +144,6 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 		}
 	}
 
-	/* Fallback to main context lookup (PineScript lexical scoping) */
 	if e.varLookup != nil {
 		if varSeries, mainIdx, ok := e.varLookup(id.Name, barIdx); ok {
 			if varSeries == nil {
@@ -155,7 +155,6 @@ func (e *StreamingBarEvaluator) evaluateIdentifierAtBar(id *ast.Identifier, secC
 					return varSeries.Get(offset), nil
 				}
 			}
-			/* Warmup period: security bar has no corresponding main bar yet */
 			if mainIdx < 0 {
 				return math.NaN(), nil
 			}
@@ -193,121 +192,6 @@ func evaluateOHLCVAtBar(id *ast.Identifier, secCtx *context.Context, barIdx int)
 		return (bar.High + bar.Low + bar.Close + bar.Close) / 4, nil
 	default:
 		return 0.0, newUnknownIdentifierError(id.Name)
-	}
-}
-
-func (e *StreamingBarEvaluator) evaluateTACallAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	funcName := extractCallFunctionName(call.Callee)
-
-	switch funcName {
-	case "ta.sma":
-		return e.evaluateSMAAtBar(call, secCtx, barIdx)
-	case "ta.ema":
-		return e.evaluateEMAAtBar(call, secCtx, barIdx)
-	case "ta.rma":
-		return e.evaluateRMAAtBar(call, secCtx, barIdx)
-	case "ta.rsi":
-		return e.evaluateRSIAtBar(call, secCtx, barIdx)
-	case "ta.atr":
-		return e.evaluateATRAtBar(call, secCtx, barIdx)
-	case "ta.stdev":
-		return e.evaluateSTDEVAtBar(call, secCtx, barIdx)
-	case "ta.swma":
-		return e.evaluateSWMAAtBar(call, secCtx, barIdx)
-	case "ta.cci":
-		return e.evaluateCCIAtBar(call, secCtx, barIdx)
-	case "ta.bbw":
-		return e.evaluateBBWAtBar(call, secCtx, barIdx)
-	case "ta.cog":
-		return e.evaluateCOGAtBar(call, secCtx, barIdx)
-	case "ta.tsi":
-		return e.evaluateTSIAtBar(call, secCtx, barIdx)
-	case "ta.pivothigh":
-		return e.evaluatePivotHighAtBar(call, secCtx, barIdx)
-	case "ta.pivotlow":
-		return e.evaluatePivotLowAtBar(call, secCtx, barIdx)
-	case "ta.valuewhen", "valuewhen":
-		return e.evaluateValuewhenAtBar(call, secCtx, barIdx)
-	case "fixnan", "ta.fixnan":
-		return e.fixnanEvaluator.EvaluateAtBar(e, call, secCtx, barIdx)
-	case "ta.percentrank":
-		return e.evaluatePercentrankAtBar(call, secCtx, barIdx)
-	case "ta.percentile_nearest_rank":
-		return e.evaluatePercentileNearestRankAtBar(call, secCtx, barIdx)
-	case "ta.percentile_linear_interpolation":
-		return e.evaluatePercentileLinearInterpolationAtBar(call, secCtx, barIdx)
-	case "ta.correlation":
-		return e.evaluateCorrelationAtBar(call, secCtx, barIdx)
-	case "ta.wma":
-		return e.evaluateWMAAtBar(call, secCtx, barIdx)
-	case "ta.alma":
-		return e.evaluateALMAAtBar(call, secCtx, barIdx)
-	case "ta.hma":
-		return e.evaluateHMAAtBar(call, secCtx, barIdx)
-	case "ta.kcw":
-		return e.evaluateKCWAtBar(call, secCtx, barIdx)
-	case "ta.sar":
-		return e.evaluateSARAtBar(call, secCtx, barIdx)
-	case "ta.tr", "tr":
-		return e.evaluateTRFuncAtBar(call, secCtx, barIdx)
-	case "ta.change":
-		return e.evaluateChangeAtBar(call, secCtx, barIdx)
-	case "ta.mom":
-		return e.evaluateMomAtBar(call, secCtx, barIdx)
-	case "ta.roc":
-		return e.evaluateRocAtBar(call, secCtx, barIdx)
-	case "ta.crossover":
-		return e.evaluateCrossoverAtBar(call, secCtx, barIdx)
-	case "ta.crossunder":
-		return e.evaluateCrossunderAtBar(call, secCtx, barIdx)
-	case "ta.cross":
-		return e.evaluateCrossAtBar(call, secCtx, barIdx)
-	case "ta.falling":
-		return e.evaluateFallingAtBar(call, secCtx, barIdx)
-	case "ta.rising":
-		return e.evaluateRisingAtBar(call, secCtx, barIdx)
-	case "ta.barssince", "ta.barsince", "barssince":
-		return e.evaluateBarsSinceAtBar(call, secCtx, barIdx)
-	case "ta.cum":
-		return e.evaluateCumAtBar(call, secCtx, barIdx)
-	case "ta.highest":
-		return e.evaluateHighestAtBar(call, secCtx, barIdx)
-	case "ta.lowest":
-		return e.evaluateLowestAtBar(call, secCtx, barIdx)
-	case "ta.sum":
-		return e.evaluateSumAtBar(call, secCtx, barIdx)
-	case "ta.range":
-		return e.evaluateRangeAtBar(call, secCtx, barIdx)
-	case "ta.dev":
-		return e.evaluateDevAtBar(call, secCtx, barIdx)
-	case "ta.variance":
-		return e.evaluateVarianceAtBar(call, secCtx, barIdx)
-	case "ta.median":
-		return e.evaluateMedianAtBar(call, secCtx, barIdx)
-	case "ta.mode":
-		return e.evaluateModeAtBar(call, secCtx, barIdx)
-	case "ta.cmo":
-		return e.evaluateCMOAtBar(call, secCtx, barIdx)
-	case "ta.wpr":
-		return e.evaluateWPRAtBar(call, secCtx, barIdx)
-	case "ta.mfi":
-		return e.evaluateMFIAtBar(call, secCtx, barIdx)
-	case "ta.vwma":
-		return e.evaluateVWMAAtBar(call, secCtx, barIdx)
-	case "ta.linreg":
-		return e.evaluateLinregAtBar(call, secCtx, barIdx)
-	case "ta.highestbars":
-		return e.evaluateHighestBarsAtBar(call, secCtx, barIdx)
-	case "ta.lowestbars":
-		return e.evaluateLowestBarsAtBar(call, secCtx, barIdx)
-	case "math.max":
-		return e.evaluateMathMaxAtBar(call, secCtx, barIdx)
-	case "math.min":
-		return e.evaluateMathMinAtBar(call, secCtx, barIdx)
-	case "math.abs":
-		return e.evaluateMathAbsAtBar(call, secCtx, barIdx)
-	default:
-		return 0.0, newUnsupportedFunctionError(funcName)
 	}
 }
 
@@ -612,12 +496,17 @@ func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression,
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
 	if propID, ok := expr.Property.(*ast.Identifier); ok {
-		if objID, ok := expr.Object.(*ast.Identifier); ok && objID.Name == "ta" {
-			if propID.Name == "tr" {
-				return e.evaluateTrueRangeAtBar(secCtx, barIdx)
+		if objID, ok := expr.Object.(*ast.Identifier); ok {
+			if objID.Name == "ta" {
+				if propID.Name == "tr" {
+					return e.evaluateTrueRangeAtBar(secCtx, barIdx)
+				}
+				if _, known := volumeIndicatorFactories[propID.Name]; known {
+					return e.evaluateVolumeIndicatorAtBar(propID.Name, secCtx, barIdx)
+				}
 			}
-			if _, known := volumeIndicatorFactories[propID.Name]; known {
-				return e.evaluateVolumeIndicatorAtBar(propID.Name, secCtx, barIdx)
+			if val, ok := lookupMemberConstant(objID.Name, propID.Name); ok {
+				return val, nil
 			}
 		}
 		return 0.0, newUnsupportedExpressionError(expr)
@@ -1053,4 +942,36 @@ func (e *StreamingBarEvaluator) evaluateSARAtBar(call *ast.CallExpression, secCt
 	state := NewSARStateManager(cacheKey, start, inc, maxAF, len(secCtx.Data))
 	e.taStateCache[cacheKey] = state
 	return state.ComputeAtBar(secCtx, nil, barIdx)
+}
+
+func (e *StreamingBarEvaluator) fixnanCallAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
+	return e.fixnanEvaluator.EvaluateAtBar(e, call, secCtx, barIdx)
+}
+
+func init() {
+	registerCallHandler("ta.sma", (*StreamingBarEvaluator).evaluateSMAAtBar)
+	registerCallHandler("ta.ema", (*StreamingBarEvaluator).evaluateEMAAtBar)
+	registerCallHandler("ta.rma", (*StreamingBarEvaluator).evaluateRMAAtBar)
+	registerCallHandler("ta.rsi", (*StreamingBarEvaluator).evaluateRSIAtBar)
+	registerCallHandler("ta.atr", (*StreamingBarEvaluator).evaluateATRAtBar)
+	registerCallHandler("ta.stdev", (*StreamingBarEvaluator).evaluateSTDEVAtBar)
+	registerCallHandler("ta.swma", (*StreamingBarEvaluator).evaluateSWMAAtBar)
+	registerCallHandler("ta.cci", (*StreamingBarEvaluator).evaluateCCIAtBar)
+	registerCallHandler("ta.bbw", (*StreamingBarEvaluator).evaluateBBWAtBar)
+	registerCallHandler("ta.cog", (*StreamingBarEvaluator).evaluateCOGAtBar)
+	registerCallHandler("ta.tsi", (*StreamingBarEvaluator).evaluateTSIAtBar)
+	registerCallHandler("ta.pivothigh", (*StreamingBarEvaluator).evaluatePivotHighAtBar)
+	registerCallHandler("ta.pivotlow", (*StreamingBarEvaluator).evaluatePivotLowAtBar)
+	registerCallHandlerAliases((*StreamingBarEvaluator).evaluateValuewhenAtBar, "ta.valuewhen", "valuewhen")
+	registerCallHandlerAliases((*StreamingBarEvaluator).fixnanCallAtBar, "fixnan", "ta.fixnan")
+	registerCallHandler("ta.percentrank", (*StreamingBarEvaluator).evaluatePercentrankAtBar)
+	registerCallHandler("ta.percentile_nearest_rank", (*StreamingBarEvaluator).evaluatePercentileNearestRankAtBar)
+	registerCallHandler("ta.percentile_linear_interpolation", (*StreamingBarEvaluator).evaluatePercentileLinearInterpolationAtBar)
+	registerCallHandler("ta.correlation", (*StreamingBarEvaluator).evaluateCorrelationAtBar)
+	registerCallHandler("ta.wma", (*StreamingBarEvaluator).evaluateWMAAtBar)
+	registerCallHandler("ta.alma", (*StreamingBarEvaluator).evaluateALMAAtBar)
+	registerCallHandler("ta.hma", (*StreamingBarEvaluator).evaluateHMAAtBar)
+	registerCallHandler("ta.kcw", (*StreamingBarEvaluator).evaluateKCWAtBar)
+	registerCallHandler("ta.sar", (*StreamingBarEvaluator).evaluateSARAtBar)
+	registerCallHandlerAliases((*StreamingBarEvaluator).evaluateTRFuncAtBar, "ta.tr", "tr")
 }

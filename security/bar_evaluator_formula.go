@@ -266,3 +266,19 @@ func (e *StreamingBarEvaluator) evaluateMathAbsAtBar(call *ast.CallExpression, s
 	}
 	return math.Abs(val), nil
 }
+
+func init() {
+	registerCallHandler("ta.change", (*StreamingBarEvaluator).evaluateChangeAtBar)
+	registerCallHandler("ta.mom", (*StreamingBarEvaluator).evaluateMomAtBar)
+	registerCallHandler("ta.roc", (*StreamingBarEvaluator).evaluateRocAtBar)
+	registerCallHandler("ta.crossover", (*StreamingBarEvaluator).evaluateCrossoverAtBar)
+	registerCallHandler("ta.crossunder", (*StreamingBarEvaluator).evaluateCrossunderAtBar)
+	registerCallHandler("ta.cross", (*StreamingBarEvaluator).evaluateCrossAtBar)
+	registerCallHandler("ta.falling", (*StreamingBarEvaluator).evaluateFallingAtBar)
+	registerCallHandler("ta.rising", (*StreamingBarEvaluator).evaluateRisingAtBar)
+	registerCallHandlerAliases((*StreamingBarEvaluator).evaluateBarsSinceAtBar, "ta.barssince", "ta.barsince", "barssince")
+	registerCallHandler("ta.cum", (*StreamingBarEvaluator).evaluateCumAtBar)
+	registerCallHandler("math.max", (*StreamingBarEvaluator).evaluateMathMaxAtBar)
+	registerCallHandler("math.min", (*StreamingBarEvaluator).evaluateMathMinAtBar)
+	registerCallHandler("math.abs", (*StreamingBarEvaluator).evaluateMathAbsAtBar)
+}
