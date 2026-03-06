@@ -1,16 +1,17 @@
-5 undefined symbols remaining (arrow function scope only):
+Remaining compile errors (arrow scope sub-fixes A/B/C resolved):
 
 Parse: ✅
 Generate: ✅
-Compile: ❌ (5 undefined symbols)
+Compile: ❌ (10+ undefined symbols)
 
-Arrow function identifier resolver bugs:
-  - Source params back-referenced as bare name: src (should be srcSeries.GetCurrent())
-  - For-loop iterators as series: iSeries, rSeries (should be bare i, r)
-  - Built-in `n` (bar_index v3) not mapped in arrow bodies: n, nSeries
-Execute: ❌ Not reached
+Resolved by Blocker #2 fixes:
+  ✅ Source params typed *series.Series with GetCurrent() access
+  ✅ For-loop iterators emit float64(i), not iSeries/rSeries
+  ✅ v3 `n` alias mapped to bar_index in all scopes
 
-Arrow functions with complex local variables and parameters fail to emit
-series declarations and parameter-to-series promotion for nested scopes.
+Remaining errors (not Blocker #2):
+  - undefined: priceSeries — cross-scope variable capture from outer arrow into inner arrow
+  - undefined: EMA, LowPass, Linreg, Gaussian, Sine_WMA, etc. — string literal comparison codegen emits bare identifiers
+  - undefined: gauss_poles — top-level variable not captured into arrow function scope
 
-Blocker: #2 (arrow function for-loop scope resolution)
+Blocker: #2 (partial), plus string comparison codegen and cross-scope capture

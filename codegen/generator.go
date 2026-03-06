@@ -1268,6 +1268,7 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 		isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
 
 		if isInLoop && g.loopContextStack.IsLoopCounter(e.Name) {
+			// Loop counters are Go int; float64-cast required for arithmetic with float64 operands.
 			return fmt.Sprintf("float64(%s)", e.Name), nil
 		}
 
@@ -1275,10 +1276,15 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			return "bar_indexSeries.GetCurrent()", nil
 		}
 
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, ArrowScope); resolved {
-			return code, nil
+		// Arrow resolver checked before variables: registered parameters take priority
+		// (covers IIFE for-loop bodies where g.variables would otherwise return Series access)
+		if g.arrowAccessResolver != nil {
+			if access, resolved := g.arrowAccessResolver.ResolveAccess(e.Name); resolved {
+				return access, nil
+			}
 		}
 
+		// User variables and parameters shadow builtins (PineScript semantics)
 		if varType, exists := g.variables[e.Name]; exists {
 			if varType == "float" || varType == "float64" || varType == "bool" {
 				return e.Name + "Series.GetCurrent()", nil
@@ -1286,6 +1292,10 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			if varType == "function" {
 				return e.Name, nil
 			}
+		}
+
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, ArrowScope); resolved {
+			return code, nil
 		}
 
 		if constVal, isConstant := g.constants[e.Name]; isConstant {
@@ -1458,6 +1468,10 @@ func (g *generator) generatePlotExpression(expr ast.Expression) (string, error) 
 			condCode, consequentCode, alternateCode), nil
 
 	case *ast.Identifier:
+		/* User-declared variables shadow builtins (PineScript semantics) */
+		if _, exists := g.variables[e.Name]; exists {
+			return e.Name + "Series.Get(0)", nil
+		}
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, BarLoopScope); resolved {
 			return code, nil
 		}
@@ -1585,15 +1599,26 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		return g.extractSeriesExpression(e), nil
 
 	case *ast.Identifier:
-		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {
-			return code, nil
-		}
-
 		varName := e.Name
 
 		/* Loop counter resolves to float64(counterVar) inside for-loop conditions */
 		if g.loopContextStack != nil && g.loopContextStack.IsInLoop() && g.loopContextStack.IsLoopCounter(varName) {
 			return fmt.Sprintf("float64(%s)", varName), nil
+		}
+
+		/* User-declared variables shadow builtins (PineScript semantics) */
+		if _, exists := g.variables[varName]; exists {
+			if constVal, isConstant := g.constants[varName]; isConstant {
+				if constVal == "input.source" {
+					return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
+				}
+				return varName, nil
+			}
+			return fmt.Sprintf("%sSeries.GetCurrent()", varName), nil
+		}
+
+		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {
+			return code, nil
 		}
 
 		if constVal, isConstant := g.constants[varName]; isConstant {
@@ -3125,6 +3150,20 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				return fmt.Sprintf("%sSeries.GetCurrent()", e.Name)
 			}
 			return e.Name
+		}
+
+		// Arrow resolver checked before builtins: parameters shadow builtins (PineScript semantics)
+		if g.arrowAccessResolver != nil {
+			if access, resolved := g.arrowAccessResolver.ResolveAccess(e.Name); resolved {
+				return access
+			}
+		}
+
+		// User-declared variables always shadow builtins (PineScript semantics)
+		if varType, exists := g.variables[e.Name]; exists {
+			if varType == "float" || varType == "float64" || varType == "bool" {
+				return e.Name + "Series.GetCurrent()"
+			}
 		}
 
 		if code, resolved := g.builtinHandler.TryResolveIdentifier(e, g.accessScope()); resolved {

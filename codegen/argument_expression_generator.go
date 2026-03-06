@@ -90,20 +90,29 @@ func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (st
 		return id.Name, nil
 	}
 
-	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.scope); resolved {
+	expectsSeries := false
+	if g.signatureRegistry != nil {
 		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+		expectsSeries = hasSignature && paramType == ParamTypeSeries
+	}
 
-		if hasSignature && paramType == ParamTypeSeries {
+	// Arrow resolver checked before builtins; bypassed when passing to a series-typed parameter
+	// so the identifier routes to *Series by name convention instead of scalar resolution.
+	if !expectsSeries && g.generator.arrowAccessResolver != nil {
+		if access, resolved := g.generator.arrowAccessResolver.ResolveAccess(id.Name); resolved {
+			return access, nil
+		}
+	}
+
+	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.scope); resolved {
+		if expectsSeries {
 			return g.resolveBuiltinToSeries(id.Name, code)
 		}
 		return g.resolveBuiltinToValue(id.Name, code)
 	}
 
-	if g.signatureRegistry != nil {
-		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
-		if hasSignature && paramType == ParamTypeSeries {
-			return fmt.Sprintf("%sSeries", id.Name), nil
-		}
+	if expectsSeries {
+		return fmt.Sprintf("%sSeries", id.Name), nil
 	}
 
 	return g.generator.resolveUserIdentifierAccess(id.Name), nil

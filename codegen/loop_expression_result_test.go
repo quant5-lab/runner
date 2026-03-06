@@ -23,7 +23,7 @@ x = for i = 0 to 9
     i
 plot(x)
 `,
-			mustContainAll:   []string{"__result = float64(i)", "func() float64"},
+			mustContainAll:   []string{"__result = float64(float64(i))", "func() float64"},
 			forbiddenPattern: []string{"__result = 0.0"},
 			description:      "bare identifier as last body statement assigns to __result",
 		},
@@ -89,7 +89,7 @@ x = for i = 0 to 9
     i
 plot(x)
 `,
-			mustContainAll:   []string{"__result = float64(i)", "return __result"},
+			mustContainAll:   []string{"__result = float64(float64(i))", "return __result"},
 			forbiddenPattern: []string{"__result = 0.0"},
 			description:      "only last expression statement becomes __result, preceding statements normal",
 		},
@@ -188,7 +188,7 @@ x = for i = 0 to 9
     -i
 plot(x)
 `,
-			mustContainAll:   []string{"__result = float64(-i)", "func() float64"},
+			mustContainAll:   []string{"__result = float64(-float64(i))", "func() float64"},
 			forbiddenPattern: []string{"__result = 0.0"},
 			description:      "unary negation as last body statement assigns to __result",
 		},

@@ -78,6 +78,27 @@ func TestResolveUserIdentifierAccess(t *testing.T) {
 			expected: "anyVarSeries.GetCurrent()",
 		},
 		{
+			name: "arrow series parameter resolves to nameSeries.GetCurrent()",
+			setup: func(g *generator) {
+				r := NewArrowSeriesAccessResolver()
+				r.RegisterSeriesParameter("src")
+				g.arrowAccessResolver = r
+			},
+			ident:    "src",
+			expected: "srcSeries.GetCurrent()",
+		},
+		{
+			name: "arrow series parameter takes priority over scalar parameter",
+			setup: func(g *generator) {
+				r := NewArrowSeriesAccessResolver()
+				r.RegisterParameter("src")
+				r.RegisterSeriesParameter("src")
+				g.arrowAccessResolver = r
+			},
+			ident:    "src",
+			expected: "srcSeries.GetCurrent()",
+		},
+		{
 			name: "arrow parameter takes priority over local with same name",
 			setup: func(g *generator) {
 				r := NewArrowSeriesAccessResolver()
@@ -152,6 +173,16 @@ func TestExtractSeriesExpression_ContextAwareIdentifierResolution(t *testing.T) 
 			},
 			expr:     &ast.Identifier{Name: "diff"},
 			expected: "diff",
+		},
+		{
+			name: "series parameter identifier in arrow context resolves to GetCurrent()",
+			setup: func(g *generator) {
+				r := NewArrowSeriesAccessResolver()
+				r.RegisterSeriesParameter("src")
+				g.arrowAccessResolver = r
+			},
+			expr:     &ast.Identifier{Name: "src"},
+			expected: "srcSeries.GetCurrent()",
 		},
 		{
 			name: "outer scope identifier in arrow context uses series access",

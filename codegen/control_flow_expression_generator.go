@@ -30,6 +30,11 @@ func (c *ControlFlowExpressionGenerator) GenerateForExpressionAsIIFE(forStmt *as
 	builder.WriteString("var __result float64\n")
 
 	counterVar := forStmt.Counter
+	if c.baseGenerator.loopContextStack != nil {
+		c.baseGenerator.loopContextStack.Push(counterVar)
+		defer c.baseGenerator.loopContextStack.Pop()
+	}
+
 	fromCode, err := c.baseGenerator.generateExpression(forStmt.From)
 	if err != nil {
 		return "", fmt.Errorf("generating for-expression from bound: %w", err)

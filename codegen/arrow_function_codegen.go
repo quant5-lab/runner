@@ -33,7 +33,11 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	a.loopModifiedVars = loopAnalyzer.FindLoopModifiedVariables(arrowFunc.Body)
 
 	for _, param := range arrowFunc.Params {
-		a.accessResolver.RegisterParameter(param.Name)
+		if paramUsage[param.Name] == ParameterUsageSeries {
+			a.accessResolver.RegisterSeriesParameter(param.Name)
+		} else {
+			a.accessResolver.RegisterParameter(param.Name)
+		}
 	}
 
 	varNames := a.collectAllVariableNames(arrowFunc.Body)
@@ -277,8 +281,14 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 	wasInArrowFunction := a.gen.inArrowFunctionBody
 	a.gen.inArrowFunctionBody = true
 
+	// Expose the access resolver globally so all sub-generators (e.g. ControlFlowExpressionGenerator
+	// processing IIFE for-loops) can resolve parameters and local variables correctly.
+	wasArrowAccessResolver := a.gen.arrowAccessResolver
+	a.gen.arrowAccessResolver = a.accessResolver
+
 	defer func() {
 		a.gen.inArrowFunctionBody = wasInArrowFunction
+		a.gen.arrowAccessResolver = wasArrowAccessResolver
 		for _, param := range arrowFunc.Params {
 			if savedType, wasSaved := savedVariables[param.Name]; wasSaved {
 				a.gen.variables[param.Name] = savedType

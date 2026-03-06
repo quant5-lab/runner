@@ -302,3 +302,63 @@ func TestBuiltinIdentifierRegistry_IsConstantBuiltin(t *testing.T) {
 		t.Error("last_bar_index should not be a series identifier")
 	}
 }
+
+/*
+TestBuiltinIdentifierRegistry_ResolveAlias validates that Pine v3→v4 identifier aliases
+resolve correctly. ResolveAlias is identity-preserving: non-alias names return unchanged.
+*/
+func TestBuiltinIdentifierRegistry_ResolveAlias(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"n resolves to bar_index (Pine v3 alias)", "n", "bar_index"},
+		{"bar_index resolves to itself (no alias)", "bar_index", "bar_index"},
+		{"close resolves to itself (no alias)", "close", "close"},
+		{"open resolves to itself (no alias)", "open", "open"},
+		{"user variable resolves to itself (not an alias)", "myVar", "myVar"},
+		{"empty string resolves to itself", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := registry.ResolveAlias(tt.input)
+			if result != tt.expected {
+				t.Errorf("ResolveAlias(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+/*
+TestBuiltinIdentifierRegistry_AliasedIdentifierIsBuiltin validates that v3 alias names
+pass IsBuiltinSeriesIdentifier after alias resolution (i.e., 'n' → 'bar_index' → builtin).
+This ensures the alias + registry lookup pipeline works end-to-end.
+*/
+func TestBuiltinIdentifierRegistry_AliasedIdentifierIsBuiltin(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"n is builtin via alias to bar_index", "n", true},
+		{"bar_index is builtin directly", "bar_index", true},
+		{"unaliased user var is not builtin", "userVar", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved := registry.ResolveAlias(tt.input)
+			result := registry.IsBuiltinSeriesIdentifier(resolved) || registry.IsConstantBuiltin(resolved)
+			if result != tt.expected {
+				t.Errorf("IsBuiltin(ResolveAlias(%q)) = %v, want %v (resolved=%q)",
+					tt.input, result, tt.expected, resolved)
+			}
+		})
+	}
+}

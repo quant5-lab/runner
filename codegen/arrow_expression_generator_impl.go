@@ -125,8 +125,9 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 	}
 
 	if e.gen.callRouter != nil {
+		savedResolver := e.gen.arrowAccessResolver
 		e.gen.arrowAccessResolver = e.accessResolver
-		defer func() { e.gen.arrowAccessResolver = nil }()
+		defer func() { e.gen.arrowAccessResolver = savedResolver }()
 
 		routedCode, routeErr := e.gen.callRouter.RouteCall(e.gen, call)
 		if routeErr != nil {

@@ -444,8 +444,11 @@ func (h *BuiltinIdentifierHandler) TryResolveIdentifier(expr *ast.Identifier, sc
 		return fmt.Sprintf("%q", hex), true
 	}
 
-	if h.IsBuiltinSeriesIdentifier(expr.Name) || h.registry.IsConstantBuiltin(expr.Name) {
-		code := h.generateBuiltinAccess(expr.Name, scope)
+	// Resolve Pine v3 aliases (e.g. "n" → "bar_index") before builtin lookup
+	resolvedName := h.registry.ResolveAlias(expr.Name)
+
+	if h.registry.IsBuiltinSeriesIdentifier(resolvedName) || h.registry.IsConstantBuiltin(resolvedName) {
+		code := h.generateBuiltinAccess(resolvedName, scope)
 		if code != "" {
 			return code, true
 		}

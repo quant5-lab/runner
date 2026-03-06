@@ -14,6 +14,7 @@ type BuiltinIdentifierRegistry struct {
 	calendarBuiltins      map[string]CalendarBuiltinInfo
 	constantBuiltins      map[string]bool
 	sessionSeriesBuiltins map[string]bool
+	v3Aliases             map[string]string // Pine v3→v4 identifier renames (e.g. "n" → "bar_index")
 }
 
 func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
@@ -59,7 +60,18 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 			"session.isfirstbar_regular": true,
 			"session.islastbar_regular":  true,
 		},
+		v3Aliases: map[string]string{
+			"n": "bar_index", // Pine v3 name for bar_index
+		},
 	}
+}
+
+/* ResolveAlias translates a Pine v3 identifier name to its canonical v4+ equivalent, or returns it unchanged. */
+func (r *BuiltinIdentifierRegistry) ResolveAlias(name string) string {
+	if resolved, ok := r.v3Aliases[name]; ok {
+		return resolved
+	}
+	return name
 }
 
 func (r *BuiltinIdentifierRegistry) IsBuiltinSeriesIdentifier(name string) bool {

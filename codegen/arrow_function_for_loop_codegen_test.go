@@ -572,3 +572,128 @@ plot(nested(5))
 		})
 	}
 }
+
+/*
+TestArrowForLoopCounterArithmetic validates that loop counter variables (Go int) are correctly
+cast to float64 when used in arithmetic expressions, math calls, and conditional expressions
+inside arrow-function for-loops. This is necessary because Pine counters are logically numeric
+but the generated Go for-loop counter is typed int.
+*/
+func TestArrowForLoopCounterArithmetic(t *testing.T) {
+	tests := []struct {
+		name             string
+		pine             string
+		mustContainAll   []string
+		forbiddenPattern []string
+		description      string
+	}{
+		{
+			name: "counter in math.abs call is float64-cast",
+			pine: `
+//@version=5
+indicator("Test")
+absSum(len) =>
+    total = 0.0
+    for i = 0 to len - 1
+        total := total + math.abs(i)
+    total
+plot(absSum(5))
+`,
+			mustContainAll: []string{
+				"math.Abs(float64(i))",
+			},
+			forbiddenPattern: []string{
+				"iSeries",
+				"math.Abs(i)",
+			},
+			description: "loop counter passed to math.abs() receives float64() cast",
+		},
+		{
+			name: "counter in math.sin call is float64-cast",
+			pine: `
+//@version=5
+indicator("Test")
+sinSum(len) =>
+    total = 0.0
+    for i = 0 to len - 1
+        total := total + math.sin(i)
+    total
+plot(sinSum(5))
+`,
+			mustContainAll: []string{
+				"math.Sin(float64(i))",
+			},
+			forbiddenPattern: []string{
+				"iSeries",
+			},
+			description: "loop counter passed to math.sin() receives float64() cast",
+		},
+		{
+			name: "counter multiplied with parameter is float64-cast",
+			pine: `
+//@version=5
+indicator("Test")
+weightedSum(src, len) =>
+    total = 0.0
+    for i = 0 to len - 1
+        total := total + src * i
+    total
+plot(weightedSum(close, 5))
+`,
+			mustContainAll: []string{
+				"float64(i)",
+				"src * float64(i)",
+			},
+			forbiddenPattern: []string{
+				"iSeries",
+			},
+			description: "loop counter in binary expression with scalar parameter is float64-cast",
+		},
+		{
+			name: "nested loop inner counter float64-cast, outer counter float64-cast independently",
+			pine: `
+//@version=5
+indicator("Test")
+matrix(rows, cols) =>
+    total = 0.0
+    for r = 0 to rows - 1
+        for c = 0 to cols - 1
+            total := total + r + c
+    total
+plot(matrix(3, 4))
+`,
+			mustContainAll: []string{
+				"float64(r)",
+				"float64(c)",
+			},
+			forbiddenPattern: []string{
+				"var rSeries",
+				"var cSeries",
+			},
+			description: "each loop counter in nested loops receives independent float64 cast",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			goCode, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+
+			for _, pattern := range tt.mustContainAll {
+				if !strings.Contains(goCode, pattern) {
+					t.Errorf("Missing required pattern: %q\nDescription: %s\nGenerated code:\n%s",
+						pattern, tt.description, goCode)
+				}
+			}
+
+			for _, forbidden := range tt.forbiddenPattern {
+				if strings.Contains(goCode, forbidden) {
+					t.Errorf("Found forbidden pattern: %q\nDescription: %s\nGenerated code:\n%s",
+						forbidden, tt.description, goCode)
+				}
+			}
+		})
+	}
+}
