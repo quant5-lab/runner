@@ -68,7 +68,7 @@ func TestArrowFunctionCodegen_SignatureGeneration(t *testing.T) {
 			analyzer := NewParameterUsageAnalyzer()
 			paramTypes := analyzer.AnalyzeArrowFunction(arrowFunc)
 
-			signature, _, err := afc.analyzeAndGenerateSignature(tt.funcName, arrowFunc, paramTypes)
+			signature, _, err := afc.analyzeAndGenerateSignature(tt.funcName, arrowFunc, paramTypes, nil)
 			if err != nil {
 				t.Fatalf("analyzeAndGenerateSignature() error: %v", err)
 			}

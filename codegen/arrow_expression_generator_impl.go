@@ -163,6 +163,9 @@ func (e *ArrowExpressionGeneratorImpl) generateIdentifier(id *ast.Identifier) (s
 }
 
 func (e *ArrowExpressionGeneratorImpl) generateLiteral(lit *ast.Literal) (string, error) {
+	if s, isStr := lit.Value.(string); isStr {
+		return fmt.Sprintf("%q", s), nil
+	}
 	return fmt.Sprintf("%v", lit.Value), nil
 }
 

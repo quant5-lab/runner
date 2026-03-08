@@ -48,5 +48,11 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 		argStrings = append(argStrings, argCode)
 	}
 
+	if g.arrowCaptureRegistry != nil {
+		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
+			argStrings = append(argStrings, cap.GoParamName())
+		}
+	}
+
 	return strings.Join(argStrings, ", "), nil
 }

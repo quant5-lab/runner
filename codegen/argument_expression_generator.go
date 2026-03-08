@@ -33,13 +33,25 @@ func NewArgumentExpressionGenerator(
 	}
 }
 
-/* Generate produces a float64-typed Go expression for use as a function argument */
+/* Generate produces a correctly-typed Go expression for use as a function argument.
+ * String-typed parameters bypass float64 coercion. */
 func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, error) {
 	code, err := g.generate(expr)
 	if err != nil {
 		return "", err
 	}
+	if g.isStringParam() {
+		return code, nil
+	}
 	return g.ensureFloat64(expr, code), nil
+}
+
+func (g *ArgumentExpressionGenerator) isStringParam() bool {
+	if g.signatureRegistry == nil {
+		return false
+	}
+	paramType, ok := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+	return ok && paramType == ParamTypeString
 }
 
 /* generate produces a raw Go expression preserving its native Go type (bool stays bool) */
@@ -167,6 +179,8 @@ func (g *ArgumentExpressionGenerator) generateLiteral(lit *ast.Literal) (string,
 		return fmt.Sprintf("%.1f", v), nil
 	case int:
 		return fmt.Sprintf("%d.0", v), nil
+	case string:
+		return fmt.Sprintf("%q", v), nil
 	default:
 		return fmt.Sprintf("%v", v), nil
 	}

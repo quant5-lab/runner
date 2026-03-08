@@ -293,7 +293,7 @@ plot(accumulate(1.5, 10))
 			description: "scalar parameter accessed in loop body stays float64, no series lookup",
 		},
 		{
-			name: "outer scope variable in arrow loop body resolves to scalar bare name",
+			name: "outer scope series variable captured and passed as *series.Series parameter",
 			pine: `
 //@version=5
 indicator("Test")
@@ -307,13 +307,14 @@ plot(clamp(5))
 `,
 			mustContainAll: []string{
 				"totalSeries.Set(",
-				"+ ref)",
+				"refSeries *series.Series",
+				"refSeries.GetCurrent()",
 			},
 			forbiddenPattern: []string{
 				"arrowCtx.GetOrCreateSeries(\"ref\")",
 				"ref float64",
 			},
-			description: "outer scope variable in arrow loop body resolves to scalar bare name",
+			description: "outer scope float series variable is captured as *series.Series injection, not a local arrow series",
 		},
 	}
 
@@ -422,6 +423,175 @@ for [i, val] in close
 				"float64(val)",
 			},
 			description: "element variable from range is already float64, no cast needed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			goCode, err := compilePineScript(tt.pine)
+			if err != nil {
+				t.Fatalf("Compilation failed: %v", err)
+			}
+
+			for _, pattern := range tt.mustContainAll {
+				if !strings.Contains(goCode, pattern) {
+					t.Errorf("Missing required pattern: %q\nDescription: %s\nGenerated code:\n%s",
+						pattern, tt.description, goCode)
+				}
+			}
+
+			for _, forbidden := range tt.forbiddenPattern {
+				if strings.Contains(goCode, forbidden) {
+					t.Errorf("Found forbidden pattern: %q\nDescription: %s\nGenerated code:\n%s",
+						forbidden, tt.description, goCode)
+				}
+			}
+		})
+	}
+}
+
+/*
+TestArrowOuterScopeCapture validates that outer-scope (strategy-level) variables referenced
+inside arrow function bodies are correctly captured as injected parameters. Captures are
+classified by the storage kind of the outer variable: float/bool series → *series.Series,
+string → string, array_series → *series.ArraySeries, scalar inputs → float64.
+
+Shadowing rules: formal parameters and locally declared variables within the arrow function
+body suppress capture of any same-named outer variable.
+*/
+func TestArrowOuterScopeCapture(t *testing.T) {
+	tests := []struct {
+		name             string
+		pine             string
+		mustContainAll   []string
+		forbiddenPattern []string
+		description      string
+	}{
+		{
+			name: "outer series variable injected as *series.Series parameter",
+			pine: `
+//@version=5
+indicator("Test")
+price = close
+getVal() =>
+    price
+plot(getVal())
+`,
+			mustContainAll: []string{
+				"priceSeries *series.Series",
+				"priceSeries.GetCurrent()",
+				"getVal(", // call site includes priceSeries arg
+				"priceSeries)",
+			},
+			forbiddenPattern: []string{
+				"price float64",
+				"arrowCtx.GetOrCreateSeries(\"price\")",
+			},
+			description: "outer float series variable is injected as *series.Series, accessed via GetCurrent()",
+		},
+		{
+			name: "outer series variable subscripted in arrow body uses Series.Get()",
+			pine: `
+//@version=5
+indicator("Test")
+price = close
+prevVal() =>
+    price[1]
+plot(prevVal())
+`,
+			mustContainAll: []string{
+				"priceSeries *series.Series",
+				"priceSeries.Get(int(1))",
+				"priceSeries)",
+			},
+			forbiddenPattern: []string{
+				"price float64",
+				"priceSeries.GetCurrent()",
+			},
+			description: "outer series variable subscripted inside arrow body resolves via Get(offset)",
+		},
+		{
+			name: "multiple outer series variables each captured distinctly",
+			pine: `
+//@version=5
+indicator("Test")
+src1 = close
+src2 = open
+diff() =>
+    src1 - src2
+plot(diff())
+`,
+			mustContainAll: []string{
+				"src1Series *series.Series",
+				"src2Series *series.Series",
+				"src1Series.GetCurrent()",
+				"src2Series.GetCurrent()",
+			},
+			forbiddenPattern: []string{
+				"src1 float64",
+				"src2 float64",
+			},
+			description: "each outer series variable gets its own *series.Series parameter in the signature",
+		},
+		{
+			name: "formal parameter shadows outer series — outer NOT captured as function param",
+			pine: `
+//@version=5
+indicator("Test")
+price = close
+useParam(price) =>
+    price
+plot(useParam(close))
+`,
+			mustContainAll: []string{
+				"price float64",
+			},
+			forbiddenPattern: []string{
+				// The outer priceSeries exists in main scope but must NOT appear in the function signature
+				"useParam(arrowCtx *context.ArrowContext, priceSeries",
+			},
+			description: "formal parameter named 'price' shadows the outer series 'price'; outer is not captured as function parameter",
+		},
+		{
+			name: "local variable shadows outer series — outer NOT injected as capture param",
+			pine: `
+//@version=5
+indicator("Test")
+ref = close
+localShadow() =>
+    ref = 42.0
+    ref
+plot(localShadow())
+`,
+			mustContainAll: []string{
+				"arrowCtx.GetOrCreateSeries(\"ref\")",
+			},
+			forbiddenPattern: []string{
+				// The outer refSeries exists in main scope but must NOT appear in the function signature
+				"localShadow(arrowCtx *context.ArrowContext, refSeries",
+			},
+			description: "locally declared 'ref' shadows outer 'ref'; outer series is not injected as extra capture parameter",
+		},
+		{
+			name: "user-defined function name in outer scope is NOT captured",
+			pine: `
+//@version=5
+indicator("Test")
+helper(x) =>
+    x * 2.0
+caller() =>
+    helper(close)
+plot(caller())
+`,
+			mustContainAll: []string{
+				"helper(",
+			},
+			forbiddenPattern: []string{
+				"helperSeries *series.Series",
+				"helper float64",
+				"helper string",
+			},
+			description: "function-type outer variables are not injectable captures; calls go through the call router",
 		},
 	}
 

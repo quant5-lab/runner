@@ -27,15 +27,14 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	analyzer := NewParameterUsageAnalyzer()
 	paramUsage := analyzer.AnalyzeArrowFunction(arrowFunc)
 
-	a.gen.signatureRegistrar.RegisterArrowFunction(funcName, arrowFunc.Params, paramUsage, "float64")
-
 	loopAnalyzer := NewArrowLoopModificationAnalyzer()
 	a.loopModifiedVars = loopAnalyzer.FindLoopModifiedVariables(arrowFunc.Body)
 
 	for _, param := range arrowFunc.Params {
-		if paramUsage[param.Name] == ParameterUsageSeries {
+		switch paramUsage[param.Name] {
+		case ParameterUsageSeries:
 			a.accessResolver.RegisterSeriesParameter(param.Name)
-		} else {
+		default:
 			a.accessResolver.RegisterParameter(param.Name)
 		}
 	}
@@ -49,7 +48,20 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 		a.accessResolver.RegisterLoopModified(varName)
 	}
 
-	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc, paramUsage)
+	captures := a.findOuterScopeCaptures(arrowFunc, varNames)
+	for _, cap := range captures {
+		switch {
+		case cap.NeedsSeriesAccessRegistration():
+			a.accessResolver.RegisterSeriesParameter(cap.Name)
+		case cap.Kind != OuterScopeCaptureArraySeries:
+			a.accessResolver.RegisterParameter(cap.Name)
+		}
+	}
+	a.gen.arrowCaptureRegistry.Register(funcName, captures)
+
+	a.gen.signatureRegistrar.RegisterArrowFunction(funcName, arrowFunc.Params, paramUsage, "float64")
+
+	signature, returnType, err := a.analyzeAndGenerateSignature(funcName, arrowFunc, paramUsage, captures)
 	if err != nil {
 		return "", err
 	}
@@ -83,8 +95,8 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	return code, nil
 }
 
-func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arrowFunc *ast.ArrowFunctionExpression, paramTypes map[string]ParameterUsageType) (string, string, error) {
-	params := a.buildParameterList(arrowFunc.Params, paramTypes)
+func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arrowFunc *ast.ArrowFunctionExpression, paramTypes map[string]ParameterUsageType, captures []OuterScopeCapture) (string, string, error) {
+	params := a.buildParameterList(arrowFunc.Params, paramTypes, captures)
 	returnType, err := a.inferReturnType(arrowFunc)
 	if err != nil {
 		return "", "", err
@@ -94,22 +106,43 @@ func (a *ArrowFunctionCodegen) analyzeAndGenerateSignature(funcName string, arro
 	return signature, returnType, nil
 }
 
-func (a *ArrowFunctionCodegen) buildParameterList(params []ast.Identifier, paramTypes map[string]ParameterUsageType) string {
-	if len(params) == 0 {
-		return ""
-	}
-
+func (a *ArrowFunctionCodegen) buildParameterList(params []ast.Identifier, paramTypes map[string]ParameterUsageType, captures []OuterScopeCapture) string {
 	var parts []string
+
 	for _, param := range params {
-		paramType := paramTypes[param.Name]
-		if paramType == ParameterUsageSeries {
+		switch paramTypes[param.Name] {
+		case ParameterUsageSeries:
 			parts = append(parts, fmt.Sprintf("%sSeries *series.Series", param.Name))
-		} else {
+		case ParameterUsageString:
+			parts = append(parts, fmt.Sprintf("%s string", param.Name))
+		default:
 			parts = append(parts, fmt.Sprintf("%s float64", param.Name))
 		}
 	}
 
+	for _, cap := range captures {
+		parts = append(parts, fmt.Sprintf("%s %s", cap.GoParamName(), cap.GoParamType()))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
 	return ", " + strings.Join(parts, ", ")
+}
+
+func (a *ArrowFunctionCodegen) findOuterScopeCaptures(arrowFunc *ast.ArrowFunctionExpression, varNames []string) []OuterScopeCapture {
+	params := make(map[string]bool, len(arrowFunc.Params))
+	for _, p := range arrowFunc.Params {
+		params[p.Name] = true
+	}
+
+	locals := make(map[string]bool, len(varNames))
+	for _, v := range varNames {
+		locals[v] = true
+	}
+
+	captureAnalyzer := NewOuterScopeCaptureAnalyzer(params, locals, a.gen.constants, a.gen.variables)
+	return captureAnalyzer.Analyze(arrowFunc.Body)
 }
 
 func (a *ArrowFunctionCodegen) inferReturnType(arrowFunc *ast.ArrowFunctionExpression) (string, error) {

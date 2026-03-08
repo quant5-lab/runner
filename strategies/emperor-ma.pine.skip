@@ -1,17 +1,18 @@
-Remaining compile errors (arrow scope sub-fixes A/B/C resolved):
+Blocker #2 RESOLVED — all 6 sub-fixes applied (A/B/C/D/E/F).
 
 Parse: ✅
 Generate: ✅
-Compile: ❌ (10+ undefined symbols)
+Compile: ❌ (5 errors — string-valued color variables stored into float64 *series.Series)
 
 Resolved by Blocker #2 fixes:
-  ✅ Source params typed *series.Series with GetCurrent() access
-  ✅ For-loop iterators emit float64(i), not iSeries/rSeries
-  ✅ v3 `n` alias mapped to bar_index in all scopes
+  ✅ (A) Source params typed *series.Series with GetCurrent() access
+  ✅ (B) For-loop iterators emit float64(i), not iSeries/rSeries
+  ✅ (C) v3 `n` alias mapped to bar_index in all scopes
+  ✅ (D) String equality comparison codegen — EMA, LowPass, Linreg, Gaussian, Sine_WMA
+  ✅ (E) Cross-scope variable capture — gauss_poles, outer series variables
+  ✅ (F) Dual call-site capture injection — priceSeries
 
 Remaining errors (not Blocker #2):
-  - undefined: priceSeries — cross-scope variable capture from outer arrow into inner arrow
-  - undefined: EMA, LowPass, Linreg, Gaussian, Sine_WMA, etc. — string literal comparison codegen emits bare identifiers
-  - undefined: gauss_poles — top-level variable not captured into arrow function scope
+  - cannot use c1..c5 (type string) as float64 in col1Series..col5Series.Set — color string variables stored into *series.Series
 
-Blocker: #2 (partial), plus string comparison codegen and cross-scope capture
+Blocker: string variable storage (no blocker # assigned)

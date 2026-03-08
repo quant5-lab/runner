@@ -5,6 +5,7 @@ type FunctionParameterType int
 const (
 	ParamTypeScalar FunctionParameterType = iota
 	ParamTypeSeries
+	ParamTypeString
 )
 
 type FunctionSignature struct {

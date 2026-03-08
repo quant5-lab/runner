@@ -7,6 +7,7 @@ type ParameterUsageType int
 const (
 	ParameterUsageScalar ParameterUsageType = iota
 	ParameterUsageSeries
+	ParameterUsageString
 )
 
 type ParameterUsageAnalyzer struct {
@@ -70,6 +71,7 @@ func (a *ParameterUsageAnalyzer) analyzeExpression(expr ast.Expression) {
 	case *ast.CallExpression:
 		a.analyzeCallExpression(e)
 	case *ast.BinaryExpression:
+		a.detectStringParam(e)
 		a.analyzeExpression(e.Left)
 		a.analyzeExpression(e.Right)
 	case *ast.ConditionalExpression:
@@ -79,7 +81,6 @@ func (a *ParameterUsageAnalyzer) analyzeExpression(expr ast.Expression) {
 	case *ast.UnaryExpression:
 		a.analyzeExpression(e.Argument)
 	case *ast.MemberExpression:
-		/* Subscript access on parameter: src[i] marks src as series */
 		if e.Computed {
 			if obj, ok := e.Object.(*ast.Identifier); ok {
 				if _, isParam := a.parameterTypes[obj.Name]; isParam {
@@ -93,6 +94,59 @@ func (a *ParameterUsageAnalyzer) analyzeExpression(expr ast.Expression) {
 				a.analyzeExpression(elem)
 			}
 		}
+	case *ast.ForStatement:
+		a.analyzeExpression(e.From)
+		a.analyzeExpression(e.To)
+		if e.Step != nil {
+			a.analyzeExpression(e.Step)
+		}
+		for _, bodyStmt := range e.Body {
+			a.analyzeStatement(bodyStmt)
+		}
+	case *ast.ForInStatement:
+		a.analyzeExpression(e.Collection)
+		for _, bodyStmt := range e.Body {
+			a.analyzeStatement(bodyStmt)
+		}
+	case *ast.WhileStatement:
+		a.analyzeExpression(e.Condition)
+		for _, bodyStmt := range e.Body {
+			a.analyzeStatement(bodyStmt)
+		}
+	case *ast.IfStatement:
+		a.analyzeExpression(e.Test)
+		for _, conseq := range e.Consequent {
+			a.analyzeStatement(conseq)
+		}
+		for _, alt := range e.Alternate {
+			a.analyzeStatement(alt)
+		}
+	}
+}
+
+func (a *ParameterUsageAnalyzer) detectStringParam(e *ast.BinaryExpression) {
+	if e.Operator != "==" && e.Operator != "!=" {
+		return
+	}
+	a.markStringParamIfLiteral(e.Left, e.Right)
+	a.markStringParamIfLiteral(e.Right, e.Left)
+}
+
+func (a *ParameterUsageAnalyzer) markStringParamIfLiteral(candidate, other ast.Expression) {
+	ident, isIdent := candidate.(*ast.Identifier)
+	if !isIdent {
+		return
+	}
+	lit, isLit := other.(*ast.Literal)
+	if !isLit {
+		return
+	}
+	if _, isStr := lit.Value.(string); !isStr {
+		return
+	}
+	usage, isParam := a.parameterTypes[ident.Name]
+	if isParam && usage == ParameterUsageScalar {
+		a.parameterTypes[ident.Name] = ParameterUsageString
 	}
 }
 
@@ -100,7 +154,6 @@ func (a *ParameterUsageAnalyzer) analyzeCallExpression(call *ast.CallExpression)
 	funcName := extractCallFunctionName(call)
 	argCount := len(call.Arguments)
 
-	/* Promote first arg to series when TA function needs historical lookback on its source */
 	if sharedTASignatures.Contains(funcName) && argCount >= 1 {
 		promoteFirstArg := false
 		if argCount >= 2 && sharedTASignatures.NeedsSourcePromotion(funcName, argCount) {

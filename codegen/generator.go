@@ -84,6 +84,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.callRouter = NewCallExpressionRouter()
 	gen.funcSigRegistry = NewFunctionSignatureRegistry()
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
+	gen.arrowCaptureRegistry = NewArrowCaptureRegistry()
 	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 	gen.symbolTable = NewSymbolTable()
@@ -227,6 +228,7 @@ type generator struct {
 	arrowContextLifecycle      *ArrowContextLifecycleManager
 	returnValueStorage         *ReturnValueSeriesStorageHandler
 	arrowAccessResolver        *ArrowSeriesAccessResolver
+	arrowCaptureRegistry       *ArrowCaptureRegistry
 	symbolTable                SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
@@ -3002,6 +3004,12 @@ func (g *generator) generateUserDefinedFunctionCallWithContext(callExpr *ast.Cal
 			return "", fmt.Errorf("failed to generate argument %d: %w", idx, err)
 		}
 		args = append(args, argCode)
+	}
+
+	if g.arrowCaptureRegistry != nil {
+		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
+			args = append(args, cap.GoParamName())
+		}
 	}
 
 	return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", ")), nil

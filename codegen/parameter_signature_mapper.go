@@ -19,8 +19,12 @@ func (m *ParameterSignatureMapper) MapUsageToSignatureTypes(params []ast.Identif
 }
 
 func (m *ParameterSignatureMapper) mapSingleParameter(paramName string, usageTypes map[string]ParameterUsageType) FunctionParameterType {
-	if usageTypes[paramName] == ParameterUsageSeries {
+	switch usageTypes[paramName] {
+	case ParameterUsageSeries:
 		return ParamTypeSeries
+	case ParameterUsageString:
+		return ParamTypeString
+	default:
+		return ParamTypeScalar
 	}
-	return ParamTypeScalar
 }
