@@ -354,6 +354,27 @@ func TestAllTransformers_Coverage(t *testing.T) {
 			checkObj:    "request",
 			checkProp:   "security",
 		},
+		{
+			name:        "TickerNamespace - heikinashi",
+			input:       `haT = heikinashi(sym)`,
+			transformer: NewTickerNamespaceTransformer(),
+			checkObj:    "ticker",
+			checkProp:   "heikinashi",
+		},
+		{
+			name:        "TickerNamespace - heikenashi typo",
+			input:       `haT = heikenashi(sym)`,
+			transformer: NewTickerNamespaceTransformer(),
+			checkObj:    "ticker",
+			checkProp:   "heikinashi",
+		},
+		{
+			name:        "TickerNamespace - renko",
+			input:       `renkoT = renko(sym)`,
+			transformer: NewTickerNamespaceTransformer(),
+			checkObj:    "ticker",
+			checkProp:   "renko",
+		},
 	}
 
 	for _, tc := range testCases {

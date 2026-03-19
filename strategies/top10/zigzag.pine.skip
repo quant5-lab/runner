@@ -1,8 +1,8 @@
 ZigZag PA Strategy V4.1 (v4) — harmonic pattern recognition
 
 Parse: ✅ (v4→v5 preprocessing)
-Generate: ❌ (unsupported function in expression position: heikenashi)
-Compile: ❌ Not reached
+Generate: ✅ (heikenashi→ticker.heikinashi via TickerNamespaceTransformer)
+Compile: ❌ (UDF-local variable series emission, bare `tickerid` variable, multiple undefined series)
 Execute: ❌ Not reached
 
-Blocker: #4 (v4→v5 `heikenashi` identifier not mapped to `ticker.heikinashi`)
+Blocker: #4 (remaining: UDF scope, bare identifiers)

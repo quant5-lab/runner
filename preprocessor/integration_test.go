@@ -142,6 +142,7 @@ ma = sma(close, 20)
 stddev = stdev(close, 20)
 absVal = abs(ma)
 dailyHigh = security(syminfo.tickerid, "D", high)
+haT = heikinashi(syminfo.tickerid)
 `
 
 	p, err := parser.NewParser()
@@ -166,10 +167,11 @@ dailyHigh = security(syminfo.tickerid, "D", high)
 		obj       string
 		prop      string
 	}{
-		{1, "ta", "sma"},           // sma → ta.sma
-		{2, "ta", "stdev"},         // stdev → ta.stdev
-		{3, "math", "abs"},         // abs → math.abs
-		{4, "request", "security"}, // security → request.security
+		{1, "ta", "sma"},            // sma → ta.sma
+		{2, "ta", "stdev"},          // stdev → ta.stdev
+		{3, "math", "abs"},          // abs → math.abs
+		{4, "request", "security"},  // security → request.security
+		{5, "ticker", "heikinashi"}, // heikinashi → ticker.heikinashi
 	}
 
 	/* Statement 0: study → indicator (simple Ident rename) */
