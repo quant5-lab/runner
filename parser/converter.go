@@ -792,10 +792,67 @@ func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, er
 		}
 	}
 
+	alternate, err := c.convertIfExprElseClause(ifExpr.ElseClause)
+	if err != nil {
+		return nil, fmt.Errorf("converting if-expression else clause: %w", err)
+	}
+
 	return &ast.IfStatement{
 		NodeType:   ast.TypeIfStatement,
 		Test:       test,
 		Consequent: body,
+		Alternate:  alternate,
+	}, nil
+}
+
+func (c *Converter) convertIfExprElseClause(ec *ElseClause) ([]ast.Node, error) {
+	if ec == nil {
+		return []ast.Node{}, nil
+	}
+	if ec.ElseIf != nil {
+		node, err := c.convertIfGrammarNode(ec.ElseIf)
+		if err != nil {
+			return nil, err
+		}
+		return []ast.Node{node}, nil
+	}
+	nodes := []ast.Node{}
+	for _, stmt := range ec.ElseBody {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes, nil
+}
+
+func (c *Converter) convertIfGrammarNode(ifGram *IfStatement) (ast.Node, error) {
+	test, err := c.convertOrExpr(ifGram.Condition)
+	if err != nil {
+		return nil, err
+	}
+	body := []ast.Node{}
+	for _, stmt := range ifGram.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+	alternate, err := c.convertIfExprElseClause(ifGram.ElseClause)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.IfStatement{
+		NodeType:   ast.TypeIfStatement,
+		Test:       test,
+		Consequent: body,
+		Alternate:  alternate,
 	}, nil
 }
 

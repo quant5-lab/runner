@@ -544,6 +544,82 @@ func TestStrategyExitComment(t *testing.T) {
 	}
 }
 
+/*
+TestExit_ClosesAllMatchingEntriesById verifies that Exit(exitID, fromEntry) exits every open
+trade carrying the given fromEntry ID, mirroring the Close semantics for the strategy.exit path.
+*/
+func TestExit_ClosesAllMatchingEntriesById(t *testing.T) {
+	type entry struct {
+		id  string
+		qty float64
+	}
+	tests := []struct {
+		name            string
+		pyramiding      int
+		entries         []entry
+		exitID          string
+		fromEntry       string
+		entryPrice      float64
+		exitPrice       float64
+		wantClosedCount int
+		wantOpenCount   int
+	}{
+		{
+			name:       "two_same_fromentry_both_closed",
+			pyramiding: 2,
+			entries:    []entry{{"e", 10}, {"e", 10}},
+			exitID:     "exit", fromEntry: "e",
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 2, wantOpenCount: 0,
+		},
+		{
+			name:       "mixed_fromentry_only_matching_closed",
+			pyramiding: 3,
+			entries:    []entry{{"e", 10}, {"e", 10}, {"other", 5}},
+			exitID:     "exit", fromEntry: "e",
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 2, wantOpenCount: 1,
+		},
+		{
+			name:       "nonexistent_fromentry_is_noop",
+			pyramiding: 2,
+			entries:    []entry{{"e", 10}, {"e", 10}},
+			exitID:     "exit", fromEntry: "no_such_id",
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 0, wantOpenCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("Test", 10000, tt.pyramiding)
+
+			bar, ts := 0, int64(1000)
+			for _, e := range tt.entries {
+				s.Entry(e.id, Long, e.qty, "")
+				bar++
+				ts += 1000
+				s.OnBarUpdate(bar, tt.entryPrice, ts)
+			}
+
+			s.Exit(tt.exitID, tt.fromEntry, tt.exitPrice, ts, "")
+			bar++
+			ts += 1000
+			s.OnBarUpdate(bar, tt.exitPrice, ts)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != tt.wantClosedCount {
+				t.Errorf("closed count: got %d, want %d", len(closed), tt.wantClosedCount)
+			}
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != tt.wantOpenCount {
+				t.Errorf("open count: got %d, want %d", len(open), tt.wantOpenCount)
+			}
+		})
+	}
+}
+
 /* TestStrategyMixedComments verifies behavior with mixed comment/no-comment trades */
 func TestStrategyMixedComments(t *testing.T) {
 	s := NewStrategy()
@@ -638,6 +714,103 @@ func TestStrategyCloseAll(t *testing.T) {
 	closedTrades := s.tradeHistory.GetClosedTrades()
 	if len(closedTrades) != 2 {
 		t.Errorf("Should have 2 closed trades, got %d", len(closedTrades))
+	}
+}
+
+/*
+TestCloseAll_ClosesAllOpenTradesRegardlessOfEntryId verifies that CloseAll exits every open
+trade irrespective of entry ID, covering N>2 positions, same-ID pyramiding, short direction,
+variable lot sizes, and the no-op when no trades are open.
+*/
+func TestCloseAll_ClosesAllOpenTradesRegardlessOfEntryId(t *testing.T) {
+	type entry struct {
+		id        string
+		direction string
+		qty       float64
+	}
+	tests := []struct {
+		name             string
+		direction        string
+		entries          []entry
+		entryPrice       float64
+		exitPrice        float64
+		wantClosedCount  int
+		wantPositionSize float64
+		wantNetProfit    float64
+	}{
+		{
+			name:       "three_unique_ids_long",
+			direction:  Long,
+			entries:    []entry{{"a", Long, 10}, {"b", Long, 10}, {"c", Long, 10}},
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 3, wantPositionSize: 0, wantNetProfit: 300, // (110-100)*10 * 3
+		},
+		{
+			name:       "four_same_id_long",
+			direction:  Long,
+			entries:    []entry{{"e", Long, 10}, {"e", Long, 10}, {"e", Long, 10}, {"e", Long, 10}},
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 4, wantPositionSize: 0, wantNetProfit: 400,
+		},
+		{
+			name:       "three_unique_ids_short",
+			direction:  Short,
+			entries:    []entry{{"a", Short, 5}, {"b", Short, 5}, {"c", Short, 5}},
+			entryPrice: 100, exitPrice: 90,
+			wantClosedCount: 3, wantPositionSize: 0, wantNetProfit: 150, // (100-90)*5 * 3
+		},
+		{
+			name:       "variable_lot_sizes_profit_per_trade",
+			direction:  Long,
+			entries:    []entry{{"a", Long, 10}, {"b", Long, 20}, {"c", Long, 5}},
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 3, wantPositionSize: 0, wantNetProfit: 350, // (110-100)*(10+20+5)
+		},
+		{
+			name:       "no_open_trades_is_noop",
+			direction:  Long,
+			entries:    nil,
+			entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 0, wantPositionSize: 0, wantNetProfit: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pyramiding := len(tt.entries)
+			if pyramiding == 0 {
+				pyramiding = 1
+			}
+			s := NewStrategy()
+			s.CallWithPyramiding("Test", 10000, pyramiding)
+
+			bar, ts := 0, int64(1000)
+			for _, e := range tt.entries {
+				s.Entry(e.id, e.direction, e.qty, "")
+				bar++
+				ts += 1000
+				s.OnBarUpdate(bar, tt.entryPrice, ts)
+			}
+
+			s.CloseAll(tt.exitPrice, ts, "")
+			bar++
+			ts += 1000
+			s.OnBarUpdate(bar, tt.exitPrice, ts)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != tt.wantClosedCount {
+				t.Errorf("closed count: got %d, want %d", len(closed), tt.wantClosedCount)
+			}
+			if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+				t.Errorf("open count: got %d, want 0", len(s.GetTradeHistory().GetOpenTrades()))
+			}
+			if s.GetPositionSize() != tt.wantPositionSize {
+				t.Errorf("position size: got %.2f, want %.2f", s.GetPositionSize(), tt.wantPositionSize)
+			}
+			if s.GetNetProfit() != tt.wantNetProfit {
+				t.Errorf("net profit: got %.2f, want %.2f", s.GetNetProfit(), tt.wantNetProfit)
+			}
+		})
 	}
 }
 
@@ -926,6 +1099,116 @@ func TestStrategyEvenTrades(t *testing.T) {
 	evenCount := s.GetEvenTradesCount()
 	if evenCount != 1 {
 		t.Errorf("EvenTrades: expected 1, got %d", evenCount)
+	}
+}
+
+/*
+TestClose_ClosesAllMatchingEntriesById verifies that Close("id") exits every open trade
+carrying that entry ID, while leaving unrelated entries untouched and computing profit
+independently for each closed trade. Covers homogeneous and mixed pyramiding, both
+directions, variable lot sizes, and the no-op for a non-existent ID.
+*/
+func TestClose_ClosesAllMatchingEntriesById(t *testing.T) {
+	type entry struct {
+		id  string
+		qty float64
+	}
+	tests := []struct {
+		name             string
+		pyramiding       int
+		direction        string
+		entries          []entry
+		closeID          string
+		entryPrice       float64
+		exitPrice        float64
+		wantClosedCount  int
+		wantOpenCount    int
+		wantPositionSize float64
+		wantNetProfit    float64
+	}{
+		{
+			name:       "two_same_id_long",
+			pyramiding: 2, direction: Long,
+			entries: []entry{{"e", 10}, {"e", 10}},
+			closeID: "e", entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 2, wantOpenCount: 0,
+			wantPositionSize: 0, wantNetProfit: 200, // (110-100)*10 * 2
+		},
+		{
+			name:       "three_same_id_long",
+			pyramiding: 3, direction: Long,
+			entries: []entry{{"e", 10}, {"e", 10}, {"e", 10}},
+			closeID: "e", entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 3, wantOpenCount: 0,
+			wantPositionSize: 0, wantNetProfit: 300,
+		},
+		{
+			name:       "two_same_id_short",
+			pyramiding: 2, direction: Short,
+			entries: []entry{{"s", 5}, {"s", 5}},
+			closeID: "s", entryPrice: 100, exitPrice: 90,
+			wantClosedCount: 2, wantOpenCount: 0,
+			wantPositionSize: 0, wantNetProfit: 100, // (100-90)*5 * 2
+		},
+		{
+			name:       "mixed_ids_only_target_closed",
+			pyramiding: 3, direction: Long,
+			entries: []entry{{"target", 10}, {"target", 10}, {"other", 5}},
+			closeID: "target", entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 2, wantOpenCount: 1,
+			wantPositionSize: 5, wantNetProfit: 200,
+		},
+		{
+			name:       "variable_lot_sizes_profit_per_trade",
+			pyramiding: 3, direction: Long,
+			entries: []entry{{"e", 10}, {"e", 20}, {"e", 5}},
+			closeID: "e", entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 3, wantOpenCount: 0,
+			wantPositionSize: 0, wantNetProfit: 350, // (110-100)*(10+20+5)
+		},
+		{
+			name:       "nonexistent_id_is_noop",
+			pyramiding: 2, direction: Long,
+			entries: []entry{{"e", 10}, {"e", 10}},
+			closeID: "no_such_id", entryPrice: 100, exitPrice: 110,
+			wantClosedCount: 0, wantOpenCount: 2,
+			wantPositionSize: 20, wantNetProfit: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("Test", 10000, tt.pyramiding)
+
+			bar, ts := 0, int64(1000)
+			for _, e := range tt.entries {
+				s.Entry(e.id, tt.direction, e.qty, "")
+				bar++
+				ts += 1000
+				s.OnBarUpdate(bar, tt.entryPrice, ts)
+			}
+
+			s.Close(tt.closeID, tt.exitPrice, ts, "")
+			bar++
+			ts += 1000
+			s.OnBarUpdate(bar, tt.exitPrice, ts)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != tt.wantClosedCount {
+				t.Errorf("closed count: got %d, want %d", len(closed), tt.wantClosedCount)
+			}
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != tt.wantOpenCount {
+				t.Errorf("open count: got %d, want %d", len(open), tt.wantOpenCount)
+			}
+			if s.GetPositionSize() != tt.wantPositionSize {
+				t.Errorf("position size: got %.2f, want %.2f", s.GetPositionSize(), tt.wantPositionSize)
+			}
+			if s.GetNetProfit() != tt.wantNetProfit {
+				t.Errorf("net profit: got %.2f, want %.2f", s.GetNetProfit(), tt.wantNetProfit)
+			}
+		})
 	}
 }
 
@@ -1693,6 +1976,162 @@ func TestBuildClosedTrade(t *testing.T) {
 				t.Errorf("MaxRunup: got %.4f, want %.4f", closed.MaxRunup, tt.wantMaxRU)
 			}
 		})
+	}
+}
+
+/*
+TestTradeHistory_MatchingOpenTrades verifies the entry-ID scoped snapshot: empty history,
+no match, single match, multiple same-ID match, mixed IDs, and result isolation from
+subsequent mutations to the source collection.
+*/
+func TestTradeHistory_MatchingOpenTrades(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   []Trade
+		entryID string
+		wantLen int
+		wantIDs []string
+	}{
+		{
+			name:    "empty_history_returns_empty",
+			setup:   nil,
+			entryID: "x",
+			wantLen: 0,
+		},
+		{
+			name:    "no_matching_id_returns_empty",
+			setup:   []Trade{{EntryID: "a"}, {EntryID: "b"}},
+			entryID: "x",
+			wantLen: 0,
+		},
+		{
+			name:    "single_exact_match",
+			setup:   []Trade{{EntryID: "a", Size: 10}},
+			entryID: "a",
+			wantLen: 1, wantIDs: []string{"a"},
+		},
+		{
+			name:    "multiple_same_id_all_returned",
+			setup:   []Trade{{EntryID: "a"}, {EntryID: "a"}, {EntryID: "a"}},
+			entryID: "a",
+			wantLen: 3, wantIDs: []string{"a", "a", "a"},
+		},
+		{
+			name:    "mixed_ids_returns_matching_subset_preserving_order",
+			setup:   []Trade{{EntryID: "a"}, {EntryID: "b"}, {EntryID: "a"}},
+			entryID: "a",
+			wantLen: 2, wantIDs: []string{"a", "a"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := NewTradeHistory()
+			for _, tr := range tt.setup {
+				th.AddOpenTrade(tr)
+			}
+
+			result := th.MatchingOpenTrades(tt.entryID)
+
+			if len(result) != tt.wantLen {
+				t.Fatalf("len: got %d, want %d", len(result), tt.wantLen)
+			}
+			for i, wantID := range tt.wantIDs {
+				if result[i].EntryID != wantID {
+					t.Errorf("result[%d].EntryID: got %q, want %q", i, result[i].EntryID, wantID)
+				}
+			}
+		})
+	}
+}
+
+/*
+TestTradeHistory_MatchingOpenTrades_ResultIsIndependentCopy verifies that mutating the
+returned slice does not affect the underlying open trade collection.
+*/
+func TestTradeHistory_MatchingOpenTrades_ResultIsIndependentCopy(t *testing.T) {
+	th := NewTradeHistory()
+	th.AddOpenTrade(Trade{EntryID: "a", Size: 10})
+	th.AddOpenTrade(Trade{EntryID: "a", Size: 20})
+
+	result := th.MatchingOpenTrades("a")
+	result[0].EntryID = "mutated"
+
+	open := th.GetOpenTrades()
+	if open[0].EntryID != "a" {
+		t.Errorf("mutating result affected source: got %q, want %q", open[0].EntryID, "a")
+	}
+}
+
+/*
+TestTradeHistory_AllOpenTradesSnapshot verifies the unfiltered safe snapshot: empty history,
+single trade, multiple trades, and result isolation from subsequent mutations.
+*/
+func TestTradeHistory_AllOpenTradesSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   []Trade
+		wantLen int
+		wantIDs []string
+	}{
+		{
+			name:    "empty_history_returns_empty",
+			setup:   nil,
+			wantLen: 0,
+		},
+		{
+			name:    "single_trade_returned",
+			setup:   []Trade{{EntryID: "a", Size: 10}},
+			wantLen: 1, wantIDs: []string{"a"},
+		},
+		{
+			name:    "multiple_trades_all_returned_preserving_insertion_order",
+			setup:   []Trade{{EntryID: "a"}, {EntryID: "b"}, {EntryID: "c"}},
+			wantLen: 3, wantIDs: []string{"a", "b", "c"},
+		},
+		{
+			name:    "duplicate_ids_all_returned_preserving_insertion_order",
+			setup:   []Trade{{EntryID: "x"}, {EntryID: "x"}, {EntryID: "y"}, {EntryID: "x"}},
+			wantLen: 4, wantIDs: []string{"x", "x", "y", "x"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := NewTradeHistory()
+			for _, tr := range tt.setup {
+				th.AddOpenTrade(tr)
+			}
+
+			result := th.AllOpenTradesSnapshot()
+
+			if len(result) != tt.wantLen {
+				t.Fatalf("len: got %d, want %d", len(result), tt.wantLen)
+			}
+			for i, wantID := range tt.wantIDs {
+				if result[i].EntryID != wantID {
+					t.Errorf("result[%d].EntryID: got %q, want %q", i, result[i].EntryID, wantID)
+				}
+			}
+		})
+	}
+}
+
+/*
+TestTradeHistory_AllOpenTradesSnapshot_ResultIsIndependentCopy verifies that mutating the
+returned slice does not affect the underlying open trade collection.
+*/
+func TestTradeHistory_AllOpenTradesSnapshot_ResultIsIndependentCopy(t *testing.T) {
+	th := NewTradeHistory()
+	th.AddOpenTrade(Trade{EntryID: "a", Size: 10})
+	th.AddOpenTrade(Trade{EntryID: "b", Size: 20})
+
+	result := th.AllOpenTradesSnapshot()
+	result[0].EntryID = "mutated"
+
+	open := th.GetOpenTrades()
+	if open[0].EntryID != "a" {
+		t.Errorf("mutating result affected source: got %q, want %q", open[0].EntryID, "a")
 	}
 }
 

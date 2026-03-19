@@ -84,6 +84,9 @@ func TestArrowBuiltinSubscript_RegistryCompleteness(t *testing.T) {
 	for _, name := range registry.DerivedPriceNames() {
 		allSeriesBuiltins[name] = true
 	}
+	for _, name := range registry.IntegerSeriesBuiltinNames() {
+		allSeriesBuiltins[name] = true
+	}
 	for _, name := range registry.TimeSeriesBuiltinNames() {
 		allSeriesBuiltins[name] = true
 	}

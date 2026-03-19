@@ -32,11 +32,51 @@ func (i *IfStatementConverter) Convert(stmt *Statement) (ast.Node, error) {
 		return nil, err
 	}
 
+	alternate, err := i.convertElseClause(stmt.Core.If.ElseClause)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ast.IfStatement{
 		NodeType:   ast.TypeIfStatement,
 		Test:       test,
 		Consequent: consequent,
-		Alternate:  []ast.Node{},
+		Alternate:  alternate,
+	}, nil
+}
+
+func (i *IfStatementConverter) convertElseClause(ec *ElseClause) ([]ast.Node, error) {
+	if ec == nil {
+		return []ast.Node{}, nil
+	}
+	if ec.ElseIf != nil {
+		node, err := i.convertIfGrammarNode(ec.ElseIf)
+		if err != nil {
+			return nil, err
+		}
+		return []ast.Node{node}, nil
+	}
+	return i.convertBody(ec.ElseBody)
+}
+
+func (i *IfStatementConverter) convertIfGrammarNode(ifGram *IfStatement) (ast.Node, error) {
+	test, err := i.orExprConverter(ifGram.Condition)
+	if err != nil {
+		return nil, err
+	}
+	consequent, err := i.convertBody(ifGram.Body)
+	if err != nil {
+		return nil, err
+	}
+	alternate, err := i.convertElseClause(ifGram.ElseClause)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.IfStatement{
+		NodeType:   ast.TypeIfStatement,
+		Test:       test,
+		Consequent: consequent,
+		Alternate:  alternate,
 	}, nil
 }
 

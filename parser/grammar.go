@@ -41,10 +41,16 @@ type StatementCore struct {
 }
 
 type IfStatement struct {
-	Condition *OrExpr      `parser:"'if' @@"`
-	Indent    *string      `parser:"@Indent"`
-	Body      []*Statement `parser:"@@+"`
-	Dedent    *string      `parser:"@Dedent"`
+	Condition  *OrExpr      `parser:"'if' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	ElseClause *ElseClause  `parser:"( @@ )?"`
+}
+
+type ElseClause struct {
+	ElseIf   *IfStatement `parser:"'else' ( @@"`
+	ElseBody []*Statement `parser:"| Indent @@+ Dedent )"`
 }
 
 type ForStatement struct {
@@ -140,10 +146,11 @@ type ForInExpr struct {
 }
 
 type IfExpr struct {
-	Condition *OrExpr      `parser:"'if' @@"`
-	Indent    *string      `parser:"@Indent"`
-	Body      []*Statement `parser:"@@+"`
-	Dedent    *string      `parser:"@Dedent"`
+	Condition  *OrExpr      `parser:"'if' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	ElseClause *ElseClause  `parser:"( @@ )?"`
 }
 
 type SwitchExpr struct {

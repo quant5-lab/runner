@@ -5,7 +5,6 @@ import (
 	"math"
 )
 
-/* Direction constants */
 const (
 	Long  = "long"
 	Short = "short"
@@ -33,7 +32,6 @@ const (
 	CommissionCashPerContract = "cash_per_contract"
 )
 
-/* Trade represents a single trade (open or closed) */
 type Trade struct {
 	EntryID      string  `json:"entryId"`
 	ExitID       string  `json:"exitId"`
@@ -53,7 +51,6 @@ type Trade struct {
 	Commission   float64 `json:"commission"`
 }
 
-/* Order represents a pending order - unified for entry and close operations */
 type Order struct {
 	ID           string
 	ExitID       string // Semantic exit ID propagated to Trade.ExitID on fill
@@ -67,13 +64,11 @@ type Order struct {
 	ExitComment  string // Comment for close orders
 }
 
-/* OrderManager manages pending orders */
 type OrderManager struct {
 	orders      []Order
 	nextOrderID int
 }
 
-/* NewOrderManager creates a new order manager */
 func NewOrderManager() *OrderManager {
 	return &OrderManager{
 		orders:      []Order{},
@@ -81,7 +76,6 @@ func NewOrderManager() *OrderManager {
 	}
 }
 
-/* CreateEntryOrder creates a pending entry order */
 func (om *OrderManager) CreateEntryOrder(id, direction string, qty float64, createdBar int, comment string) Order {
 	om.removeOrderByID(id)
 
@@ -98,7 +92,6 @@ func (om *OrderManager) CreateEntryOrder(id, direction string, qty float64, crea
 	return order
 }
 
-/* CreateCloseOrder creates a pending close order for specific entry */
 func (om *OrderManager) CreateCloseOrder(exitID, fromEntry string, createdBar int, comment string) Order {
 	orderID := fmt.Sprintf("_close_%s_%d", fromEntry, createdBar)
 	om.removeOrderByID(orderID)
@@ -116,7 +109,6 @@ func (om *OrderManager) CreateCloseOrder(exitID, fromEntry string, createdBar in
 	return order
 }
 
-/* CreateCloseAllOrder creates a pending close-all order */
 func (om *OrderManager) CreateCloseAllOrder(createdBar int, comment string) Order {
 	orderID := fmt.Sprintf("_close_all_%d", createdBar)
 	om.removeOrderByID(orderID)
@@ -137,7 +129,6 @@ func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBa
 	return om.CreateEntryOrder(id, direction, qty, createdBar, comment)
 }
 
-/* CreateNetOrder creates a pending strategy.order (net-position) order */
 func (om *OrderManager) CreateNetOrder(id, direction string, qty float64, createdBar int, comment string) Order {
 	om.removeOrderByID(id)
 
@@ -163,7 +154,6 @@ func (om *OrderManager) removeOrderByID(id string) {
 	}
 }
 
-/* GetPendingOrders returns orders ready to execute */
 func (om *OrderManager) GetPendingOrders(currentBar int) []Order {
 	pending := []Order{}
 	for _, order := range om.orders {
@@ -174,7 +164,6 @@ func (om *OrderManager) GetPendingOrders(currentBar int) []Order {
 	return pending
 }
 
-/* RemoveOrder removes an order by ID */
 func (om *OrderManager) RemoveOrder(id string) {
 	for i, order := range om.orders {
 		if order.ID == id {
@@ -188,28 +177,23 @@ func (om *OrderManager) ClearAll() {
 	om.orders = om.orders[:0]
 }
 
-/* PositionTracker tracks current position */
 type PositionTracker struct {
 	positionSize     float64
 	positionAvgPrice float64
 	totalCost        float64
 }
 
-/* NewPositionTracker creates a new position tracker */
 func NewPositionTracker() *PositionTracker {
 	return &PositionTracker{}
 }
 
-/* UpdatePosition updates position from trade */
 func (pt *PositionTracker) UpdatePosition(qty, price float64, direction string) {
 	sizeChange := qty
 	if direction == Short {
 		sizeChange = -qty
 	}
 
-	// Check if closing or opening position
 	if (pt.positionSize > 0 && sizeChange < 0) || (pt.positionSize < 0 && sizeChange > 0) {
-		// Closing or reducing position
 		pt.positionSize += sizeChange
 		if pt.positionSize == 0 {
 			pt.positionAvgPrice = 0
@@ -218,7 +202,6 @@ func (pt *PositionTracker) UpdatePosition(qty, price float64, direction string) 
 			pt.totalCost = pt.positionAvgPrice * abs(pt.positionSize)
 		}
 	} else {
-		// Opening or adding to position
 		addedCost := qty * price
 		pt.totalCost += addedCost
 		pt.positionSize += sizeChange
@@ -230,23 +213,19 @@ func (pt *PositionTracker) UpdatePosition(qty, price float64, direction string) 
 	}
 }
 
-/* GetPositionSize returns current position size */
 func (pt *PositionTracker) GetPositionSize() float64 {
 	return pt.positionSize
 }
 
-/* GetAvgPrice returns average entry price */
 func (pt *PositionTracker) GetAvgPrice() float64 {
 	return pt.positionAvgPrice
 }
 
-/* TradeHistory tracks open and closed trades */
 type TradeHistory struct {
 	openTrades   []Trade
 	closedTrades []Trade
 }
 
-/* NewTradeHistory creates a new trade history */
 func NewTradeHistory() *TradeHistory {
 	return &TradeHistory{
 		openTrades:   []Trade{},
@@ -254,7 +233,6 @@ func NewTradeHistory() *TradeHistory {
 	}
 }
 
-/* AddOpenTrade adds a new open trade */
 func (th *TradeHistory) AddOpenTrade(trade Trade) {
 	th.openTrades = append(th.openTrades, trade)
 }
@@ -287,7 +265,6 @@ func buildClosedTrade(open Trade, closeSize, profit, commission, metricsScale fl
 	}
 }
 
-/* CloseTrade closes a trade by entry ID */
 func (th *TradeHistory) CloseTrade(entryID, exitID string, exitPrice float64, exitBar int, exitTime int64, exitComment string, exitCommission float64) *Trade {
 	for i, trade := range th.openTrades {
 		if trade.EntryID == entryID {
@@ -343,17 +320,28 @@ func (th *TradeHistory) PartialCloseTrades(direction, exitID string, qty, exitPr
 	return qty - remaining, newlyClosed
 }
 
-/* GetOpenTrades returns open trades */
 func (th *TradeHistory) GetOpenTrades() []Trade {
 	return th.openTrades
 }
 
-/* GetClosedTrades returns closed trades */
+func (th *TradeHistory) MatchingOpenTrades(entryID string) []Trade {
+	var matching []Trade
+	for _, trade := range th.openTrades {
+		if trade.EntryID == entryID {
+			matching = append(matching, trade)
+		}
+	}
+	return matching
+}
+
+func (th *TradeHistory) AllOpenTradesSnapshot() []Trade {
+	return append([]Trade{}, th.openTrades...)
+}
+
 func (th *TradeHistory) GetClosedTrades() []Trade {
 	return th.closedTrades
 }
 
-/* UpdateOpenTradeMetrics updates MaxDrawdown and MaxRunup for all open trades based on bar data */
 func (th *TradeHistory) UpdateOpenTradeMetrics(barHigh, barLow float64) {
 	for i := range th.openTrades {
 		trade := &th.openTrades[i]
@@ -380,13 +368,11 @@ func (th *TradeHistory) UpdateOpenTradeMetrics(barHigh, barLow float64) {
 	}
 }
 
-/* EquityCalculator calculates equity */
 type EquityCalculator struct {
 	initialCapital float64
 	realizedProfit float64
 }
 
-/* NewEquityCalculator creates a new equity calculator */
 func NewEquityCalculator(initialCapital float64) *EquityCalculator {
 	return &EquityCalculator{
 		initialCapital: initialCapital,
@@ -394,22 +380,18 @@ func NewEquityCalculator(initialCapital float64) *EquityCalculator {
 	}
 }
 
-/* UpdateFromClosedTrade updates realized profit from closed trade */
 func (ec *EquityCalculator) UpdateFromClosedTrade(trade Trade) {
 	ec.realizedProfit += trade.Profit
 }
 
-/* GetEquity returns current equity including unrealized profit */
 func (ec *EquityCalculator) GetEquity(unrealizedProfit float64) float64 {
 	return ec.initialCapital + ec.realizedProfit + unrealizedProfit
 }
 
-/* GetNetProfit returns realized profit */
 func (ec *EquityCalculator) GetNetProfit() float64 {
 	return ec.realizedProfit
 }
 
-/* Strategy implements strategy operations */
 type Strategy struct {
 	context           interface{} // Context with OHLCV data
 	orderManager      *OrderManager
@@ -638,7 +620,6 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, com
 		return
 	}
 
-	// Verify trade exists before creating close order
 	openTrades := s.tradeHistory.GetOpenTrades()
 	for _, trade := range openTrades {
 		if trade.EntryID == id {
@@ -649,27 +630,23 @@ func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, com
 	}
 }
 
-/* executeCloseOrder executes a close order at given price - internal use only */
-func (s *Strategy) executeCloseOrder(exitID, entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
-	openTrades := s.tradeHistory.GetOpenTrades()
-	for _, trade := range openTrades {
-		if trade.EntryID == entryID {
-			exitCommission := s.calcCommission(trade.Size, fillPrice)
-			closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, exitID, fillPrice, fillBar, fillTime, comment, exitCommission)
-			if closedTrade != nil {
-				// Update position tracker
-				oppositeDir := Long
-				if trade.Direction == Long {
-					oppositeDir = Short
-				}
-				s.positionTracker.UpdatePosition(trade.Size, fillPrice, oppositeDir)
-
-				// Update equity
-				s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
+func (s *Strategy) closeTrades(trades []Trade, exitID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
+	for _, trade := range trades {
+		exitCommission := s.calcCommission(trade.Size, fillPrice)
+		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, exitID, fillPrice, fillBar, fillTime, comment, exitCommission)
+		if closedTrade != nil {
+			oppositeDir := Long
+			if trade.Direction == Long {
+				oppositeDir = Short
 			}
-			return
+			s.positionTracker.UpdatePosition(trade.Size, fillPrice, oppositeDir)
+			s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
 		}
 	}
+}
+
+func (s *Strategy) executeCloseOrder(exitID, entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
+	s.closeTrades(s.tradeHistory.MatchingOpenTrades(entryID), exitID, fillPrice, fillBar, fillTime, comment)
 }
 
 /* CloseAll creates a pending close-all order - fills at next bar open per TradingView model */
@@ -678,31 +655,13 @@ func (s *Strategy) CloseAll(currentPrice float64, currentTime int64, comment str
 		return
 	}
 
-	// Only create close-all order if there are open trades
-	openTrades := s.tradeHistory.GetOpenTrades()
-	if len(openTrades) > 0 {
+	if len(s.tradeHistory.GetOpenTrades()) > 0 {
 		s.orderManager.CreateCloseAllOrder(s.currentBar, comment)
 	}
 }
 
-/* executeCloseAllOrder executes a close-all order at given price - internal use only */
 func (s *Strategy) executeCloseAllOrder(fillPrice float64, fillBar int, fillTime int64, comment string) {
-	openTrades := s.tradeHistory.GetOpenTrades()
-	for _, trade := range openTrades {
-		exitCommission := s.calcCommission(trade.Size, fillPrice)
-		closedTrade := s.tradeHistory.CloseTrade(trade.EntryID, "", fillPrice, fillBar, fillTime, comment, exitCommission)
-		if closedTrade != nil {
-			// Update position tracker
-			oppositeDir := Long
-			if trade.Direction == Long {
-				oppositeDir = Short
-			}
-			s.positionTracker.UpdatePosition(trade.Size, fillPrice, oppositeDir)
-
-			// Update equity
-			s.equityCalculator.UpdateFromClosedTrade(*closedTrade)
-		}
-	}
+	s.closeTrades(s.tradeHistory.AllOpenTradesSnapshot(), "", fillPrice, fillBar, fillTime, comment)
 }
 
 /* Exit exits with stop/limit orders (simplified - just closes) */
@@ -726,7 +685,6 @@ func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLeve
 		return
 	}
 
-	// Find open trade by entry ID
 	openTrades := s.tradeHistory.GetOpenTrades()
 	var trade *Trade
 	for i := range openTrades {
@@ -808,7 +766,6 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	}
 }
 
-/* OnBarMetrics updates per-trade MaxDrawdown and MaxRunup using bar high/low data */
 func (s *Strategy) OnBarMetrics(barHigh, barLow float64) {
 	if !s.initialized {
 		return
@@ -816,12 +773,10 @@ func (s *Strategy) OnBarMetrics(barHigh, barLow float64) {
 	s.tradeHistory.UpdateOpenTradeMetrics(barHigh, barLow)
 }
 
-/* GetPositionSize returns current position size */
 func (s *Strategy) GetPositionSize() float64 {
 	return s.positionTracker.GetPositionSize()
 }
 
-/* GetPositionAvgPrice returns average entry price */
 func (s *Strategy) GetPositionAvgPrice() float64 {
 	avgPrice := s.positionTracker.GetAvgPrice()
 	if avgPrice == 0 {
@@ -830,7 +785,6 @@ func (s *Strategy) GetPositionAvgPrice() float64 {
 	return avgPrice
 }
 
-/* GetEquity returns current equity including unrealized P&L */
 func (s *Strategy) GetEquity(currentPrice float64) float64 {
 	unrealizedPL := 0.0
 	openTrades := s.tradeHistory.GetOpenTrades()
@@ -847,17 +801,14 @@ func (s *Strategy) GetEquity(currentPrice float64) float64 {
 	return s.equityCalculator.GetEquity(unrealizedPL)
 }
 
-/* Equity returns current equity */
 func (s *Strategy) Equity() float64 {
 	return s.GetEquity(s.currentPrice)
 }
 
-/* GetNetProfit returns realized profit */
 func (s *Strategy) GetNetProfit() float64 {
 	return s.equityCalculator.GetNetProfit()
 }
 
-/* GetTradeHistory returns trade history (for chart data export) */
 func (s *Strategy) GetTradeHistory() *TradeHistory {
 	return s.tradeHistory
 }
@@ -906,7 +857,6 @@ func (s *Strategy) GetAvgLosingTrade() float64 {
 	return AvgLosingTrade(s.tradeHistory.GetClosedTrades())
 }
 
-/* Helper function */
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x

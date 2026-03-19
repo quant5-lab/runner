@@ -487,8 +487,7 @@ plot(tally(20))
 `,
 			mustContainAll: []string{
 				"upsSeries.Set((upsSeries.GetCurrent() + 1))",
-				"downs = (downsSeries.GetCurrent() + 1)",
-				"downsSeries.Set(downs)",
+				"downsSeries.Set((downsSeries.GetCurrent() + 1))",
 			},
 			forbiddenPattern: []string{
 				"ups := (ups + 1)",

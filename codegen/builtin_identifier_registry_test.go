@@ -91,7 +91,7 @@ func TestBuiltinIdentifierRegistry_IsOHLCVField(t *testing.T) {
 		{"low is OHLCV", "low", true},
 		{"volume is OHLCV", "volume", true},
 		{"tr is OHLCV", "tr", true},
-		{"bar_index is OHLCV", "bar_index", true},
+		{"bar_index is not OHLCV", "bar_index", false},
 		{"hl2 not OHLCV", "hl2", false},
 		{"hlc3 not OHLCV", "hlc3", false},
 		{"ohlc4 not OHLCV", "ohlc4", false},
@@ -110,6 +110,36 @@ func TestBuiltinIdentifierRegistry_IsOHLCVField(t *testing.T) {
 	}
 }
 
+func TestBuiltinIdentifierRegistry_IsIntegerSeriesBuiltin(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"bar_index is integer series", "bar_index", true},
+		{"close is not integer series", "close", false},
+		{"tr is not integer series", "tr", false},
+		{"time is not integer series", "time", false},
+		{"hl2 is not integer series", "hl2", false},
+		{"last_bar_index is not integer series", "last_bar_index", false},
+		{"n v3 alias is not integer series directly", "n", false},
+		{"BAR_INDEX uppercase is not integer series", "BAR_INDEX", false},
+		{"user_var is not integer series", "user_var", false},
+		{"empty string is not integer series", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := registry.IsIntegerSeriesBuiltin(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsIntegerSeriesBuiltin(%s) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
 
@@ -122,6 +152,7 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 			isBuiltin := registry.IsBuiltinSeriesIdentifier(builtin)
 			isDerived := registry.IsDerivedPrice(builtin)
 			isOHLCV := registry.IsOHLCVField(builtin)
+			isIntegerSeries := registry.IsIntegerSeriesBuiltin(builtin)
 			isTimeSeries := registry.IsTimeSeriesBuiltin(builtin)
 			isCalendar := registry.IsCalendarBuiltin(builtin)
 
@@ -136,6 +167,9 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 			if isOHLCV {
 				categories++
 			}
+			if isIntegerSeries {
+				categories++
+			}
 			if isTimeSeries {
 				categories++
 			}
@@ -144,8 +178,8 @@ func TestBuiltinIdentifierRegistry_MutualExclusivity(t *testing.T) {
 			}
 
 			if categories != 1 {
-				t.Errorf("%s must belong to exactly one category (derived=%v, ohlcv=%v, timeSeries=%v, calendar=%v)",
-					builtin, isDerived, isOHLCV, isTimeSeries, isCalendar)
+				t.Errorf("%s must belong to exactly one category (derived=%v, ohlcv=%v, integerSeries=%v, timeSeries=%v, calendar=%v)",
+					builtin, isDerived, isOHLCV, isIntegerSeries, isTimeSeries, isCalendar)
 			}
 		})
 	}
@@ -297,16 +331,66 @@ func TestBuiltinIdentifierRegistry_IsConstantBuiltin(t *testing.T) {
 		})
 	}
 
-	/* constant builtins must NOT be series identifiers */
-	if registry.IsBuiltinSeriesIdentifier("last_bar_index") {
-		t.Error("last_bar_index should not be a series identifier")
+}
+
+func TestBuiltinIdentifierRegistry_ConstantBuiltinsExcludedFromSeriesCategories(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	constants := []string{"last_bar_index", "last_bar_time", "timenow"}
+
+	for _, name := range constants {
+		t.Run(name, func(t *testing.T) {
+			if registry.IsBuiltinSeriesIdentifier(name) {
+				t.Errorf("%s: IsBuiltinSeriesIdentifier = true, constant builtins must not be series", name)
+			}
+			if registry.IsOHLCVField(name) {
+				t.Errorf("%s: IsOHLCVField = true, want false", name)
+			}
+			if registry.IsIntegerSeriesBuiltin(name) {
+				t.Errorf("%s: IsIntegerSeriesBuiltin = true, want false", name)
+			}
+			if registry.IsTimeSeriesBuiltin(name) {
+				t.Errorf("%s: IsTimeSeriesBuiltin = true, want false", name)
+			}
+			if registry.IsCalendarBuiltin(name) {
+				t.Errorf("%s: IsCalendarBuiltin = true, want false", name)
+			}
+			if registry.IsDerivedPrice(name) {
+				t.Errorf("%s: IsDerivedPrice = true, want false", name)
+			}
+		})
 	}
 }
 
-/*
-TestBuiltinIdentifierRegistry_ResolveAlias validates that Pine v3→v4 identifier aliases
-resolve correctly. ResolveAlias is identity-preserving: non-alias names return unchanged.
-*/
+func TestBuiltinIdentifierRegistry_IntegerSeriesBuiltinNames(t *testing.T) {
+	registry := NewBuiltinIdentifierRegistry()
+
+	names := registry.IntegerSeriesBuiltinNames()
+
+	if len(names) == 0 {
+		t.Fatal("IntegerSeriesBuiltinNames() returned empty — enumeration broken")
+	}
+
+	nameSet := make(map[string]bool, len(names))
+	for _, name := range names {
+		if nameSet[name] {
+			t.Errorf("IntegerSeriesBuiltinNames() returned duplicate: %q", name)
+		}
+		nameSet[name] = true
+
+		if !registry.IsIntegerSeriesBuiltin(name) {
+			t.Errorf("%q returned by IntegerSeriesBuiltinNames() but IsIntegerSeriesBuiltin = false", name)
+		}
+		if !registry.IsBuiltinSeriesIdentifier(name) {
+			t.Errorf("%q returned by IntegerSeriesBuiltinNames() but IsBuiltinSeriesIdentifier = false", name)
+		}
+	}
+
+	if !nameSet["bar_index"] {
+		t.Error("IntegerSeriesBuiltinNames() must contain bar_index")
+	}
+}
+
 func TestBuiltinIdentifierRegistry_ResolveAlias(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
 
@@ -333,11 +417,6 @@ func TestBuiltinIdentifierRegistry_ResolveAlias(t *testing.T) {
 	}
 }
 
-/*
-TestBuiltinIdentifierRegistry_AliasedIdentifierIsBuiltin validates that v3 alias names
-pass IsBuiltinSeriesIdentifier after alias resolution (i.e., 'n' → 'bar_index' → builtin).
-This ensures the alias + registry lookup pipeline works end-to-end.
-*/
 func TestBuiltinIdentifierRegistry_AliasedIdentifierIsBuiltin(t *testing.T) {
 	registry := NewBuiltinIdentifierRegistry()
 

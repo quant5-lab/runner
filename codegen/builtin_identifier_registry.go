@@ -10,29 +10,32 @@ type CalendarBuiltinInfo struct {
 type BuiltinIdentifierRegistry struct {
 	ohlcvFields           map[string]bool
 	derivedPrices         map[string]bool
+	integerSeriesBuiltins map[string]bool
 	timeSeriesBuiltins    map[string]bool
 	calendarBuiltins      map[string]CalendarBuiltinInfo
 	constantBuiltins      map[string]bool
 	sessionSeriesBuiltins map[string]bool
-	v3Aliases             map[string]string // Pine v3→v4 identifier renames (e.g. "n" → "bar_index")
+	v3Aliases             map[string]string
 }
 
 func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 	return &BuiltinIdentifierRegistry{
 		ohlcvFields: map[string]bool{
-			"close":     true,
-			"open":      true,
-			"high":      true,
-			"low":       true,
-			"volume":    true,
-			"tr":        true,
-			"bar_index": true,
+			"close":  true,
+			"open":   true,
+			"high":   true,
+			"low":    true,
+			"volume": true,
+			"tr":     true,
 		},
 		derivedPrices: map[string]bool{
 			"hl2":   true,
 			"hlc3":  true,
 			"ohlc4": true,
 			"hlcc4": true,
+		},
+		integerSeriesBuiltins: map[string]bool{
+			"bar_index": true,
 		},
 		timeSeriesBuiltins: map[string]bool{
 			"time":            true,
@@ -61,12 +64,11 @@ func NewBuiltinIdentifierRegistry() *BuiltinIdentifierRegistry {
 			"session.islastbar_regular":  true,
 		},
 		v3Aliases: map[string]string{
-			"n": "bar_index", // Pine v3 name for bar_index
+			"n": "bar_index",
 		},
 	}
 }
 
-/* ResolveAlias translates a Pine v3 identifier name to its canonical v4+ equivalent, or returns it unchanged. */
 func (r *BuiltinIdentifierRegistry) ResolveAlias(name string) string {
 	if resolved, ok := r.v3Aliases[name]; ok {
 		return resolved
@@ -75,7 +77,7 @@ func (r *BuiltinIdentifierRegistry) ResolveAlias(name string) string {
 }
 
 func (r *BuiltinIdentifierRegistry) IsBuiltinSeriesIdentifier(name string) bool {
-	if r.ohlcvFields[name] || r.derivedPrices[name] || r.timeSeriesBuiltins[name] {
+	if r.ohlcvFields[name] || r.derivedPrices[name] || r.integerSeriesBuiltins[name] || r.timeSeriesBuiltins[name] {
 		return true
 	}
 	_, isCalendar := r.calendarBuiltins[name]
@@ -88,6 +90,10 @@ func (r *BuiltinIdentifierRegistry) IsDerivedPrice(name string) bool {
 
 func (r *BuiltinIdentifierRegistry) IsOHLCVField(name string) bool {
 	return r.ohlcvFields[name]
+}
+
+func (r *BuiltinIdentifierRegistry) IsIntegerSeriesBuiltin(name string) bool {
+	return r.integerSeriesBuiltins[name]
 }
 
 func (r *BuiltinIdentifierRegistry) IsTimeSeriesBuiltin(name string) bool {
@@ -127,6 +133,14 @@ func (r *BuiltinIdentifierRegistry) OHLCVFieldNames() []string {
 func (r *BuiltinIdentifierRegistry) DerivedPriceNames() []string {
 	names := make([]string, 0, len(r.derivedPrices))
 	for name := range r.derivedPrices {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *BuiltinIdentifierRegistry) IntegerSeriesBuiltinNames() []string {
+	names := make([]string, 0, len(r.integerSeriesBuiltins))
+	for name := range r.integerSeriesBuiltins {
 		names = append(names, name)
 	}
 	return names
