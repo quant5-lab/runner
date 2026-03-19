@@ -85,14 +85,19 @@ func TestExpandTabs_LineEndings(t *testing.T) {
 			expected: "line1    \nline2    \nline3",
 		},
 		{
-			name:     "preserves CRLF newlines",
+			name:     "CRLF normalised to LF",
 			input:    "line1\t\r\nline2\t\r\nline3",
-			expected: "line1    \r\nline2    \r\nline3",
+			expected: "line1    \nline2    \nline3",
 		},
 		{
-			name:     "mixed line endings preserved",
+			name:     "mixed CR and LF normalised to LF",
 			input:    "line1\t\nline2\t\r\nline3",
-			expected: "line1    \nline2    \r\nline3",
+			expected: "line1    \nline2    \nline3",
+		},
+		{
+			name:     "bare CR stripped",
+			input:    "line1\rline2",
+			expected: "line1line2",
 		},
 	}
 

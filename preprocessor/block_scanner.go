@@ -2,6 +2,20 @@ package preprocessor
 
 import "strings"
 
+func getIndentation(line string) int {
+	count := 0
+	for _, ch := range line {
+		if ch == ' ' {
+			count++
+		} else if ch == '\t' {
+			count += 4
+		} else {
+			break
+		}
+	}
+	return count
+}
+
 type LineInfo struct {
 	Raw       string
 	Trimmed   string

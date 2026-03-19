@@ -1,38 +1,36 @@
 package codegen
 
-// SymbolInfo holds type information for a single variable
 type SymbolInfo struct {
 	Name string
 	Type VariableType
 }
 
-// SymbolTable tracks variable type information during code generation
-// Responsibility: Maintain variable→type mappings for type-aware code generation
 type SymbolTable interface {
-	// Register declares a variable with its type
 	Register(name string, varType VariableType)
 
-	// Lookup retrieves type information for a variable
-	// Returns VariableTypeUnknown if variable not registered
+	// Returns VariableTypeUnknown if the variable has not been registered.
 	Lookup(name string) VariableType
 
-	// IsSeries checks if a variable is of series type
 	IsSeries(name string) bool
 
-	// IsScalar checks if a variable is of scalar type
 	IsScalar(name string) bool
 
-	// Clone creates an independent copy for nested scopes
+	// Clone returns an independent copy so nested scopes cannot mutate the caller's table.
 	Clone() SymbolTable
 
-	// Merge combines symbols from another table (for scope hierarchies)
 	Merge(other SymbolTable)
 
-	// AllSymbols returns all registered symbols
 	AllSymbols() []SymbolInfo
 }
 
-// NewSymbolTable creates a new symbol table instance
+// Prevents nil-pointer panics when calling Clone on an uninitialised table.
+func cloneSymbolTable(src SymbolTable) SymbolTable {
+	if src == nil {
+		return nil
+	}
+	return src.Clone()
+}
+
 func NewSymbolTable() SymbolTable {
 	return &symbolTableImpl{
 		symbols: make(map[string]VariableType),

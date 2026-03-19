@@ -45,5 +45,6 @@ func NewV4ToV5Pipeline() *Pipeline {
 		Add(NewMathNamespaceTransformer()).
 		Add(NewRequestNamespaceTransformer()).
 		Add(NewTickerNamespaceTransformer()).
+		Add(NewV4BuiltinIdentifierTransformer()).
 		Add(NewStudyToIndicatorTransformer())
 }

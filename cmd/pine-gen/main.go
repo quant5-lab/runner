@@ -41,8 +41,6 @@ func main() {
 		sourceStr = transformInputTypeParameters(sourceStr)
 	}
 
-	sourceStr = preprocessor.NormalizeIfBlocks(sourceStr)
-
 	pineParser, err := parser.NewParser()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create parser: %v\n", err)

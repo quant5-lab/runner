@@ -1,8 +1,8 @@
 zigzag-pa (v4) — price action zigzag
 
 Parse: ✅ (v4→v5 preprocessing)
-Generate: ✅ (heikenashi→ticker.heikinashi via TickerNamespaceTransformer)
-Compile: ❌ (UDF-local variable series emission, bare `tickerid` variable, multiple undefined series)
-Execute: ❌ Not reached
+Generate: ✅ (heikenashi→ticker.heikinashi, bare tickerid→syminfo.tickerid, UDF scope isolation)
+Compile: ✅
+Execute: ⏳ (needs 60-min secondary data fixture for request.security)
 
-Blocker: #4 (remaining: UDF scope, bare identifiers)
+Blocker: #4 RESOLVED

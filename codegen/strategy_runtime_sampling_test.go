@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/quant5-lab/runner/parser"
-	"github.com/quant5-lab/runner/preprocessor"
 )
 
 /* TestStrategyRuntimeSamplingOrder validates execution order for strategy runtime state sampling */
@@ -20,8 +19,6 @@ if close > 100
 
 plot(posAvg)
 `
-
-	script = preprocessor.NormalizeIfBlocks(script)
 
 	pineParser, err := parser.NewParser()
 	if err != nil {
@@ -110,8 +107,6 @@ if close > sma20
 plot(sma20)
 `
 
-	script = preprocessor.NormalizeIfBlocks(script)
-
 	pineParser, err := parser.NewParser()
 	if err != nil {
 		t.Fatalf("Parser creation failed: %v", err)
@@ -158,8 +153,6 @@ plot(posAvg)
 plot(posSize)
 plot(eq)
 `
-
-	script = preprocessor.NormalizeIfBlocks(script)
 
 	pineParser, err := parser.NewParser()
 	if err != nil {

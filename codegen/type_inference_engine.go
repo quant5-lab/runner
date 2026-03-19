@@ -117,6 +117,9 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	if funcName == "ta.pivot_point_levels" || funcName == "pivot_point_levels" {
 		return "array_series"
 	}
+	if IsTickerConstructorFunction(funcName) {
+		return "string"
+	}
 	if retType := ColorFunctionReturnType(funcName); retType != "" {
 		return retType
 	}

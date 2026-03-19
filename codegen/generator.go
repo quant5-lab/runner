@@ -1608,6 +1608,13 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return fmt.Sprintf("float64(%s)", varName), nil
 		}
 
+		// Arrow resolver checked before variables: registered parameters take priority
+		if g.arrowAccessResolver != nil {
+			if access, resolved := g.arrowAccessResolver.ResolveAccess(varName); resolved {
+				return access, nil
+			}
+		}
+
 		/* User-declared variables shadow builtins (PineScript semantics) */
 		if _, exists := g.variables[varName]; exists {
 			if constVal, isConstant := g.constants[varName]; isConstant {

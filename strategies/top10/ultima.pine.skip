@@ -1,8 +1,8 @@
 BEST Strategy Template (v4) — full risk management framework
 
-Parse: ❌ (unexpected token "," at line 297 — preprocessor artifact)
-Generate: ❌ Not reached (first 300 lines: codegen fails with time() IIFE gap)
+Parse: ✅ (v4→v5 preprocessing, \r stripping, multiline continuation, expectingIndent reset)
+Generate: ❌ (time() IIFE not implemented — separate scope from Blocker #4)
 Compile: ❌ Not reached
 Execute: ❌ Not reached
 
-Blocker: #4 (v4→v5 preprocessor parse artifact at line 297), #9 (alert). Resolved: UDF/arrow scope, strategy.* API, str.*, input.*
+Blocker: #4 RESOLVED (parse/preprocess). Remaining: time() IIFE generator, #10 (alert)

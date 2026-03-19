@@ -68,7 +68,8 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 
 	a.localStorage = NewArrowLocalVariableStorage(a.gen.ind())
 	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
-	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen, a.gen.symbolTable)
+	arrowSymbolTable := cloneSymbolTable(a.gen.symbolTable)
+	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen, arrowSymbolTable)
 
 	body, err := a.generateFunctionBody(arrowFunc)
 	if err != nil {
