@@ -235,7 +235,8 @@ func TestSecurityATRGeneration(t *testing.T) {
 	}
 
 	// Inline ATR computation must NOT appear — it belongs in the bar evaluator, not the main loop.
-	inlineATRPatterns := []string{"Inline ATR", "alpha := 1.0 / 14", "prevATR :="}
+	// These patterns are what ATRHandler would generate if ta.atr were incorrectly inlined here.
+	inlineATRPatterns := []string{"Inline RMA(14)", "alpha := 1.0 / float64(14)", "currentSource :="}
 	for _, pattern := range inlineATRPatterns {
 		if strings.Contains(code, pattern) {
 			t.Errorf("Inline ATR pattern %q must not appear in main loop (evaluated by bar evaluator)\nGenerated code:\n%s", pattern, code)

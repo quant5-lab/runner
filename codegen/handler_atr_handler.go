@@ -32,5 +32,5 @@ func (h *ATRHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		return g.indentCode(code), nil
 	}
 
-	return g.generateInlineATR(varName, periodResult.StaticValue)
+	return g.generateRMA(varName, periodResult.StaticValue, NewTrueRangeAccessGenerator(), false)
 }

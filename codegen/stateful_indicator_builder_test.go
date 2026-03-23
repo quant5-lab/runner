@@ -87,56 +87,93 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 	builder := NewStatefulIndicatorBuilder("ta.rma", "rma10", P(10), mockAccessor, true, NewTopLevelIndicatorContext())
 	code := builder.BuildRMA()
 
-	t.Run("HasNaNCheckInInitialization", func(t *testing.T) {
+	t.Run("InitPhase_FlagPatternDeclaredBeforeLoop", func(t *testing.T) {
+		if !strings.Contains(code, "_sma_has_nan := false") {
+			t.Error("Missing _sma_has_nan flag declaration before initialization loop")
+		}
+	})
+
+	t.Run("InitPhase_LoopSetsFlag", func(t *testing.T) {
 		if !strings.Contains(code, "val := sourceSeries.Get(j)") {
 			t.Error("Missing value extraction in initialization loop")
 		}
 		if !strings.Contains(code, "if math.IsNaN(val)") {
-			t.Error("Missing NaN check in initialization")
+			t.Error("Missing NaN check in initialization loop")
+		}
+		if !strings.Contains(code, "_sma_has_nan = true") {
+			t.Error("Loop must set _sma_has_nan flag on NaN, not call Series.Set(NaN) inside loop")
 		}
 		if !strings.Contains(code, "break") {
-			t.Error("Missing break statement on NaN in initialization (should break loop, not return from function)")
+			t.Error("Loop must break on NaN detection")
 		}
 	})
 
-	t.Run("HasNaNCheckInRecursivePhase", func(t *testing.T) {
-		if !strings.Contains(code, "if math.IsNaN(currentSource)") {
-			t.Error("Missing NaN check for current source")
+	t.Run("InitPhase_PostLoopFlagGuardsOutput", func(t *testing.T) {
+		if !strings.Contains(code, "if _sma_has_nan {") {
+			t.Error("Missing post-loop flag guard for NaN output")
 		}
+		loopEnd := strings.Index(code, "}")
+		flagGuard := strings.Index(code, "if _sma_has_nan {")
+		if flagGuard != -1 && loopEnd != -1 && flagGuard < loopEnd {
+			t.Error("_sma_has_nan guard must appear after the initialization loop")
+		}
+	})
+
+	t.Run("RecursivePhase_CurrentSourceNaNPropagates", func(t *testing.T) {
+		if !strings.Contains(code, "if math.IsNaN(currentSource)") {
+			t.Error("Missing NaN check for current source in recursive phase")
+		}
+	})
+
+	t.Run("RecursivePhase_PrevNaNRecoversWithCurrentSource", func(t *testing.T) {
 		if !strings.Contains(code, "else if math.IsNaN(previousValue)") {
-			t.Error("Missing NaN recovery check for previous value")
+			t.Error("Missing previous-NaN branch in recursive phase")
+		}
+		// Both EMA and RMA now recover from NaN previous by using currentSource
+		prevNaNIdx := strings.Index(code, "else if math.IsNaN(previousValue)")
+		if prevNaNIdx == -1 {
+			t.Fatal("Missing else if math.IsNaN(previousValue)")
+		}
+		branchBody := code[prevNaNIdx:]
+		nextElse := strings.Index(branchBody, "} else {")
+		if nextElse == -1 {
+			t.Fatal("Cannot find closing } else { of prev-NaN branch")
+		}
+		branchBody = branchBody[:nextElse]
+		if !strings.Contains(branchBody, "currentSource") {
+			t.Error("RMA prev-NaN branch must recover using currentSource")
+		}
+		if strings.Contains(branchBody, "math.NaN()") {
+			t.Error("RMA prev-NaN branch must NOT propagate NaN — recovers with currentSource")
 		}
 	})
 }
 
-func TestStatefulIndicatorBuilder_EMA_Structure(t *testing.T) {
-	mockAccessor := &MockAccessGenerator{
-		loopAccessFn: func(loopVar string) string {
-			return "priceSeries.Get(" + loopVar + ")"
-		},
+func TestStatefulIndicatorBuilder_isEMAVariant(t *testing.T) {
+	tests := []struct {
+		indicatorName string
+		want          bool
+	}{
+		{"ta.ema", true},
+		{"ema", true},
+		{"ta.rma", false},
+		{"rma", false},
+		{"ta.atr", false},
+		{"atr", false},
+		{"ta.sma", false},
+		{"sma", false},
+		{"", false},
+		{"ema_trend", false},
 	}
 
-	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
-	code := builder.BuildEMA()
-	t.Logf("EMA code:\n%s", code)
-
-	t.Run("HasCorrectAlpha", func(t *testing.T) {
-		if !strings.Contains(code, "alpha := 2.0 / float64(20+1)") {
-			t.Error("EMA must use alpha = 2/(period+1), not 1/period")
-		}
-	})
-
-	t.Run("HasSameStructureAsRMA", func(t *testing.T) {
-		if !strings.Contains(code, "/* Inline EMA(20) - Stateful recursive calculation */") {
-			t.Error("Missing EMA header comment")
-		}
-		if !strings.Contains(code, "previousValue := ema20Series.Get(1)") {
-			t.Error("EMA must reference its own previous value")
-		}
-		if !strings.Contains(code, "newValue := alpha*currentSource + (1-alpha)*previousValue") {
-			t.Error("Missing EMA recursive formula")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.indicatorName, func(t *testing.T) {
+			got := isEMAVariant(tt.indicatorName)
+			if got != tt.want {
+				t.Errorf("isEMAVariant(%q) = %v, want %v", tt.indicatorName, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestStatefulIndicatorBuilder_DifferentPeriods(t *testing.T) {

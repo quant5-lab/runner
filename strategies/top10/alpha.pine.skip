@@ -3,6 +3,6 @@ AlphaTrend Strategy (v5) — ATR-based trend follower with MFI/RSI filter
 Parse: ✅
 Generate: ✅
 Compile: ✅
-Execute: ✅ (0 trades — series initial value 0.0 vs PineScript na causes nz() fixed point)
+Execute: ✅ (10 trades, equity $10,012.41)
 
-Blocker: ~~#1~~ resolved | #6 (self-referencing series init → 0 trades)
+Blocker: ~~#1~~ resolved | ~~#6~~ resolved (MFI internal series not advancing in temp var hoisting)

@@ -10,40 +10,20 @@ import (
 // Pine Script formula: sum := na(sum[1]) ? src : alpha * src + (1 - alpha) * nz(sum[1])
 // When previous EMA is NaN, should use current source as starting point.
 func TestEMANaNRecovery(t *testing.T) {
-	tests := []struct {
-		name              string
-		wantPrevNaNBranch string
-		wantElseBranch    string
-		description       string
-	}{
-		{
-			name:              "prevEMA NaN uses current source",
-			wantPrevNaNBranch: "testEmaSeries.Set(currentSource)",
-			wantElseBranch:    "alpha*currentSource",
-			description:       "When prevEMA is NaN, EMA should use current source value (Pine: na(sum[1]) ? src)",
-		},
+	accessor := NewOHLCVFieldAccessGenerator("Close")
+	context := NewTopLevelIndicatorContext()
+	builder := NewStatefulIndicatorBuilder("ta.ema", "testEma", P(20), accessor, true, context)
+
+	code := builder.BuildEMA()
+
+	if !strings.Contains(code, "if math.IsNaN(previousValue)") {
+		t.Error("Missing previousValue NaN check")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			accessor := NewOHLCVFieldAccessGenerator("Close")
-			context := NewTopLevelIndicatorContext()
-			builder := NewStatefulIndicatorBuilder("ta.ema", "testEma", P(20), accessor, true, context)
-
-			code := builder.BuildEMA()
-
-			if !strings.Contains(code, "if math.IsNaN(previousValue)") {
-				t.Error("Missing previousValue NaN check")
-			}
-
-			if !strings.Contains(code, tt.wantPrevNaNBranch) {
-				t.Errorf("Missing expected recovery pattern %q", tt.wantPrevNaNBranch)
-			}
-
-			if !strings.Contains(code, tt.wantElseBranch) {
-				t.Errorf("Missing expected EMA formula pattern %q", tt.wantElseBranch)
-			}
-		})
+	if !strings.Contains(code, "testEmaSeries.Set(currentSource)") {
+		t.Error("EMA prev-NaN recovery must use current source (Pine: na(sum[1]) ? src)")
+	}
+	if !strings.Contains(code, "alpha*currentSource") {
+		t.Error("EMA recursive formula must use alpha*currentSource")
 	}
 }
 
@@ -237,12 +217,124 @@ func TestEMAContextTypes(t *testing.T) {
 	}
 }
 
+// TestRMAvsEMA_PrevNaNBranchContract validates the prev-NaN branch of the recursive phase
+// for both the needsNaN=true (NaN guards present) and needsNaN=false (no guards) cases:
+//
+//	needsNaN=true:
+//	  - EMA: restarts from currentSource (Pine: na(sum[1]) ? src — defined recovery)
+//	  - RMA: propagates NaN (formula alpha*src+(1-alpha)*NaN = NaN — no recovery)
+//
+//	needsNaN=false (production path for ta.ema with OHLCV source):
+//	  - Neither indicator emits any NaN guards — the formula is applied directly.
+func TestRMAvsEMA_PrevNaNBranchContract(t *testing.T) {
+	tests := []struct {
+		name         string
+		indicator    string
+		buildFn      func(*StatefulIndicatorBuilder) string
+		needsNaN     bool
+		wantRecovery bool // only meaningful when needsNaN=true
+	}{
+		{
+			name:         "EMA recovers from NaN previous",
+			indicator:    "ta.ema",
+			buildFn:      func(b *StatefulIndicatorBuilder) string { return b.BuildEMA() },
+			needsNaN:     true,
+			wantRecovery: true,
+		},
+		{
+			name:         "EMA bare alias recovers from NaN previous",
+			indicator:    "ema",
+			buildFn:      func(b *StatefulIndicatorBuilder) string { return b.BuildEMA() },
+			needsNaN:     true,
+			wantRecovery: true,
+		},
+		{
+			name:         "RMA recovers from NaN previous with currentSource",
+			indicator:    "ta.rma",
+			buildFn:      func(b *StatefulIndicatorBuilder) string { return b.BuildRMA() },
+			needsNaN:     true,
+			wantRecovery: true,
+		},
+		{
+			name:         "RMA bare alias recovers from NaN previous with currentSource",
+			indicator:    "rma",
+			buildFn:      func(b *StatefulIndicatorBuilder) string { return b.BuildRMA() },
+			needsNaN:     true,
+			wantRecovery: true,
+		},
+		{
+			name:      "EMA needsNaN=false emits no NaN guards",
+			indicator: "ta.ema",
+			buildFn:   func(b *StatefulIndicatorBuilder) string { return b.BuildEMA() },
+			needsNaN:  false,
+		},
+		{
+			name:      "RMA needsNaN=false emits no NaN guards",
+			indicator: "ta.rma",
+			buildFn:   func(b *StatefulIndicatorBuilder) string { return b.BuildRMA() },
+			needsNaN:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			accessor := NewOHLCVFieldAccessGenerator("Close")
+			context := NewTopLevelIndicatorContext()
+			builder := NewStatefulIndicatorBuilder(tt.indicator, "testIndicator", P(14), accessor, tt.needsNaN, context)
+			code := tt.buildFn(builder)
+
+			if !tt.needsNaN {
+				if strings.Contains(code, "math.IsNaN(currentSource)") {
+					t.Errorf("%s needsNaN=false must not emit currentSource NaN guard\nCode: %s", tt.indicator, code)
+				}
+				if strings.Contains(code, "math.IsNaN(previousValue)") {
+					t.Errorf("%s needsNaN=false must not emit previousValue NaN guard\nCode: %s", tt.indicator, code)
+				}
+				return
+			}
+
+			prevNaNIdx := strings.Index(code, "else if math.IsNaN(previousValue)")
+			if prevNaNIdx == -1 {
+				t.Fatal("Missing 'else if math.IsNaN(previousValue)' branch in recursive phase")
+			}
+
+			// Extract branch body: content between the opening { and next } else {
+			afterBranch := code[prevNaNIdx:]
+			openBrace := strings.Index(afterBranch, "{")
+			if openBrace == -1 {
+				t.Fatal("Cannot find opening brace of prev-NaN branch")
+			}
+			closingElse := strings.Index(afterBranch[openBrace:], "} else {")
+			if closingElse == -1 {
+				t.Fatal("Cannot find '} else {' closing prev-NaN branch")
+			}
+			branchBody := afterBranch[openBrace : openBrace+closingElse]
+
+			if tt.wantRecovery {
+				if !strings.Contains(branchBody, "currentSource") {
+					t.Errorf("%s prev-NaN branch must use currentSource for recovery\nBranch body: %s", tt.indicator, branchBody)
+				}
+				if strings.Contains(branchBody, "math.NaN()") {
+					t.Errorf("%s prev-NaN branch must NOT propagate NaN — EMA recovers from currentSource\nBranch body: %s", tt.indicator, branchBody)
+				}
+			} else {
+				if !strings.Contains(branchBody, "math.NaN()") {
+					t.Errorf("%s prev-NaN branch must propagate math.NaN() — formula undefined when previous is NaN\nBranch body: %s", tt.indicator, branchBody)
+				}
+				if strings.Contains(branchBody, "currentSource") {
+					t.Errorf("%s prev-NaN branch must NOT recover from currentSource — that is EMA-specific semantics\nBranch body: %s", tt.indicator, branchBody)
+				}
+			}
+		})
+	}
+}
+
 // TestEMAEdgeCasePeriods validates EMA correctness for edge case periods.
 func TestEMAEdgeCasePeriods(t *testing.T) {
 	edgePeriods := []int{1, 2, 3, 200, 500}
 
 	for _, period := range edgePeriods {
-		t.Run(string(rune('0'+period/100))+string(rune('0'+(period/10)%10))+string(rune('0'+period%10)), func(t *testing.T) {
+		t.Run(fmt.Sprintf("period_%d", period), func(t *testing.T) {
 			accessor := NewOHLCVFieldAccessGenerator("Close")
 			context := NewTopLevelIndicatorContext()
 			generator := NewStatefulEMAGenerator("testEma", period, accessor, context)

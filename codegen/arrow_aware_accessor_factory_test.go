@@ -32,9 +32,9 @@ func TestArrowAwareAccessorFactory_TaTrMemberExpression(t *testing.T) {
 	}
 
 	// Verify accessor type
-	trAccessor, ok := accessor.(*BuiltinTrueRangeAccessor)
+	trAccessor, ok := accessor.(*TrueRangeAccessGenerator)
 	if !ok {
-		t.Fatalf("Expected *BuiltinTrueRangeAccessor, got %T", accessor)
+		t.Fatalf("Expected *TrueRangeAccessGenerator, got %T", accessor)
 	}
 
 	// Verify current value access
@@ -49,8 +49,8 @@ func TestArrowAwareAccessorFactory_TaTrMemberExpression(t *testing.T) {
 
 	// Verify loop value access
 	loopCode := trAccessor.GenerateLoopValueAccess("j")
-	if !strings.Contains(loopCode, "ctx.BarIndex-j") {
-		t.Errorf("GenerateLoopValueAccess() should contain ctx.BarIndex-j, got: %s", loopCode)
+	if !strings.Contains(loopCode, "ctx.BarIndex - j") {
+		t.Errorf("GenerateLoopValueAccess() should contain ctx.BarIndex - j, got: %s", loopCode)
 	}
 
 	if !strings.Contains(loopCode, "math.Max") {
@@ -84,8 +84,8 @@ func TestArrowAwareAccessorFactory_TrIdentifier(t *testing.T) {
 	}
 
 	// Verify it returns BuiltinTrueRangeAccessor
-	if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
-		t.Fatalf("Expected *BuiltinTrueRangeAccessor for tr identifier, got %T", accessor)
+	if _, ok := accessor.(*TrueRangeAccessGenerator); !ok {
+		t.Fatalf("Expected *TrueRangeAccessGenerator for tr identifier, got %T", accessor)
 	}
 }
 
@@ -107,7 +107,7 @@ func TestArrowAwareAccessorFactory_TrNotConfusedWithParameter(t *testing.T) {
 			t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
 		}
 
-		if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
+		if _, ok := accessor.(*TrueRangeAccessGenerator); !ok {
 			t.Errorf("tr should return BuiltinTrueRangeAccessor, got %T", accessor)
 		}
 	})
@@ -121,7 +121,7 @@ func TestArrowAwareAccessorFactory_TrNotConfusedWithParameter(t *testing.T) {
 		}
 
 		// Should NOT be BuiltinTrueRangeAccessor
-		if _, ok := accessor.(*BuiltinTrueRangeAccessor); ok {
+		if _, ok := accessor.(*TrueRangeAccessGenerator); ok {
 			t.Errorf("my_tr parameter should not return BuiltinTrueRangeAccessor, got %T", accessor)
 		}
 	})

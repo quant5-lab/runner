@@ -299,6 +299,16 @@ func (m *TempVariableManager) GenerateNextCalls() string {
 
 	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("if i < barCount-1 { %sSeries.Next() }\n", varName)
+
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("if i < barCount-1 { %sSeries.Next() }\n", internalName)
+				}
+			}
+		}
 	}
 
 	return code

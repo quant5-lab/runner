@@ -219,6 +219,88 @@ func TestTypeInferenceEngine_InferType_CallExpression(t *testing.T) {
 			expected: "string",
 		},
 		{
+			name: "ta.cross returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "cross"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "fast"},
+					&ast.Identifier{Name: "slow"},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "ta.rising returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "rising"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: 3.0},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "ta.falling returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "falling"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "volume"},
+					&ast.Literal{Value: 2.0},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare crossover returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "crossover"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare crossunder returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "crossunder"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare cross returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "cross"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare rising returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "rising"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: 3.0}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare falling returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "falling"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: 3.0}},
+			},
+			expected: "bool",
+		},
+		{
 			name: "color.r returns float64",
 			expr: &ast.CallExpression{
 				Callee: &ast.MemberExpression{

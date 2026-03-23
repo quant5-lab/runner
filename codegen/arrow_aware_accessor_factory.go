@@ -71,7 +71,7 @@ func (f *ArrowAwareAccessorFactory) createIdentifierAccessor(id *ast.Identifier)
 	// Check builtins FIRST - they take precedence over local variables
 	// This prevents builtins like 'tr' from being mistakenly treated as Series variables
 	if id.Name == "tr" {
-		return NewBuiltinTrueRangeAccessor(), nil
+		return NewTrueRangeAccessGenerator(), nil
 	}
 
 	// Check OHLCV builtins - use arrow-specific accessor (ctx.Data pattern)
@@ -110,7 +110,7 @@ func (f *ArrowAwareAccessorFactory) createMemberAccessor(member *ast.MemberExpre
 	prop, okProp := member.Property.(*ast.Identifier)
 
 	if okProp && obj.Name == "ta" && prop.Name == "tr" {
-		return NewBuiltinTrueRangeAccessor(), nil
+		return NewTrueRangeAccessGenerator(), nil
 	}
 
 	if okProp && obj.Name == "ctx" {

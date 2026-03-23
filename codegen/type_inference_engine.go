@@ -108,7 +108,7 @@ func (te *TypeInferenceEngine) inferUnaryExpressionType(e *ast.UnaryExpression) 
 func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) string {
 	funcName := extractFunctionName(e.Callee)
 
-	if funcName == "ta.crossover" || funcName == "ta.crossunder" {
+	if isBoolReturningTAFunction(funcName) {
 		return "bool"
 	}
 	if funcName == "input.bool" {
@@ -150,6 +150,21 @@ func (te *TypeInferenceEngine) IsBoolConstant(name string) bool {
 func (te *TypeInferenceEngine) GetVariableType(name string) (string, bool) {
 	varType, exists := te.variables[name]
 	return varType, exists
+}
+
+// isBoolReturningTAFunction reports whether funcName is a ta.* function
+// whose return type is series bool per the Pine reference manual.
+// Pine guarantees bool is never na, so callers must use NewBoolSeries.
+func isBoolReturningTAFunction(funcName string) bool {
+	switch funcName {
+	case "ta.crossover", "crossover",
+		"ta.crossunder", "crossunder",
+		"ta.cross", "cross",
+		"ta.rising", "rising",
+		"ta.falling", "falling":
+		return true
+	}
+	return false
 }
 
 func extractFunctionName(callee ast.Expression) string {

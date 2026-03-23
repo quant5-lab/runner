@@ -2,35 +2,21 @@
   "version": "1.0",
   "strategy": "Arrow-ImplicitOHLC",
   "dataSource": "BTCUSDT_1D.json",
-  "generatedAt": "2026-02-01T12:10:44Z",
+  "generatedAt": "2026-03-23T06:57:39Z",
   "result": {
     "trades": [
       {
-        "entryId": "Long",
-        "entryBar": 20,
-        "entryTime": 1504656000,
-        "entryPrice": 4366.49,
-        "entryComment": "",
-        "exitBar": 23,
-        "exitTime": 1504915200,
-        "exitPrice": 4282.8,
-        "exitComment": "Position reversal",
-        "size": 1,
-        "profit": -83.6899999999996,
-        "direction": "long"
-      },
-      {
         "entryId": "Short",
-        "entryBar": 23,
-        "entryTime": 1504915200,
-        "entryPrice": 4282.8,
+        "entryBar": 33,
+        "entryTime": 1505779200,
+        "entryPrice": 4060,
         "entryComment": "",
         "exitBar": 60,
         "exitTime": 1508112000,
         "exitPrice": 5710,
         "exitComment": "Position reversal",
         "size": 1,
-        "profit": -1427.1999999999998,
+        "profit": -1650,
         "direction": "short"
       },
       {
@@ -1884,8 +1870,8 @@
         "direction": "short"
       }
     ],
-    "equity": 38130.919999999984,
-    "netProfit": 11934.499999999985,
+    "equity": 37991.80999999998,
+    "netProfit": 11795.389999999985,
     "totalTrades": 0,
     "plots": {}
   }

@@ -143,3 +143,49 @@ func TestBarsSinceHandler_RegisteredInTAFunctionRegistry(t *testing.T) {
 		}
 	}
 }
+
+func TestBarsSinceHandler_HistoricalSubscriptCondition(t *testing.T) {
+	handler := &BarsSinceHandler{}
+
+	tests := []struct {
+		name   string
+		offset int
+		want   string
+	}{
+		{"offset_1", 1, "signalSeries.Get(1)"},
+		{"offset_2", 2, "signalSeries.Get(2)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			g.variables["signal"] = "series"
+
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.barssince"},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "signal"},
+						Property: &ast.Literal{Value: float64(tt.offset)},
+						Computed: true,
+					},
+				},
+			}
+
+			code, err := handler.GenerateCode(g, "K1", call)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !strings.Contains(code, "value.IsTrue("+tt.want+")") {
+				t.Errorf("want value.IsTrue(%s), got:\n%s", tt.want, code)
+			}
+			if !strings.Contains(code, "K1Series.Set(0.0)") {
+				t.Errorf("missing counter reset in:\n%s", code)
+			}
+			if !strings.Contains(code, "K1Series.Set(math.NaN())") {
+				t.Errorf("missing NaN sentinel in:\n%s", code)
+			}
+		})
+	}
+}

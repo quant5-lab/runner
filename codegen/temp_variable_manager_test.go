@@ -305,6 +305,70 @@ func TestTempVariableManager_ExtractPeriod(t *testing.T) {
 	}
 }
 
+/* TestTempVariableManager_CompositeInternalSeriesAdvancement verifies that
+ * composite indicators hoisted to temp vars have their internal state series
+ * advanced alongside the primary series — ForwardSeriesBuffer paradigm requires
+ * every series that is Set() each bar to also call Next() at bar boundary.
+ */
+func TestTempVariableManager_CompositeInternalSeriesAdvancement(t *testing.T) {
+	cases := []struct {
+		name         string
+		funcName     string
+		period       int
+		wantInternal []string
+	}{
+		{
+			name:         "rsi_internal_series",
+			funcName:     "ta.rsi",
+			period:       14,
+			wantInternal: []string{"_gains", "_losses", "_rma_gains", "_rma_losses"},
+		},
+		{
+			name:         "mfi_internal_series",
+			funcName:     "ta.mfi",
+			period:       14,
+			wantInternal: []string{"_positive_mf", "_negative_mf"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := &generator{
+				variables: make(map[string]string),
+				constants: make(map[string]interface{}),
+				indent:    1,
+			}
+			g.taRegistry = NewTAFunctionRegistry()
+			g.compositeIndicatorRegistry = NewCompositeIndicatorRegistry()
+			g.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
+			g.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
+			mgr := NewTempVariableManager(g)
+
+			call := &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: tc.period},
+				},
+			}
+			info := CallInfo{Call: call, FuncName: tc.funcName, ArgHash: "test"}
+			varName := mgr.GetOrCreate(info)
+
+			nextCalls := mgr.GenerateNextCalls()
+
+			if !strings.Contains(nextCalls, varName+"Series.Next()") {
+				t.Errorf("primary series Next() missing for %s:\n%s", tc.funcName, nextCalls)
+			}
+
+			for _, suffix := range tc.wantInternal {
+				internalName := "_" + varName + suffix
+				if !strings.Contains(nextCalls, internalName+"Series.Next()") {
+					t.Errorf("internal series %q Next() missing for %s:\n%s", internalName, tc.funcName, nextCalls)
+				}
+			}
+		})
+	}
+}
+
 /* TestTempVariableManager_Reset tests clearing state */
 func TestTempVariableManager_Reset(t *testing.T) {
 	g := &generator{

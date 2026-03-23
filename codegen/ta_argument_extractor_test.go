@@ -729,33 +729,54 @@ func TestTAArgumentExtractor_ExtractWithDynamic_SourceVariations(t *testing.T) {
 }
 
 func TestTAArgumentExtractor_ExtractWithDynamic_BuiltinHandling(t *testing.T) {
-	gen := &generator{
-		variables:      make(map[string]string),
-		constants:      make(map[string]interface{}),
-		constEvaluator: validation.NewWarmupAnalyzer(),
+	newGen := func() *generator {
+		return &generator{
+			variables:      make(map[string]string),
+			constants:      make(map[string]interface{}),
+			constEvaluator: validation.NewWarmupAnalyzer(),
+		}
 	}
 
-	extractor := NewTAArgumentExtractor(gen)
-
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "tr"},
-			&ast.Literal{Value: 14.0},
+	tests := []struct {
+		name       string
+		sourceExpr ast.Expression
+	}{
+		{
+			name:       "bare tr identifier",
+			sourceExpr: &ast.Identifier{Name: "tr"},
+		},
+		{
+			name: "ta.tr member expression",
+			sourceExpr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "tr"},
+			},
 		},
 	}
 
-	result, err := extractor.ExtractWithDynamic(call, "ta.rma")
-	if err != nil {
-		t.Fatalf("ExtractWithDynamic() error = %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewTAArgumentExtractor(newGen())
 
-	if result.AccessGen == nil {
-		t.Fatal("AccessGen should not be nil")
-	}
+			call := &ast.CallExpression{
+				Arguments: []ast.Expression{tt.sourceExpr, &ast.Literal{Value: 14.0}},
+			}
 
-	_, ok := result.AccessGen.(*BuiltinTrueRangeAccessor)
-	if !ok {
-		t.Errorf("Expected BuiltinTrueRangeAccessor, got %T", result.AccessGen)
+			result, err := extractor.ExtractWithDynamic(call, "ta.rma")
+			if err != nil {
+				t.Fatalf("ExtractWithDynamic() error = %v", err)
+			}
+
+			if result.AccessGen == nil {
+				t.Fatal("AccessGen should not be nil")
+			}
+			if _, ok := result.AccessGen.(*TrueRangeAccessGenerator); !ok {
+				t.Errorf("AccessGen = %T, want *TrueRangeAccessGenerator", result.AccessGen)
+			}
+			if !result.NeedsNaNCheck {
+				t.Error("NeedsNaNCheck = false, want true: ta.tr needs NaN check")
+			}
+		})
 	}
 }
 

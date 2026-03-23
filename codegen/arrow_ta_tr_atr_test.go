@@ -8,7 +8,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestArrowTACall_TrAsAccessor validates ta.tr as AccessGenerator source in arrow functions */
 func TestArrowTACall_TrAsAccessor(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -27,7 +26,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 				Property: &ast.Identifier{Name: "tr"},
 			},
 			lengthExpr:      &ast.Literal{Value: float64(20)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -39,7 +38,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 				Property: &ast.Identifier{Name: "tr"},
 			},
 			lengthExpr:      &ast.Literal{Value: float64(14)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -51,7 +50,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 				Property: &ast.Identifier{Name: "tr"},
 			},
 			lengthExpr:      &ast.Literal{Value: float64(14)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -63,7 +62,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 				Property: &ast.Identifier{Name: "tr"},
 			},
 			lengthExpr:      &ast.Literal{Value: float64(10)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -75,7 +74,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 				Property: &ast.Identifier{Name: "tr"},
 			},
 			lengthExpr:      &ast.Literal{Value: float64(5)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -84,7 +83,7 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 			taFunc:          "ta.sma",
 			sourceExpr:      &ast.Identifier{Name: "tr"},
 			lengthExpr:      &ast.Literal{Value: float64(20)},
-			expectAccessor:  "BuiltinTrueRangeAccessor",
+			expectAccessor:  "TrueRangeAccessGenerator",
 			expectInline:    true,
 			expectSeriesGet: false,
 		},
@@ -142,7 +141,6 @@ func TestArrowTACall_TrAsAccessor(t *testing.T) {
 	}
 }
 
-/* TestArrowTACall_TrHistoricalOffset validates ta.tr[N] subscript access via builtin handler */
 func TestArrowTACall_TrHistoricalOffset(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
@@ -199,7 +197,6 @@ func TestArrowTACall_TrHistoricalOffset(t *testing.T) {
 	}
 }
 
-/* TestArrowTACall_TrVsParameter validates builtin precedence over user parameters */
 func TestArrowTACall_TrVsParameter(t *testing.T) {
 	t.Run("tr builtin takes precedence over parameter", func(t *testing.T) {
 		gen := newTestGenerator()
@@ -218,11 +215,10 @@ func TestArrowTACall_TrVsParameter(t *testing.T) {
 			t.Fatalf("CreateAccessorForExpression(tr) failed: %v", err)
 		}
 
-		if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
+		if _, ok := accessor.(*TrueRangeAccessGenerator); !ok {
 			t.Errorf("tr should resolve to BuiltinTrueRangeAccessor, got %T", accessor)
 		}
 
-		/* Test ta.tr MemberExpression - always builtin */
 		taTr := &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
 			Property: &ast.Identifier{Name: "tr"},
@@ -232,7 +228,7 @@ func TestArrowTACall_TrVsParameter(t *testing.T) {
 			t.Fatalf("CreateAccessorForExpression(ta.tr) failed: %v", err)
 		}
 
-		if _, ok := accessor2.(*BuiltinTrueRangeAccessor); !ok {
+		if _, ok := accessor2.(*TrueRangeAccessGenerator); !ok {
 			t.Errorf("ta.tr should resolve to BuiltinTrueRangeAccessor, got %T", accessor2)
 		}
 	})
@@ -252,13 +248,12 @@ func TestArrowTACall_TrVsParameter(t *testing.T) {
 			t.Fatalf("CreateAccessorForExpression(my_tr_series) failed: %v", err)
 		}
 
-		if _, ok := accessor.(*BuiltinTrueRangeAccessor); ok {
+		if _, ok := accessor.(*TrueRangeAccessGenerator); ok {
 			t.Error("User parameter should not resolve to BuiltinTrueRangeAccessor")
 		}
 	})
 }
 
-/* TestArrowTACall_TrFirstBarBehavior validates first bar TR calculation with no previous close */
 func TestArrowTACall_TrFirstBarBehavior(t *testing.T) {
 	gen := newTestGenerator()
 	accessResolver := NewArrowSeriesAccessResolver()
@@ -276,68 +271,50 @@ func TestArrowTACall_TrFirstBarBehavior(t *testing.T) {
 		t.Fatalf("CreateAccessorForExpression failed: %v", err)
 	}
 
-	trAccessor, ok := accessor.(*BuiltinTrueRangeAccessor)
+	trAccessor, ok := accessor.(*TrueRangeAccessGenerator)
 	if !ok {
-		t.Fatalf("Expected BuiltinTrueRangeAccessor, got %T", accessor)
+		t.Fatalf("Expected TrueRangeAccessGenerator, got %T", accessor)
 	}
 
 	currentCode := trAccessor.GenerateCurrentValueAccess()
 
-	if !strings.Contains(currentCode, "ctx.BarIndex < 1") {
-		t.Error("Expected first bar check 'ctx.BarIndex < 1' in generated code")
+	if !strings.Contains(currentCode, "if idx == 0") {
+		t.Error("Expected first bar check 'if idx == 0' in generated code")
 	}
 
-	if !strings.Contains(currentCode, ".High") && !strings.Contains(currentCode, ".Low") {
-		t.Error("Expected High-Low fallback calculation for first bar")
+	if !strings.Contains(currentCode, "return h - l") {
+		t.Error("Bar 0 must return h - l (high minus low)")
 	}
 
 	loopCode := trAccessor.GenerateLoopValueAccess("j")
-	if !strings.Contains(loopCode, "barIdx < 1") {
+	if !strings.Contains(loopCode, "if idx == 0") {
 		t.Error("Expected first bar check in loop access generation")
 	}
 }
 
-/* TestArrowTACall_TrWarmupConsistency validates TR base offset for warmup calculations */
-func TestArrowTACall_TrWarmupConsistency(t *testing.T) {
-	tests := []struct {
-		name        string
-		period      int
-		expectValid bool
-	}{
-		{"period 1 immediate", 1, true},
-		{"period 10 small", 10, true},
-		{"period 14 standard ATR", 14, true},
-		{"period 50 medium", 50, true},
-		{"period 200 large", 200, true},
+// TestArrowTACall_TrBaseOffsetIsZero verifies that the BuiltinTrueRangeAccessor
+// returned by the arrow-context factory always has GetBaseOffset() == 0.
+// A non-zero base offset would shift the warmup boundary and cause off-by-one
+// errors in indicator period calculations.
+func TestArrowTACall_TrBaseOffsetIsZero(t *testing.T) {
+	gen := newTestGenerator()
+	accessResolver := NewArrowSeriesAccessResolver()
+	identifierResolver := NewArrowIdentifierResolver(accessResolver)
+	exprGen := &legacyArrowExpressionGenerator{gen: gen}
+	factory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
+
+	taTr := &ast.MemberExpression{
+		Object:   &ast.Identifier{Name: "ta"},
+		Property: &ast.Identifier{Name: "tr"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gen := newTestGenerator()
-			accessResolver := NewArrowSeriesAccessResolver()
-			identifierResolver := NewArrowIdentifierResolver(accessResolver)
-			exprGen := &legacyArrowExpressionGenerator{gen: gen}
-			factory := NewArrowAwareAccessorFactory(identifierResolver, exprGen, gen, gen.symbolTable)
+	accessor, err := factory.CreateAccessorForExpression(taTr)
+	if err != nil {
+		t.Fatalf("CreateAccessorForExpression failed: %v", err)
+	}
 
-			taTr := &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "tr"},
-			}
-
-			accessor, err := factory.CreateAccessorForExpression(taTr)
-			if err != nil {
-				t.Fatalf("CreateAccessorForExpression failed: %v", err)
-			}
-
-			baseOffset := accessor.GetBaseOffset()
-			if baseOffset < 0 {
-				t.Errorf("Base offset should be non-negative, got %d", baseOffset)
-			}
-
-			if baseOffset != 0 {
-				t.Errorf("TR base offset should be 0 (current bar), got %d", baseOffset)
-			}
-		})
+	if got := accessor.GetBaseOffset(); got != 0 {
+		t.Errorf("TR base offset = %d, want 0 (current-bar access)", got)
 	}
 }
 

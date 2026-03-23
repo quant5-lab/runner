@@ -161,16 +161,7 @@ func (a *Asserter) AssertEquity(tolerance float64) *Asserter {
 }
 
 func (a *Asserter) floatClose(expected, actual, tolerance float64) bool {
-	if math.IsNaN(expected) && math.IsNaN(actual) {
-		return true
-	}
-
-	if math.IsNaN(expected) || math.IsNaN(actual) {
-		return false
-	}
-
-	diff := math.Abs(expected - actual)
-	return diff <= tolerance
+	return floatWithin(expected, actual, tolerance)
 }
 
 func AssertTradesMatch(t *testing.T, expected, actual []Trade) {
@@ -192,7 +183,7 @@ func AssertTradesMatch(t *testing.T, expected, actual []Trade) {
 			t.Errorf("Trade[%d].exitBar: expected %d, got %d", i, exp.ExitBar, act.ExitBar)
 		}
 
-		if !floatEquals(exp.Profit, act.Profit, 0.01) {
+		if !floatWithin(exp.Profit, act.Profit, 0.01) {
 			t.Errorf("Trade[%d].profit: expected %.2f, got %.2f", i, exp.Profit, act.Profit)
 		}
 	}
@@ -214,7 +205,7 @@ func AssertPlotSmokePoints(t *testing.T, plotName string, expectedValues, actual
 			continue
 		}
 
-		if !floatEquals(exp, act, 0.01) {
+		if !floatWithin(exp, act, 0.01) {
 			t.Errorf("Plot %q[%d]: expected %.4f, got %.4f", plotName, idx, exp, act)
 		}
 	}

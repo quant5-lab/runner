@@ -31,9 +31,9 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 		{"RMA sufficient", "rma_close_100", 100, 110, 99, false},
 		{"RSI warmup", "rsi_close_14", 14, 20, 13, true},
 		{"RSI sufficient", "rsi_close_14", 14, 20, 14, false},
-		{"ATR warmup start", "atr_hlc_14", 14, 20, 0, false},
-		{"ATR warmup mid", "atr_hlc_14", 14, 20, 6, false},
-		{"ATR warmup end", "atr_hlc_14", 14, 20, 12, false},
+		{"ATR warmup start", "atr_hlc_14", 14, 20, 0, true},
+		{"ATR warmup mid", "atr_hlc_14", 14, 20, 6, true},
+		{"ATR warmup end", "atr_hlc_14", 14, 20, 12, true},
 		{"ATR sufficient", "atr_hlc_14", 14, 20, 13, false},
 		{"STDEV warmup start", "stdev_close_20", 20, 25, 0, true},
 		{"STDEV warmup mid", "stdev_close_20", 20, 25, 9, true},
@@ -55,8 +55,8 @@ func TestTAStateManager_InsufficientDataReturnsNaN(t *testing.T) {
 			}
 
 			if tt.wantNaN {
-				if !math.IsNaN(value) && value != 0.0 {
-					t.Errorf("expected NaN or 0 at index %d (period %d), got %.4f",
+				if !math.IsNaN(value) {
+					t.Errorf("expected NaN at index %d (period %d), got %.4f",
 						tt.validateIdx, tt.period, value)
 				}
 			} else {
@@ -97,8 +97,8 @@ func TestTAStateManager_WarmupBoundaryTransition(t *testing.T) {
 			lastWarmupIdx := tt.period - 2
 			if lastWarmupIdx >= 0 {
 				valueBeforeBoundary, _ := manager.ComputeAtBar(ctx, sourceID, lastWarmupIdx)
-				if !math.IsNaN(valueBeforeBoundary) && valueBeforeBoundary != 0.0 {
-					t.Errorf("index %d (period-2): expected NaN or 0, got %.4f",
+				if !math.IsNaN(valueBeforeBoundary) {
+					t.Errorf("index %d (period-2): expected NaN, got %.4f",
 						lastWarmupIdx, valueBeforeBoundary)
 				}
 			}
@@ -158,14 +158,8 @@ func TestTAStateManager_EmptyDataReturnsError(t *testing.T) {
 	for _, m := range managers {
 		t.Run(m.name, func(t *testing.T) {
 			value, err := m.manager.ComputeAtBar(emptyCtx, sourceID, 0)
-			if m.name == "ATR" {
-				if value != 0.0 {
-					t.Errorf("expected 0 for empty data, got %.4f", value)
-				}
-			} else {
-				if err == nil && !math.IsNaN(value) {
-					t.Errorf("expected error or NaN for empty data, got value %.4f", value)
-				}
+			if err == nil && !math.IsNaN(value) {
+				t.Errorf("expected error or NaN for empty data, got value %.4f", value)
 			}
 		})
 	}
@@ -196,8 +190,8 @@ func TestTAStateManager_SingleBarReturnsNaN(t *testing.T) {
 				t.Fatalf("ComputeAtBar failed: %v", err)
 			}
 
-			if !math.IsNaN(value) && value != 0.0 {
-				t.Errorf("single bar with period %d: expected NaN or 0, got %.4f", tt.period, value)
+			if !math.IsNaN(value) {
+				t.Errorf("single bar with period %d: expected NaN, got %.4f", tt.period, value)
 			}
 		})
 	}
@@ -267,8 +261,8 @@ func TestTAStateManager_ConsecutiveNaNsNoGaps(t *testing.T) {
 				if err != nil {
 					t.Fatalf("bar %d: ComputeAtBar failed: %v", i, err)
 				}
-				if !math.IsNaN(value) && value != 0.0 {
-					t.Errorf("bar %d: expected NaN or 0 in warmup sequence, got %.4f", i, value)
+				if !math.IsNaN(value) {
+					t.Errorf("bar %d: expected NaN in warmup sequence, got %.4f", i, value)
 				}
 			}
 

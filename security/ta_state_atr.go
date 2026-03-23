@@ -1,6 +1,8 @@
 package security
 
 import (
+	"math"
+
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/runtime/series"
@@ -58,7 +60,7 @@ func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expression
 	}
 
 	if barIdx < s.period-1 {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
 
 	return s.buf.Get(s.buf.Position() - barIdx), nil

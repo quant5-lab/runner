@@ -745,7 +745,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				code += g.ind() + fmt.Sprintf("%sArraySeries = series.NewArraySeries(len(ctx.Data))\n", varName)
 				continue
 			}
-			code += g.ind() + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
+			code += g.ind() + fmt.Sprintf("%sSeries = %s(len(ctx.Data))\n", varName, SeriesCtorForType(varType))
 		}
 	}
 
@@ -2691,73 +2691,6 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 
 		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
 	}
-}
-
-/* generateInlineATR generates inline ATR calculation for security() context
- * ATR = RMA(TR, period) where TR = max(H-L, |H-prevC|, |L-prevC|)
- */
-func (g *generator) generateInlineATR(varName string, period int) (string, error) {
-	var code string
-
-	code += g.ind() + fmt.Sprintf("/* Inline ATR(%d) in security context */\n", period)
-	code += g.ind() + "if ctx.BarIndex < 1 {\n"
-	g.indent++
-	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-	g.indent--
-	code += g.ind() + "} else {\n"
-	g.indent++
-
-	/* Calculate TR for current bar */
-	code += g.ind() + "hl := highSeries.GetCurrent() - lowSeries.GetCurrent()\n"
-	code += g.ind() + "hc := math.Abs(highSeries.GetCurrent() - closeSeries.Get(1))\n"
-	code += g.ind() + "lc := math.Abs(lowSeries.GetCurrent() - closeSeries.Get(1))\n"
-	code += g.ind() + "tr := math.Max(hl, math.Max(hc, lc))\n"
-
-	/* RMA smoothing of TR */
-	code += g.ind() + fmt.Sprintf("if ctx.BarIndex < %d {\n", period)
-	g.indent++
-	/* Warmup: use SMA for first period bars - loop uses absolute indices */
-	code += g.ind() + "sum := 0.0\n"
-	code += g.ind() + "for j := 0; j <= ctx.BarIndex; j++ {\n"
-	g.indent++
-	code += g.ind() + "if j == 0 {\n"
-	g.indent++
-	code += g.ind() + "sum += ctx.Data[j].High - ctx.Data[j].Low\n"
-	g.indent--
-	code += g.ind() + "} else {\n"
-	g.indent++
-	code += g.ind() + "hl_j := ctx.Data[j].High - ctx.Data[j].Low\n"
-	code += g.ind() + "hc_j := math.Abs(ctx.Data[j].High - ctx.Data[j-1].Close)\n"
-	code += g.ind() + "lc_j := math.Abs(ctx.Data[j].Low - ctx.Data[j-1].Close)\n"
-	code += g.ind() + "sum += math.Max(hl_j, math.Max(hc_j, lc_j))\n"
-	g.indent--
-	code += g.ind() + "}\n"
-	g.indent--
-	code += g.ind() + "}\n"
-	code += g.ind() + fmt.Sprintf("if ctx.BarIndex == %d-1 {\n", period)
-	g.indent++
-	code += g.ind() + fmt.Sprintf("%sSeries.Set(sum / %d.0)\n", varName, period)
-	g.indent--
-	code += g.ind() + "} else {\n"
-	g.indent++
-	code += g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-	g.indent--
-	code += g.ind() + "}\n"
-	g.indent--
-	code += g.ind() + "} else {\n"
-	g.indent++
-	/* RMA: prevATR + (TR - prevATR) / period */
-	code += g.ind() + fmt.Sprintf("alpha := 1.0 / %d.0\n", period)
-	code += g.ind() + fmt.Sprintf("prevATR := %sSeries.Get(1)\n", varName)
-	code += g.ind() + "atr := prevATR + alpha*(tr - prevATR)\n"
-	code += g.ind() + fmt.Sprintf("%sSeries.Set(atr)\n", varName)
-	g.indent--
-	code += g.ind() + "}\n"
-
-	g.indent--
-	code += g.ind() + "}\n"
-
-	return code, nil
 }
 
 /* generateBinaryExpressionInSecurityContext handles BinaryExpression with temp series

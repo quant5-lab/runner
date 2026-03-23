@@ -138,6 +138,49 @@ func TestTAArgumentExtractor_ExtractSourceOnly_HLCComposites(t *testing.T) {
 	}
 }
 
+func TestTAArgumentExtractor_ExtractSourceOnly_TrBuiltin(t *testing.T) {
+	tests := []struct {
+		name       string
+		sourceExpr ast.Expression
+	}{
+		{
+			name:       "bare tr identifier",
+			sourceExpr: &ast.Identifier{Name: "tr"},
+		},
+		{
+			name: "ta.tr member expression",
+			sourceExpr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "tr"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := newExtractSourceOnlyExtractor()
+			call := &ast.CallExpression{
+				Arguments: []ast.Expression{tt.sourceExpr},
+			}
+
+			comp, err := extractor.ExtractSourceOnly(call, "ta.swma")
+			if err != nil {
+				t.Fatalf("ExtractSourceOnly() error = %v", err)
+			}
+
+			if comp.Period != 0 {
+				t.Errorf("Period = %d, want 0", comp.Period)
+			}
+			if _, ok := comp.AccessGen.(*TrueRangeAccessGenerator); !ok {
+				t.Errorf("AccessGen = %T, want *TrueRangeAccessGenerator", comp.AccessGen)
+			}
+			if !comp.NeedsNaNCheck {
+				t.Error("NeedsNaNCheck = false, want true: ta.tr needs NaN check")
+			}
+		})
+	}
+}
+
 func TestTAArgumentExtractor_ExtractSourceOnly_ExtraArgsIgnored(t *testing.T) {
 	/* Extra arguments beyond the source must be silently ignored (like SWMA's fixed period) */
 	extractor := newExtractSourceOnlyExtractor()

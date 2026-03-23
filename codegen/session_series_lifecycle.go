@@ -54,16 +54,16 @@ func (l *SessionSeriesLifecycle) GenerateInitializations(indent string) string {
 	}
 	code := ""
 	if l.hasIsfirstbar {
-		code += indent + "session_isfirstbarSeries = series.NewSeries(len(ctx.Data))\n"
+		code += indent + "session_isfirstbarSeries = series.NewBoolSeries(len(ctx.Data))\n"
 	}
 	if l.hasIslastbar {
-		code += indent + "session_islastbarSeries = series.NewSeries(len(ctx.Data))\n"
+		code += indent + "session_islastbarSeries = series.NewBoolSeries(len(ctx.Data))\n"
 	}
 	if l.hasIsfirstbarRegular {
-		code += indent + "session_isfirstbar_regularSeries = series.NewSeries(len(ctx.Data))\n"
+		code += indent + "session_isfirstbar_regularSeries = series.NewBoolSeries(len(ctx.Data))\n"
 	}
 	if l.hasIslastbarRegular {
-		code += indent + "session_islastbar_regularSeries = series.NewSeries(len(ctx.Data))\n"
+		code += indent + "session_islastbar_regularSeries = series.NewBoolSeries(len(ctx.Data))\n"
 	}
 	return code
 }

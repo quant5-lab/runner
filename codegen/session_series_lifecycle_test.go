@@ -71,10 +71,10 @@ func TestSessionSeriesLifecycle_CodeContent(t *testing.T) {
 	t.Run("initializations", func(t *testing.T) {
 		code := lifecycle.GenerateInitializations("\t")
 		for _, s := range []string{
-			"session_isfirstbarSeries = series.NewSeries(len(ctx.Data))",
-			"session_islastbarSeries = series.NewSeries(len(ctx.Data))",
-			"session_isfirstbar_regularSeries = series.NewSeries(len(ctx.Data))",
-			"session_islastbar_regularSeries = series.NewSeries(len(ctx.Data))",
+			"session_isfirstbarSeries = series.NewBoolSeries(len(ctx.Data))",
+			"session_islastbarSeries = series.NewBoolSeries(len(ctx.Data))",
+			"session_isfirstbar_regularSeries = series.NewBoolSeries(len(ctx.Data))",
+			"session_islastbar_regularSeries = series.NewBoolSeries(len(ctx.Data))",
 		} {
 			if !strings.Contains(code, s) {
 				t.Errorf("missing %q in:\n%s", s, code)

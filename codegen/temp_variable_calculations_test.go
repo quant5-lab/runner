@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -221,53 +222,51 @@ func TestTempVariableManager_GenerateCalculations_EmptyManager(t *testing.T) {
 	}
 }
 
-/* TestTempVariableManager_GenerateCalculations_ATRFunction tests ATR-specific calculation */
+/* TestTempVariableManager_GenerateCalculations_ATRFunction verifies that
+ * GenerateCalculations emits the canonical Pine ATR algorithm for each period:
+ *
+ *  - NaN warmup (bars 0..period-2), SMA seed (bar period-1), RMA recursive (bar period+)
+ *  - TR uses handle_na=true: bar 0 returns high-low so the seed window is always valid
+ *  - RMA alpha is 1/period (not EMA's 2/(period+1))
+ */
 func TestTempVariableManager_GenerateCalculations_ATRFunction(t *testing.T) {
-	g := &generator{
-		variables: make(map[string]string),
-		constants: make(map[string]interface{}),
-		indent:    2,
-	}
-	g.taRegistry = NewTAFunctionRegistry()
+	for _, period := range []int{1, 2, 5, 14} {
+		period := period
+		t.Run(fmt.Sprintf("period_%d", period), func(t *testing.T) {
+			g := &generator{
+				variables: make(map[string]string),
+				constants: make(map[string]interface{}),
+				indent:    2,
+			}
+			g.taRegistry = NewTAFunctionRegistry()
+			mgr := NewTempVariableManager(g)
 
-	mgr := NewTempVariableManager(g)
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "atr"},
+				},
+				Arguments: []ast.Expression{&ast.Literal{Value: period}},
+			}
+			varName := mgr.GetOrCreate(CallInfo{Call: call, FuncName: "ta.atr", ArgHash: "atr_test"})
+			code, err := mgr.GenerateCalculations()
+			if err != nil {
+				t.Fatalf("GenerateCalculations() error = %v", err)
+			}
 
-	call := &ast.CallExpression{
-		Callee: &ast.MemberExpression{
-			Object:   &ast.Identifier{Name: "ta"},
-			Property: &ast.Identifier{Name: "atr"},
-		},
-		Arguments: []ast.Expression{
-			&ast.Literal{Value: 2}, // ATR period
-		},
-	}
-
-	info := CallInfo{Call: call, FuncName: "ta.atr", ArgHash: "atr_test"}
-	varName := mgr.GetOrCreate(info)
-
-	code, err := mgr.GenerateCalculations()
-	if err != nil {
-		t.Fatalf("GenerateCalculations() error = %v", err)
-	}
-
-	// ATR-specific checks
-	if !strings.Contains(code, "Inline ATR(2)") {
-		t.Errorf("Expected ATR comment not found in:\n%s", code)
-	}
-
-	// Should calculate True Range
-	if !strings.Contains(code, "hl := highSeries.GetCurrent() - lowSeries.GetCurrent()") {
-		t.Error("Expected True Range calculation not found")
-	}
-
-	// Should use RMA smoothing
-	if !strings.Contains(code, "alpha := 1.0 / 2.0") {
-		t.Error("Expected RMA alpha calculation not found")
-	}
-
-	// Should set temp variable
-	if !strings.Contains(code, varName+"Series.Set(") {
-		t.Errorf("Expected Series.Set() for %s not found", varName)
+			boundary := period - 1
+			for _, want := range []string{
+				fmt.Sprintf("ctx.BarIndex < %d", boundary),
+				fmt.Sprintf("ctx.BarIndex == %d", boundary),
+				fmt.Sprintf("alpha := 1.0 / float64(%d)", period),
+				"if idx == 0 { return h - l }",
+				varName + "Series.Set(",
+			} {
+				if !strings.Contains(code, want) {
+					t.Errorf("missing %q\n%s", want, code)
+				}
+			}
+		})
 	}
 }
 

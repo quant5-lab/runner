@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,6 +58,11 @@ func (m *GoldenManager) LoadExpected(t *testing.T, filename string) *StrategyRes
 func (m *GoldenManager) SaveGolden(t *testing.T, filename, strategyName, dataSource string, result *StrategyResult) {
 	t.Helper()
 
+	if existing := m.loadExistingResult(filename); existing != nil && ResultsEqual(existing, result) {
+		t.Logf("Golden file unchanged, skipping write: %s", filename)
+		return
+	}
+
 	golden := GoldenFile{
 		Version:        "1.0",
 		Strategy:       strategyName,
@@ -82,6 +86,36 @@ func (m *GoldenManager) SaveGolden(t *testing.T, filename, strategyName, dataSou
 	}
 
 	t.Logf("Saved golden file: %s", path)
+}
+
+func (m *GoldenManager) ValidateOrUpdate(t *testing.T, goldenFile, strategyName, dataSource string, actual *StrategyResult) {
+	t.Helper()
+
+	if m.updateMode {
+		m.SaveGolden(t, goldenFile, strategyName, dataSource, actual)
+		return
+	}
+
+	expected := m.LoadExpected(t, goldenFile)
+	if expected == nil {
+		t.Fatalf("Golden file %s not found - run with -update-golden flag to generate", goldenFile)
+	}
+
+	if err := CompareResults(expected, actual); err != nil {
+		t.Fatalf("Golden file mismatch:\n%v", err)
+	}
+}
+
+func (m *GoldenManager) loadExistingResult(filename string) *StrategyResult {
+	data, err := os.ReadFile(m.ExpectedPath(filename))
+	if err != nil {
+		return nil
+	}
+	var golden GoldenFile
+	if err := json.Unmarshal(data, &golden); err != nil {
+		return nil
+	}
+	return golden.StrategyResult
 }
 
 func (m *GoldenManager) LoadMarketData(t *testing.T, filename string) *MarketData {
@@ -118,74 +152,4 @@ func (m *GoldenManager) EnsureDataFile(t *testing.T, filename string) string {
 	}
 
 	return path
-}
-
-func (m *GoldenManager) ValidateOrUpdate(t *testing.T, goldenFile, strategyName, dataSource string, actual *StrategyResult) {
-	t.Helper()
-
-	if m.updateMode {
-		m.SaveGolden(t, goldenFile, strategyName, dataSource, actual)
-		t.Logf("Updated golden file: %s", goldenFile)
-		return
-	}
-
-	expected := m.LoadExpected(t, goldenFile)
-	if expected == nil {
-		t.Fatalf("Golden file %s not found - run with -update-golden flag to generate", goldenFile)
-	}
-
-	if err := CompareResults(expected, actual); err != nil {
-		t.Fatalf("Golden file mismatch:\n%v", err)
-	}
-}
-
-func CompareResults(expected, actual *StrategyResult) error {
-	if len(expected.Trades) != len(actual.Trades) {
-		return fmt.Errorf("trade count: expected %d, got %d", len(expected.Trades), len(actual.Trades))
-	}
-
-	for i := range expected.Trades {
-		if err := compareTrade(i, &expected.Trades[i], &actual.Trades[i]); err != nil {
-			return err
-		}
-	}
-
-	// Compare equity
-	if !floatEquals(expected.Equity, actual.Equity, 0.01) {
-		return fmt.Errorf("equity: expected %.2f, got %.2f", expected.Equity, actual.Equity)
-	}
-
-	return nil
-}
-
-func compareTrade(index int, expected, actual *Trade) error {
-	if expected.EntryBar != actual.EntryBar {
-		return fmt.Errorf("trade[%d].entryBar: expected %d, got %d", index, expected.EntryBar, actual.EntryBar)
-	}
-
-	if expected.ExitBar != actual.ExitBar {
-		return fmt.Errorf("trade[%d].exitBar: expected %d, got %d", index, expected.ExitBar, actual.ExitBar)
-	}
-
-	if !floatEquals(expected.EntryPrice, actual.EntryPrice, 0.01) {
-		return fmt.Errorf("trade[%d].entryPrice: expected %.2f, got %.2f", index, expected.EntryPrice, actual.EntryPrice)
-	}
-
-	if !floatEquals(expected.ExitPrice, actual.ExitPrice, 0.01) {
-		return fmt.Errorf("trade[%d].exitPrice: expected %.2f, got %.2f", index, expected.ExitPrice, actual.ExitPrice)
-	}
-
-	if !floatEquals(expected.Profit, actual.Profit, 0.01) {
-		return fmt.Errorf("trade[%d].profit: expected %.2f, got %.2f", index, expected.Profit, actual.Profit)
-	}
-
-	return nil
-}
-
-func floatEquals(a, b, tolerance float64) bool {
-	diff := a - b
-	if diff < 0 {
-		diff = -diff
-	}
-	return diff <= tolerance
 }

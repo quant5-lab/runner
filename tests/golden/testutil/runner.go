@@ -90,7 +90,7 @@ func (r *StrategyRunner) runStrategy(t *testing.T, binaryPath, dataPath, outputP
 	)
 
 	output, err := cmd.CombinedOutput()
-	t.Logf("[GOLDEN_TEST_DEBUG] Strategy execution output:\n%s", output)
+	t.Logf("Strategy execution output:\n%s", output)
 	if err != nil {
 		t.Fatalf("Execute strategy: %v\nOutput: %s", err, output)
 	}

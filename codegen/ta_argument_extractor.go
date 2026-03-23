@@ -63,8 +63,8 @@ func (e *TAArgumentExtractor) ExtractWithDynamic(call *ast.CallExpression, funcN
 			SourceExpr:    sourceExpr,
 			PeriodResult:  periodResult,
 			SourceInfo:    SourceInfo{},
-			AccessGen:     NewBuiltinTrueRangeAccessor(),
-			NeedsNaNCheck: false,
+			AccessGen:     NewTrueRangeAccessGenerator(),
+			NeedsNaNCheck: true,
 			Preamble:      "",
 		}, nil
 	}
@@ -135,6 +135,18 @@ func (e *TAArgumentExtractor) ExtractSourceOnly(call *ast.CallExpression, funcNa
 	}
 
 	sourceExpr := call.Arguments[0]
+
+	if e.isTrBuiltin(sourceExpr) {
+		return &TAArgumentComponents{
+			SourceExpr:    sourceExpr,
+			Period:        0,
+			SourceInfo:    SourceInfo{},
+			AccessGen:     NewTrueRangeAccessGenerator(),
+			NeedsNaNCheck: true,
+			Preamble:      "",
+		}, nil
+	}
+
 	sourceInfo := e.classifier.ClassifyAST(sourceExpr)
 	accessGen := CreateAccessGenerator(sourceInfo)
 	needsNaN := sourceInfo.IsSeriesVariable()

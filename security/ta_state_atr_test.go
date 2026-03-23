@@ -1,6 +1,7 @@
 package security
 
 import (
+	"math"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
@@ -28,8 +29,8 @@ func TestATRStateManager_WarmupPeriod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ComputeAtBar failed at bar %d: %v", i, err)
 		}
-		if result != 0.0 {
-			t.Errorf("Bar %d: expected 0 during warmup, got %.4f", i, result)
+		if !math.IsNaN(result) {
+			t.Errorf("Bar %d: expected NaN during warmup (Pine ta.atr returns na), got %.4f", i, result)
 		}
 	}
 
