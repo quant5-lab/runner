@@ -227,10 +227,12 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		hasModifier := firstCall.modifierPrefix != ""
 
-		/* Transform data if modifier exists (before context creation) */
+		// Transform data if modifier present; capture TransformResult for bar-mapping.
 		if hasModifier {
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_data = ticker.NewTransformer(%q).Transform(%s_data)\n",
-				varName, firstCall.modifierPrefix, varName))
+			ctorCode := transformerConstructorCode(firstCall.call.SymbolExpr, firstCall.modifierPrefix)
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_transformResult := (%s).Transform(%s_data)\n",
+				varName, ctorCode, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_data = %s_transformResult.Bars\n", varName, varName))
 		}
 
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
@@ -241,11 +243,13 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		resolvedKey := fmt.Sprintf("%s:%s", firstCall.resolvedSym, firstCall.resolvedTf)
 
+		mapperCode := buildMapperCode(varName, hasModifier && isVariableBarCountModifier(firstCall.modifierPrefix))
+
 		if isSymbolPlaceholder || isTimeframePlaceholder {
 			var runtimeKeyArgs []string
 			symbolArg := "ctx.Symbol"
 			if hasModifier {
-				symbolArg = generateModifierCall(firstCall.modifierPrefix, "ctx.Symbol")
+				symbolArg = generateModifierCall(firstCall.modifierPrefix, "ctx.Symbol", firstCall.call.SymbolExpr)
 			}
 			if isSymbolPlaceholder {
 				runtimeKeyArgs = append(runtimeKeyArgs, symbolArg)
@@ -256,25 +260,11 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			keyExpr := fmt.Sprintf("fmt.Sprintf(%q, %s)", runtimeKey, strings.Join(runtimeKeyArgs, ", "))
 
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%s] = %s_ctx\n", keyExpr, varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
-			codeBuilder.WriteString("\t} else {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t}\n")
+			codeBuilder.WriteString(mapperCode)
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%s] = %s_mapper\n\n", keyExpr, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", resolvedKey, varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
-			codeBuilder.WriteString("\t} else {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t}\n")
+			codeBuilder.WriteString(mapperCode)
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", resolvedKey, varName))
 		}
 	}
@@ -333,6 +323,27 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 		StrategyName:         code.StrategyName,
 		AdditionalImports:    mergedImports,
 	}, nil
+}
+
+// buildMapperCode emits the mapper initialisation block for one security symbol.
+//
+// For variable-bar-count modifiers (Renko, Kagi, …) the same-TF branch uses
+// BuildMappingFromTransform; all other same-TF cases use BuildIdentityMapping.
+func buildMapperCode(varName string, variableBarCount bool) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
+	b.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
+	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+	b.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
+	if variableBarCount {
+		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingFromTransform(%s_transformResult.MainToSynthetic)\n", varName, varName))
+	} else {
+		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
+	}
+	b.WriteString("\t} else {\n")
+	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+	b.WriteString("\t}\n")
+	return b.String()
 }
 
 /* mergeImports combines two import lists without duplicates */

@@ -52,7 +52,7 @@ func (p *SecurityPrefetcher) Prefetch(program *ast.Program, limit int) error {
 			return fmt.Errorf("fetch %s:%s: %w", req.BaseSymbol, req.Timeframe, err)
 		}
 
-		transformedData := req.Transformer.Transform(ohlcvData)
+		transformedData := req.Transformer.Transform(ohlcvData).Bars
 
 		secCtx := context.New(req.CacheKey, req.Timeframe, len(transformedData))
 		for _, bar := range transformedData {

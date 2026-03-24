@@ -9,7 +9,8 @@ type MappingMode int
 const (
 	ModeDownscaling MappingMode = iota // Security TF < Base TF (e.g., H→D)
 	ModeUpscaling                      // Security TF > Base TF (e.g., M→D, W→D)
-	ModeIdentity                       // Same TF or HA on same TF
+	ModeIdentity                       // Same TF — bar-count-preserving transform (HA) or no modifier
+	ModeTransformed                    // Same TF — variable-bar-count transform (Renko, Kagi, LineBreak, PointFig)
 )
 
 /*
@@ -22,8 +23,9 @@ Mode determines lookup algorithm:
 Thread-safe for reads after initialization (immutable ranges and mode).
 */
 type SecurityBarMapper struct {
-	ranges []BarRange
-	mode   MappingMode
+	ranges          []BarRange
+	mode            MappingMode
+	mainToSynthetic []int // populated only in ModeTransformed
 }
 
 func NewSecurityBarMapper() *SecurityBarMapper {
@@ -117,7 +119,23 @@ Parameters:
 */
 func (m *SecurityBarMapper) BuildIdentityMapping(barCount int) {
 	m.mode = ModeIdentity
-	m.ranges = nil // Identity mode doesn't use ranges
+	m.ranges = nil
+	m.mainToSynthetic = nil
+}
+
+/*
+BuildMappingFromTransform stores the per-source-bar synthetic index mapping
+produced by variable-bar-count transformers (Renko, Kagi, LineBreak, PointFig).
+
+mainToSynthetic[i] is the index of the last closed synthetic bar when source bar i
+was processed (-1 means no synthetic bar has formed yet at that point).
+
+Used when security TF equals base TF but the modifier reduces bar count.
+*/
+func (m *SecurityBarMapper) BuildMappingFromTransform(mainToSynthetic []int) {
+	m.mode = ModeTransformed
+	m.ranges = nil
+	m.mainToSynthetic = mainToSynthetic
 }
 
 /*
@@ -203,13 +221,23 @@ Returns -1 if no valid mapping found.
 Thread-safe after mapper initialization.
 */
 func (m *SecurityBarMapper) FindDailyBarIndex(barIndex int, lookahead bool) int {
-	if m.mode == ModeIdentity {
+	switch m.mode {
+	case ModeIdentity:
 		return barIndex
-	}
-	if m.mode == ModeUpscaling {
+	case ModeTransformed:
+		return m.findTransformedIndex(barIndex)
+	case ModeUpscaling:
 		return m.findUpscalingIndex(barIndex, lookahead)
+	default:
+		return m.findDownscalingIndex(barIndex, lookahead)
 	}
-	return m.findDownscalingIndex(barIndex, lookahead)
+}
+
+func (m *SecurityBarMapper) findTransformedIndex(mainBarIdx int) int {
+	if mainBarIdx < 0 || mainBarIdx >= len(m.mainToSynthetic) {
+		return -1
+	}
+	return m.mainToSynthetic[mainBarIdx]
 }
 
 func (m *SecurityBarMapper) findUpscalingIndex(baseBarIndex int, lookahead bool) int {

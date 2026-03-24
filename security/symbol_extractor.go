@@ -91,6 +91,14 @@ func (e *SymbolExtractor) extractFromTickerCall(call *ast.CallExpression) string
 			}
 		}
 
+	case "pointfigure", "ticker.pointfigure":
+		if len(call.Arguments) >= 5 {
+			baseSymbol := e.extractRaw(call.Arguments[0])
+			if baseSymbol != "" {
+				return string(ticker.ModifierPointFig) + ":" + baseSymbol
+			}
+		}
+
 	case "ticker.standard":
 		if len(call.Arguments) >= 1 {
 			modifiedSymbol := e.extractRaw(call.Arguments[0])
