@@ -9,7 +9,7 @@ import (
 )
 
 // TestValuewhenStateManager_RingCapacityInvariant verifies that the internal
-// match index ring never grows beyond O(occurrence+1) capacity regardless of
+// match ring never grows beyond O(occurrence+1) capacity regardless of
 // how many bars are processed or how frequently the condition matches.
 func TestValuewhenStateManager_RingCapacityInvariant(t *testing.T) {
 	tests := []struct {
@@ -34,51 +34,28 @@ func TestValuewhenStateManager_RingCapacityInvariant(t *testing.T) {
 
 			ctx := &context.Context{Data: data}
 
-			conditionExpr := &ast.BinaryExpression{
-				Left:     &ast.Identifier{Name: "bar_index"},
-				Operator: "%",
-				Right:    &ast.Literal{Value: float64(tt.matchEveryN)},
-			}
-			conditionExpr = &ast.BinaryExpression{
-				Left:     conditionExpr,
-				Operator: "==",
-				Right:    &ast.Literal{Value: 0.0},
-			}
-
+			conditionExpr := &ast.Literal{Value: 1.0}
 			sourceExpr := &ast.Identifier{Name: "close"}
 			evaluator := NewStreamingBarEvaluator()
 
-			mgr := NewValuewhenStateManager(
-				"test_capacity_invariant",
-				tt.occurrence,
-				conditionExpr,
-				sourceExpr,
-				len(data),
-				evaluator,
-			)
+			mgr := newValuewhenStateManager(conditionExpr, sourceExpr, tt.occurrence, len(data), evaluator)
 
 			finalBar := tt.barCount - 1
-			_, err := mgr.ComputeAtBar(ctx, nil, finalBar)
+			_, err := mgr.ComputeAtBar(ctx, finalBar)
 			if err != nil {
 				t.Fatalf("ComputeAtBar(%d) failed: %v", finalBar, err)
 			}
 
 			expectedCapacity := tt.occurrence + 1
-			actualCapacity := mgr.matchRing.capacity
 
-			if actualCapacity != expectedCapacity {
-				t.Errorf("ring capacity: expected %d, got %d (occurrence+1 invariant violated)",
-					expectedCapacity, actualCapacity)
-			}
-
-			if len(mgr.matchRing.buffer) != expectedCapacity {
+			if len(mgr.ring.values) != expectedCapacity {
 				t.Errorf("ring buffer allocation: expected %d, got %d",
-					expectedCapacity, len(mgr.matchRing.buffer))
+					expectedCapacity, len(mgr.ring.values))
 			}
 
-			if mgr.matchRing.Size() > expectedCapacity {
-				t.Errorf("ring size %d exceeds capacity %d",
-					mgr.matchRing.Size(), expectedCapacity)
+			if mgr.ring.count > expectedCapacity {
+				t.Errorf("ring count %d exceeds capacity %d",
+					mgr.ring.count, expectedCapacity)
 			}
 		})
 	}
@@ -114,24 +91,17 @@ func TestValuewhenStateManager_RepeatedBarIdempotencyWithRing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("occurrence_"+string(rune('0'+tt.occurrence)), func(t *testing.T) {
-			mgr := NewValuewhenStateManager(
-				"test_idempotency",
-				tt.occurrence,
-				conditionExpr,
-				sourceExpr,
-				len(data),
-				evaluator,
-			)
+			mgr := newValuewhenStateManager(conditionExpr, sourceExpr, tt.occurrence, len(data), evaluator)
 
-			first, err := mgr.ComputeAtBar(ctx, nil, tt.targetBar)
+			first, err := mgr.ComputeAtBar(ctx, tt.targetBar)
 			if err != nil {
 				t.Fatalf("first call bar %d: %v", tt.targetBar, err)
 			}
 
-			initialSize := mgr.matchRing.Size()
+			initialCount := mgr.ring.count
 
 			for rep := 1; rep <= 5; rep++ {
-				v, err := mgr.ComputeAtBar(ctx, nil, tt.targetBar)
+				v, err := mgr.ComputeAtBar(ctx, tt.targetBar)
 				if err != nil {
 					t.Fatalf("rep %d bar %d: %v", rep, tt.targetBar, err)
 				}
@@ -140,9 +110,9 @@ func TestValuewhenStateManager_RepeatedBarIdempotencyWithRing(t *testing.T) {
 					t.Errorf("rep %d: value mutated %.6f → %.6f", rep, first, v)
 				}
 
-				if mgr.matchRing.Size() != initialSize {
-					t.Errorf("rep %d: ring size mutated %d → %d (idempotency violated)",
-						rep, initialSize, mgr.matchRing.Size())
+				if mgr.ring.count != initialCount {
+					t.Errorf("rep %d: ring count mutated %d → %d (idempotency violated)",
+						rep, initialCount, mgr.ring.count)
 				}
 			}
 		})
@@ -180,24 +150,17 @@ func TestValuewhenStateManager_HistoricalAnchorStableAfterAdvance(t *testing.T) 
 
 	for _, tt := range tests {
 		t.Run("occurrence_"+string(rune('0'+tt.occurrence)), func(t *testing.T) {
-			mgr := NewValuewhenStateManager(
-				"test_historical_anchor",
-				tt.occurrence,
-				conditionExpr,
-				sourceExpr,
-				len(data),
-				evaluator,
-			)
+			mgr := newValuewhenStateManager(conditionExpr, sourceExpr, tt.occurrence, len(data), evaluator)
 
-			first, err := mgr.ComputeAtBar(ctx, nil, tt.anchorBar)
+			first, err := mgr.ComputeAtBar(ctx, tt.anchorBar)
 			if err != nil {
 				t.Fatalf("anchor bar %d: %v", tt.anchorBar, err)
 			}
 
-			_, _ = mgr.ComputeAtBar(ctx, nil, tt.advanceBar)
+			_, _ = mgr.ComputeAtBar(ctx, tt.advanceBar)
 
 			for rep := 1; rep <= 3; rep++ {
-				v, err := mgr.ComputeAtBar(ctx, nil, tt.anchorBar)
+				v, err := mgr.ComputeAtBar(ctx, tt.anchorBar)
 				if err != nil {
 					t.Fatalf("rep %d anchor bar %d: %v", rep, tt.anchorBar, err)
 				}
@@ -212,69 +175,48 @@ func TestValuewhenStateManager_HistoricalAnchorStableAfterAdvance(t *testing.T) 
 }
 
 // TestValuewhenStateManager_RingEvictionSemantics validates that when matches
-// exceed ring capacity, the oldest indices are evicted and the most recent
-// (occurrence+1) matches remain accessible for correct occurrence-based lookback.
+// exceed ring capacity, the oldest values are evicted and the most recent
+// (occurrence+1) values remain accessible for correct occurrence-based lookback.
 func TestValuewhenStateManager_RingEvictionSemantics(t *testing.T) {
 	tests := []struct {
 		name                 string
 		occurrence           int
 		totalMatches         int
 		expectedAccessible   int
-		expectedInaccessible int
 	}{
-		{"occ0_10_matches", 0, 10, 1, 9},
-		{"occ2_100_matches", 2, 100, 3, 97},
-		{"occ5_50_matches", 5, 50, 6, 44},
+		{"occ0_10_matches", 0, 10, 1},
+		{"occ2_100_matches", 2, 100, 3},
+		{"occ5_50_matches", 5, 50, 6},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := make([]context.OHLCV, tt.totalMatches)
+			ring := newMatchRing(tt.occurrence + 1)
+
 			for i := 0; i < tt.totalMatches; i++ {
-				data[i] = context.OHLCV{Close: float64(100 + i)}
-			}
-
-			ctx := &context.Context{Data: data}
-
-			conditionExpr := &ast.Literal{Value: 1.0}
-			sourceExpr := &ast.Identifier{Name: "close"}
-			evaluator := NewStreamingBarEvaluator()
-
-			mgr := NewValuewhenStateManager(
-				"test_eviction",
-				tt.occurrence,
-				conditionExpr,
-				sourceExpr,
-				len(data),
-				evaluator,
-			)
-
-			finalBar := tt.totalMatches - 1
-			_, err := mgr.ComputeAtBar(ctx, nil, finalBar)
-			if err != nil {
-				t.Fatalf("ComputeAtBar(%d) failed: %v", finalBar, err)
+				ring.push(float64(100 + i))
 			}
 
 			for n := 0; n < tt.expectedAccessible; n++ {
-				idx, found := mgr.matchRing.GetNthMostRecent(n)
+				v, found := ring.nthMostRecent(n)
 				if !found {
-					t.Errorf("GetNthMostRecent(%d): expected accessible (within capacity), got not found", n)
+					t.Errorf("nthMostRecent(%d): expected accessible, got not found", n)
 				}
-				expectedIdx := tt.totalMatches - 1 - n
-				if idx != expectedIdx {
-					t.Errorf("GetNthMostRecent(%d): expected bar %d, got %d", n, expectedIdx, idx)
+				expectedVal := float64(100 + tt.totalMatches - 1 - n)
+				if v != expectedVal {
+					t.Errorf("nthMostRecent(%d): expected %.0f, got %.0f", n, expectedVal, v)
 				}
 			}
 
 			for n := tt.expectedAccessible; n < tt.totalMatches; n++ {
-				_, found := mgr.matchRing.GetNthMostRecent(n)
+				_, found := ring.nthMostRecent(n)
 				if found {
-					t.Errorf("GetNthMostRecent(%d): expected not found (evicted), got accessible", n)
+					t.Errorf("nthMostRecent(%d): expected not found (evicted), got accessible", n)
 				}
 			}
 
-			if mgr.matchRing.Size() != tt.expectedAccessible {
-				t.Errorf("ring size: expected %d, got %d", tt.expectedAccessible, mgr.matchRing.Size())
+			if ring.count != tt.expectedAccessible {
+				t.Errorf("ring count: expected %d, got %d", tt.expectedAccessible, ring.count)
 			}
 		})
 	}

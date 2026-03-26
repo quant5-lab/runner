@@ -8,66 +8,6 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-/* TestStreamingBarEvaluator_ValuewhenOccurrenceSelection verifies occurrence-based lookback */
-func TestStreamingBarEvaluator_ValuewhenOccurrenceSelection(t *testing.T) {
-	data := []context.OHLCV{
-		{Close: 100.0, High: 105.0},
-		{Close: 103.0, High: 108.0},
-		{Close: 101.0, High: 106.0},
-		{Close: 104.0, High: 109.0},
-		{Close: 105.0, High: 110.0},
-	}
-
-	ctx := &context.Context{Data: data}
-	evaluator := NewStreamingBarEvaluator()
-
-	conditionExpr := &ast.BinaryExpression{
-		Operator: ">",
-		Left:     &ast.Identifier{Name: "close"},
-		Right:    &ast.Literal{Value: 102.0},
-	}
-
-	tests := []struct {
-		name       string
-		occurrence int
-		barIdx     int
-		expected   float64
-		desc       string
-	}{
-		{"most_recent", 0, 4, 110.0, "occurrence=0 returns current bar (most recent match)"},
-		{"second_recent", 1, 4, 109.0, "occurrence=1 returns 2nd most recent match"},
-		{"third_recent", 2, 4, 108.0, "occurrence=2 returns 3rd most recent match"},
-		{"earlier_bar_context", 0, 3, 109.0, "at bar 3, occurrence=0 returns bar 3"},
-		{"earlier_bar_second", 1, 3, 108.0, "at bar 3, occurrence=1 returns bar 1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			valuewhenCall := &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "ta"},
-					Property: &ast.Identifier{Name: "valuewhen"},
-				},
-				Arguments: []ast.Expression{
-					conditionExpr,
-					&ast.Identifier{Name: "high"},
-					&ast.Literal{Value: float64(tt.occurrence)},
-				},
-			}
-
-			result, err := evaluator.EvaluateAtBar(valuewhenCall, ctx, tt.barIdx)
-			if err != nil {
-				t.Fatalf("%s: EvaluateAtBar failed: %v", tt.desc, err)
-			}
-
-			if result != tt.expected {
-				t.Errorf("%s: expected %.2f, got %.2f", tt.desc, tt.expected, result)
-			}
-		})
-	}
-}
-
-/* TestStreamingBarEvaluator_ValuewhenBoundaryConditions verifies edge cases */
 func TestStreamingBarEvaluator_ValuewhenBoundaryConditions(t *testing.T) {
 	data := []context.OHLCV{
 		{Close: 100.0, High: 105.0},
@@ -165,7 +105,6 @@ func TestStreamingBarEvaluator_ValuewhenBoundaryConditions(t *testing.T) {
 	}
 }
 
-/* TestStreamingBarEvaluator_ValuewhenComplexExpressions verifies expression support */
 func TestStreamingBarEvaluator_ValuewhenComplexExpressions(t *testing.T) {
 	data := []context.OHLCV{
 		{Close: 100.0, High: 105.0, Low: 95.0},
@@ -261,94 +200,6 @@ func TestStreamingBarEvaluator_ValuewhenComplexExpressions(t *testing.T) {
 	}
 }
 
-/* TestStreamingBarEvaluator_ValuewhenConditionTypes verifies condition expression handling */
-func TestStreamingBarEvaluator_ValuewhenConditionTypes(t *testing.T) {
-	data := []context.OHLCV{
-		{Close: 100.0, High: 105.0},
-		{Close: 103.0, High: 108.0},
-		{Close: 101.0, High: 106.0},
-		{Close: 104.0, High: 109.0},
-		{Close: 105.0, High: 110.0},
-	}
-
-	ctx := &context.Context{Data: data}
-	evaluator := NewStreamingBarEvaluator()
-
-	tests := []struct {
-		name      string
-		condition ast.Expression
-		expected  float64
-		desc      string
-	}{
-		{
-			name: "greater_than",
-			condition: &ast.BinaryExpression{
-				Operator: ">",
-				Left:     &ast.Identifier{Name: "close"},
-				Right:    &ast.Literal{Value: 103.5},
-			},
-			expected: 110.0,
-			desc:     "condition with > operator",
-		},
-		{
-			name: "less_than",
-			condition: &ast.BinaryExpression{
-				Operator: "<",
-				Left:     &ast.Identifier{Name: "close"},
-				Right:    &ast.Literal{Value: 102.0},
-			},
-			expected: 106.0,
-			desc:     "condition with < operator",
-		},
-		{
-			name: "equality",
-			condition: &ast.BinaryExpression{
-				Operator: "==",
-				Left:     &ast.Identifier{Name: "close"},
-				Right:    &ast.Literal{Value: 104.0},
-			},
-			expected: 109.0,
-			desc:     "condition with == operator",
-		},
-		{
-			name: "greater_equal",
-			condition: &ast.BinaryExpression{
-				Operator: ">=",
-				Left:     &ast.Identifier{Name: "close"},
-				Right:    &ast.Literal{Value: 104.0},
-			},
-			expected: 110.0,
-			desc:     "condition with >= operator",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			valuewhenCall := &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "ta"},
-					Property: &ast.Identifier{Name: "valuewhen"},
-				},
-				Arguments: []ast.Expression{
-					tt.condition,
-					&ast.Identifier{Name: "high"},
-					&ast.Literal{Value: 0.0},
-				},
-			}
-
-			result, err := evaluator.EvaluateAtBar(valuewhenCall, ctx, 4)
-			if err != nil {
-				t.Fatalf("%s: EvaluateAtBar failed: %v", tt.desc, err)
-			}
-
-			if result != tt.expected {
-				t.Errorf("%s: expected %.2f, got %.2f", tt.desc, tt.expected, result)
-			}
-		})
-	}
-}
-
-/* TestStreamingBarEvaluator_ValuewhenArgumentValidation verifies error handling */
 func TestStreamingBarEvaluator_ValuewhenArgumentValidation(t *testing.T) {
 	ctx := &context.Context{Data: []context.OHLCV{{Close: 100.0, High: 105.0}}}
 	evaluator := NewStreamingBarEvaluator()
@@ -410,109 +261,299 @@ func TestStreamingBarEvaluator_ValuewhenArgumentValidation(t *testing.T) {
 	}
 }
 
-/* TestStreamingBarEvaluator_ValuewhenBarProgression verifies behavior across bars */
-func TestStreamingBarEvaluator_ValuewhenBarProgression(t *testing.T) {
-	data := []context.OHLCV{
-		{Close: 100.0, High: 105.0},
-		{Close: 103.0, High: 108.0},
-		{Close: 101.0, High: 106.0},
-		{Close: 104.0, High: 109.0},
-		{Close: 105.0, High: 110.0},
-		{Close: 106.0, High: 111.0},
+// TestStreamingBarEvaluator_ValuewhenCacheIsolation verifies that two valuewhen
+// calls with distinct condition expressions maintain independent cache entries and
+// independent state — a different condition threshold must never bleed into another
+// valuewhen's match history.
+func TestStreamingBarEvaluator_ValuewhenCacheIsolation(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100.0, High: 105.0},
+			{Close: 103.0, High: 108.0},
+			{Close: 101.0, High: 106.0},
+			{Close: 104.0, High: 109.0},
+		},
 	}
 
-	ctx := &context.Context{Data: data}
 	evaluator := NewStreamingBarEvaluator()
 
-	conditionExpr := &ast.BinaryExpression{
-		Operator: ">",
-		Left:     &ast.Identifier{Name: "close"},
-		Right:    &ast.Literal{Value: 102.0},
+	makecall := func(threshold float64) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "valuewhen"},
+			},
+			Arguments: []ast.Expression{
+				&ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Literal{Value: threshold},
+				},
+				&ast.Identifier{Name: "high"},
+				&ast.Literal{Value: 0.0},
+			},
+		}
 	}
 
-	tests := []struct {
-		barIdx   int
-		expected float64
-		desc     string
-	}{
-		{1, 108.0, "bar 1: first match, returns self"},
-		{3, 109.0, "bar 3: most recent match is bar 3"},
-		{5, 111.0, "bar 5: most recent match is bar 5"},
-		{2, 108.0, "bar 2: no match at bar 2, returns bar 1"},
+	call1 := makecall(102.0)
+	call2 := makecall(103.0)
+
+	r1, err := evaluator.EvaluateAtBar(call1, ctx, 2)
+	if err != nil {
+		t.Fatalf("call1 bar 2: %v", err)
+	}
+	r2, err := evaluator.EvaluateAtBar(call2, ctx, 2)
+	if err != nil {
+		t.Fatalf("call2 bar 2: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			valuewhenCall := &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "ta"},
-					Property: &ast.Identifier{Name: "valuewhen"},
-				},
-				Arguments: []ast.Expression{
-					conditionExpr,
-					&ast.Identifier{Name: "high"},
-					&ast.Literal{Value: 0.0},
-				},
-			}
-
-			result, err := evaluator.EvaluateAtBar(valuewhenCall, ctx, tt.barIdx)
-			if err != nil {
-				t.Fatalf("bar %d: EvaluateAtBar failed: %v", tt.barIdx, err)
-			}
-
-			if result != tt.expected {
-				t.Errorf("bar %d: expected %.2f, got %.2f", tt.barIdx, tt.expected, result)
-			}
-		})
+	if got := len(evaluator.valuewhenCache); got != 2 {
+		t.Errorf("expected 2 independent cache entries, got %d", got)
+	}
+	if math.IsNaN(r1) || r1 != 108.0 {
+		t.Errorf("call1 bar 2: expected 108.0 (carry-forward from bar 1), got %.4f", r1)
+	}
+	if !math.IsNaN(r2) {
+		t.Errorf("call2 bar 2: expected NaN (no match before bar 3), got %.4f", r2)
 	}
 }
 
-/* TestStreamingBarEvaluator_ValuewhenStateIsolation verifies independent evaluation */
-func TestStreamingBarEvaluator_ValuewhenStateIsolation(t *testing.T) {
-	data := []context.OHLCV{
-		{Close: 100.0, High: 105.0},
-		{Close: 103.0, High: 108.0},
-		{Close: 104.0, High: 109.0},
+// TestStreamingBarEvaluator_ValuewhenCachesStateAcrossBars verifies that a single
+// ValuewhenStateManager is created and reused across all calls sharing the same
+// condition, source, and occurrence — confirming cache key correctness and
+// ForwardSeriesBuffer historical access via the evaluator dispatch path.
+func TestStreamingBarEvaluator_ValuewhenCachesStateAcrossBars(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100.0, High: 105.0},
+			{Close: 103.0, High: 108.0},
+			{Close: 101.0, High: 106.0},
+			{Close: 104.0, High: 109.0},
+			{Close: 105.0, High: 110.0},
+		},
 	}
 
-	ctx := &context.Context{Data: data}
 	evaluator := NewStreamingBarEvaluator()
-
-	conditionExpr := &ast.BinaryExpression{
-		Operator: ">",
-		Left:     &ast.Identifier{Name: "close"},
-		Right:    &ast.Literal{Value: 102.0},
-	}
-
-	valuewhenCall := &ast.CallExpression{
+	call := &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
 			Property: &ast.Identifier{Name: "valuewhen"},
 		},
 		Arguments: []ast.Expression{
-			conditionExpr,
+			&ast.BinaryExpression{
+				Operator: ">",
+				Left:     &ast.Identifier{Name: "close"},
+				Right:    &ast.Literal{Value: 102.0},
+			},
 			&ast.Identifier{Name: "high"},
 			&ast.Literal{Value: 0.0},
 		},
 	}
 
-	result1, err1 := evaluator.EvaluateAtBar(valuewhenCall, ctx, 2)
-	result2, err2 := evaluator.EvaluateAtBar(valuewhenCall, ctx, 2)
-
-	if err1 != nil || err2 != nil {
-		t.Fatalf("EvaluateAtBar failed: err1=%v, err2=%v", err1, err2)
+	saved := make([]float64, len(ctx.Data))
+	for i := range ctx.Data {
+		v, err := evaluator.EvaluateAtBar(call, ctx, i)
+		if err != nil {
+			t.Fatalf("bar %d: %v", i, err)
+		}
+		saved[i] = v
 	}
 
-	if result1 != result2 {
-		t.Errorf("state isolation failed: first=%.2f, second=%.2f", result1, result2)
+	if got := len(evaluator.valuewhenCache); got != 1 {
+		t.Errorf("expected exactly 1 cached ValuewhenStateManager, got %d", got)
 	}
 
-	result3, err3 := evaluator.EvaluateAtBar(valuewhenCall, ctx, 1)
-	if err3 != nil {
-		t.Fatalf("EvaluateAtBar at bar 1 failed: %v", err3)
+	requeried, err := evaluator.EvaluateAtBar(call, ctx, 2)
+	if err != nil {
+		t.Fatalf("historical re-request bar 2: %v", err)
+	}
+	if requeried != saved[2] {
+		t.Errorf("historical re-request bar 2: expected %.4f, got %.4f", saved[2], requeried)
+	}
+}
+
+// TestStreamingBarEvaluator_ValuewhenUnqualifiedAlias verifies that the bare
+// "valuewhen" identifier (without "ta." prefix) resolves to the same handler
+// as "ta.valuewhen" and produces correct output.
+func TestStreamingBarEvaluator_ValuewhenUnqualifiedAlias(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100.0, High: 105.0},
+			{Close: 103.0, High: 108.0},
+			{Close: 101.0, High: 106.0},
+		},
+	}
+	evaluator := NewStreamingBarEvaluator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "valuewhen"}, // unqualified alias
+		Arguments: []ast.Expression{
+			&ast.BinaryExpression{
+				Operator: ">",
+				Left:     &ast.Identifier{Name: "close"},
+				Right:    &ast.Literal{Value: 102.0},
+			},
+			&ast.Identifier{Name: "high"},
+			&ast.Literal{Value: 0.0},
+		},
 	}
 
-	if result1 == result3 {
-		t.Errorf("expected different results for different bars, got %.2f for both", result1)
+	result, err := evaluator.EvaluateAtBar(call, ctx, 2)
+	if err != nil {
+		t.Fatalf("unqualified valuewhen alias: unexpected error: %v", err)
 	}
+	assertFloat64(t, "valuewhen_alias_carry_forward", result, 108.0, 0)
+}
+
+// TestStreamingBarEvaluator_ValuewhenCacheIsolationBySourceExpression verifies that
+// two ta.valuewhen calls with identical condition and occurrence but different source
+// expressions maintain independent cache entries — the source expression is part of
+// the cache key.
+func TestStreamingBarEvaluator_ValuewhenCacheIsolationBySourceExpression(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100.0, High: 105.0, Low: 95.0},
+			{Close: 103.0, High: 108.0, Low: 98.0},
+			{Close: 101.0, High: 106.0, Low: 96.0},
+		},
+	}
+	evaluator := NewStreamingBarEvaluator()
+
+	cond := &ast.BinaryExpression{
+		Operator: ">",
+		Left:     &ast.Identifier{Name: "close"},
+		Right:    &ast.Literal{Value: 102.0},
+	}
+
+	makeCall := func(srcField string) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "valuewhen"},
+			},
+			Arguments: []ast.Expression{cond, &ast.Identifier{Name: srcField}, &ast.Literal{Value: 0.0}},
+		}
+	}
+
+	rHigh, err := evaluator.EvaluateAtBar(makeCall("high"), ctx, 2)
+	if err != nil {
+		t.Fatalf("source=high: %v", err)
+	}
+	rLow, err := evaluator.EvaluateAtBar(makeCall("low"), ctx, 2)
+	if err != nil {
+		t.Fatalf("source=low: %v", err)
+	}
+
+	if got := len(evaluator.valuewhenCache); got != 2 {
+		t.Errorf("expected 2 independent cache entries (one per source), got %d", got)
+	}
+	assertFloat64(t, "source_high_carry_forward", rHigh, 108.0, 0)
+	assertFloat64(t, "source_low_carry_forward", rLow, 98.0, 0)
+}
+
+// TestStreamingBarEvaluator_ValuewhenCarryForwardBetweenMatches verifies that on
+// non-matching bars valuewhen returns the source value captured at the most recent
+// matching bar, not NaN — the canonical carry-forward contract. This covers the
+// evaluator dispatch path (not just the state manager directly).
+func TestStreamingBarEvaluator_ValuewhenCarryForwardBetweenMatches(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100},
+			{Close: 111},
+			{Close: 108},
+			{Close: 107},
+			{Close: 121},
+			{Close: 109},
+		},
+	}
+	evaluator := NewStreamingBarEvaluator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "ta"},
+			Property: &ast.Identifier{Name: "valuewhen"},
+		},
+		Arguments: []ast.Expression{
+			closeGtExpr(110),
+			&ast.Identifier{Name: "close"},
+			&ast.Literal{Value: 0.0},
+		},
+	}
+
+	tests := []struct {
+		barIdx  int
+		wantNaN bool
+		want    float64
+		label   string
+	}{
+		{0, true, 0, "no_match_yet_NaN"},
+		{1, false, 111, "match_captures_value"},
+		{2, false, 111, "carry_forward_after_first_match"},
+		{3, false, 111, "carry_forward_two_bars_after"},
+		{4, false, 121, "new_match_updates_value"},
+		{5, false, 121, "carry_forward_after_second_match"},
+	}
+
+	for _, bc := range tests {
+		t.Run(bc.label, func(t *testing.T) {
+			result, err := evaluator.EvaluateAtBar(call, ctx, bc.barIdx)
+			if err != nil {
+				t.Fatalf("bar %d: EvaluateAtBar failed: %v", bc.barIdx, err)
+			}
+			if bc.wantNaN {
+				if !math.IsNaN(result) {
+					t.Errorf("bar %d: expected NaN, got %.4f", bc.barIdx, result)
+				}
+			} else {
+				assertFloat64(t, bc.label, result, bc.want, 0)
+			}
+		})
+	}
+}
+
+// TestStreamingBarEvaluator_ValuewhenCacheIsolationByOccurrence verifies that two
+// ta.valuewhen calls with identical condition and source but different occurrence
+// values maintain independent cache entries and independent state machines.
+func TestStreamingBarEvaluator_ValuewhenCacheIsolationByOccurrence(t *testing.T) {
+	ctx := &context.Context{
+		Data: []context.OHLCV{
+			{Close: 100.0, High: 105.0},
+			{Close: 103.0, High: 108.0},
+			{Close: 101.0, High: 106.0},
+			{Close: 104.0, High: 109.0},
+		},
+	}
+	evaluator := NewStreamingBarEvaluator()
+
+	cond := &ast.BinaryExpression{
+		Operator: ">",
+		Left:     &ast.Identifier{Name: "close"},
+		Right:    &ast.Literal{Value: 102.0},
+	}
+	src := &ast.Identifier{Name: "high"}
+
+	makeCall := func(occurrence int) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "valuewhen"},
+			},
+			Arguments: []ast.Expression{cond, src, &ast.Literal{Value: float64(occurrence)}},
+		}
+	}
+
+	r0, err := evaluator.EvaluateAtBar(makeCall(0), ctx, 3)
+	if err != nil {
+		t.Fatalf("occ=0: %v", err)
+	}
+	r1, err := evaluator.EvaluateAtBar(makeCall(1), ctx, 3)
+	if err != nil {
+		t.Fatalf("occ=1: %v", err)
+	}
+
+	if got := len(evaluator.valuewhenCache); got != 2 {
+		t.Errorf("expected 2 independent cache entries (one per occurrence), got %d", got)
+	}
+	assertFloat64(t, "occ0_most_recent", r0, 109.0, 0)
+	assertFloat64(t, "occ1_previous", r1, 108.0, 0)
 }

@@ -97,6 +97,40 @@ func extractSingleExpressionArgument(call *ast.CallExpression, funcName string) 
 	return call.Arguments[0], nil
 }
 
+func extractPivotArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (ast.Expression, int, int, error) {
+	funcName := extractCallFunctionName(call.Callee)
+
+	if len(call.Arguments) == 2 {
+		leftBars, err := extractNumberLiteral(call.Arguments[0], inputConstantsMap...)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		rightBars, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		defaultSource := "high"
+		if funcName == "ta.pivotlow" {
+			defaultSource = "low"
+		}
+		return &ast.Identifier{Name: defaultSource}, int(leftBars), int(rightBars), nil
+	}
+
+	if len(call.Arguments) < 3 {
+		return nil, 0, 0, newInsufficientArgumentsError(funcName, 3, len(call.Arguments))
+	}
+
+	leftBars, err := extractNumberLiteral(call.Arguments[1], inputConstantsMap...)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	rightBars, err := extractNumberLiteral(call.Arguments[2], inputConstantsMap...)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return call.Arguments[0], int(leftBars), int(rightBars), nil
+}
+
 func extractValuewhenArguments(call *ast.CallExpression, inputConstantsMap ...map[string]float64) (ast.Expression, ast.Expression, int, error) {
 	funcName := extractCallFunctionName(call.Callee)
 

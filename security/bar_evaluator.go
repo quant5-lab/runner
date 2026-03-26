@@ -24,9 +24,10 @@ type VarLookupFunc func(varName string, secBarIdx int) (*series.Series, int, boo
 
 type StreamingBarEvaluator struct {
 	taStateCache      map[string]TAStateManager
+	pivotStateCache   map[string]*PivotStateManager
 	volumeStateCache  map[string]*volumeIndicatorState
 	barsSinceCache    map[*ast.CallExpression]*BarsSinceStateManager
-	valuewhenCache    map[*ast.CallExpression]*ValuewhenStateManager
+	valuewhenCache    map[string]*ValuewhenStateManager
 	fixnanEvaluator   *FixnanEvaluator
 	varRegistry       *VariableRegistry
 	secBarMapper      *BarIndexMapper
@@ -37,9 +38,10 @@ type StreamingBarEvaluator struct {
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
 		taStateCache:     make(map[string]TAStateManager),
+		pivotStateCache:  make(map[string]*PivotStateManager),
 		volumeStateCache: make(map[string]*volumeIndicatorState),
 		barsSinceCache:   make(map[*ast.CallExpression]*BarsSinceStateManager),
-		valuewhenCache:   make(map[*ast.CallExpression]*ValuewhenStateManager),
+		valuewhenCache:   make(map[string]*ValuewhenStateManager),
 		fixnanEvaluator: NewFixnanEvaluator(
 			NewMapStateStorage(),
 			NewSequentialWarmupStrategy(),
@@ -448,42 +450,6 @@ func (e *StreamingBarEvaluator) evaluateConditionalExpressionAtBar(expr *ast.Con
 		return e.EvaluateAtBar(expr.Consequent, secCtx, barIdx)
 	}
 	return e.EvaluateAtBar(expr.Alternate, secCtx, barIdx)
-}
-
-func (e *StreamingBarEvaluator) evaluatePivotHighAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, leftBars, rightBars, err := extractPivotArguments(call, e.inputConstantsMap)
-	if err != nil {
-		return 0.0, err
-	}
-
-	evaluator := NewDelayedPivotHighEvaluator(leftBars, rightBars)
-	return evaluator.EvaluateAtBar(secCtx.Data, sourceID.Name, barIdx), nil
-}
-
-func (e *StreamingBarEvaluator) evaluatePivotLowAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	sourceID, leftBars, rightBars, err := extractPivotArguments(call, e.inputConstantsMap)
-	if err != nil {
-		return 0.0, err
-	}
-
-	evaluator := NewDelayedPivotLowEvaluator(leftBars, rightBars)
-	return evaluator.EvaluateAtBar(secCtx.Data, sourceID.Name, barIdx), nil
-}
-
-func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	conditionExpr, sourceExpr, occurrence, err := extractValuewhenArguments(call, e.inputConstantsMap)
-	if err != nil {
-		return 0.0, err
-	}
-
-	state, cached := e.valuewhenCache[call]
-	if !cached {
-		cacheKey := buildValuewhenCacheKey(conditionExpr, sourceExpr, occurrence)
-		state = NewValuewhenStateManager(cacheKey, occurrence, conditionExpr, sourceExpr, len(secCtx.Data), e)
-		e.valuewhenCache[call] = state
-	}
-
-	return state.ComputeAtBar(secCtx, nil, barIdx)
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
@@ -952,9 +918,6 @@ func init() {
 	registerCallHandler("ta.bbw", (*StreamingBarEvaluator).evaluateBBWAtBar)
 	registerCallHandler("ta.cog", (*StreamingBarEvaluator).evaluateCOGAtBar)
 	registerCallHandler("ta.tsi", (*StreamingBarEvaluator).evaluateTSIAtBar)
-	registerCallHandler("ta.pivothigh", (*StreamingBarEvaluator).evaluatePivotHighAtBar)
-	registerCallHandler("ta.pivotlow", (*StreamingBarEvaluator).evaluatePivotLowAtBar)
-	registerCallHandlerAliases((*StreamingBarEvaluator).evaluateValuewhenAtBar, "ta.valuewhen", "valuewhen")
 	registerCallHandlerAliases((*StreamingBarEvaluator).fixnanCallAtBar, "fixnan", "ta.fixnan")
 	registerCallHandler("ta.percentrank", (*StreamingBarEvaluator).evaluatePercentrankAtBar)
 	registerCallHandler("ta.percentile_nearest_rank", (*StreamingBarEvaluator).evaluatePercentileNearestRankAtBar)
