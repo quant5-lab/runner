@@ -17,7 +17,9 @@ func TestArrayConstructorHandler_CanHandle(t *testing.T) {
 		{"array.new_float", true},
 		{"array.new_int", true},
 		{"array.new_bool", true},
+		{"array.new_color", true},
 		{"array.from", true},
+		{"array.new_string", false},
 		{"array.push", false},
 		{"array.get", false},
 		{"ta.sma", false},
@@ -136,6 +138,34 @@ func TestArrayConstructorHandler_GenerateFrom(t *testing.T) {
 	}
 	if !strings.Contains(code, "1") || !strings.Contains(code, "2") || !strings.Contains(code, "3") {
 		t.Errorf("Expected elements 1, 2, 3, got %q", code)
+	}
+}
+
+func TestArrayConstructorHandler_GenerateNewColor(t *testing.T) {
+	handler := NewArrayConstructorHandler()
+	g := createMockGenerator()
+
+	call := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "array"},
+			Property: &ast.Identifier{Name: "new_color"},
+		},
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: 3.0},
+			&ast.Identifier{Name: "color.red"},
+		},
+	}
+
+	code, err := handler.GenerateCode(g, call)
+	if err != nil {
+		t.Fatalf("GenerateCode failed: %v", err)
+	}
+
+	if !strings.Contains(code, "arrayops.NewArrayWithValue") {
+		t.Errorf("Expected arrayops.NewArrayWithValue call, got %q", code)
+	}
+	if !strings.Contains(code, "int(3)") {
+		t.Errorf("Expected size parameter int(3), got %q", code)
 	}
 }
 

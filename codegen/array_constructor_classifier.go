@@ -8,7 +8,19 @@ func NewArrayConstructorClassifier() *ArrayConstructorClassifier {
 
 func (c *ArrayConstructorClassifier) IsArrayConstructor(funcName string) bool {
 	switch funcName {
-	case "array.new_float", "array.new_int", "array.new_bool", "array.from":
+	case "array.new_float", "array.new_int", "array.new_bool", "array.new_color", "array.from":
+		return true
+	}
+	return false
+}
+
+func (c *ArrayConstructorClassifier) IsStringArrayConstructor(funcName string) bool {
+	return false
+}
+
+func (c *ArrayConstructorClassifier) IsNumericArrayConstructor(funcName string) bool {
+	switch funcName {
+	case "array.new_float", "array.new_int", "array.new_bool", "array.new_color":
 		return true
 	}
 	return false
@@ -33,7 +45,10 @@ func (c *ArrayConstructorClassifier) IsReadOnlyMethod(funcName string) bool {
 		"array.median", "array.mode", "array.stdev", "array.variance",
 		"array.range", "array.percentile_linear_interpolation",
 		"array.percentile_nearest_rank", "array.percentrank",
-		"array.covariance", "array.standardize", "array.abs":
+		"array.covariance", "array.standardize", "array.abs",
+		"array.binary_search", "array.binary_search_leftmost",
+		"array.binary_search_rightmost", "array.every", "array.some",
+		"array.join":
 		return true
 	}
 	return false

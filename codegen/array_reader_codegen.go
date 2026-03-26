@@ -67,6 +67,18 @@ func (h *ArrayReaderCodegen) GenerateCode(g *generator, call *ast.CallExpression
 		return h.generateStandardize(g, call)
 	case "array.abs":
 		return h.generateAbs(g, call)
+	case "array.binary_search":
+		return h.generateBinarySearch(g, call, "BinarySearch")
+	case "array.binary_search_leftmost":
+		return h.generateBinarySearch(g, call, "BinarySearchLeftmost")
+	case "array.binary_search_rightmost":
+		return h.generateBinarySearch(g, call, "BinarySearchRightmost")
+	case "array.every":
+		return h.generatePredicate(g, call, "array.every", "Every")
+	case "array.some":
+		return h.generatePredicate(g, call, "array.some", "Some")
+	case "array.join":
+		return h.generateJoin(g, call)
 	}
 
 	return "", nil
@@ -434,6 +446,59 @@ func (h *ArrayReaderCodegen) generateSimpleStatistic(g *generator, call *ast.Cal
 	}
 
 	return fmt.Sprintf("arrayops.NewStatistics().%s(%sArraySeries, %d)", method, arrayVar, offset), nil
+}
+
+func (h *ArrayReaderCodegen) generateBinarySearch(g *generator, call *ast.CallExpression, method string) (string, error) {
+	if len(call.Arguments) != 2 {
+		return "", fmt.Errorf("array.%s requires 2 arguments, got %d", method, len(call.Arguments))
+	}
+
+	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("array.%s: %w", method, err)
+	}
+
+	valueCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("array.%s: value: %w", method, err)
+	}
+
+	return fmt.Sprintf("float64(arrayops.NewSearch().%s(%sArraySeries, %d, %s))", method, arrayVar, offset, valueCode), nil
+}
+
+func (h *ArrayReaderCodegen) generatePredicate(g *generator, call *ast.CallExpression, funcName, method string) (string, error) {
+	if len(call.Arguments) != 1 {
+		return "", fmt.Errorf("%s requires 1 argument, got %d", funcName, len(call.Arguments))
+	}
+
+	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", funcName, err)
+	}
+
+	return fmt.Sprintf("func() float64 { if arrayops.NewPredicates().%s(%sArraySeries, %d) { return 1.0 }; return 0.0 }()", method, arrayVar, offset), nil
+}
+
+func (h *ArrayReaderCodegen) generateJoin(g *generator, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 || len(call.Arguments) > 2 {
+		return "", fmt.Errorf("array.join requires 1-2 arguments, got %d", len(call.Arguments))
+	}
+
+	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("array.join: %w", err)
+	}
+
+	separator := `", "`
+	if len(call.Arguments) == 2 {
+		sepCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
+		if err != nil {
+			return "", fmt.Errorf("array.join: separator: %w", err)
+		}
+		separator = sepCode
+	}
+
+	return fmt.Sprintf("arrayops.NewFormatters().Join(%sArraySeries, %d, %s)", arrayVar, offset, separator), nil
 }
 
 func (h *ArrayReaderCodegen) extractArrayAccess(g *generator, arg ast.Expression) (arrayVar string, offset int, err error) {

@@ -1317,6 +1317,9 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 		return e.Name, nil
 
 	case *ast.Literal:
+		if s, ok := e.Value.(string); ok {
+			return fmt.Sprintf("%q", s), nil
+		}
 		return fmt.Sprintf("%v", e.Value), nil
 
 	case *ast.CallExpression:
@@ -2151,6 +2154,14 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				return "", err
 			}
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, colorCode), nil
+		}
+		if funcName == "array.join" {
+			readerCodegen := NewArrayReaderCodegen()
+			joinCode, err := readerCodegen.GenerateCode(g, expr)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, joinCode), nil
 		}
 		return "", fmt.Errorf("unsupported call expression for string variable: %s", funcName)
 

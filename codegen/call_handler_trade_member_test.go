@@ -63,7 +63,7 @@ func TestTradeCollectionCallHandler_GenerateCode(t *testing.T) {
 					Property: &ast.Identifier{Name: "profit"},
 				},
 				Arguments: []ast.Expression{
-					&ast.Literal{Value: "5"},
+					&ast.Literal{Value: 5.0},
 				},
 			},
 			wantCode: "tradeAccessor.ClosedTradeProfit(int(5))",
@@ -97,7 +97,7 @@ func TestTradeCollectionCallHandler_GenerateCode(t *testing.T) {
 					Property: &ast.Identifier{Name: "size"},
 				},
 				Arguments: []ast.Expression{
-					&ast.Literal{Value: "0"},
+					&ast.Literal{Value: 0.0},
 				},
 			},
 			wantCode: "tradeAccessor.ClosedTradeSize(int(0))",
@@ -182,7 +182,7 @@ func TestTradeCollectionCallHandler_IntegrationWithRouter(t *testing.T) {
 			Property: &ast.Identifier{Name: "profit"},
 		},
 		Arguments: []ast.Expression{
-			&ast.Literal{Value: "0"},
+			&ast.Literal{Value: 0.0},
 		},
 	}
 

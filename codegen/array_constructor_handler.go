@@ -21,13 +21,11 @@ func (h *ArrayConstructorHandler) GenerateCode(g *generator, call *ast.CallExpre
 	funcName := extractCallFunctionName(call)
 
 	switch funcName {
-	case "array.new_float", "array.new_int", "array.new_bool":
-		return h.generateNewArray(g, call)
 	case "array.from":
 		return h.generateFrom(g, call)
+	default:
+		return h.generateNewArray(g, call)
 	}
-
-	return "", nil
 }
 
 func (h *ArrayConstructorHandler) generateNewArray(g *generator, call *ast.CallExpression) (string, error) {

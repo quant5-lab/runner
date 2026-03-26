@@ -126,6 +126,9 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	if retType := ColorFunctionReturnType(funcName); retType != "" {
 		return retType
 	}
+	if funcName == "array.join" {
+		return "string"
+	}
 
 	return "float64"
 }
