@@ -99,3 +99,29 @@ func TestNeedsParentheses(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeLogicalOperator(t *testing.T) {
+	tests := []struct {
+		pine     string
+		expected string
+	}{
+		{"and", "&&"},
+		{"or", "||"},
+		{"not", "!"},
+		{"&&", "&&"},
+		{"||", "||"},
+		{"!", "!"},
+		{"+", "+"},
+		{"-", "-"},
+		{"*", "*"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pine, func(t *testing.T) {
+			got := NormalizeLogicalOperator(tt.pine)
+			if got != tt.expected {
+				t.Errorf("NormalizeLogicalOperator(%q) = %q, want %q", tt.pine, got, tt.expected)
+			}
+		})
+	}
+}

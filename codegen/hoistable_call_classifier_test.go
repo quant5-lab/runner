@@ -52,6 +52,8 @@ func TestHoistableCallClassifier_StatefulValueFunctions(t *testing.T) {
 		expected bool
 	}{
 		{"fixnan", "fixnan", true},
+		{"valuewhen", "valuewhen", true},
+		{"ta.valuewhen", "ta.valuewhen", true},
 	}
 
 	for _, tt := range tests {
@@ -78,6 +80,8 @@ func TestHoistableCallClassifier_IsStatefulValueFunction(t *testing.T) {
 		expected bool
 	}{
 		{"fixnan is stateful", "fixnan", true},
+		{"valuewhen is stateful", "valuewhen", true},
+		{"ta.valuewhen is stateful", "ta.valuewhen", true},
 		{"ta.sma not stateful value", "ta.sma", false},
 		{"nz not stateful value", "nz", false},
 		{"math.abs not stateful value", "math.abs", false},

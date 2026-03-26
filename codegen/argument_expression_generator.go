@@ -229,14 +229,7 @@ func (g *ArgumentExpressionGenerator) generateLogicalExpression(logical *ast.Log
 	leftCode = g.generator.ensureBooleanOperand(logical.Left, leftCode)
 	rightCode = g.generator.ensureBooleanOperand(logical.Right, rightCode)
 
-	op := logical.Operator
-	switch op {
-	case "and":
-		op = "&&"
-	case "or":
-		op = "||"
-	}
-
+	op := NormalizeLogicalOperator(logical.Operator)
 	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
 }
 

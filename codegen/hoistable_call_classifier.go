@@ -5,7 +5,9 @@ import (
 )
 
 var defaultStatefulValueFunctions = map[string]bool{
-	"fixnan": true,
+	"fixnan":       true,
+	"valuewhen":    true,
+	"ta.valuewhen": true,
 }
 
 type HoistableCallClassifier struct {

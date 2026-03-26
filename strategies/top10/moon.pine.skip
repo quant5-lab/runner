@@ -1,8 +1,0 @@
-Moon Phases Strategy (v4) — lunar cycle trading with valuewhen()
-
-Parse: ✅ (v4→v5 preprocessing)
-Generate: ✅
-Compile: ❌ (undefined: valuewhen_*Series, non-boolean condition in if statement)
-Execute: ❌ Not reached
-
-Blocker: #5 (valuewhen codegen emits undefined series vars, non-boolean conditions). Resolved: UDF/arrow scope calendar builtins

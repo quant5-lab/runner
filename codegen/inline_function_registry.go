@@ -12,10 +12,7 @@ type InlineFunctionRegistry struct {
 // NewInlineFunctionRegistry creates registry with known inline-only functions
 func NewInlineFunctionRegistry() *InlineFunctionRegistry {
 	return &InlineFunctionRegistry{
-		inlineFunctions: map[string]bool{
-			"valuewhen":    true,
-			"ta.valuewhen": true,
-		},
+		inlineFunctions: map[string]bool{},
 	}
 }
 

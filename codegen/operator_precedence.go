@@ -58,3 +58,16 @@ func NeedsParentheses(childOp string, parentOp string, isRightChild bool) bool {
 
 	return false
 }
+
+func NormalizeLogicalOperator(pineOperator string) string {
+	switch pineOperator {
+	case "and":
+		return "&&"
+	case "or":
+		return "||"
+	case "not":
+		return "!"
+	default:
+		return pineOperator
+	}
+}

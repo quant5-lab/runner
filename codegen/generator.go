@@ -1393,14 +1393,7 @@ func (g *generator) generateLogicalExpression(logExpr *ast.LogicalExpression) (s
 		return "", err
 	}
 
-	op := logExpr.Operator
-	switch op {
-	case "and":
-		op = "&&"
-	case "or":
-		op = "||"
-	}
-
+	op := NormalizeLogicalOperator(logExpr.Operator)
 	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
 }
 
@@ -1563,13 +1556,7 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 		leftCode = g.ensureBooleanOperand(e.Left, leftCode)
 		rightCode = g.ensureBooleanOperand(e.Right, rightCode)
 
-		op := e.Operator
-		switch op {
-		case "and":
-			op = "&&"
-		case "or":
-			op = "||"
-		}
+		op := NormalizeLogicalOperator(e.Operator)
 		return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
 
 	case *ast.BinaryExpression:
@@ -1595,15 +1582,7 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			return "", err
 		}
 
-		// Map Pine operators to Go operators
-		op := e.Operator
-		switch op {
-		case "and":
-			op = "&&"
-		case "or":
-			op = "||"
-		}
-
+		op := NormalizeLogicalOperator(e.Operator)
 		return fmt.Sprintf("(%s %s %s)", left, op, right), nil
 
 	case *ast.MemberExpression:
@@ -3166,13 +3145,14 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		/* Binary expressions should be formatted with operator precedence */
 		formatter := NewBinaryExpressionFormatterWithExtractor(g.extractSeriesExpression)
 		return formatter.formatWithExtractor(e)
+	case *ast.LogicalExpression:
+		left := g.extractSeriesExpression(e.Left)
+		right := g.extractSeriesExpression(e.Right)
+		op := NormalizeLogicalOperator(e.Operator)
+		return fmt.Sprintf("(value.IsTrue(%s) %s value.IsTrue(%s))", left, op, right)
 	case *ast.UnaryExpression:
-		/* Unary expression like -1, +x */
 		operand := g.extractSeriesExpression(e.Argument)
-		op := e.Operator
-		if op == "not" {
-			op = "!"
-		}
+		op := NormalizeLogicalOperator(e.Operator)
 		return fmt.Sprintf("%s%s", op, operand)
 	case *ast.CallExpression:
 		return g.extractCallExpression(e)
