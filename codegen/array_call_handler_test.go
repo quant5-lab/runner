@@ -49,16 +49,16 @@ func historySubscript(varName string, offset int) *ast.MemberExpression {
 // --- CanHandle ---
 
 func TestArrayMethodCallHandler_CanHandle(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 
-	accept := []string{"array.get", "array.size"}
+	accept := []string{"array.get", "array.size", "array.new_float", "array.push", "array.from", "array.sum"}
 	for _, name := range accept {
 		if !h.CanHandle(name) {
 			t.Errorf("ArrayMethodCallHandler must accept %q", name)
 		}
 	}
 
-	reject := []string{"array.new_float", "array.push", "array", "array.set", "ta.array", ""}
+	reject := []string{"array", "ta.array", ""}
 	for _, name := range reject {
 		if h.CanHandle(name) {
 			t.Errorf("ArrayMethodCallHandler must not accept %q", name)
@@ -69,7 +69,7 @@ func TestArrayMethodCallHandler_CanHandle(t *testing.T) {
 // --- array.get ---
 
 func TestArrayMethodCallHandler_Get_IdentifierCurrentBar(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	code, err := h.GenerateCode(g, arrayGetCall(
@@ -85,7 +85,7 @@ func TestArrayMethodCallHandler_Get_IdentifierCurrentBar(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_IdentifierNonZeroIndex(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	code, err := h.GenerateCode(g, arrayGetCall(
@@ -101,7 +101,7 @@ func TestArrayMethodCallHandler_Get_IdentifierNonZeroIndex(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_HistorySubscriptAccess(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	// array.get(levels[1], 0) — access previous bar's array element
@@ -118,7 +118,7 @@ func TestArrayMethodCallHandler_Get_HistorySubscriptAccess(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_HistorySubscriptLargerOffset(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("pivots")
 
 	// array.get(pivots[3], 2)
@@ -135,7 +135,7 @@ func TestArrayMethodCallHandler_Get_HistorySubscriptLargerOffset(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_DynamicIndexExpression(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	// array.get(levels, someVar)
@@ -155,7 +155,7 @@ func TestArrayMethodCallHandler_Get_DynamicIndexExpression(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_WrongArgCountReturnsError(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	for _, argCount := range []int{0, 1, 3} {
@@ -175,7 +175,7 @@ func TestArrayMethodCallHandler_Get_WrongArgCountReturnsError(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Get_NonArraySeriesVariableReturnsError(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newTestGenerator()
 	g.variables["myVar"] = "function" // not array_series
 
@@ -189,7 +189,7 @@ func TestArrayMethodCallHandler_Get_NonArraySeriesVariableReturnsError(t *testin
 }
 
 func TestArrayMethodCallHandler_Get_UnregisteredVariableReturnsError(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newTestGenerator() // levels not registered
 
 	_, err := h.GenerateCode(g, arrayGetCall(
@@ -204,7 +204,7 @@ func TestArrayMethodCallHandler_Get_UnregisteredVariableReturnsError(t *testing.
 // --- array.size ---
 
 func TestArrayMethodCallHandler_Size_Identifier(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	code, err := h.GenerateCode(g, arraySizeCall(&ast.Identifier{Name: "levels"}))
@@ -217,7 +217,7 @@ func TestArrayMethodCallHandler_Size_Identifier(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Size_HistorySubscript(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	// array.size(levels[2]) — size of previous bar's array
@@ -231,7 +231,7 @@ func TestArrayMethodCallHandler_Size_HistorySubscript(t *testing.T) {
 }
 
 func TestArrayMethodCallHandler_Size_WrongArgCountReturnsError(t *testing.T) {
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 	g := newGeneratorWithArrayVar("levels")
 
 	for _, argCount := range []int{0, 2, 3} {
@@ -299,7 +299,7 @@ func TestResolveSubscriptOffset_DynamicExpression(t *testing.T) {
 
 func TestArrayMethodCallHandler_RegisteredInRouter(t *testing.T) {
 	router := NewCallExpressionRouter()
-	h := &ArrayMethodCallHandler{}
+	h := NewArrayMethodCallHandler()
 
 	for _, name := range []string{"array.get", "array.size"} {
 		found := false

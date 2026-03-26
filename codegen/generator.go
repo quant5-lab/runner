@@ -998,7 +998,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 func (g *generator) generateStatement(node ast.Node) (string, error) {
 	switch n := node.(type) {
 	case *ast.ExpressionStatement:
-		return g.generateExpression(n.Expression)
+		exprCode, err := g.generateExpression(n.Expression)
+		if err != nil {
+			return "", err
+		}
+		if exprCode == "" {
+			return "", nil
+		}
+		return g.ind() + exprCode + "\n", nil
 	case *ast.VariableDeclaration:
 		return g.generateVariableDeclaration(n)
 	case *ast.IfStatement:
@@ -2422,6 +2429,17 @@ func (g *generator) generateVariableInit(varName string, initExpr ast.Expression
 
 func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpression) (string, error) {
 	funcName := g.extractFunctionName(call.Callee)
+
+	// Handle array constructors (array.new_*, array.from)
+	classifier := NewArrayConstructorClassifier()
+	if classifier.IsArrayConstructor(funcName) {
+		handler := NewArrayConstructorHandler()
+		initCode, err := handler.GenerateCode(g, call)
+		if err != nil {
+			return "", err
+		}
+		return g.ind() + fmt.Sprintf("%sArraySeries.Set(%s)\n", varName, initCode), nil
+	}
 
 	// Check if this is a user-defined function
 	if varType, exists := g.variables[funcName]; exists && varType == "function" {

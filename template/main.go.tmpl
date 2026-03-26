@@ -12,6 +12,7 @@ import (
 	"github.com/quant5-lab/runner/runtime/clock"
 	"encoding/json"
 
+	"github.com/quant5-lab/runner/runtime/arrayops"
 	"github.com/quant5-lab/runner/runtime/chartdata"
 	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/runtime/calendar"
@@ -31,6 +32,7 @@ var (
 	_ = math.IsNaN
 	_ = rand.Float64
 	_ = log.Printf
+	_ = arrayops.NewMutator
 	_ = session.Parse
 	_ = series.NewSeries
 	_ = datafetcher.NewFileFetcher

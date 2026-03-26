@@ -6,25 +6,63 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* ArrayMethodCallHandler: array.get(arr, index) and array.size(arr) for array_series variables.
- * arr may be an Identifier (current bar) or a computed MemberExpression arr[n] (history offset n).
- * Dynamic element indices are supported for array.get. */
-type ArrayMethodCallHandler struct{}
+/* ArrayMethodCallHandler: Dispatcher for all array.* operations.
+ * Delegates to specialized handlers based on function category:
+ *   - ArrayConstructorHandler: array.new_*, array.from
+ *   - ArrayMutatorCodegen: array.push, array.pop, array.set, etc.
+ *   - ArrayReaderCodegen: array.first, array.last, array.sum, etc.
+ *   - Direct methods: array.get, array.size (legacy implementation)
+ */
+type ArrayMethodCallHandler struct {
+	constructorHandler *ArrayConstructorHandler
+	mutatorCodegen     *ArrayMutatorCodegen
+	readerCodegen      *ArrayReaderCodegen
+}
+
+func NewArrayMethodCallHandler() *ArrayMethodCallHandler {
+	return &ArrayMethodCallHandler{
+		constructorHandler: NewArrayConstructorHandler(),
+		mutatorCodegen:     NewArrayMutatorCodegen(),
+		readerCodegen:      NewArrayReaderCodegen(),
+	}
+}
 
 func (h *ArrayMethodCallHandler) CanHandle(funcName string) bool {
-	return funcName == "array.get" || funcName == "array.size"
+	return h.isArrayNamespaceFunction(funcName)
 }
 
 func (h *ArrayMethodCallHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
+	// Handle direct legacy methods first (array.get, array.size)
 	switch funcName {
 	case "array.get":
 		return h.generateGet(g, call)
 	case "array.size":
 		return h.generateSize(g, call)
 	}
+
+	// Delegate to specialized handlers
+	if h.constructorHandler.CanHandle(funcName) {
+		return h.constructorHandler.GenerateCode(g, call)
+	}
+
+	if h.mutatorCodegen.CanHandle(funcName) {
+		return h.mutatorCodegen.GenerateCode(g, call)
+	}
+
+	if h.readerCodegen.CanHandle(funcName) {
+		return h.readerCodegen.GenerateCode(g, call)
+	}
+
 	return "", nil
+}
+
+func (h *ArrayMethodCallHandler) isArrayNamespaceFunction(funcName string) bool {
+	if len(funcName) < 6 {
+		return false
+	}
+	return funcName[:6] == "array."
 }
 
 func (h *ArrayMethodCallHandler) generateGet(g *generator, call *ast.CallExpression) (string, error) {

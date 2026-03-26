@@ -114,6 +114,9 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	if funcName == "input.bool" {
 		return "bool"
 	}
+	if te.isArrayConstructor(funcName) {
+		return "array_series"
+	}
 	if funcName == "ta.pivot_point_levels" || funcName == "pivot_point_levels" {
 		return "array_series"
 	}
@@ -125,6 +128,11 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	}
 
 	return "float64"
+}
+
+func (te *TypeInferenceEngine) isArrayConstructor(funcName string) bool {
+	classifier := NewArrayConstructorClassifier()
+	return classifier.IsArrayConstructor(funcName)
 }
 
 func (te *TypeInferenceEngine) IsBoolVariable(expr ast.Expression) bool {
