@@ -13,7 +13,7 @@ type ValuewhenStateManager struct {
 	occurrence    int
 	conditionExpr ast.Expression
 	sourceExpr    ast.Expression
-	matchIndices  []int
+	matchRing     *MatchIndexRing
 	computed      int
 	evaluator     BarEvaluator
 	resultBuf     *series.Series
@@ -32,7 +32,7 @@ func NewValuewhenStateManager(
 		occurrence:    occurrence,
 		conditionExpr: conditionExpr,
 		sourceExpr:    sourceExpr,
-		matchIndices:  make([]int, 0, 64),
+		matchRing:     NewMatchIndexRing(occurrence),
 		evaluator:     evaluator,
 		resultBuf:     series.NewSeries(max(capacity, 1)),
 	}
@@ -50,14 +50,13 @@ func (s *ValuewhenStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expr
 		}
 
 		if condVal != 0.0 {
-			s.matchIndices = append(s.matchIndices, s.computed)
+			s.matchRing.Push(s.computed)
 		}
 
-		matchCount := len(s.matchIndices)
-		if matchCount == 0 || s.occurrence >= matchCount {
+		targetIdx, found := s.matchRing.GetNthMostRecent(s.occurrence)
+		if !found {
 			s.resultBuf.Set(math.NaN())
 		} else {
-			targetIdx := s.matchIndices[matchCount-1-s.occurrence]
 			sourceVal, err := s.evaluator.EvaluateAtBar(s.sourceExpr, secCtx, targetIdx)
 			if err != nil {
 				return math.NaN(), err
