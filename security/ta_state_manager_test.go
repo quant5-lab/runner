@@ -75,6 +75,85 @@ func TestRMAStateManager_KnownValues(t *testing.T) {
 	}
 }
 
+func TestEMAStateManager_KnownValues(t *testing.T) {
+	// createContextWithBars closes: 100, 101, 102, 103, …
+	// EMA(3): alpha=2/(3+1)=0.5
+	// bar 0: seed=100   (NaN output, barIdx < period-1=2)
+	// bar 1: (100*1+101)/2 = 100.5  (NaN output)
+	// bar 2: (100.5*2+102)/3 = 101.0  ← first valid
+	// bar 3: 103*0.5 + 101.0*0.5 = 102.0
+	tests := []struct {
+		name   string
+		barIdx int
+		want   float64
+	}{
+		{"first valid bar", 2, 101.0},
+		{"first smoothed bar", 3, 102.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := createContextWithBars(20)
+			m := newEMAStateManager("ema_close_3", 3, 20, NewStreamingBarEvaluator())
+			src := &ast.Identifier{Name: "close"}
+
+			v, err := m.ComputeAtBar(ctx, src, tt.barIdx)
+			if err != nil {
+				t.Fatalf("bar %d: %v", tt.barIdx, err)
+			}
+			if math.Abs(v-tt.want) > 1e-9 {
+				t.Errorf("EMA(3) at bar %d = %.9f, want %.9f", tt.barIdx, v, tt.want)
+			}
+		})
+	}
+}
+
+func TestRMAStateManager_NaNSeedPropagatesIndefinitely(t *testing.T) {
+	// If bar 0 source is NaN, Wilder smoothing self-references the NaN seed on
+	// every subsequent bar — no bar should ever escape NaN.
+	ctx := closesOnlyCtx(math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN())
+	m := newRMAStateManager("rma_nan", 3, 6, NewStreamingBarEvaluator())
+	src := &ast.Identifier{Name: "close"}
+
+	for i := 0; i < len(ctx.Data); i++ {
+		v, err := m.ComputeAtBar(ctx, src, i)
+		if err != nil {
+			t.Fatalf("bar %d: unexpected error: %v", i, err)
+		}
+		if !math.IsNaN(v) {
+			t.Errorf("bar %d: NaN seed must propagate indefinitely, got %.6f", i, v)
+		}
+	}
+}
+
+func TestRSIStateManager_ConsecutiveNaNsDuringWarmup(t *testing.T) {
+	// RSI requires period+1 source values before emitting a valid result.
+	// Bars 0..period-1 must all be NaN; bar period must be valid.
+	period := 5
+	ctx := createContextWithBars(period + 5)
+	m := newRSIStateManager("rsi_close_5", period, period+5, NewStreamingBarEvaluator())
+	src := &ast.Identifier{Name: "close"}
+
+	for i := 0; i < period; i++ {
+		v, err := m.ComputeAtBar(ctx, src, i)
+		if err != nil {
+			t.Fatalf("bar %d: %v", i, err)
+		}
+		if !math.IsNaN(v) {
+			t.Errorf("bar %d: RSI warmup must be NaN (period=%d), got %.4f", i, period, v)
+		}
+	}
+
+	for i := period; i < period+5; i++ {
+		v, err := m.ComputeAtBar(ctx, src, i)
+		if err != nil {
+			t.Fatalf("bar %d: %v", i, err)
+		}
+		if math.IsNaN(v) {
+			t.Errorf("bar %d: RSI post-warmup must be valid, got NaN", i)
+		}
+	}
+}
+
 func TestEMAStateManager_MonotonicInputConvergence(t *testing.T) {
 	for _, period := range []int{3, 5, 10} {
 		t.Run(fmt.Sprintf("period%d", period), func(t *testing.T) {

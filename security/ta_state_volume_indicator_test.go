@@ -425,6 +425,47 @@ func TestVolumeIndicatorState_IsolatedState(t *testing.T) {
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
+func TestVolumeIndicatorState_AllTypesHistoricalAccessStable(t *testing.T) {
+	// All 8 volume indicators must preserve historical bar values after advancing
+	// the cursor — the core ForwardSeriesBuffer historical look-back invariant.
+	bars := []context.OHLCV{
+		{Open: 9, High: 12, Low: 8, Close: 10, Volume: 100},
+		{Open: 10, High: 14, Low: 9, Close: 12, Volume: 200},
+		{Open: 12, High: 13, Low: 10, Close: 11, Volume: 150},
+		{Open: 11, High: 15, Low: 10, Close: 13, Volume: 250},
+		{Open: 13, High: 16, Low: 12, Close: 14, Volume: 180},
+	}
+	ctx := makeSecCtx(bars)
+	anchor := 2
+
+	for _, name := range []string{"obv", "accdist", "pvt", "iii", "wvad", "nvi", "pvi", "wad"} {
+		t.Run(name, func(t *testing.T) {
+			st, err := newVolumeState(name, len(bars))
+			if err != nil {
+				t.Fatalf("newVolumeState: %v", err)
+			}
+
+			first, err := st.computeAtBar(ctx, anchor)
+			if err != nil {
+				t.Fatalf("anchor bar %d: %v", anchor, err)
+			}
+
+			_, _ = st.computeAtBar(ctx, len(bars)-1)
+
+			second, err := st.computeAtBar(ctx, anchor)
+			if err != nil {
+				t.Fatalf("re-query anchor bar %d: %v", anchor, err)
+			}
+			if !math.IsNaN(first) && math.Abs(first-second) > 1e-9 {
+				t.Errorf("bar %d: value changed after advance: %.6f → %.6f", anchor, first, second)
+			}
+			if math.IsNaN(first) && !math.IsNaN(second) {
+				t.Errorf("bar %d: was NaN, became %.6f after advance", anchor, second)
+			}
+		})
+	}
+}
+
 func TestVolumeState_AllKnownIndicators(t *testing.T) {
 	for _, name := range []string{"obv", "accdist", "pvt", "iii", "wvad", "nvi", "pvi", "wad"} {
 		t.Run(name, func(t *testing.T) {

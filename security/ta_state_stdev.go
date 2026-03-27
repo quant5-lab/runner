@@ -5,14 +5,12 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
-	"github.com/quant5-lab/runner/runtime/series"
 )
 
 type STDEVStateManager struct {
 	cacheKey  string
 	period    int
-	buf       *series.Series
-	computed  int
+	buf       forwardBufferE
 	evaluator BarEvaluator
 }
 
@@ -20,43 +18,42 @@ func NewSTDEVStateManager(cacheKey string, period int, capacity int, evaluator B
 	return &STDEVStateManager{
 		cacheKey:  cacheKey,
 		period:    period,
-		buf:       series.NewSeries(max(capacity, 1)),
+		buf:       newForwardBufferE(capacity),
 		evaluator: evaluator,
 	}
 }
 
 func (s *STDEVStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		if s.computed > 0 {
-			s.buf.Next()
-		}
-
-		if s.computed < s.period-1 {
-			s.buf.Set(math.NaN())
-		} else {
-			mean, err := s.windowMean(secCtx, sourceExpr, s.computed)
-			if err != nil {
-				return math.NaN(), err
-			}
-
-			variance, err := s.windowVariance(secCtx, sourceExpr, s.computed, mean)
-			if err != nil {
-				return math.NaN(), err
-			}
-
-			s.buf.Set(math.Sqrt(variance))
-		}
-
-		s.computed++
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
 	}
-
-	return s.buf.Get(s.buf.Position() - barIdx), nil
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		if bar < s.period-1 {
+			return math.NaN(), nil
+		}
+		return s.stdevAtBar(secCtx, sourceExpr, bar)
+	}); err != nil {
+		return math.NaN(), err
+	}
+	return s.buf.at(barIdx), nil
 }
 
-func (s *STDEVStateManager) windowMean(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
+func (s *STDEVStateManager) stdevAtBar(secCtx *context.Context, sourceExpr ast.Expression, bar int) (float64, error) {
+	mean, err := s.windowMean(secCtx, sourceExpr, bar)
+	if err != nil {
+		return math.NaN(), err
+	}
+	variance, err := s.windowVariance(secCtx, sourceExpr, bar, mean)
+	if err != nil {
+		return math.NaN(), err
+	}
+	return math.Sqrt(variance), nil
+}
+
+func (s *STDEVStateManager) windowMean(secCtx *context.Context, sourceExpr ast.Expression, bar int) (float64, error) {
 	sum := 0.0
 	for i := 0; i < s.period; i++ {
-		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, barIdx-s.period+1+i)
+		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar-s.period+1+i)
 		if err != nil {
 			return 0, err
 		}
@@ -65,10 +62,10 @@ func (s *STDEVStateManager) windowMean(secCtx *context.Context, sourceExpr ast.E
 	return sum / float64(s.period), nil
 }
 
-func (s *STDEVStateManager) windowVariance(secCtx *context.Context, sourceExpr ast.Expression, barIdx int, mean float64) (float64, error) {
+func (s *STDEVStateManager) windowVariance(secCtx *context.Context, sourceExpr ast.Expression, bar int, mean float64) (float64, error) {
 	variance := 0.0
 	for i := 0; i < s.period; i++ {
-		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, barIdx-s.period+1+i)
+		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar-s.period+1+i)
 		if err != nil {
 			return 0, err
 		}

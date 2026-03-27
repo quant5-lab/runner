@@ -5,41 +5,36 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
-	"github.com/quant5-lab/runner/runtime/series"
 )
 
 type CUMStateManager struct {
-	buf       *series.Series
-	computed  int
+	buf       forwardBufferE
 	evaluator BarEvaluator
 }
 
 func NewCUMStateManager(capacity int, evaluator BarEvaluator) *CUMStateManager {
 	return &CUMStateManager{
-		buf:       series.NewSeries(max(capacity, 1)),
+		buf:       newForwardBufferE(capacity),
 		evaluator: evaluator,
 	}
 }
 
 func (s *CUMStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		if s.computed > 0 {
-			s.buf.Next()
-		}
-
-		val, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, s.computed)
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar)
 		if err != nil {
 			return math.NaN(), err
 		}
-
 		prev := 0.0
-		if s.computed > 0 {
-			prev = s.buf.Get(1)
+		if bar > 0 {
+			prev = s.buf.prev()
 		}
-
-		s.buf.Set(prev + val)
-		s.computed++
+		return prev + v, nil
+	}); err != nil {
+		return math.NaN(), err
 	}
-
-	return s.buf.Get(s.buf.Position() - barIdx), nil
+	return s.buf.at(barIdx), nil
 }

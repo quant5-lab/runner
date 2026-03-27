@@ -5,7 +5,6 @@ import (
 
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
-	"github.com/quant5-lab/runner/runtime/series"
 )
 
 // SARStateManager ignores sourceExpr — uses High and Low from secCtx.Data directly.
@@ -14,12 +13,11 @@ type SARStateManager struct {
 	start     float64
 	inc       float64
 	maxAF     float64
-	buf       *series.Series
-	computed  int
 	isUptrend bool
 	sar       float64
 	ep        float64
 	af        float64
+	buf       forwardBufferE
 }
 
 func NewSARStateManager(cacheKey string, start, inc, maxAF float64, capacity int) *SARStateManager {
@@ -28,42 +26,40 @@ func NewSARStateManager(cacheKey string, start, inc, maxAF float64, capacity int
 		start:    start,
 		inc:      inc,
 		maxAF:    maxAF,
-		buf:      series.NewSeries(capacity),
+		buf:      newForwardBufferE(capacity),
 	}
 }
 
 func (s *SARStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expression, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		if s.computed > 0 {
-			s.buf.Next()
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+		s.isUptrend = false
+		s.sar = 0
+		s.ep = 0
+		s.af = 0
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		if bar == 0 {
+			return math.NaN(), nil
 		}
-
-		if s.computed == 0 {
-			s.buf.Set(math.NaN())
-			s.computed++
-			continue
-		}
-
-		if s.computed == 1 {
+		if bar == 1 {
 			s.initFromBar0(secCtx.Data)
 		}
-
-		s.sar = s.projectSAR(secCtx.Data, s.computed)
-		s.buf.Set(s.sar)
-		s.computed++
+		result := s.projectSAR(secCtx.Data, bar)
+		s.sar = result
+		return result, nil
+	}); err != nil {
+		return math.NaN(), err
 	}
-
-	return s.buf.Get(s.buf.Position() - barIdx), nil
+	return s.buf.at(barIdx), nil
 }
 
 func (s *SARStateManager) initFromBar0(data []context.OHLCV) {
 	high0 := data[0].High
 	low0 := data[0].Low
 	high1 := data[1].High
-
 	s.isUptrend = high1 >= high0
 	s.af = s.start
-
 	if s.isUptrend {
 		s.sar = low0
 		s.ep = high0
@@ -78,9 +74,7 @@ func (s *SARStateManager) projectSAR(data []context.OHLCV, i int) float64 {
 	low := data[i].Low
 	highPrev := data[i-1].High
 	lowPrev := data[i-1].Low
-
 	projected := s.sar + s.af*(s.ep-s.sar)
-
 	if s.isUptrend {
 		if i >= 2 && projected > data[i-2].Low {
 			projected = data[i-2].Low
@@ -114,6 +108,5 @@ func (s *SARStateManager) projectSAR(data []context.OHLCV, i int) float64 {
 			s.af = math.Min(s.af+s.inc, s.maxAF)
 		}
 	}
-
 	return projected
 }

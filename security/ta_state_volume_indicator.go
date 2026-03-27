@@ -5,58 +5,50 @@ import (
 	"math"
 
 	"github.com/quant5-lab/runner/runtime/context"
-	"github.com/quant5-lab/runner/runtime/series"
 )
 
 // volumeFormula computes one bar's contribution to a cumulative volume indicator.
-// prevValue is the seed on the very first bar for indicators that seed at 0;
-// for nvi/pvi it is pre-seeded to 1000 by the factory.
+// prevValue is either the seed (bar 0) or the prior bar's accumulated value.
 type volumeFormula func(bar, prevBar context.OHLCV, prevValue float64, isFirstBar bool) float64
 
 // volumeIndicatorState mirrors the TAStateManager contract without requiring a
-// source Identifier — volume indicators are computed exclusively from OHLCV.
+// source expression — volume indicators are computed exclusively from OHLCV.
 type volumeIndicatorState struct {
-	buf      *series.Series
-	computed int
-	seed     float64
-	formula  volumeFormula
+	buf     forwardBufferE
+	seed    float64
+	formula volumeFormula
 }
 
 func newVolumeIndicatorState(capacity int, seed float64, formula volumeFormula) *volumeIndicatorState {
 	return &volumeIndicatorState{
-		buf:     series.NewSeries(capacity),
+		buf:     newForwardBufferE(capacity),
 		seed:    seed,
 		formula: formula,
 	}
 }
 
 func (s *volumeIndicatorState) computeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		if s.computed > 0 {
-			s.buf.Next()
-		}
-
-		bar := secCtx.Data[s.computed]
-		isFirstBar := s.computed == 0
-
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		isFirst := bar == 0
+		current := secCtx.Data[bar]
 		var prevBar context.OHLCV
-		if !isFirstBar {
-			prevBar = secCtx.Data[s.computed-1]
+		if !isFirst {
+			prevBar = secCtx.Data[bar-1]
 		}
-
 		prev := s.seed
-		if !isFirstBar {
-			prev = s.buf.Get(1)
-			if math.IsNaN(prev) {
-				prev = s.seed
+		if !isFirst {
+			if p := s.buf.prev(); !math.IsNaN(p) {
+				prev = p
 			}
 		}
-
-		s.buf.Set(s.formula(bar, prevBar, prev, isFirstBar))
-		s.computed++
+		return s.formula(current, prevBar, prev, isFirst), nil
+	}); err != nil {
+		return math.NaN(), err
 	}
-
-	return s.buf.Get(s.buf.Position() - barIdx), nil
+	return s.buf.at(barIdx), nil
 }
 
 var volumeIndicatorFactories = map[string]func(capacity int) *volumeIndicatorState{
