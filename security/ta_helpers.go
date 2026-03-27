@@ -24,6 +24,10 @@ func buildTACacheKey(funcName, sourceName string, period int) string {
 	return fmt.Sprintf("%s_%s_%d", funcName, sourceName, period)
 }
 
+func buildValuewhenCacheKey(conditionExpr ast.Expression, sourceExpr ast.Expression, occurrence int) string {
+	return fmt.Sprintf("valuewhen_%s_%s_%d", expressionKey(conditionExpr), expressionKey(sourceExpr), occurrence)
+}
+
 func extractSourceOnlyArgument(call *ast.CallExpression, funcName string) (ast.Expression, error) {
 	if len(call.Arguments) < 1 {
 		return nil, newInsufficientArgumentsError(funcName, 1, 0)

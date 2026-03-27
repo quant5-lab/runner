@@ -26,6 +26,7 @@ type StreamingBarEvaluator struct {
 	taStateCache      map[string]TAStateManager
 	volumeStateCache  map[string]*volumeIndicatorState
 	barsSinceCache    map[*ast.CallExpression]*BarsSinceStateManager
+	valuewhenCache    map[*ast.CallExpression]*ValuewhenStateManager
 	fixnanEvaluator   *FixnanEvaluator
 	varRegistry       *VariableRegistry
 	secBarMapper      *BarIndexMapper
@@ -38,6 +39,7 @@ func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 		taStateCache:     make(map[string]TAStateManager),
 		volumeStateCache: make(map[string]*volumeIndicatorState),
 		barsSinceCache:   make(map[*ast.CallExpression]*BarsSinceStateManager),
+		valuewhenCache:   make(map[*ast.CallExpression]*ValuewhenStateManager),
 		fixnanEvaluator: NewFixnanEvaluator(
 			NewMapStateStorage(),
 			NewSequentialWarmupStrategy(),
@@ -474,24 +476,14 @@ func (e *StreamingBarEvaluator) evaluateValuewhenAtBar(call *ast.CallExpression,
 		return 0.0, err
 	}
 
-	occurrenceCount := 0
-	for lookbackOffset := 0; lookbackOffset <= barIdx; lookbackOffset++ {
-		lookbackBarIdx := barIdx - lookbackOffset
-
-		conditionValue, err := e.EvaluateAtBar(conditionExpr, secCtx, lookbackBarIdx)
-		if err != nil {
-			return 0.0, err
-		}
-
-		if conditionValue != 0.0 {
-			if occurrenceCount == occurrence {
-				return e.EvaluateAtBar(sourceExpr, secCtx, lookbackBarIdx)
-			}
-			occurrenceCount++
-		}
+	state, cached := e.valuewhenCache[call]
+	if !cached {
+		cacheKey := buildValuewhenCacheKey(conditionExpr, sourceExpr, occurrence)
+		state = NewValuewhenStateManager(cacheKey, occurrence, conditionExpr, sourceExpr, len(secCtx.Data), e)
+		e.valuewhenCache[call] = state
 	}
 
-	return math.NaN(), nil
+	return state.ComputeAtBar(secCtx, nil, barIdx)
 }
 
 func (e *StreamingBarEvaluator) evaluateMemberExpressionAtBar(expr *ast.MemberExpression, secCtx *context.Context, barIdx int) (float64, error) {
