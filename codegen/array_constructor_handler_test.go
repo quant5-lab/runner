@@ -19,6 +19,11 @@ func TestArrayConstructorHandler_CanHandle(t *testing.T) {
 		{"array.new_bool", true},
 		{"array.new_color", true},
 		{"array.from", true},
+		{"array.new_label", true},
+		{"array.new_line", true},
+		{"array.new_box", true},
+		{"array.new_table", true},
+		{"array.new_linefill", true},
 		{"array.new_string", false},
 		{"array.push", false},
 		{"array.get", false},
@@ -166,6 +171,50 @@ func TestArrayConstructorHandler_GenerateNewColor(t *testing.T) {
 	}
 	if !strings.Contains(code, "int(3)") {
 		t.Errorf("Expected size parameter int(3), got %q", code)
+	}
+}
+
+func TestArrayConstructorHandler_GenerateDrawingArrayStub(t *testing.T) {
+	handler := NewArrayConstructorHandler()
+	g := createMockGenerator()
+
+	tests := []struct {
+		name     string
+		property string
+		args     []ast.Expression
+		want     string
+	}{
+		{"empty label", "new_label", nil, "[]float64{}"},
+		{"empty line", "new_line", nil, "[]float64{}"},
+		{"empty box", "new_box", nil, "[]float64{}"},
+		{"empty table", "new_table", nil, "[]float64{}"},
+		{"empty linefill", "new_linefill", nil, "[]float64{}"},
+		{"label with size", "new_label", []ast.Expression{&ast.Literal{Value: 5.0}}, "make([]float64, int(5))"},
+		{"line with zero size", "new_line", []ast.Expression{&ast.Literal{Value: 0.0}}, "make([]float64, int(0))"},
+		{"box with large size", "new_box", []ast.Expression{&ast.Literal{Value: 500.0}}, "make([]float64, int(500))"},
+		{"table with identifier", "new_table", []ast.Expression{&ast.Identifier{Name: "maxCount"}}, "make([]float64, int(maxCount))"},
+		{"initial value ignored", "new_label", []ast.Expression{&ast.Literal{Value: 10.0}, &ast.Identifier{Name: "na"}}, "make([]float64, int(10))"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "array"},
+					Property: &ast.Identifier{Name: tt.property},
+				},
+				Arguments: tt.args,
+			}
+
+			code, err := handler.GenerateCode(g, call)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !strings.Contains(code, tt.want) {
+				t.Errorf("got %q, want substring %q", code, tt.want)
+			}
+		})
 	}
 }
 

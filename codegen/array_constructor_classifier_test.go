@@ -15,6 +15,11 @@ func TestArrayConstructorClassifier_IsArrayConstructor(t *testing.T) {
 		{"array.new_bool", "array.new_bool", true},
 		{"array.new_color", "array.new_color", true},
 		{"array.from", "array.from", true},
+		{"array.new_label", "array.new_label", true},
+		{"array.new_line", "array.new_line", true},
+		{"array.new_box", "array.new_box", true},
+		{"array.new_table", "array.new_table", true},
+		{"array.new_linefill", "array.new_linefill", true},
 
 		{"array.new_string not supported yet", "array.new_string", false},
 		{"array.push is mutator not constructor", "array.push", false},
@@ -184,11 +189,42 @@ func TestArrayConstructorClassifier_IsReadOnlyMethod(t *testing.T) {
 	}
 }
 
+func TestArrayConstructorClassifier_IsDrawingArrayConstructor(t *testing.T) {
+	classifier := NewArrayConstructorClassifier()
+
+	tests := []struct {
+		name     string
+		funcName string
+		want     bool
+	}{
+		{"array.new_label", "array.new_label", true},
+		{"array.new_line", "array.new_line", true},
+		{"array.new_box", "array.new_box", true},
+		{"array.new_table", "array.new_table", true},
+		{"array.new_linefill", "array.new_linefill", true},
+
+		{"array.new_float is numeric not drawing", "array.new_float", false},
+		{"array.from is polymorphic not drawing", "array.from", false},
+		{"typo array.new_labels", "array.new_labels", false},
+		{"unknown array.new_polyline", "array.new_polyline", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := classifier.IsDrawingArrayConstructor(tt.funcName)
+			if got != tt.want {
+				t.Errorf("IsDrawingArrayConstructor(%q) = %v, want %v", tt.funcName, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestArrayConstructorClassifier_MethodCategoryMutualExclusivity(t *testing.T) {
 	classifier := NewArrayConstructorClassifier()
 
 	allMethods := []string{
 		"array.new_float", "array.new_int", "array.new_bool", "array.new_color", "array.from",
+		"array.new_label", "array.new_line", "array.new_box", "array.new_table", "array.new_linefill",
 		"array.push", "array.pop", "array.shift", "array.unshift", "array.set", "array.insert", "array.remove", "array.clear", "array.fill", "array.reverse", "array.sort", "array.concat",
 		"array.get", "array.size", "array.first", "array.last", "array.includes", "array.indexof", "array.slice", "array.sum", "array.join",
 	}
@@ -222,26 +258,59 @@ func TestArrayConstructorClassifier_MethodCategoryMutualExclusivity(t *testing.T
 func TestArrayConstructorClassifier_TypeSpecificConstructorMutualExclusivity(t *testing.T) {
 	classifier := NewArrayConstructorClassifier()
 
-	constructors := []string{
+	numericConstructors := []string{
 		"array.new_float", "array.new_int", "array.new_bool", "array.new_color",
 	}
 
-	for _, method := range constructors {
+	for _, method := range numericConstructors {
 		isNumeric := classifier.IsNumericArrayConstructor(method)
 		isString := classifier.IsStringArrayConstructor(method)
+		isDrawing := classifier.IsDrawingArrayConstructor(method)
 
 		if isNumeric && isString {
 			t.Errorf("%q classified as both numeric and string constructor", method)
 		}
-		if !isNumeric && !isString {
-			t.Errorf("%q classified as neither numeric nor string constructor", method)
+		if isNumeric && isDrawing {
+			t.Errorf("%q classified as both numeric and drawing constructor", method)
+		}
+		if !isNumeric && !isString && !isDrawing {
+			t.Errorf("%q classified as neither numeric, string, nor drawing constructor", method)
 		}
 	}
 
-	if classifier.IsNumericArrayConstructor("array.from") {
-		t.Error("array.from should not be classified as numeric-specific (it's polymorphic)")
+	drawingConstructors := []string{
+		"array.new_label", "array.new_line", "array.new_box", "array.new_table", "array.new_linefill",
 	}
-	if classifier.IsStringArrayConstructor("array.from") {
-		t.Error("array.from should not be classified as string-specific (it's polymorphic)")
+
+	for _, method := range drawingConstructors {
+		isNumeric := classifier.IsNumericArrayConstructor(method)
+		isString := classifier.IsStringArrayConstructor(method)
+		isDrawing := classifier.IsDrawingArrayConstructor(method)
+
+		if isDrawing && isNumeric {
+			t.Errorf("%q classified as both drawing and numeric constructor", method)
+		}
+		if isDrawing && isString {
+			t.Errorf("%q classified as both drawing and string constructor", method)
+		}
+		if !isDrawing {
+			t.Errorf("%q should be classified as drawing constructor", method)
+		}
+	}
+
+	polymorphicConstructors := []string{"array.from"}
+	for _, method := range polymorphicConstructors {
+		if classifier.IsNumericArrayConstructor(method) {
+			t.Errorf("%q should not be classified as numeric-specific (it's polymorphic)", method)
+		}
+		if classifier.IsStringArrayConstructor(method) {
+			t.Errorf("%q should not be classified as string-specific (it's polymorphic)", method)
+		}
+		if classifier.IsDrawingArrayConstructor(method) {
+			t.Errorf("%q should not be classified as drawing-specific (it's polymorphic)", method)
+		}
+		if !classifier.IsArrayConstructor(method) {
+			t.Errorf("%q should still be recognized as array constructor", method)
+		}
 	}
 }

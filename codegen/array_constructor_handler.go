@@ -19,11 +19,15 @@ func (h *ArrayConstructorHandler) CanHandle(funcName string) bool {
 
 func (h *ArrayConstructorHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
+	classifier := NewArrayConstructorClassifier()
 
 	switch funcName {
 	case "array.from":
 		return h.generateFrom(g, call)
 	default:
+		if classifier.IsDrawingArrayConstructor(funcName) {
+			return h.generateDrawingArrayStub(g, call)
+		}
 		return h.generateNewArray(g, call)
 	}
 }
@@ -65,6 +69,19 @@ func (h *ArrayConstructorHandler) generateFrom(g *generator, call *ast.CallExpre
 	}
 
 	return fmt.Sprintf("[]float64{%s}", joinStrings(elemCodes, ", ")), nil
+}
+
+func (h *ArrayConstructorHandler) generateDrawingArrayStub(g *generator, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) == 0 {
+		return "[]float64{}", nil
+	}
+
+	sizeCode, err := g.generateArrowFunctionExpression(call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("drawing array constructor: size: %w", err)
+	}
+
+	return fmt.Sprintf("make([]float64, int(%s))", sizeCode), nil
 }
 
 func joinStrings(parts []string, sep string) string {
