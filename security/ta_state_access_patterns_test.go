@@ -8,26 +8,38 @@ import (
 )
 
 var allTATypes = []struct {
-	name     string
-	cacheKey string
-	period   int
+	name          string
+	cacheKey      string
+	period        int
+	warmup        int
+	nanPostWarmup bool
 }{
-	{"SMA", "sma_close_5", 5},
-	{"EMA", "ema_close_5", 5},
-	{"RMA", "rma_close_5", 5},
-	{"RSI", "rsi_close_5", 5},
-	{"ATR", "atr_hlc_5", 5},
-	{"STDEV", "stdev_close_5", 5},
+	{"SMA", "sma_close_5", 5, 4, false},
+	{"EMA", "ema_close_5", 5, 4, false},
+	{"RMA", "rma_close_5", 5, 4, false},
+	{"RSI", "rsi_close_5", 5, 5, false},
+	{"ATR", "atr_hlc_5", 5, 4, true},
+	{"STDEV", "stdev_close_5", 5, 4, false},
+	{"TSI", "tsi_close_5_13", 5, 17, false},
+	{"SAR", "sar_0.0200_0.0200_0.2000", 5, 1, true},
 }
 
-// TestTAStateManager_NonSequentialAccess verifies that requesting a historical
-// bar after advancing the cursor returns the same value as the original query.
-// This is the core ForwardSeriesBuffer historical-look-back invariant.
+func createTAManager(name, cacheKey string, period, capacity int, evaluator BarEvaluator) TAStateManager {
+	switch name {
+	case "TSI":
+		return NewTSIStateManager(cacheKey, 5, 13, capacity, evaluator)
+	case "SAR":
+		return NewSARStateManager(cacheKey, 0.02, 0.02, 0.20, capacity)
+	default:
+		return NewTAStateManager(cacheKey, period, capacity, evaluator)
+	}
+}
+
 func TestTAStateManager_NonSequentialAccess(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(40)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 40, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 40, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			anchor := 20
@@ -53,24 +65,18 @@ func TestTAStateManager_NonSequentialAccess(t *testing.T) {
 	}
 }
 
-// TestTAStateManager_ColdJumpCatchUp verifies that jumping directly to a far
-// bar triggers the full catch-up loop so all intermediate bars become accessible.
 func TestTAStateManager_ColdJumpCatchUp(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(50)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			if _, err := m.ComputeAtBar(ctx, src, 40); err != nil {
 				t.Fatalf("cold jump to bar 40: %v", err)
 			}
 
-			warmup := tt.period - 1
-			if tt.name == "RSI" {
-				warmup = tt.period
-			}
-			for _, bar := range []int{warmup, warmup + 5, 30, 40} {
+			for _, bar := range []int{tt.warmup, tt.warmup + 5, 30, 40} {
 				if bar > 40 {
 					continue
 				}
@@ -78,7 +84,7 @@ func TestTAStateManager_ColdJumpCatchUp(t *testing.T) {
 				if err != nil {
 					t.Fatalf("bar %d: %v", bar, err)
 				}
-				if math.IsNaN(v) && tt.name != "ATR" {
+				if math.IsNaN(v) && !tt.nanPostWarmup {
 					t.Errorf("bar %d: unexpected NaN after cold-jump catch-up", bar)
 				}
 			}
@@ -86,13 +92,11 @@ func TestTAStateManager_ColdJumpCatchUp(t *testing.T) {
 	}
 }
 
-// TestTAStateManager_PartialCatchUp verifies that a partial advance followed by
-// a later query correctly computes all intermediate state without gaps.
 func TestTAStateManager_PartialCatchUp(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(30)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 30, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 30, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			earlyBar := tt.period + 1
@@ -104,21 +108,18 @@ func TestTAStateManager_PartialCatchUp(t *testing.T) {
 			if err != nil {
 				t.Fatalf("bar %d: %v", lateBar, err)
 			}
-			if math.IsNaN(v) && tt.name != "ATR" {
+			if math.IsNaN(v) && !tt.nanPostWarmup {
 				t.Errorf("bar %d: unexpected NaN after partial catch-up from bar %d", lateBar, earlyBar)
 			}
 		})
 	}
 }
 
-// TestTAStateManager_MultipleHistoricalLookbacks verifies that after a single
-// full catch-up, all prior bars can be queried in arbitrary order and return
-// consistent values.
 func TestTAStateManager_MultipleHistoricalLookbacks(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(50)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			if _, err := m.ComputeAtBar(ctx, src, 45); err != nil {

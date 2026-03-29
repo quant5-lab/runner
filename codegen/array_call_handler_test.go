@@ -7,11 +7,10 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-// newGeneratorWithArrayVar returns a test generator with the named variable
-// registered as "array_series".
 func newGeneratorWithArrayVar(varName string) *generator {
 	g := newTestGenerator()
-	g.variables[varName] = "array_series"
+	g.variables[varName] = ArrayElementFloat64.TypeTag()
+	g.arrayVariableRegistry.Register(varName, ArrayElementFloat64)
 	return g
 }
 
@@ -254,12 +253,13 @@ func TestArrayMethodCallHandler_Size_WrongArgCountReturnsError(t *testing.T) {
 
 func TestIsArraySeriesVariable(t *testing.T) {
 	g := newTestGenerator()
-	g.variables["levels"] = "array_series"
+	g.variables["levels"] = ArrayElementFloat64.TypeTag()
+	g.arrayVariableRegistry.Register("levels", ArrayElementFloat64)
 	g.variables["ema"] = "function"
 	g.variables["label"] = "string"
 
 	if !g.isArraySeriesVariable("levels") {
-		t.Error("levels registered as array_series must return true")
+		t.Error("levels registered as array_series_float must return true")
 	}
 	if g.isArraySeriesVariable("ema") {
 		t.Error("ema registered as function must return false")

@@ -8,12 +8,13 @@ func NewArrayConstructorClassifier() *ArrayConstructorClassifier {
 
 func (c *ArrayConstructorClassifier) IsArrayConstructor(funcName string) bool {
 	return c.IsNumericArrayConstructor(funcName) ||
+		c.IsStringArrayConstructor(funcName) ||
 		c.IsDrawingArrayConstructor(funcName) ||
 		funcName == "array.from"
 }
 
 func (c *ArrayConstructorClassifier) IsStringArrayConstructor(funcName string) bool {
-	return false
+	return funcName == "array.new_string"
 }
 
 func (c *ArrayConstructorClassifier) IsNumericArrayConstructor(funcName string) bool {

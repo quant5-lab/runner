@@ -30,21 +30,22 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	registryGuard := NewVariableRegistryGuard(variablesRegistry)
 
 	gen := &generator{
-		imports:            make(map[string]bool),
-		variables:          variablesRegistry,
-		varInits:           make(map[string]ast.Expression),
-		constants:          make(map[string]interface{}),
-		reassignedVars:     make(map[string]bool),
-		strategyConfig:     NewStrategyConfig(),
-		limits:             NewCodeGenerationLimits(),
-		safetyGuard:        NewRuntimeSafetyGuard(),
-		persistenceEmitter: NewVarPersistenceEmitter(NewRuntimeSafetyGuard()),
-		loopContextStack:   NewLoopContextStack(),
-		constantRegistry:   constantRegistry,
-		typeSystem:         typeSystem,
-		boolConverter:      boolConverter,
-		registryGuard:      registryGuard,
-		pineVersion:        program.PineVersion,
+		imports:               make(map[string]bool),
+		variables:             variablesRegistry,
+		varInits:              make(map[string]ast.Expression),
+		constants:             make(map[string]interface{}),
+		reassignedVars:        make(map[string]bool),
+		strategyConfig:        NewStrategyConfig(),
+		limits:                NewCodeGenerationLimits(),
+		safetyGuard:           NewRuntimeSafetyGuard(),
+		persistenceEmitter:    NewVarPersistenceEmitter(NewRuntimeSafetyGuard()),
+		loopContextStack:      NewLoopContextStack(),
+		constantRegistry:      constantRegistry,
+		typeSystem:            typeSystem,
+		boolConverter:         boolConverter,
+		registryGuard:         registryGuard,
+		arrayVariableRegistry: NewArrayVariableRegistry(),
+		pineVersion:           program.PineVersion,
 	}
 
 	gen.inputHandler = NewInputHandler()
@@ -197,10 +198,11 @@ type generator struct {
 	persistenceEmitter       *VarPersistenceEmitter
 	hoistedArrowContexts     []ArrowCallSite
 
-	constantRegistry *ConstantRegistry
-	typeSystem       *TypeInferenceEngine
-	boolConverter    *BooleanConverter
-	registryGuard    *VariableRegistryGuard
+	constantRegistry      *ConstantRegistry
+	typeSystem            *TypeInferenceEngine
+	boolConverter         *BooleanConverter
+	registryGuard         *VariableRegistryGuard
+	arrayVariableRegistry *ArrayVariableRegistry
 
 	inputHandler               *InputHandler
 	inputConstExtractor        *InputConstantExtractor
@@ -664,8 +666,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 				}
 				continue
 			}
-			if varType == "array_series" {
-				code += g.ind() + fmt.Sprintf("var %sArraySeries *series.ArraySeries\n", varName)
+			if elemType, ok := ParseArrayElementType(varType); ok {
+				suffix := elemType.VariableSuffix()
+				goType := elemType.SeriesType()
+				code += g.ind() + fmt.Sprintf("var %s%s %s\n", varName, suffix, goType)
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("var %sSeries *series.Series\n", varName)
@@ -741,8 +745,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			if varType == "function" || varType == "string" {
 				continue
 			}
-			if varType == "array_series" {
-				code += g.ind() + fmt.Sprintf("%sArraySeries = series.NewArraySeries(len(ctx.Data))\n", varName)
+			if elemType, ok := ParseArrayElementType(varType); ok {
+				suffix := elemType.VariableSuffix()
+				ctorCall := elemType.NewSeriesCall("len(ctx.Data)")
+				code += g.ind() + fmt.Sprintf("%s%s = %s\n", varName, suffix, ctorCall)
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("%sSeries = %s(len(ctx.Data))\n", varName, SeriesCtorForType(varType))
@@ -771,7 +777,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 		/* Register user variables */
 		for varName, varType := range g.variables {
-			if varType == "function" || varType == "string" || varType == "array_series" {
+			if varType == "function" || varType == "string" {
+				continue
+			}
+			if _, ok := ParseArrayElementType(varType); ok {
 				continue
 			}
 			code += g.ind() + fmt.Sprintf("ctx.RegisterSeries(%q, %sSeries)\n", varName, varName)
@@ -912,8 +921,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			code += g.ind() + fmt.Sprintf("_ = %s\n", varName)
 			continue
 		}
-		if varType == "array_series" {
-			code += g.ind() + fmt.Sprintf("_ = %sArraySeries\n", varName)
+		if elemType, ok := ParseArrayElementType(varType); ok {
+			suffix := elemType.VariableSuffix()
+			code += g.ind() + fmt.Sprintf("_ = %s%s\n", varName, suffix)
 			continue
 		}
 		/* Skip input constants - they don't have Series versions */
@@ -949,8 +959,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if varType == "function" || varType == "string" {
 			continue
 		}
-		if varType == "array_series" {
-			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %sArraySeries.Next() }\n", iterVar, varName)
+		if elemType, ok := ParseArrayElementType(varType); ok {
+			suffix := elemType.VariableSuffix()
+			code += g.ind() + fmt.Sprintf("if %s < barCount-1 { %s%s.Next() }\n", iterVar, varName, suffix)
 			continue
 		}
 		if g.inputHandler != nil && g.inputHandler.IsInputConstant(varName) {
@@ -1795,10 +1806,12 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			if g.registryGuard != nil {
 				if g.registryGuard.SafeRegister(varName, varType) {
 					g.varInits[varName] = declarator.Init
+					g.registerArrayVariable(varName, varType)
 				}
 			} else {
 				g.variables[varName] = varType
 				g.varInits[varName] = declarator.Init
+				g.registerArrayVariable(varName, varType)
 			}
 		}
 
@@ -2075,6 +2088,22 @@ func (g *generator) createAccessorForFixnan(expr ast.Expression) (AccessGenerato
 // inferVariableType delegates to TypeInferenceEngine
 func (g *generator) inferVariableType(expr ast.Expression) string {
 	return g.typeSystem.InferType(expr)
+}
+
+func (g *generator) registerArrayVariable(varName, varType string) {
+	if g.arrayVariableRegistry == nil {
+		return
+	}
+	if elemType, ok := ParseArrayElementType(varType); ok {
+		g.arrayVariableRegistry.Register(varName, elemType)
+	}
+}
+
+func (g *generator) lookupArrayElementType(varName string) (ArrayElementType, bool) {
+	if g.arrayVariableRegistry == nil {
+		return 0, false
+	}
+	return g.arrayVariableRegistry.Lookup(varName)
 }
 
 func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expression) (string, error) {
@@ -2428,7 +2457,12 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		if err != nil {
 			return "", err
 		}
-		return g.ind() + fmt.Sprintf("%sArraySeries.Set(%s)\n", varName, initCode), nil
+		arrayType, ok := g.lookupArrayElementType(varName)
+		if !ok {
+			return "", fmt.Errorf("array variable %q not registered", varName)
+		}
+		suffix := arrayType.VariableSuffix()
+		return g.ind() + fmt.Sprintf("%s%s.Set(%s)\n", varName, suffix, initCode), nil
 	}
 
 	// Check if this is a user-defined function
@@ -3093,8 +3127,9 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 					}
 				}
 			}
-			if g.variables[varName] == "array_series" {
-				return fmt.Sprintf("%sArraySeries.Get(%d)", varName, offset)
+			if arrayType, ok := g.lookupArrayElementType(varName); ok {
+				suffix := arrayType.VariableSuffix()
+				return fmt.Sprintf("%s%s.Get(%d)", varName, suffix, offset)
 			}
 			return fmt.Sprintf("%sSeries.Get(%d)", varName, offset)
 		}

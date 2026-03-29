@@ -13,7 +13,7 @@ func TestTAStateManager_RepeatedBarIdempotency(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(30)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 30, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 30, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			targetBar := 20
@@ -42,7 +42,7 @@ func TestTAStateManager_HistoricalAnchorStableAfterAdvance(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(50)
-			m := NewTAStateManager(tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, 50, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			anchor := 15
@@ -75,7 +75,7 @@ func TestTAStateManager_FullHistoricalConsistency(t *testing.T) {
 	for _, tt := range allTATypes {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := createContextWithBars(dataSize)
-			m := NewTAStateManager(tt.cacheKey, tt.period, dataSize, NewStreamingBarEvaluator())
+			m := createTAManager(tt.name, tt.cacheKey, tt.period, dataSize, NewStreamingBarEvaluator())
 			src := &ast.Identifier{Name: "close"}
 
 			saved := make([]float64, dataSize)

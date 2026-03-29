@@ -20,6 +20,7 @@ func (h *ArrayConstructorHandler) CanHandle(funcName string) bool {
 func (h *ArrayConstructorHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 	classifier := NewArrayConstructorClassifier()
+	typeResolver := NewArrayConstructorTypeResolver()
 
 	switch funcName {
 	case "array.from":
@@ -28,13 +29,14 @@ func (h *ArrayConstructorHandler) GenerateCode(g *generator, call *ast.CallExpre
 		if classifier.IsDrawingArrayConstructor(funcName) {
 			return h.generateDrawingArrayStub(g, call)
 		}
-		return h.generateNewArray(g, call)
+		elemType, _ := typeResolver.ResolveVariableType(funcName)
+		return h.generateNewArray(g, call, elemType)
 	}
 }
 
-func (h *ArrayConstructorHandler) generateNewArray(g *generator, call *ast.CallExpression) (string, error) {
+func (h *ArrayConstructorHandler) generateNewArray(g *generator, call *ast.CallExpression, elemType ArrayElementType) (string, error) {
 	if len(call.Arguments) == 0 {
-		return "[]float64{}", nil
+		return elemType.GoSliceType() + "{}", nil
 	}
 
 	sizeCode, err := g.generateArrowFunctionExpression(call.Arguments[0])
@@ -43,7 +45,7 @@ func (h *ArrayConstructorHandler) generateNewArray(g *generator, call *ast.CallE
 	}
 
 	if len(call.Arguments) == 1 {
-		return fmt.Sprintf("make([]float64, int(%s))", sizeCode), nil
+		return fmt.Sprintf("make(%s, int(%s))", elemType.GoSliceType(), sizeCode), nil
 	}
 
 	initialCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
@@ -51,7 +53,12 @@ func (h *ArrayConstructorHandler) generateNewArray(g *generator, call *ast.CallE
 		return "", fmt.Errorf("array.new: initial value: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewArrayWithValue(int(%s), %s)", sizeCode, initialCode), nil
+	constructorFunc := "arrayops.NewArrayWithValue"
+	if elemType.IsString() {
+		constructorFunc = "arrayops.NewStringArrayWithValue"
+	}
+
+	return fmt.Sprintf("%s(int(%s), %s)", constructorFunc, sizeCode, initialCode), nil
 }
 
 func (h *ArrayConstructorHandler) generateFrom(g *generator, call *ast.CallExpression) (string, error) {

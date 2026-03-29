@@ -26,6 +26,7 @@ func newTestGenerator() *generator {
 		typeSystem:                 typeSystem,
 		boolConverter:              boolConverter,
 		constantRegistry:           constantRegistry,
+		arrayVariableRegistry:      NewArrayVariableRegistry(),
 		runtimeOnlyFilter:          NewRuntimeOnlyFunctionFilter(),
 		constEvaluator:             validation.NewWarmupAnalyzer(),
 		plotCollector:              NewPlotCollector(),

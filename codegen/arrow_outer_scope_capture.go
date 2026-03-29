@@ -7,10 +7,11 @@ import "github.com/quant5-lab/runner/ast"
 type OuterScopeCaptureKind int
 
 const (
-	OuterScopeCaptureScalar      OuterScopeCaptureKind = iota // float64 — input constant or numeric literal
-	OuterScopeCaptureString                                   // string  — string constant or string variable
-	OuterScopeCaptureSeriesFloat                              // *series.Series — float/bool series variable or input.source
-	OuterScopeCaptureArraySeries                              // *series.ArraySeries — array_series variable
+	OuterScopeCaptureScalar            OuterScopeCaptureKind = iota // float64 — input constant or numeric literal
+	OuterScopeCaptureString                                         // string  — string constant or string variable
+	OuterScopeCaptureSeriesFloat                                    // *series.Series — float/bool series variable or input.source
+	OuterScopeCaptureArraySeries                                    // *series.ArraySeries — array_series_float variable
+	OuterScopeCaptureStringArraySeries                              // *series.StringArraySeries — array_series_string variable
 )
 
 // OuterScopeCapture describes a single outer-scope identifier that an arrow function
@@ -28,6 +29,8 @@ func (c OuterScopeCapture) GoParamName() string {
 		return c.Name + "Series"
 	case OuterScopeCaptureArraySeries:
 		return c.Name + "ArraySeries"
+	case OuterScopeCaptureStringArraySeries:
+		return c.Name + "StringArraySeries"
 	default:
 		return c.Name
 	}
@@ -39,6 +42,8 @@ func (c OuterScopeCapture) GoParamType() string {
 		return "*series.Series"
 	case OuterScopeCaptureArraySeries:
 		return "*series.ArraySeries"
+	case OuterScopeCaptureStringArraySeries:
+		return "*series.StringArraySeries"
 	case OuterScopeCaptureString:
 		return "string"
 	default:
@@ -248,9 +253,11 @@ func kindForVariable(varType string) (OuterScopeCaptureKind, bool) {
 		return OuterScopeCaptureSeriesFloat, true
 	case "string":
 		return OuterScopeCaptureString, true
-	case "array_series":
+	case "array_series_float":
 		return OuterScopeCaptureArraySeries, true
-	default: // "function" and any unknown type
+	case "array_series_string":
+		return OuterScopeCaptureStringArraySeries, true
+	default:
 		return 0, false
 	}
 }

@@ -89,12 +89,13 @@ func (h *ArrayReaderCodegen) generateFirst(g *generator, call *ast.CallExpressio
 		return "", fmt.Errorf("array.first requires 1 argument, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.first: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewAccessor().First(%sArraySeries, %d)", arrayVar, offset), nil
+	return fmt.Sprintf("%s.First(%s%s, %d)",
+		elemType.AccessorConstructor(), arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateLast(g *generator, call *ast.CallExpression) (string, error) {
@@ -102,12 +103,13 @@ func (h *ArrayReaderCodegen) generateLast(g *generator, call *ast.CallExpression
 		return "", fmt.Errorf("array.last requires 1 argument, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.last: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewAccessor().Last(%sArraySeries, %d)", arrayVar, offset), nil
+	return fmt.Sprintf("%s.Last(%s%s, %d)",
+		elemType.AccessorConstructor(), arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateIncludes(g *generator, call *ast.CallExpression) (string, error) {
@@ -115,7 +117,7 @@ func (h *ArrayReaderCodegen) generateIncludes(g *generator, call *ast.CallExpres
 		return "", fmt.Errorf("array.includes requires 2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.includes: %w", err)
 	}
@@ -125,8 +127,8 @@ func (h *ArrayReaderCodegen) generateIncludes(g *generator, call *ast.CallExpres
 		return "", fmt.Errorf("array.includes: value: %w", err)
 	}
 
-	return fmt.Sprintf("func() float64 { if arrayops.NewAccessor().Includes(%sArraySeries, %d, %s) { return 1.0 }; return 0.0 }()",
-		arrayVar, offset, valueCode), nil
+	return fmt.Sprintf("func() float64 { if %s.Includes(%s%s, %d, %s) { return 1.0 }; return 0.0 }()",
+		elemType.AccessorConstructor(), arrayVar, elemType.VariableSuffix(), offset, valueCode), nil
 }
 
 func (h *ArrayReaderCodegen) generateIndexOf(g *generator, call *ast.CallExpression) (string, error) {
@@ -134,7 +136,7 @@ func (h *ArrayReaderCodegen) generateIndexOf(g *generator, call *ast.CallExpress
 		return "", fmt.Errorf("array.indexof requires 2-3 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.indexof: %w", err)
 	}
@@ -153,8 +155,8 @@ func (h *ArrayReaderCodegen) generateIndexOf(g *generator, call *ast.CallExpress
 		startIndex = fmt.Sprintf("int(%s)", startCode)
 	}
 
-	return fmt.Sprintf("float64(arrayops.NewAccessor().IndexOf(%sArraySeries, %d, %s, %s))",
-		arrayVar, offset, valueCode, startIndex), nil
+	return fmt.Sprintf("float64(%s.IndexOf(%s%s, %d, %s, %s))",
+		elemType.AccessorConstructor(), arrayVar, elemType.VariableSuffix(), offset, valueCode, startIndex), nil
 }
 
 func (h *ArrayReaderCodegen) generateLastIndexOf(g *generator, call *ast.CallExpression) (string, error) {
@@ -162,7 +164,7 @@ func (h *ArrayReaderCodegen) generateLastIndexOf(g *generator, call *ast.CallExp
 		return "", fmt.Errorf("array.lastindexof requires 2-3 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.lastindexof: %w", err)
 	}
@@ -181,8 +183,8 @@ func (h *ArrayReaderCodegen) generateLastIndexOf(g *generator, call *ast.CallExp
 		startIndex = fmt.Sprintf("int(%s)", startCode)
 	}
 
-	return fmt.Sprintf("float64(arrayops.NewAccessor().LastIndexOf(%sArraySeries, %d, %s, %s))",
-		arrayVar, offset, valueCode, startIndex), nil
+	return fmt.Sprintf("float64(%s.LastIndexOf(%s%s, %d, %s, %s))",
+		elemType.AccessorConstructor(), arrayVar, elemType.VariableSuffix(), offset, valueCode, startIndex), nil
 }
 
 func (h *ArrayReaderCodegen) generateSlice(g *generator, call *ast.CallExpression) (string, error) {
@@ -190,7 +192,7 @@ func (h *ArrayReaderCodegen) generateSlice(g *generator, call *ast.CallExpressio
 		return "", fmt.Errorf("array.slice requires 1-3 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.slice: %w", err)
 	}
@@ -214,8 +216,8 @@ func (h *ArrayReaderCodegen) generateSlice(g *generator, call *ast.CallExpressio
 		indexTo = fmt.Sprintf("int(%s)", toCode)
 	}
 
-	return fmt.Sprintf("arrayops.NewTransformer().Slice(%sArraySeries, %d, %s, %s)",
-		arrayVar, offset, indexFrom, indexTo), nil
+	return fmt.Sprintf("%s.Slice(%s%s, %d, %s, %s)",
+		elemType.TransformerConstructor(), arrayVar, elemType.VariableSuffix(), offset, indexFrom, indexTo), nil
 }
 
 func (h *ArrayReaderCodegen) generateCopy(g *generator, call *ast.CallExpression) (string, error) {
@@ -223,12 +225,13 @@ func (h *ArrayReaderCodegen) generateCopy(g *generator, call *ast.CallExpression
 		return "", fmt.Errorf("array.copy requires 1 argument, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.copy: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewTransformer().Copy(%sArraySeries, %d)", arrayVar, offset), nil
+	return fmt.Sprintf("%s.Copy(%s%s, %d)",
+		elemType.TransformerConstructor(), arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateSortIndices(g *generator, call *ast.CallExpression) (string, error) {
@@ -236,7 +239,7 @@ func (h *ArrayReaderCodegen) generateSortIndices(g *generator, call *ast.CallExp
 		return "", fmt.Errorf("array.sort_indices requires 1-2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.sort_indices: %w", err)
 	}
@@ -250,7 +253,8 @@ func (h *ArrayReaderCodegen) generateSortIndices(g *generator, call *ast.CallExp
 		order = orderCode
 	}
 
-	return fmt.Sprintf("arrayops.NewTransformer().SortIndices(%sArraySeries, %d, %s)", arrayVar, offset, order), nil
+	return fmt.Sprintf("%s.SortIndices(%s%s, %d, %s)",
+		elemType.TransformerConstructor(), arrayVar, elemType.VariableSuffix(), offset, order), nil
 }
 
 func (h *ArrayReaderCodegen) generateSum(g *generator, call *ast.CallExpression) (string, error) {
@@ -286,9 +290,13 @@ func (h *ArrayReaderCodegen) generateStdev(g *generator, call *ast.CallExpressio
 		return "", fmt.Errorf("array.stdev requires 1-2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.stdev: %w", err)
+	}
+
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.stdev requires numeric array, got %s array", elemType.GoType())
 	}
 
 	biased := "false"
@@ -300,7 +308,8 @@ func (h *ArrayReaderCodegen) generateStdev(g *generator, call *ast.CallExpressio
 		biased = fmt.Sprintf("%s != 0.0", biasedCode)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Stdev(%sArraySeries, %d, %s)", arrayVar, offset, biased), nil
+	return fmt.Sprintf("%s.Stdev(%s%s, %d, %s)",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset, biased), nil
 }
 
 func (h *ArrayReaderCodegen) generateVariance(g *generator, call *ast.CallExpression) (string, error) {
@@ -308,9 +317,13 @@ func (h *ArrayReaderCodegen) generateVariance(g *generator, call *ast.CallExpres
 		return "", fmt.Errorf("array.variance requires 1-2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.variance: %w", err)
+	}
+
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.variance requires numeric array, got %s array", elemType.GoType())
 	}
 
 	biased := "false"
@@ -322,7 +335,8 @@ func (h *ArrayReaderCodegen) generateVariance(g *generator, call *ast.CallExpres
 		biased = fmt.Sprintf("%s != 0.0", biasedCode)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Variance(%sArraySeries, %d, %s)", arrayVar, offset, biased), nil
+	return fmt.Sprintf("%s.Variance(%s%s, %d, %s)",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset, biased), nil
 }
 
 func (h *ArrayReaderCodegen) generatePercentileLinear(g *generator, call *ast.CallExpression) (string, error) {
@@ -330,9 +344,13 @@ func (h *ArrayReaderCodegen) generatePercentileLinear(g *generator, call *ast.Ca
 		return "", fmt.Errorf("array.percentile_linear_interpolation requires 2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.percentile_linear_interpolation: %w", err)
+	}
+
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.percentile_linear_interpolation requires numeric array, got %s array", elemType.GoType())
 	}
 
 	percentileCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
@@ -340,8 +358,8 @@ func (h *ArrayReaderCodegen) generatePercentileLinear(g *generator, call *ast.Ca
 		return "", fmt.Errorf("array.percentile_linear_interpolation: percentile: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Percentile(%sArraySeries, %d, %s, \"linear\")",
-		arrayVar, offset, percentileCode), nil
+	return fmt.Sprintf("%s.Percentile(%s%s, %d, %s, \"linear\")",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset, percentileCode), nil
 }
 
 func (h *ArrayReaderCodegen) generatePercentileNearest(g *generator, call *ast.CallExpression) (string, error) {
@@ -349,9 +367,13 @@ func (h *ArrayReaderCodegen) generatePercentileNearest(g *generator, call *ast.C
 		return "", fmt.Errorf("array.percentile_nearest_rank requires 2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.percentile_nearest_rank: %w", err)
+	}
+
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.percentile_nearest_rank requires numeric array, got %s array", elemType.GoType())
 	}
 
 	percentileCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
@@ -359,8 +381,8 @@ func (h *ArrayReaderCodegen) generatePercentileNearest(g *generator, call *ast.C
 		return "", fmt.Errorf("array.percentile_nearest_rank: percentile: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Percentile(%sArraySeries, %d, %s, \"nearest_rank\")",
-		arrayVar, offset, percentileCode), nil
+	return fmt.Sprintf("%s.Percentile(%s%s, %d, %s, \"nearest_rank\")",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset, percentileCode), nil
 }
 
 func (h *ArrayReaderCodegen) generatePercentRank(g *generator, call *ast.CallExpression) (string, error) {
@@ -368,9 +390,13 @@ func (h *ArrayReaderCodegen) generatePercentRank(g *generator, call *ast.CallExp
 		return "", fmt.Errorf("array.percentrank requires 2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.percentrank: %w", err)
+	}
+
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.percentrank requires numeric array, got %s array", elemType.GoType())
 	}
 
 	valueCode, err := g.generateArrowFunctionExpression(call.Arguments[1])
@@ -378,7 +404,8 @@ func (h *ArrayReaderCodegen) generatePercentRank(g *generator, call *ast.CallExp
 		return "", fmt.Errorf("array.percentrank: value: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().PercentRank(%sArraySeries, %d, %s)", arrayVar, offset, valueCode), nil
+	return fmt.Sprintf("%s.PercentRank(%s%s, %d, %s)",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset, valueCode), nil
 }
 
 func (h *ArrayReaderCodegen) generateCovariance(g *generator, call *ast.CallExpression) (string, error) {
@@ -386,12 +413,16 @@ func (h *ArrayReaderCodegen) generateCovariance(g *generator, call *ast.CallExpr
 		return "", fmt.Errorf("array.covariance requires 2-3 arguments, got %d", len(call.Arguments))
 	}
 
-	array1Var, offset1, err := h.extractArrayAccess(g, call.Arguments[0])
+	array1Var, offset1, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.covariance: first array: %w", err)
 	}
 
-	array2Var, offset2, err := h.extractArrayAccess(g, call.Arguments[1])
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.covariance requires numeric array, got %s array", elemType.GoType())
+	}
+
+	array2Var, offset2, _, err := h.extractArrayAccess(g, call.Arguments[1])
 	if err != nil {
 		return "", fmt.Errorf("array.covariance: second array: %w", err)
 	}
@@ -405,8 +436,11 @@ func (h *ArrayReaderCodegen) generateCovariance(g *generator, call *ast.CallExpr
 		biased = fmt.Sprintf("%s != 0.0", biasedCode)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Covariance(%sArraySeries, %d, %sArraySeries, %d, %s)",
-		array1Var, offset1, array2Var, offset2, biased), nil
+	return fmt.Sprintf("%s.Covariance(%s%s, %d, %s%s, %d, %s)",
+		elemType.StatisticsConstructor(),
+		array1Var, elemType.VariableSuffix(), offset1,
+		array2Var, elemType.VariableSuffix(), offset2,
+		biased), nil
 }
 
 func (h *ArrayReaderCodegen) generateStandardize(g *generator, call *ast.CallExpression) (string, error) {
@@ -414,12 +448,17 @@ func (h *ArrayReaderCodegen) generateStandardize(g *generator, call *ast.CallExp
 		return "", fmt.Errorf("array.standardize requires 1 argument, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.standardize: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Standardize(%sArraySeries, %d)", arrayVar, offset), nil
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.standardize requires numeric array, got %s array", elemType.GoType())
+	}
+
+	return fmt.Sprintf("%s.Standardize(%s%s, %d)",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateAbs(g *generator, call *ast.CallExpression) (string, error) {
@@ -427,12 +466,17 @@ func (h *ArrayReaderCodegen) generateAbs(g *generator, call *ast.CallExpression)
 		return "", fmt.Errorf("array.abs requires 1 argument, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.abs: %w", err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().Abs(%sArraySeries, %d)", arrayVar, offset), nil
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("array.abs requires numeric array, got %s array", elemType.GoType())
+	}
+
+	return fmt.Sprintf("%s.Abs(%s%s, %d)",
+		elemType.StatisticsConstructor(), arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateSimpleStatistic(g *generator, call *ast.CallExpression, funcName, method string) (string, error) {
@@ -440,12 +484,17 @@ func (h *ArrayReaderCodegen) generateSimpleStatistic(g *generator, call *ast.Cal
 		return "", fmt.Errorf("%s requires 1 argument, got %d", funcName, len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", funcName, err)
 	}
 
-	return fmt.Sprintf("arrayops.NewStatistics().%s(%sArraySeries, %d)", method, arrayVar, offset), nil
+	if !elemType.SupportsStatistics() {
+		return "", fmt.Errorf("%s requires numeric array, got %s array", funcName, elemType.GoType())
+	}
+
+	return fmt.Sprintf("%s.%s(%s%s, %d)",
+		elemType.StatisticsConstructor(), method, arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateBinarySearch(g *generator, call *ast.CallExpression, method string) (string, error) {
@@ -453,7 +502,7 @@ func (h *ArrayReaderCodegen) generateBinarySearch(g *generator, call *ast.CallEx
 		return "", fmt.Errorf("array.%s requires 2 arguments, got %d", method, len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.%s: %w", method, err)
 	}
@@ -463,7 +512,8 @@ func (h *ArrayReaderCodegen) generateBinarySearch(g *generator, call *ast.CallEx
 		return "", fmt.Errorf("array.%s: value: %w", method, err)
 	}
 
-	return fmt.Sprintf("float64(arrayops.NewSearch().%s(%sArraySeries, %d, %s))", method, arrayVar, offset, valueCode), nil
+	return fmt.Sprintf("float64(%s.%s(%s%s, %d, %s))",
+		elemType.SearchConstructor(), method, arrayVar, elemType.VariableSuffix(), offset, valueCode), nil
 }
 
 func (h *ArrayReaderCodegen) generatePredicate(g *generator, call *ast.CallExpression, funcName, method string) (string, error) {
@@ -471,12 +521,13 @@ func (h *ArrayReaderCodegen) generatePredicate(g *generator, call *ast.CallExpre
 		return "", fmt.Errorf("%s requires 1 argument, got %d", funcName, len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", funcName, err)
 	}
 
-	return fmt.Sprintf("func() float64 { if arrayops.NewPredicates().%s(%sArraySeries, %d) { return 1.0 }; return 0.0 }()", method, arrayVar, offset), nil
+	return fmt.Sprintf("func() float64 { if %s.%s(%s%s, %d) { return 1.0 }; return 0.0 }()",
+		elemType.PredicatesConstructor(), method, arrayVar, elemType.VariableSuffix(), offset), nil
 }
 
 func (h *ArrayReaderCodegen) generateJoin(g *generator, call *ast.CallExpression) (string, error) {
@@ -484,7 +535,7 @@ func (h *ArrayReaderCodegen) generateJoin(g *generator, call *ast.CallExpression
 		return "", fmt.Errorf("array.join requires 1-2 arguments, got %d", len(call.Arguments))
 	}
 
-	arrayVar, offset, err := h.extractArrayAccess(g, call.Arguments[0])
+	arrayVar, offset, elemType, err := h.extractArrayAccess(g, call.Arguments[0])
 	if err != nil {
 		return "", fmt.Errorf("array.join: %w", err)
 	}
@@ -498,13 +549,16 @@ func (h *ArrayReaderCodegen) generateJoin(g *generator, call *ast.CallExpression
 		separator = sepCode
 	}
 
-	return fmt.Sprintf("arrayops.NewFormatters().Join(%sArraySeries, %d, %s)", arrayVar, offset, separator), nil
+	return fmt.Sprintf("%s.Join(%s%s, %d, %s)",
+		elemType.FormattersConstructor(), arrayVar, elemType.VariableSuffix(), offset, separator), nil
 }
 
-func (h *ArrayReaderCodegen) extractArrayAccess(g *generator, arg ast.Expression) (arrayVar string, offset int, err error) {
+func (h *ArrayReaderCodegen) extractArrayAccess(g *generator, arg ast.Expression) (arrayVar string, offset int, elemType ArrayElementType, err error) {
 	switch e := arg.(type) {
 	case *ast.Identifier:
-		if !g.isArraySeriesVariable(e.Name) {
+		var ok bool
+		elemType, ok = g.lookupArrayElementType(e.Name)
+		if !ok {
 			err = fmt.Errorf("variable %q is not an array", e.Name)
 			return
 		}
@@ -517,7 +571,11 @@ func (h *ArrayReaderCodegen) extractArrayAccess(g *generator, arg ast.Expression
 			break
 		}
 		id, ok := e.Object.(*ast.Identifier)
-		if !ok || !g.isArraySeriesVariable(id.Name) {
+		if !ok {
+			break
+		}
+		elemType, ok = g.lookupArrayElementType(id.Name)
+		if !ok {
 			break
 		}
 		arrayVar = id.Name

@@ -24,7 +24,7 @@ func TestArrayConstructorHandler_CanHandle(t *testing.T) {
 		{"array.new_box", true},
 		{"array.new_table", true},
 		{"array.new_linefill", true},
-		{"array.new_string", false},
+		{"array.new_string", true},
 		{"array.push", false},
 		{"array.get", false},
 		{"ta.sma", false},

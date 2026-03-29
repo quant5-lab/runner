@@ -75,15 +75,20 @@ func (h *ArrayMethodCallHandler) generateGet(g *generator, call *ast.CallExpress
 		return "", fmt.Errorf("array.get: %w", err)
 	}
 
+	elemType, ok := g.lookupArrayElementType(seriesName)
+	if !ok {
+		return "", fmt.Errorf("array.get: variable %q type not found", seriesName)
+	}
+
 	indexCode, err := h.resolveIndexCode(g, call.Arguments[1])
 	if err != nil {
 		return "", fmt.Errorf("array.get: %w", err)
 	}
 
 	if isDynOffset {
-		return fmt.Sprintf("%sArraySeries.Elem(int(%s), %s)", seriesName, dynOffsetExpr, indexCode), nil
+		return fmt.Sprintf("%s%s.Elem(int(%s), %s)", seriesName, elemType.VariableSuffix(), dynOffsetExpr, indexCode), nil
 	}
-	return fmt.Sprintf("%sArraySeries.Elem(%d, %s)", seriesName, barOffset, indexCode), nil
+	return fmt.Sprintf("%s%s.Elem(%d, %s)", seriesName, elemType.VariableSuffix(), barOffset, indexCode), nil
 }
 
 func (h *ArrayMethodCallHandler) generateSize(g *generator, call *ast.CallExpression) (string, error) {
@@ -106,7 +111,7 @@ func (h *ArrayMethodCallHandler) resolveArraySeriesAndOffset(g *generator, arg a
 	switch e := arg.(type) {
 	case *ast.Identifier:
 		if !g.isArraySeriesVariable(e.Name) {
-			err = fmt.Errorf("variable %q is not an array<float>", e.Name)
+			err = fmt.Errorf("variable %q is not an array", e.Name)
 			return
 		}
 		seriesName = e.Name
@@ -120,24 +125,29 @@ func (h *ArrayMethodCallHandler) resolveArraySeriesAndOffset(g *generator, arg a
 			}
 		}
 	}
-	err = fmt.Errorf("variable is not a registered array<float>")
+	err = fmt.Errorf("variable is not a registered array")
 	return
 }
 
 func (h *ArrayMethodCallHandler) resolveArrayExpression(g *generator, arg ast.Expression) (string, error) {
 	switch e := arg.(type) {
 	case *ast.Identifier:
-		if !g.isArraySeriesVariable(e.Name) {
-			return "", fmt.Errorf("variable %q is not an array<float>", e.Name)
+		elemType, ok := g.lookupArrayElementType(e.Name)
+		if !ok {
+			return "", fmt.Errorf("variable %q is not an array", e.Name)
 		}
-		return fmt.Sprintf("%sArraySeries.Get(0)", e.Name), nil
+		return fmt.Sprintf("%s%s.Get(0)", e.Name, elemType.VariableSuffix()), nil
 
 	case *ast.MemberExpression:
 		if !e.Computed {
 			break
 		}
 		id, ok := e.Object.(*ast.Identifier)
-		if !ok || !g.isArraySeriesVariable(id.Name) {
+		if !ok {
+			break
+		}
+		elemType, ok := g.lookupArrayElementType(id.Name)
+		if !ok {
 			break
 		}
 		offset, isDynamic, dynExpr, err := resolveSubscriptOffset(e.Property)
@@ -145,9 +155,9 @@ func (h *ArrayMethodCallHandler) resolveArrayExpression(g *generator, arg ast.Ex
 			return "", err
 		}
 		if isDynamic {
-			return fmt.Sprintf("%sArraySeries.Get(int(%s))", id.Name, dynExpr), nil
+			return fmt.Sprintf("%s%s.Get(int(%s))", id.Name, elemType.VariableSuffix(), dynExpr), nil
 		}
-		return fmt.Sprintf("%sArraySeries.Get(%d)", id.Name, offset), nil
+		return fmt.Sprintf("%s%s.Get(%d)", id.Name, elemType.VariableSuffix(), offset), nil
 	}
 
 	exprCode, err := g.generateArrowFunctionExpression(arg)
@@ -189,6 +199,8 @@ func resolveSubscriptOffset(prop ast.Expression) (literal int, isDynamic bool, d
 }
 
 func (g *generator) isArraySeriesVariable(varName string) bool {
-	varType, exists := g.variables[varName]
-	return exists && varType == "array_series"
+	if g.arrayVariableRegistry == nil {
+		return false
+	}
+	return g.arrayVariableRegistry.IsArrayVariable(varName)
 }

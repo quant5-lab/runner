@@ -21,7 +21,7 @@ func TestArrayConstructorClassifier_IsArrayConstructor(t *testing.T) {
 		{"array.new_table", "array.new_table", true},
 		{"array.new_linefill", "array.new_linefill", true},
 
-		{"array.new_string not supported yet", "array.new_string", false},
+		{"array.new_string is string constructor", "array.new_string", true},
 		{"array.push is mutator not constructor", "array.push", false},
 		{"array.get is reader not constructor", "array.get", false},
 		{"array.size is reader not constructor", "array.size", false},
@@ -52,7 +52,7 @@ func TestArrayConstructorClassifier_IsStringArrayConstructor(t *testing.T) {
 		funcName string
 		want     bool
 	}{
-		{"array.new_string not supported yet", "array.new_string", false},
+		{"array.new_string is string constructor", "array.new_string", true},
 		{"array.new_float is numeric not string", "array.new_float", false},
 		{"array.new_int is numeric not string", "array.new_int", false},
 		{"array.new_bool is numeric not string", "array.new_bool", false},

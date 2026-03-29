@@ -7,16 +7,18 @@ import (
 // TypeInferenceEngine determines variable types from AST expressions.
 // Type system: "float64" (default), "bool", "string"
 type TypeInferenceEngine struct {
-	variables    map[string]string
-	constants    map[string]interface{}
-	pineRegistry *PineConstantRegistry
+	variables                map[string]string
+	constants                map[string]interface{}
+	pineRegistry             *PineConstantRegistry
+	arrayConstructorResolver *ArrayConstructorTypeResolver
 }
 
 func NewTypeInferenceEngine() *TypeInferenceEngine {
 	return &TypeInferenceEngine{
-		variables:    make(map[string]string),
-		constants:    make(map[string]interface{}),
-		pineRegistry: NewPineConstantRegistry(),
+		variables:                make(map[string]string),
+		constants:                make(map[string]interface{}),
+		pineRegistry:             NewPineConstantRegistry(),
+		arrayConstructorResolver: NewArrayConstructorTypeResolver(),
 	}
 }
 
@@ -114,11 +116,8 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	if funcName == "input.bool" {
 		return "bool"
 	}
-	if te.isArrayConstructor(funcName) {
-		return "array_series"
-	}
-	if funcName == "ta.pivot_point_levels" || funcName == "pivot_point_levels" {
-		return "array_series"
+	if elemType, ok := te.arrayConstructorResolver.ResolveVariableType(funcName); ok {
+		return elemType.TypeTag()
 	}
 	if IsTickerConstructorFunction(funcName) {
 		return "string"
@@ -131,11 +130,6 @@ func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) st
 	}
 
 	return "float64"
-}
-
-func (te *TypeInferenceEngine) isArrayConstructor(funcName string) bool {
-	classifier := NewArrayConstructorClassifier()
-	return classifier.IsArrayConstructor(funcName)
 }
 
 func (te *TypeInferenceEngine) IsBoolVariable(expr ast.Expression) bool {
