@@ -50,6 +50,9 @@ func transformerConstructorCode(symbolExpr ast.Expression, modifierPrefix string
 		if srcOK && styleOK && paramOK && revOK {
 			return fmt.Sprintf("ticker.NewPointFigureTransformer(%q, %q, %g, %g)", source, style, param, reversal)
 		}
+
+	case "RANGE":
+		return "&ticker.IdentityTransformer{}"
 	}
 
 	return fmt.Sprintf("ticker.NewTransformer(%q)", modifierPrefix)

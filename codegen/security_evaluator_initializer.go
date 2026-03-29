@@ -4,11 +4,17 @@ import (
 	"fmt"
 )
 
-/*
-SecurityEvaluatorInitializer generates initialization code for security bar evaluators.
+const barLoopEvaluatorVar = "secBarEvaluator"
+const ArrowEvalMapVar = "arrowSecEvals"
+const arrowEvaluatorExpr = ArrowEvalMapVar + "[secKey]"
 
-Single Responsibility: Emit evaluator configuration code that wires VarLookup, BarMapper, and InputConstants.
-Separates evaluator setup logic from call-site-specific concerns (bar-loop vs inline vs arrow scope).
+/*
+SecurityEvaluatorInitializer centralises evaluator wiring so bar-loop, inline, and
+arrow call-sites emit identical BarMapper, VarLookup, and InputConstants setup code.
+
+evaluatorVar controls which Go variable/expression holds the persistent evaluator:
+  - bar-loop / inline:  barLoopEvaluatorVar  ("secBarEvaluator")
+  - arrow IIFE:         arrowEvaluatorExpr   ("arrowSecEvals[secKey]")
 
 Used by:
   - SecurityExpressionHandler (bar-loop scope)
@@ -16,14 +22,24 @@ Used by:
   - ArrowSecurityCallGenerator (arrow function scope)
 */
 type SecurityEvaluatorInitializer struct {
-	symbolTable SymbolTable
-	gen         *generator
+	symbolTable  SymbolTable
+	gen          *generator
+	evaluatorVar string
 }
 
 func NewSecurityEvaluatorInitializer(symbolTable SymbolTable, gen *generator) *SecurityEvaluatorInitializer {
 	return &SecurityEvaluatorInitializer{
-		symbolTable: symbolTable,
-		gen:         gen,
+		symbolTable:  symbolTable,
+		gen:          gen,
+		evaluatorVar: barLoopEvaluatorVar,
+	}
+}
+
+func NewArrowSecurityEvaluatorInitializer(symbolTable SymbolTable, gen *generator) *SecurityEvaluatorInitializer {
+	return &SecurityEvaluatorInitializer{
+		symbolTable:  symbolTable,
+		gen:          gen,
+		evaluatorVar: arrowEvaluatorExpr,
 	}
 }
 
@@ -34,20 +50,35 @@ func (init *SecurityEvaluatorInitializer) EmitInitialization(
 ) string {
 	code := ""
 
-	code += indentFunc() + "if secBarEvaluator == nil {\n"
+	code += indentFunc() + "if " + init.evaluatorVar + " == nil {\n"
 	incrementIndent()
 
+	code += init.EmitInitializationBody(indentFunc, incrementIndent, decrementIndent)
+	code += indentFunc() + init.evaluatorVar + " = security.NewSeriesCachingEvaluator(baseEvaluator)\n"
+
+	decrementIndent()
+	code += indentFunc() + "}\n"
+
+	return code
+}
+
+/*
+EmitInitializationBody emits the evaluator wiring (NewStreamingBarEvaluator, registry, bar mapper,
+var lookup, input constants) without the outer nil guard or final assignment. Used by
+ArrowSecurityCallGenerator which manages its own guard and assignment to an interface{} map.
+*/
+func (init *SecurityEvaluatorInitializer) EmitInitializationBody(
+	indentFunc func() string,
+	incrementIndent func(),
+	decrementIndent func(),
+) string {
+	code := ""
 	code += indentFunc() + "baseEvaluator := security.NewStreamingBarEvaluator()\n"
 	code += indentFunc() + "varRegistry := security.NewVariableRegistry()\n"
 	code += indentFunc() + "baseEvaluator.SetVariableRegistry(varRegistry)\n"
 	code += init.emitBarMapperSetup(indentFunc, incrementIndent, decrementIndent)
 	code += init.emitVarLookupSetup(indentFunc, incrementIndent, decrementIndent)
 	code += init.emitInputConstantsSetup(indentFunc)
-	code += indentFunc() + "secBarEvaluator = security.NewSeriesCachingEvaluator(baseEvaluator)\n"
-
-	decrementIndent()
-	code += indentFunc() + "}\n"
-
 	return code
 }
 
@@ -57,10 +88,60 @@ func (init *SecurityEvaluatorInitializer) emitBarMapperSetup(
 	decrementIndent func(),
 ) string {
 	code := ""
-
 	code += indentFunc() + "barMapper := security.NewBarIndexMapper()\n"
-	code += indentFunc() + "requestRanges := securityBarMapper.GetRanges()\n"
-	code += indentFunc() + "for _, rr := range requestRanges {\n"
+	code += indentFunc() + "switch securityBarMapper.Mode() {\n"
+	code += init.emitIdentityBarMappingBranch(indentFunc, incrementIndent, decrementIndent)
+	code += init.emitTransformedBarMappingBranch(indentFunc, incrementIndent, decrementIndent)
+	code += init.emitRangeBarMappingBranch(indentFunc, incrementIndent, decrementIndent)
+	code += indentFunc() + "}\n"
+	code += indentFunc() + "baseEvaluator.SetBarIndexMapper(barMapper)\n"
+	return code
+}
+
+func (init *SecurityEvaluatorInitializer) emitIdentityBarMappingBranch(
+	indentFunc func() string,
+	incrementIndent func(),
+	decrementIndent func(),
+) string {
+	code := indentFunc() + "case request.ModeIdentity:\n"
+	incrementIndent()
+	code += indentFunc() + "for i := range secCtx.Data {\n"
+	incrementIndent()
+	code += indentFunc() + "barMapper.SetMapping(i, i)\n"
+	decrementIndent()
+	code += indentFunc() + "}\n"
+	decrementIndent()
+	return code
+}
+
+func (init *SecurityEvaluatorInitializer) emitTransformedBarMappingBranch(
+	indentFunc func() string,
+	incrementIndent func(),
+	decrementIndent func(),
+) string {
+	code := indentFunc() + "case request.ModeTransformed:\n"
+	incrementIndent()
+	code += indentFunc() + "for mainIdx, secIdx := range securityBarMapper.MainToSynthetic() {\n"
+	incrementIndent()
+	code += indentFunc() + "if secIdx >= 0 && barMapper.GetMainBarIndexForSecurityBar(secIdx) < 0 {\n"
+	incrementIndent()
+	code += indentFunc() + "barMapper.SetMapping(secIdx, mainIdx)\n"
+	decrementIndent()
+	code += indentFunc() + "}\n"
+	decrementIndent()
+	code += indentFunc() + "}\n"
+	decrementIndent()
+	return code
+}
+
+func (init *SecurityEvaluatorInitializer) emitRangeBarMappingBranch(
+	indentFunc func() string,
+	incrementIndent func(),
+	decrementIndent func(),
+) string {
+	code := indentFunc() + "default:\n"
+	incrementIndent()
+	code += indentFunc() + "for _, rr := range securityBarMapper.GetRanges() {\n"
 	incrementIndent()
 	code += indentFunc() + "if rr.StartHourlyIndex >= 0 {\n"
 	incrementIndent()
@@ -69,8 +150,7 @@ func (init *SecurityEvaluatorInitializer) emitBarMapperSetup(
 	code += indentFunc() + "}\n"
 	decrementIndent()
 	code += indentFunc() + "}\n"
-	code += indentFunc() + "baseEvaluator.SetBarIndexMapper(barMapper)\n"
-
+	decrementIndent()
 	return code
 }
 

@@ -65,6 +65,8 @@ func NewTransformer(modifierType ModifierType) BarTransformer {
 		return NewLineBreakTransformer(LineBreakDefaultLines)
 	case ModifierPointFig:
 		return NewPointFigureTransformer(PointFigDefaultSource, PointFigStyleATR, PointFigDefaultBoxSize, PointFigDefaultReversal)
+	case ModifierRange:
+		return &IdentityTransformer{}
 	default:
 		return &IdentityTransformer{}
 	}

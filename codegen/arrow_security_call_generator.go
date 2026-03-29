@@ -102,8 +102,24 @@ func (g *ArrowSecurityCallGenerator) generateStreamingEvaluation(exprArg ast.Exp
 	}
 
 	var b strings.Builder
-	b.WriteString("\t\tsecEval := security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n")
-	b.WriteString(fmt.Sprintf("\t\tsecValue, evalErr := secEval.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON))
+
+	b.WriteString("\t\tsecurityBarMapper := arrowCtx.ConcreteBarMappers[secKey].(*request.SecurityBarMapper)\n")
+	b.WriteString("\t\tarrowSecEvalMap := arrowCtx.GetOrCreateSecurityEvaluators()\n")
+	b.WriteString("\t\tif arrowSecEvalMap[secKey] == nil {\n")
+
+	indentLevel := 1
+	indentFunc := func() string { return strings.Repeat("\t", 2+indentLevel) }
+	incrementIndent := func() { indentLevel++ }
+	decrementIndent := func() { indentLevel-- }
+
+	initializer := NewArrowSecurityEvaluatorInitializer(g.gen.symbolTable, g.gen)
+	// Emit the body of the initializer (without the outer if/end), since we handle the guard ourselves
+	b.WriteString(initializer.EmitInitializationBody(indentFunc, incrementIndent, decrementIndent))
+	b.WriteString("\t\t\tarrowSecEvalMap[secKey] = security.NewSeriesCachingEvaluator(baseEvaluator)\n")
+	b.WriteString("\t\t}\n")
+
+	b.WriteString(fmt.Sprintf("\t\tsecValue, evalErr := arrowSecEvalMap[secKey].(security.BarEvaluator).EvaluateAtBar(%s, secCtx, secBarIdx)\n",
+		exprJSON))
 	b.WriteString("\t\tif evalErr != nil { return math.NaN() }\n")
 	b.WriteString("\t\treturn secValue\n")
 	return b.String(), nil

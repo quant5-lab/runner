@@ -2,6 +2,24 @@ package ticker
 
 import "testing"
 
+func TestRange(t *testing.T) {
+	tests := []struct {
+		symbol   string
+		expected string
+	}{
+		{"BTCUSDT", "RANGE:BTCUSDT"},
+		{"BINANCE:BTCUSDT", "RANGE:BINANCE:BTCUSDT"},
+		{"", "RANGE:"},
+	}
+
+	for _, tt := range tests {
+		result := Range(tt.symbol)
+		if result != tt.expected {
+			t.Errorf("Range(%q) = %q, want %q", tt.symbol, result, tt.expected)
+		}
+	}
+}
+
 func TestHeikinashi(t *testing.T) {
 	tests := []struct {
 		symbol   string
@@ -102,6 +120,7 @@ func TestParseModifiedSymbol(t *testing.T) {
 		{"kagi", "KAGI:ETHUSDT:3.50", "ETHUSDT", ModifierKagi, true},
 		{"linebreak", "LINEBREAK:AAPL:3", "AAPL", ModifierLineBreak, true},
 		{"pointfigure", "POINTFIG:TSLA", "TSLA", ModifierPointFig, true},
+		{"range", "RANGE:BTCUSDT", "BTCUSDT", ModifierRange, true},
 		{"plain symbol", "BTCUSDT", "BTCUSDT", "", false},
 		{"exchange prefixed", "BINANCE:BTCUSDT", "BINANCE:BTCUSDT", "", false},
 		{"unknown prefix", "INVALID:SYMBOL", "INVALID:SYMBOL", "", false},
@@ -139,6 +158,7 @@ func TestIsModified(t *testing.T) {
 		{"kagi", "KAGI:ETHUSDT:3.50", true},
 		{"linebreak", "LINEBREAK:AAPL:3", true},
 		{"pointfigure", "POINTFIG:TSLA", true},
+		{"range", "RANGE:BTCUSDT", true},
 		{"plain symbol", "BTCUSDT", false},
 		{"exchange prefixed", "BINANCE:BTCUSDT", false},
 		{"unknown prefix", "INVALID:SYMBOL", false},
@@ -168,6 +188,7 @@ func TestExtractBaseSymbol(t *testing.T) {
 		{"kagi", "KAGI:ETHUSDT:3.50", "ETHUSDT"},
 		{"linebreak", "LINEBREAK:AAPL:3", "AAPL"},
 		{"pointfigure", "POINTFIG:TSLA", "TSLA"},
+		{"range", "RANGE:BTCUSDT", "BTCUSDT"},
 		{"plain symbol", "BTCUSDT", "BTCUSDT"},
 		{"exchange prefixed", "BINANCE:BTCUSDT", "BINANCE:BTCUSDT"},
 		{"empty", "", ""},

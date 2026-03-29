@@ -171,6 +171,52 @@ func TestSymbolExtractor_LinebreakCall(t *testing.T) {
 	}
 }
 
+func TestSymbolExtractor_RangeCall(t *testing.T) {
+	extractor := NewSymbolExtractor()
+
+	expr := &ast.CallExpression{
+		Callee: &ast.Identifier{Name: "range"},
+		Arguments: []ast.Expression{
+			&ast.Literal{Value: "BTCUSDT"},
+		},
+	}
+
+	symbol, modType := extractor.Extract(expr)
+
+	if symbol != "BTCUSDT" {
+		t.Errorf("symbol = %q, want BTCUSDT", symbol)
+	}
+	if modType != ticker.ModifierRange {
+		t.Errorf("modType = %q, want %q", modType, ticker.ModifierRange)
+	}
+}
+
+func TestSymbolExtractor_TickerRangeCall(t *testing.T) {
+	extractor := NewSymbolExtractor()
+
+	expr := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "ticker"},
+			Property: &ast.Identifier{Name: "range"},
+		},
+		Arguments: []ast.Expression{
+			&ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "syminfo"},
+				Property: &ast.Identifier{Name: "tickerid"},
+			},
+		},
+	}
+
+	symbol, modType := extractor.Extract(expr)
+
+	if symbol != "syminfo.tickerid" {
+		t.Errorf("symbol = %q, want syminfo.tickerid", symbol)
+	}
+	if modType != ticker.ModifierRange {
+		t.Errorf("modType = %q, want %q", modType, ticker.ModifierRange)
+	}
+}
+
 func TestSymbolExtractor_TickerStandardCall(t *testing.T) {
 	extractor := NewSymbolExtractor()
 
@@ -237,6 +283,23 @@ func TestSymbolExtractor_InsufficientArguments(t *testing.T) {
 			name: "kagi with no args",
 			expr: &ast.CallExpression{
 				Callee:    &ast.Identifier{Name: "kagi"},
+				Arguments: []ast.Expression{},
+			},
+		},
+		{
+			name: "range with no args",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "range"},
+				Arguments: []ast.Expression{},
+			},
+		},
+		{
+			name: "ticker.range with no args",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "range"},
+				},
 				Arguments: []ast.Expression{},
 			},
 		},

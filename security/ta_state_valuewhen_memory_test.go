@@ -179,10 +179,10 @@ func TestValuewhenStateManager_HistoricalAnchorStableAfterAdvance(t *testing.T) 
 // (occurrence+1) values remain accessible for correct occurrence-based lookback.
 func TestValuewhenStateManager_RingEvictionSemantics(t *testing.T) {
 	tests := []struct {
-		name                 string
-		occurrence           int
-		totalMatches         int
-		expectedAccessible   int
+		name               string
+		occurrence         int
+		totalMatches       int
+		expectedAccessible int
 	}{
 		{"occ0_10_matches", 0, 10, 1},
 		{"occ2_100_matches", 2, 100, 3},

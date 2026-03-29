@@ -169,34 +169,35 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 }
 
 type generator struct {
-	imports                  map[string]bool
-	variables                map[string]string
-	varInits                 map[string]ast.Expression
-	constants                map[string]interface{}
-	reassignedVars           map[string]bool
-	plots                    []string
-	strategyConfig           *StrategyConfig
-	indent                   int
-	userDefinedFunctions     string
-	taFunctions              []taFunctionCall
-	tupleTAFunctions         []tupleTAFunctionCall
-	inSecurityContext        bool
-	inArrowFunctionBody      bool
-	loopContextStack         *LoopContextStack
-	hasSecurityCalls         bool
-	hasSecurityExprEvals     bool
-	hasStrategyRuntimeAccess bool
-	hasBarIndexUsage         bool
-	hasLastBarIndex          bool
-	hasLastBarTime           bool
-	hasTimenow               bool
-	hasTickerCalls           bool
-	hasSortUsage             bool
-	pineVersion              int
-	limits                   CodeGenerationLimits
-	safetyGuard              RuntimeSafetyGuard
-	persistenceEmitter       *VarPersistenceEmitter
-	hoistedArrowContexts     []ArrowCallSite
+	imports                   map[string]bool
+	variables                 map[string]string
+	varInits                  map[string]ast.Expression
+	constants                 map[string]interface{}
+	reassignedVars            map[string]bool
+	plots                     []string
+	strategyConfig            *StrategyConfig
+	indent                    int
+	userDefinedFunctions      string
+	taFunctions               []taFunctionCall
+	tupleTAFunctions          []tupleTAFunctionCall
+	inSecurityContext         bool
+	inArrowFunctionBody       bool
+	loopContextStack          *LoopContextStack
+	hasSecurityCalls          bool
+	hasSecurityExprEvals      bool
+	hasArrowSecurityExprEvals bool
+	hasStrategyRuntimeAccess  bool
+	hasBarIndexUsage          bool
+	hasLastBarIndex           bool
+	hasLastBarTime            bool
+	hasTimenow                bool
+	hasTickerCalls            bool
+	hasSortUsage              bool
+	pineVersion               int
+	limits                    CodeGenerationLimits
+	safetyGuard               RuntimeSafetyGuard
+	persistenceEmitter        *VarPersistenceEmitter
+	hoistedArrowContexts      []ArrowCallSite
 
 	constantRegistry      *ConstantRegistry
 	typeSystem            *TypeInferenceEngine
@@ -690,6 +691,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.hasSecurityCalls {
 		code += g.ind() + "// StreamingBarEvaluator for security() expressions\n"
 		code += g.ind() + "var secBarEvaluator security.BarEvaluator\n"
+		if g.hasArrowSecurityExprEvals {
+			code += g.ind() + "var " + ArrowEvalMapVar + " map[string]security.BarEvaluator\n"
+		}
 		code += "\n"
 	}
 
@@ -905,6 +909,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
 	if g.hasSecurityCalls {
 		code += g.ind() + "_ = secBarEvaluator\n"
+		if g.hasArrowSecurityExprEvals {
+			code += g.ind() + "_ = " + ArrowEvalMapVar + "\n"
+		}
 	}
 	if g.hasStrategyRuntimeAccess {
 		code += g.ind() + "_ = strategy_position_avg_priceSeries\n"

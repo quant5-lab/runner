@@ -13,6 +13,7 @@ const (
 	ModifierKagi       ModifierType = "KAGI"
 	ModifierLineBreak  ModifierType = "LINEBREAK"
 	ModifierPointFig   ModifierType = "POINTFIG"
+	ModifierRange      ModifierType = "RANGE"
 )
 
 var knownModifiers = []ModifierType{
@@ -21,6 +22,7 @@ var knownModifiers = []ModifierType{
 	ModifierKagi,
 	ModifierLineBreak,
 	ModifierPointFig,
+	ModifierRange,
 }
 
 func Heikinashi(symbol string) string {
@@ -37,6 +39,10 @@ func Kagi(symbol string, reversal float64) string {
 
 func LineBreak(symbol string, numberOfLines int) string {
 	return fmt.Sprintf("%s:%s:%d", ModifierLineBreak, symbol, numberOfLines)
+}
+
+func Range(symbol string) string {
+	return fmt.Sprintf("%s:%s", ModifierRange, symbol)
 }
 
 func ParseModifiedSymbol(tickerID string) (baseSymbol string, modifierType ModifierType, hasModifier bool) {

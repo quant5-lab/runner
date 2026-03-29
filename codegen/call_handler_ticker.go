@@ -24,6 +24,8 @@ func (h *TickerFunctionHandler) CanHandle(funcName string) bool {
 		return true
 	case "pointfigure", "ticker.pointfigure":
 		return true
+	case "range", "ticker.range":
+		return true
 	case "ticker.new", "ticker.modify", "ticker.standard", "ticker.inherit":
 		return true
 	default:
@@ -51,6 +53,8 @@ func (h *TickerFunctionHandler) GenerateCode(g *generator, call *ast.CallExpress
 		return h.generateLineBreak(g, call)
 	case "pointfigure", "ticker.pointfigure":
 		return h.generatePointFigure(g, call)
+	case "range", "ticker.range":
+		return h.generateRange(g, call)
 	case "ticker.new":
 		return h.generateTickerNew(g, call)
 	case "ticker.modify":
@@ -179,6 +183,19 @@ func (h *TickerFunctionHandler) generatePointFigure(g *generator, call *ast.Call
 	}
 
 	return fmt.Sprintf("ticker.PointFigure(%s, %s, %s, float64(%s), float64(%s))", symbolArg, sourceArg, styleArg, paramArg, reversalArg), nil
+}
+
+func (h *TickerFunctionHandler) generateRange(g *generator, call *ast.CallExpression) (string, error) {
+	if len(call.Arguments) < 1 {
+		return "", fmt.Errorf("ticker.range() requires at least 1 argument (symbol)")
+	}
+
+	symbolArg, err := h.extractTickerExpression(g, call.Arguments[0])
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("ticker.Range(%s)", symbolArg), nil
 }
 
 func (h *TickerFunctionHandler) generateTickerNew(g *generator, call *ast.CallExpression) (string, error) {

@@ -99,6 +99,14 @@ func (e *SymbolExtractor) extractFromTickerCall(call *ast.CallExpression) string
 			}
 		}
 
+	case "range", "ticker.range":
+		if len(call.Arguments) >= 1 {
+			baseSymbol := e.extractRaw(call.Arguments[0])
+			if baseSymbol != "" {
+				return string(ticker.ModifierRange) + ":" + baseSymbol
+			}
+		}
+
 	case "ticker.standard":
 		if len(call.Arguments) >= 1 {
 			modifiedSymbol := e.extractRaw(call.Arguments[0])

@@ -174,6 +174,7 @@ func TestNewTransformer(t *testing.T) {
 		{ModifierKagi, "*ticker.KagiTransformer"},
 		{ModifierLineBreak, "*ticker.LineBreakTransformer"},
 		{ModifierPointFig, "*ticker.PointFigureTransformer"},
+		{ModifierRange, "*ticker.IdentityTransformer"},
 		{"", "*ticker.IdentityTransformer"},
 	}
 

@@ -16,6 +16,8 @@ type ArrowContext struct {
 	LocalSeries        map[string]*series.Series
 	SecurityContexts   map[string]*Context
 	SecurityBarMappers map[string]BarIndexMapper
+	ConcreteBarMappers map[string]interface{}
+	SecurityEvaluators map[string]interface{}
 	capacity           int
 }
 
@@ -76,4 +78,20 @@ func (ac *ArrowContext) SetBarMapper(key string, mapper BarIndexMapper) {
 		ac.SecurityBarMappers = make(map[string]BarIndexMapper)
 	}
 	ac.SecurityBarMappers[key] = mapper
+}
+
+/* SetConcreteBarMapper stores the concrete bar mapper (e.g. *request.SecurityBarMapper) for arrow security eval */
+func (ac *ArrowContext) SetConcreteBarMapper(key string, mapper interface{}) {
+	if ac.ConcreteBarMappers == nil {
+		ac.ConcreteBarMappers = make(map[string]interface{})
+	}
+	ac.ConcreteBarMappers[key] = mapper
+}
+
+/* GetOrCreateSecurityEvaluator returns the cached evaluator or nil */
+func (ac *ArrowContext) GetOrCreateSecurityEvaluators() map[string]interface{} {
+	if ac.SecurityEvaluators == nil {
+		ac.SecurityEvaluators = make(map[string]interface{})
+	}
+	return ac.SecurityEvaluators
 }

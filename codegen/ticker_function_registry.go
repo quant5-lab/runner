@@ -9,6 +9,7 @@ var tickerConstructorFunctions = map[string]bool{
 	"ticker.kagi":        true,
 	"ticker.linebreak":   true,
 	"ticker.pointfigure": true,
+	"ticker.range":       true,
 	"ticker.new":         true,
 	"ticker.modify":      true,
 	"ticker.standard":    true,
@@ -19,6 +20,7 @@ var tickerConstructorFunctions = map[string]bool{
 	"kagi":               true,
 	"linebreak":          true,
 	"pointfigure":        true,
+	"range":              true,
 }
 
 // IsTickerConstructorFunction reports whether name is a ticker constructor that

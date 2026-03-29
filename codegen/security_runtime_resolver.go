@@ -28,7 +28,7 @@ func runtimePlaceholder() string {
 
 /* extractModifierPrefix returns the modifier prefix and whether it exists */
 func extractModifierPrefix(symbol string) (prefix string, baseSymbol string, hasModifier bool) {
-	modifiers := []string{"HEIKINASHI:", "RENKO:", "KAGI:", "LINEBREAK:", "POINTFIG:"}
+	modifiers := []string{"HEIKINASHI:", "RENKO:", "KAGI:", "LINEBREAK:", "POINTFIG:", "RANGE:"}
 	for _, mod := range modifiers {
 		if strings.HasPrefix(symbol, mod) {
 			return strings.TrimSuffix(mod, ":"), strings.TrimPrefix(symbol, mod), true
@@ -79,6 +79,9 @@ func generateModifierCall(prefix string, baseSymbolCode string, symbolExpr ast.E
 			return fmt.Sprintf("ticker.PointFigure(%s, %q, %q, %g, %g)", baseSymbolCode, source, style, param, reversal)
 		}
 		return fmt.Sprintf("fmt.Sprintf(\"POINTFIG:%%s\", %s)", baseSymbolCode)
+
+	case "RANGE":
+		return "ticker.Range(" + baseSymbolCode + ")"
 	}
 
 	return baseSymbolCode

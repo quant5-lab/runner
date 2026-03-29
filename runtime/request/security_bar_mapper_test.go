@@ -551,6 +551,48 @@ func parseUTC(value, layout string) (t time.Time, err error) {
 	return time.Parse(layout, value)
 }
 
+func TestSecurityBarMapper_FindDailyBarIndex_Transformed(t *testing.T) {
+	tests := []struct {
+		name            string
+		mainToSynthetic []int
+		mainBarIdx      int
+		lookahead       bool
+		want            int
+	}{
+		// Valid forward mapping: returns the synthetic bar index for that main bar.
+		{"first main bar maps to first brick", []int{0, 0, 0, 1, 1, 2}, 0, false, 0},
+		{"last main bar of first brick", []int{0, 0, 0, 1, 1, 2}, 2, false, 0},
+		{"first main bar of second brick", []int{0, 0, 0, 1, 1, 2}, 3, false, 1},
+		{"last main bar in mapping", []int{0, 0, 0, 1, 1, 2}, 5, false, 2},
+
+		// lookahead is ignored for ModeTransformed.
+		{"lookahead=true ignored", []int{0, 0, 1, 2}, 1, true, 0},
+		{"lookahead=false same result", []int{0, 0, 1, 2}, 1, false, 0},
+
+		// Pre-formation sentinel: no synthetic bar has formed yet.
+		{"pre-formation entry returns -1", []int{-1, -1, 0, 1}, 0, false, -1},
+		{"all pre-formation returns -1", []int{-1, -1, -1}, 2, false, -1},
+
+		// Out-of-bounds access returns -1.
+		{"index beyond mapping length", []int{0, 1, 2}, 5, false, -1},
+		{"negative index", []int{0, 1, 2}, -1, false, -1},
+
+		// Empty mapping.
+		{"empty mapping any index", []int{}, 0, false, -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewSecurityBarMapper()
+			m.BuildMappingFromTransform(tt.mainToSynthetic)
+			got := m.FindDailyBarIndex(tt.mainBarIdx, tt.lookahead)
+			if got != tt.want {
+				t.Errorf("FindDailyBarIndex(%d, %v) = %d, want %d", tt.mainBarIdx, tt.lookahead, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSecurityBarMapper_BuildIdentityMapping(t *testing.T) {
 	mapper := NewSecurityBarMapper()
 	mapper.BuildIdentityMapping(1000)

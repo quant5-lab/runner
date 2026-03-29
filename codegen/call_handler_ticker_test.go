@@ -26,6 +26,8 @@ func TestTickerFunctionHandler_CanHandle(t *testing.T) {
 		{"ticker.kagi", "ticker.kagi", true},
 		{"ticker.linebreak", "ticker.linebreak", true},
 		{"ticker.pointfigure", "ticker.pointfigure", true},
+		{"range", "range", true},
+		{"ticker.range", "ticker.range", true},
 
 		{"ticker.new", "ticker.new", true},
 		{"ticker.modify", "ticker.modify", true},
@@ -679,6 +681,74 @@ func TestTickerFunctionHandler_GenerateCode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "ticker.range with literal symbol",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "range"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.Range("BTCUSDT")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.range with syminfo.tickerid",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "range"},
+				},
+				Arguments: []ast.Expression{
+					&ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "syminfo"},
+						Property: &ast.Identifier{Name: "tickerid"},
+					},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := "ticker.Range(ctx.Symbol)"
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "bare range with literal symbol",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "range"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "AAPL"},
+				},
+			},
+			expectError: false,
+			validateOutput: func(t *testing.T, code string) {
+				expected := `ticker.Range("AAPL")`
+				if code != expected {
+					t.Errorf("Expected %q, got: %q", expected, code)
+				}
+			},
+		},
+		{
+			name: "ticker.range missing symbol argument",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "range"},
+				},
+				Arguments: []ast.Expression{},
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -978,6 +1048,19 @@ func TestTickerFunctionHandler_GeneratorStateManagement(t *testing.T) {
 					Property: &ast.Identifier{Name: "standard"},
 				},
 				Arguments: []ast.Expression{},
+			},
+			expectTickerImport: true,
+		},
+		{
+			name: "ticker.range sets hasTickerCalls flag",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ticker"},
+					Property: &ast.Identifier{Name: "range"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "BTCUSDT"},
+				},
 			},
 			expectTickerImport: true,
 		},

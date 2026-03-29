@@ -300,3 +300,11 @@ func (m *SecurityBarMapper) FindTargetBarIndexByContainment(sourceBarIndex int, 
 func (m *SecurityBarMapper) GetRanges() []BarRange {
 	return m.ranges
 }
+
+func (m *SecurityBarMapper) Mode() MappingMode {
+	return m.mode
+}
+
+func (m *SecurityBarMapper) MainToSynthetic() []int {
+	return m.mainToSynthetic
+}
