@@ -28,7 +28,7 @@ type StreamingBarEvaluator struct {
 	volumeStateCache  map[string]*volumeIndicatorState
 	barsSinceCache    map[*ast.CallExpression]*BarsSinceStateManager
 	valuewhenCache    map[string]*ValuewhenStateManager
-	fixnanEvaluator   *FixnanEvaluator
+	fixnanCache       map[string]*FixnanStateManager
 	varRegistry       *VariableRegistry
 	secBarMapper      *BarIndexMapper
 	varLookup         VarLookupFunc
@@ -37,16 +37,12 @@ type StreamingBarEvaluator struct {
 
 func NewStreamingBarEvaluator() *StreamingBarEvaluator {
 	return &StreamingBarEvaluator{
-		taStateCache:     make(map[string]TAStateManager),
-		pivotStateCache:  make(map[string]*PivotStateManager),
-		volumeStateCache: make(map[string]*volumeIndicatorState),
-		barsSinceCache:   make(map[*ast.CallExpression]*BarsSinceStateManager),
-		valuewhenCache:   make(map[string]*ValuewhenStateManager),
-		fixnanEvaluator: NewFixnanEvaluator(
-			NewMapStateStorage(),
-			NewSequentialWarmupStrategy(),
-			NewHashExpressionIdentifier(),
-		),
+		taStateCache:      make(map[string]TAStateManager),
+		pivotStateCache:   make(map[string]*PivotStateManager),
+		volumeStateCache:  make(map[string]*volumeIndicatorState),
+		barsSinceCache:    make(map[*ast.CallExpression]*BarsSinceStateManager),
+		valuewhenCache:    make(map[string]*ValuewhenStateManager),
+		fixnanCache:       make(map[string]*FixnanStateManager),
 		varRegistry:       NewVariableRegistry(),
 		secBarMapper:      nil,
 		varLookup:         nil,
@@ -902,10 +898,6 @@ func (e *StreamingBarEvaluator) evaluateSARAtBar(call *ast.CallExpression, secCt
 	return state.ComputeAtBar(secCtx, nil, barIdx)
 }
 
-func (e *StreamingBarEvaluator) fixnanCallAtBar(call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
-	return e.fixnanEvaluator.EvaluateAtBar(e, call, secCtx, barIdx)
-}
-
 func init() {
 	registerCallHandler("ta.sma", (*StreamingBarEvaluator).evaluateSMAAtBar)
 	registerCallHandler("ta.ema", (*StreamingBarEvaluator).evaluateEMAAtBar)
@@ -918,7 +910,6 @@ func init() {
 	registerCallHandler("ta.bbw", (*StreamingBarEvaluator).evaluateBBWAtBar)
 	registerCallHandler("ta.cog", (*StreamingBarEvaluator).evaluateCOGAtBar)
 	registerCallHandler("ta.tsi", (*StreamingBarEvaluator).evaluateTSIAtBar)
-	registerCallHandlerAliases((*StreamingBarEvaluator).fixnanCallAtBar, "fixnan", "ta.fixnan")
 	registerCallHandler("ta.percentrank", (*StreamingBarEvaluator).evaluatePercentrankAtBar)
 	registerCallHandler("ta.percentile_nearest_rank", (*StreamingBarEvaluator).evaluatePercentileNearestRankAtBar)
 	registerCallHandler("ta.percentile_linear_interpolation", (*StreamingBarEvaluator).evaluatePercentileLinearInterpolationAtBar)

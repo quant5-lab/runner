@@ -110,7 +110,7 @@ func TestTAFunctionNameResolution_NamespacedVsDirectForms(t *testing.T) {
 			funcName := extractCallFunctionName(tc.callee)
 			switch {
 			case funcName == "fixnan" || funcName == "ta.fixnan":
-				result, err = evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, call, ctx, tc.barIdx)
+				result, err = evaluator.EvaluateAtBar(call, ctx, tc.barIdx)
 			case funcName == "pivothigh" || funcName == "ta.pivothigh":
 				result, err = evaluator.evaluatePivotHighAtBar(call, ctx, tc.barIdx)
 			default:
@@ -426,7 +426,7 @@ func TestFixnanWithNestedTAFunctions(t *testing.T) {
 				Arguments: []ast.Expression{nestedCall},
 			}
 
-			result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, tc.barIdx)
+			result, err := evaluator.EvaluateAtBar(fixnanCall, ctx, tc.barIdx)
 
 			if tc.shouldPass && err != nil {
 				t.Fatalf("%s: unexpected error: %v", tc.desc, err)
@@ -496,7 +496,7 @@ func TestFixnanWithNestedTAFunctions_Namespaced(t *testing.T) {
 				Arguments: []ast.Expression{nestedCall},
 			}
 
-			result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, tc.barIdx)
+			result, err := evaluator.EvaluateAtBar(fixnanCall, ctx, tc.barIdx)
 
 			if tc.shouldPass && err != nil {
 				t.Fatalf("%s: unexpected error: %v", tc.desc, err)
