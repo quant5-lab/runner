@@ -35,6 +35,7 @@ func main() {
 
 	sourceStr := string(sourceContent)
 	sourceStr = preprocessor.ExpandTabs(sourceStr)
+	sourceStr = preprocessor.RewriteGenericTypeSyntax(sourceStr)
 
 	pineVersion := detectPineVersion(sourceStr)
 	if pineVersion < 5 {
