@@ -1,0 +1,33 @@
+//@version=5
+strategy("Aroon Strategy", overlay=false, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Aroon Up/Down — manual implementation (ta.aroon not in PineScript v5 namespace)
+// Aroon Up  = 100 * (length + ta.highestbars(high, length+1)) / length
+// Aroon Down = 100 * (length + ta.lowestbars(low,  length+1)) / length
+
+length = 14
+
+aroon_up   = 100.0 * (length + ta.highestbars(high, length + 1)) / length
+aroon_down = 100.0 * (length + ta.lowestbars(low,  length + 1)) / length
+
+// Pattern detections — arbitrary combinations supported
+up_above_down      = aroon_up > aroon_down
+up_crosses_up_down = ta.crossover(aroon_up, aroon_down)
+up_at_100          = aroon_up >= 100.0
+up_above_50        = aroon_up > 50.0
+down_at_100        = aroon_down >= 100.0
+down_below_50      = aroon_down < 50.0
+
+// Entry: Up crosses above Down (bullish signal)
+if up_crosses_up_down
+    strategy.entry("Long", strategy.long)
+
+// Exit: Down crosses above Up
+if ta.crossunder(aroon_up, aroon_down)
+    strategy.close("Long")
+
+plot(aroon_up,   "Aroon Up",   color=color.green, linewidth=2)
+plot(aroon_down, "Aroon Down", color=color.red,   linewidth=2)
+hline(100, "100", color=color.gray, linestyle=hline.style_dotted)
+hline(50,  "50",  color=color.gray, linestyle=hline.style_dashed)
+hline(0,   "0",   color=color.gray, linestyle=hline.style_dotted)
