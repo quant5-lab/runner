@@ -1,0 +1,14 @@
+//@version=5
+indicator("Conditional as Boolean Test", overlay=false)
+
+// Test ternary expression as if-statement condition
+fast = ta.sma(close, 10)
+slow = ta.sma(close, 20)
+signal = 0.0
+
+if (close > open ? fast > slow : fast < slow)
+    signal := 1.0
+else
+    signal := -1.0
+
+plot(signal, "Signal", color=color.red)

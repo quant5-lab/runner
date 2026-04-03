@@ -9,4 +9,6 @@ type Generator interface {
 type AccessGenerator interface {
 	GenerateLoopValueAccess(loopVar string) string
 	GenerateInitialValueAccess(period int) string
+	GenerateCurrentValueAccess() string
+	GetBaseOffset() int
 }

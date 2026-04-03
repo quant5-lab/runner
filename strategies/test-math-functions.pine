@@ -1,0 +1,60 @@
+//@version=5
+strategy("Math Functions Integration Test", overlay=false, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Unary trigonometric functions
+sin_val = math.sin(close / 100)
+cos_val = math.cos(close / 100)
+tan_val = math.tan(close / 100)
+asin_val = math.asin(sin_val)
+acos_val = math.acos(cos_val)
+atan_val = math.atan(tan_val)
+
+// Unary arithmetic functions
+abs_val = math.abs(close - open)
+ceil_val = math.ceil(close)
+floor_val = math.floor(close)
+round_val = math.round(close)
+sqrt_val = math.sqrt(close)
+
+// Unary logarithmic functions
+log_val = math.log(close)
+log10_val = math.log10(close)
+exp_val = math.exp(close / 1000)
+
+// Binary functions
+max_val = math.max(close, open)
+min_val = math.min(close, open)
+pow_val = math.pow(close / 100, 2)
+
+// Special functions
+sign_val = math.sign(close - open)
+todegrees_val = math.todegrees(close / 100)
+toradians_val = math.toradians(close)
+avg_val = math.avg(open, high, low, close)
+random_val = math.random()
+random_range = math.random(0, 100)
+
+// Complex expressions combining multiple functions
+combined = math.sqrt(math.pow(math.abs(close - open), 2) + math.pow(high - low, 2))
+normalized = (close - math.min(close, open)) / math.max(close - open, 1)
+angle = math.todegrees(math.atan((high - low) / close))
+
+// Trading logic using math functions
+price_range = math.abs(high - low)
+is_large_candle = price_range > math.avg(ta.atr(14), ta.atr(20), ta.atr(30))
+is_positive = math.sign(close - open) > 0
+
+longCondition = is_large_candle and is_positive and close > math.max(open, close[1])
+shortCondition = is_large_candle and not is_positive and close < math.min(open, close[1])
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+// Plot math function results for verification
+plot(abs_val, "Abs", color.blue)
+plot(max_val, "Max", color.green)
+plot(min_val, "Min", color.red)
+plot(sign_val * 10, "Sign", color.orange)
+plot(avg_val, "Avg", color.purple)

@@ -1,0 +1,18 @@
+Blocker #2 RESOLVED — all 6 sub-fixes applied (A/B/C/D/E/F).
+
+Parse: ✅
+Generate: ✅
+Compile: ❌ (5 errors — string-valued color variables stored into float64 *series.Series)
+
+Resolved by Blocker #2 fixes:
+  ✅ (A) Source params typed *series.Series with GetCurrent() access
+  ✅ (B) For-loop iterators emit float64(i), not iSeries/rSeries
+  ✅ (C) v3 `n` alias mapped to bar_index in all scopes
+  ✅ (D) String equality comparison codegen — EMA, LowPass, Linreg, Gaussian, Sine_WMA
+  ✅ (E) Cross-scope variable capture — gauss_poles, outer series variables
+  ✅ (F) Dual call-site capture injection — priceSeries
+
+Remaining errors (not Blocker #2):
+  - cannot use c1..c5 (type string) as float64 in col1Series..col5Series.Set — color string variables stored into *series.Series
+
+Blocker: string variable storage (no blocker # assigned)

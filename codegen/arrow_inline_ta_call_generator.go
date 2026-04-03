@@ -7,23 +7,10 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/*
-ArrowInlineTACallGenerator generates inline TA function calls with arrow-context awareness.
-
-Responsibility (SRP):
-  - Single purpose: generate arrow-aware inline TA calls (rma, sma, ema, etc.)
-  - Uses ArrowAwareAccessorFactory to create proper accessors
-  - Delegates IIFE generation to InlineTAIIFERegistry
-  - No knowledge of expression evaluation or identifier resolution
-
-Design:
-  - Composition: uses factory and registry for separation of concerns
-  - DRY: reuses existing IIFE generators, only provides arrow-aware accessors
-  - KISS: simple delegation pattern, no complex logic
-*/
 type ArrowInlineTACallGenerator struct {
-	accessorFactory *ArrowAwareAccessorFactory
-	iifeRegistry    *InlineTAIIFERegistry
+	accessorFactory   *ArrowAwareAccessorFactory
+	iifeRegistry      *InlineTAIIFERegistry
+	signatureResolver *ArrowTACallSignatureResolver
 }
 
 func NewArrowInlineTACallGenerator(
@@ -31,12 +18,12 @@ func NewArrowInlineTACallGenerator(
 	registry *InlineTAIIFERegistry,
 ) *ArrowInlineTACallGenerator {
 	return &ArrowInlineTACallGenerator{
-		accessorFactory: factory,
-		iifeRegistry:    registry,
+		accessorFactory:   factory,
+		iifeRegistry:      registry,
+		signatureResolver: NewArrowTACallSignatureResolver(),
 	}
 }
 
-/* Generates arrow-aware inline TA function with proper accessor for source expression */
 func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpression) (string, bool, error) {
 	funcName := extractCallFunctionName(call)
 
@@ -45,17 +32,27 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 	}
 
 	if len(call.Arguments) < 1 {
-		return "", false, fmt.Errorf("inline TA function '%s' requires at least 1 argument", funcName)
+		return "", false, nil
 	}
 
-	sourceExpr := call.Arguments[0]
+	resolved, err := g.signatureResolver.ResolveCall(funcName, call)
+	if err != nil {
+		/* Signature mismatch — likely a user-defined function shadowing a TA name */
+		return "", false, nil
+	}
+
+	var sourceExpr ast.Expression
+	if resolved.NeedsDefaultSource {
+		sourceExpr = &ast.Identifier{Name: resolved.DefaultSourceName}
+	} else {
+		sourceExpr = resolved.SourceExpr
+	}
 
 	periodExpr := NewConstantPeriod(1)
-	if len(call.Arguments) >= 2 {
-		periodArg := call.Arguments[1]
-		extractedPeriod, err := g.extractPeriod(periodArg)
+	if resolved.LengthExpr != nil {
+		extractedPeriod, err := g.extractPeriod(resolved.LengthExpr)
 		if err != nil {
-			return "", false, fmt.Errorf("failed to extract period for '%s': %w", funcName, err)
+			return "", false, fmt.Errorf("failed to extract period from expression: %w", err)
 		}
 		if extractedPeriod == 0 {
 			return "", false, nil
@@ -65,7 +62,7 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 
 	accessor, err := g.accessorFactory.CreateAccessorForExpression(sourceExpr)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to create accessor for '%s': %w", funcName, err)
+		return "", false, fmt.Errorf("failed to create accessor for source expression: %w", err)
 	}
 
 	hasher := &ExpressionHasher{}
@@ -73,7 +70,7 @@ func (g *ArrowInlineTACallGenerator) GenerateInlineTACall(call *ast.CallExpressi
 
 	iifeCode, exists := g.iifeRegistry.Generate(funcName, accessor, periodExpr, sourceHash)
 	if !exists {
-		return "", false, fmt.Errorf("IIFE generator not found for '%s'", funcName)
+		return "", false, nil
 	}
 
 	preamble := ""
@@ -101,9 +98,9 @@ func (g *ArrowInlineTACallGenerator) extractPeriod(expr ast.Expression) (int, er
 			return strconv.Atoi(strVal)
 		}
 	case *ast.Identifier:
-		// Period is runtime parameter - inline IIFE requires compile-time constant
-		// Signal NOT HANDLED so caller delegates to runtime TA generation
+		/* Inline IIFE requires compile-time constant — delegate to runtime TA generation */
 		return 0, nil
 	}
-	return 0, fmt.Errorf("unsupported period expression type: %T", expr)
+	/* Computed expressions (BinaryExpression, CallExpression) need runtime evaluation */
+	return 0, nil
 }

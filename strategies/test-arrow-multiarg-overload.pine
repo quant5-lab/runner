@@ -1,0 +1,23 @@
+//@version=5
+strategy("Test Arrow Multiarg Overload", overlay=true)
+
+// Pattern: multi-arg overloads in arrow context
+
+pivotHigh3 = request.security(syminfo.tickerid, "1D", ta.pivothigh(high, 5, 5))
+pivotLow3 = request.security(syminfo.tickerid, "1D", ta.pivotlow(low, 5, 5))
+
+pivotHigh2 = request.security(syminfo.tickerid, "1D", ta.pivothigh(5, 5))
+pivotLow2 = request.security(syminfo.tickerid, "1D", ta.pivotlow(5, 5))
+
+longCondition = not na(pivotLow3) and close > ta.sma(close, 20)
+shortCondition = not na(pivotHigh3) and close < ta.sma(close, 20)
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+plot(pivotHigh3, color=color.red, style=plot.style_circles, title="Pivot High 3-arg")
+plot(pivotLow3, color=color.green, style=plot.style_circles, title="Pivot Low 3-arg")
+plot(pivotHigh2, color=color.orange, style=plot.style_cross, title="Pivot High 2-arg")
+plot(pivotLow2, color=color.blue, style=plot.style_cross, title="Pivot Low 2-arg")

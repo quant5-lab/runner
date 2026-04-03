@@ -1,0 +1,8 @@
+//@version=5
+indicator("RSI Arrow Function Test", overlay=false)
+
+// RSI inside arrow function - tests composite indicator in arrow context
+calcRSI(src) => ta.rsi(src, 14)
+
+rsi14 = calcRSI(close)
+plot(rsi14, "RSI 14")

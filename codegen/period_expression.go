@@ -2,28 +2,21 @@ package codegen
 
 import "fmt"
 
-/* PeriodExpression represents period value in TA indicators - either compile-time constant or runtime variable */
+/* Period value abstraction — constant, runtime variable, or computed expression */
 type PeriodExpression interface {
-	/* IsConstant returns true if period is known at compile time */
 	IsConstant() bool
 
-	/* AsInt returns integer value if constant, -1 if runtime */
+	/* -1 sentinel when not compile-time constant */
 	AsInt() int
 
-	/* AsGoExpr returns Go expression string for code generation */
 	AsGoExpr() string
-
-	/* AsIntCast returns int(expr) for loop conditions */
 	AsIntCast() string
-
-	/* AsFloat64Cast returns float64(expr) for calculations */
 	AsFloat64Cast() string
 
-	/* AsSeriesNamePart returns string for series naming (_rma_20_ vs _rma_runtime_) */
+	/* Series naming key (_rma_20_ vs _rma_runtime_ vs _rma_computed_) */
 	AsSeriesNamePart() string
 }
 
-/* ConstantPeriod represents compile-time constant period (e.g., 20) */
 type ConstantPeriod struct {
 	value int
 }
@@ -36,7 +29,6 @@ func (p *ConstantPeriod) IsConstant() bool {
 	return true
 }
 
-/* Value returns the integer value for compile-time constants */
 func (p *ConstantPeriod) Value() int {
 	return p.value
 }
@@ -61,7 +53,6 @@ func (p *ConstantPeriod) AsSeriesNamePart() string {
 	return fmt.Sprintf("%d", p.value)
 }
 
-/* RuntimePeriod represents runtime variable period (e.g., len parameter) */
 type RuntimePeriod struct {
 	variableName string
 }
@@ -92,4 +83,37 @@ func (p *RuntimePeriod) AsFloat64Cast() string {
 
 func (p *RuntimePeriod) AsSeriesNamePart() string {
 	return "runtime"
+}
+
+/* Pre-rendered Go expression from arbitrary Pine arithmetic (e.g., _length/2, round(sqrt(n))) */
+type ComputedPeriod struct {
+	goExpression string
+}
+
+func NewComputedPeriod(goExpression string) *ComputedPeriod {
+	return &ComputedPeriod{goExpression: goExpression}
+}
+
+func (p *ComputedPeriod) IsConstant() bool {
+	return false
+}
+
+func (p *ComputedPeriod) AsInt() int {
+	return -1
+}
+
+func (p *ComputedPeriod) AsGoExpr() string {
+	return p.goExpression
+}
+
+func (p *ComputedPeriod) AsIntCast() string {
+	return fmt.Sprintf("int(%s)", p.goExpression)
+}
+
+func (p *ComputedPeriod) AsFloat64Cast() string {
+	return fmt.Sprintf("float64(%s)", p.goExpression)
+}
+
+func (p *ComputedPeriod) AsSeriesNamePart() string {
+	return "computed"
 }

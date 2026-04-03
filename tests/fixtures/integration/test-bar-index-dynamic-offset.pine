@@ -1,0 +1,17 @@
+//@version=5
+indicator("bar_index Dynamic Offset", overlay=false)
+
+// Pattern: Dynamic historical reference of bar_index with variable offset
+// Tests: bar_index[variable] lookback
+
+// Test 1: Variable offset
+length = 5
+dynamicPrev = bar_index[length]
+
+// Test 2: Loop with bar_index
+sum = 0
+for i = 1 to 3
+    sum := sum + bar_index[i]
+
+plot(dynamicPrev, "Dynamic Previous", color=color.blue)
+plot(sum, "Sum of Last 3", color=color.green)

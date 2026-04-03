@@ -1,0 +1,7 @@
+//@version=5
+indicator("Reassignment Pattern")
+
+accumulate(x, step) => acc = x, acc := acc + step, acc := acc * 2, acc
+
+result = accumulate(10, 5)
+plot(result)

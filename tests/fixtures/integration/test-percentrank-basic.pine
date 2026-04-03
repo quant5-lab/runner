@@ -1,0 +1,6 @@
+//@version=5
+indicator("PercentRank Basic", overlay=false)
+
+rank = ta.percentrank(close, 20)
+
+plot(rank, "PercentRank")

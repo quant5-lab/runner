@@ -1,0 +1,21 @@
+//@version=5
+strategy("Test ta.vwma sources", overlay=true)
+
+vwmaClose = ta.vwma(close, 20)
+vwmaHigh = ta.vwma(high, 20)
+vwmaLow = ta.vwma(low, 20)
+vwmaHL2 = ta.vwma(hl2, 20)
+vwmaHLC3 = ta.vwma(hlc3, 20)
+vwmaOHLC4 = ta.vwma(ohlc4, 20)
+
+vwmaExpr = ta.vwma(high + low, 20)
+vwmaNested = ta.vwma(ta.sma(close, 10), 20)
+
+plot(vwmaClose, title="VWMA Close", color=color.blue)
+plot(vwmaHL2, title="VWMA HL2", color=color.green)
+plot(vwmaOHLC4, title="VWMA OHLC4", color=color.orange)
+
+if vwmaClose > vwmaHL2
+    strategy.entry("Long", strategy.long)
+if vwmaClose < vwmaHL2
+    strategy.close("Long")

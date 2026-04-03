@@ -1,0 +1,7 @@
+//@version=5
+indicator("State Transformation")
+
+normalize(x, min, max) => range = max - min, scaled = (x - min) / range, scaled * 100
+
+normalized = normalize(close, ta.lowest(close, 20), ta.highest(close, 20))
+plot(normalized)

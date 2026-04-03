@@ -99,64 +99,64 @@ func TestOHLCVDataAccessor_Construction(t *testing.T) {
 			fieldName:   "Close",
 			offset:      0,
 			period:      20,
-			wantInitial: "ctx.Data[ctx.BarIndex-19].Close",
-			wantLoop:    "ctx.Data[ctx.BarIndex-j].Close",
+			wantInitial: "closeSeries.Get(19)",
+			wantLoop:    "closeSeries.Get(j)",
 		},
 		{
 			name:        "offset 1 - Close[1], period 20",
 			fieldName:   "Close",
 			offset:      1,
 			period:      20,
-			wantInitial: "ctx.Data[ctx.BarIndex-20].Close",
-			wantLoop:    "ctx.Data[ctx.BarIndex-(j+1)].Close",
+			wantInitial: "closeSeries.Get(20)",
+			wantLoop:    "closeSeries.Get(j+1)",
 		},
 		{
 			name:        "offset 4 - Close[4], period 20 (BB7 bug case)",
 			fieldName:   "Close",
 			offset:      4,
 			period:      20,
-			wantInitial: "ctx.Data[ctx.BarIndex-23].Close",
-			wantLoop:    "ctx.Data[ctx.BarIndex-(j+4)].Close",
+			wantInitial: "closeSeries.Get(23)",
+			wantLoop:    "closeSeries.Get(j+4)",
 		},
 		{
 			name:        "High field with offset - High[10], period 50",
 			fieldName:   "High",
 			offset:      10,
 			period:      50,
-			wantInitial: "ctx.Data[ctx.BarIndex-59].High",
-			wantLoop:    "ctx.Data[ctx.BarIndex-(j+10)].High",
+			wantInitial: "highSeries.Get(59)",
+			wantLoop:    "highSeries.Get(j+10)",
 		},
 		{
 			name:        "Low field no offset - Low, period 14",
 			fieldName:   "Low",
 			offset:      0,
 			period:      14,
-			wantInitial: "ctx.Data[ctx.BarIndex-13].Low",
-			wantLoop:    "ctx.Data[ctx.BarIndex-j].Low",
+			wantInitial: "lowSeries.Get(13)",
+			wantLoop:    "lowSeries.Get(j)",
 		},
 		{
 			name:        "Open field with offset - Open[2], period 5",
 			fieldName:   "Open",
 			offset:      2,
 			period:      5,
-			wantInitial: "ctx.Data[ctx.BarIndex-6].Open",
-			wantLoop:    "ctx.Data[ctx.BarIndex-(j+2)].Open",
+			wantInitial: "openSeries.Get(6)",
+			wantLoop:    "openSeries.Get(j+2)",
 		},
 		{
 			name:        "Volume field with large offset - Volume[100], period 1",
 			fieldName:   "Volume",
 			offset:      100,
 			period:      1,
-			wantInitial: "ctx.Data[ctx.BarIndex-100].Volume",
-			wantLoop:    "ctx.Data[ctx.BarIndex-(j+100)].Volume",
+			wantInitial: "volumeSeries.Get(100)",
+			wantLoop:    "volumeSeries.Get(j+100)",
 		},
 		{
 			name:        "minimal period - Close[0], period 1",
 			fieldName:   "Close",
 			offset:      0,
 			period:      1,
-			wantInitial: "ctx.Data[ctx.BarIndex-0].Close",
-			wantLoop:    "ctx.Data[ctx.BarIndex-j].Close",
+			wantInitial: "closeSeries.Get(0)",
+			wantLoop:    "closeSeries.Get(j)",
 		},
 	}
 
@@ -221,8 +221,8 @@ func TestDataAccessFactory_CreateAccessor(t *testing.T) {
 				BaseOffset: 0,
 			},
 			period:            20,
-			wantInitialAccess: "ctx.Data[ctx.BarIndex-19].Close",
-			wantLoopAccess:    "ctx.Data[ctx.BarIndex-j].Close",
+			wantInitialAccess: "closeSeries.Get(19)",
+			wantLoopAccess:    "closeSeries.Get(j)",
 		},
 		{
 			name: "OHLCV field with offset 4 (BB7 case)",
@@ -232,8 +232,8 @@ func TestDataAccessFactory_CreateAccessor(t *testing.T) {
 				BaseOffset: 4,
 			},
 			period:            20,
-			wantInitialAccess: "ctx.Data[ctx.BarIndex-23].Close",
-			wantLoopAccess:    "ctx.Data[ctx.BarIndex-(j+4)].Close",
+			wantInitialAccess: "closeSeries.Get(23)",
+			wantLoopAccess:    "closeSeries.Get(j+4)",
 		},
 		{
 			name: "High field with large offset",
@@ -243,8 +243,8 @@ func TestDataAccessFactory_CreateAccessor(t *testing.T) {
 				BaseOffset: 50,
 			},
 			period:            10,
-			wantInitialAccess: "ctx.Data[ctx.BarIndex-59].High",
-			wantLoopAccess:    "ctx.Data[ctx.BarIndex-(j+50)].High",
+			wantInitialAccess: "highSeries.Get(59)",
+			wantLoopAccess:    "highSeries.Get(j+50)",
 		},
 		{
 			name: "Series variable with large offset",
@@ -341,13 +341,13 @@ func TestDataAccessStrategy_LoopVariableNames(t *testing.T) {
 			name:       "OHLCV accessor with j",
 			accessor:   NewOHLCVDataAccessor("Close", NewHistoricalOffset(4)),
 			loopVar:    "j",
-			wantFormat: "ctx.Data[ctx.BarIndex-(j+4)].Close",
+			wantFormat: "closeSeries.Get(j+4)",
 		},
 		{
 			name:       "OHLCV accessor with loopIndex",
 			accessor:   NewOHLCVDataAccessor("Close", NewHistoricalOffset(4)),
 			loopVar:    "loopIndex",
-			wantFormat: "ctx.Data[ctx.BarIndex-(loopIndex+4)].Close",
+			wantFormat: "closeSeries.Get(loopIndex+4)",
 		},
 	}
 
@@ -372,8 +372,9 @@ func TestDataAccessStrategy_AllOHLCVFields(t *testing.T) {
 		t.Run(field, func(t *testing.T) {
 			accessor := NewOHLCVDataAccessor(field, offset)
 
-			wantInitial := "ctx.Data[ctx.BarIndex-12]." + field
-			wantLoop := "ctx.Data[ctx.BarIndex-(j+3)]." + field
+			seriesName := OHLCVFieldToSeriesName(field)
+			wantInitial := seriesName + ".Get(12)"
+			wantLoop := seriesName + ".Get(j+3)"
 
 			gotInitial := accessor.GenerateInitialValueAccess(period)
 			if gotInitial != wantInitial {
@@ -404,28 +405,28 @@ func TestDataAccessStrategy_EdgeCasePeriods(t *testing.T) {
 			period:         1,
 			offset:         0,
 			wantSeriesInit: "testSeries.Get(0)",
-			wantOHLCVInit:  "ctx.Data[ctx.BarIndex-0].Close",
+			wantOHLCVInit:  "closeSeries.Get(0)",
 		},
 		{
 			name:           "period 1, offset 5",
 			period:         1,
 			offset:         5,
 			wantSeriesInit: "testSeries.Get(5)",
-			wantOHLCVInit:  "ctx.Data[ctx.BarIndex-5].Close",
+			wantOHLCVInit:  "closeSeries.Get(5)",
 		},
 		{
 			name:           "period 200, offset 4",
 			period:         200,
 			offset:         4,
 			wantSeriesInit: "testSeries.Get(203)",
-			wantOHLCVInit:  "ctx.Data[ctx.BarIndex-203].Close",
+			wantOHLCVInit:  "closeSeries.Get(203)",
 		},
 		{
 			name:           "period 100, offset 100",
 			period:         100,
 			offset:         100,
 			wantSeriesInit: "testSeries.Get(199)",
-			wantOHLCVInit:  "ctx.Data[ctx.BarIndex-199].Close",
+			wantOHLCVInit:  "closeSeries.Get(199)",
 		},
 	}
 

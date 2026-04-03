@@ -1,0 +1,37 @@
+//@version=5
+strategy("Arrow Computed Period Diverse", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+smoothedRSI(_src, _length) =>
+    ta.rsi(_src, _length - 1)
+
+adaptiveHighest(_src, _length) =>
+    ta.highest(_src, _length + 2)
+
+adaptiveLowest(_src, _length) =>
+    ta.lowest(_src, _length + 2)
+
+scaledSMA(_src, _length) =>
+    ta.sma(_src, _length * 3)
+
+rsiVal = smoothedRSI(close, 15)
+upper = adaptiveHighest(high, 18)
+lower = adaptiveLowest(low, 18)
+trend = scaledSMA(close, 5)
+
+longCond = rsiVal < 40 and close > lower
+shortCond = rsiVal > 60 and close < upper
+
+if longCond
+    strategy.entry("Long", strategy.long)
+
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0 and rsiVal > 55
+    strategy.close("Long")
+
+if strategy.position_size < 0 and rsiVal < 45
+    strategy.close("Short")
+
+plot(rsiVal, "RSI")
+plot(trend, "Trend SMA")

@@ -28,9 +28,9 @@ func TestStateManagerInitialization(t *testing.T) {
 func TestStateManagerSamplesAllFields(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 
 	if !math.IsNaN(sm.PositionAvgPriceSeries().Get(0)) {
 		t.Errorf("Expected NaN for position_avg_price with no position, got %.2f", sm.PositionAvgPriceSeries().Get(0))
@@ -52,11 +52,11 @@ func TestStateManagerSamplesAllFields(t *testing.T) {
 func TestStateManagerLongPosition(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 107.0, 103.0)
 
 	if sm.PositionAvgPriceSeries().Get(0) != 105.0 {
 		t.Errorf("Expected avg price 105.0, got %.2f", sm.PositionAvgPriceSeries().Get(0))
@@ -69,11 +69,11 @@ func TestStateManagerLongPosition(t *testing.T) {
 func TestStateManagerShortPosition(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Short", Short, 5, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 
 	if sm.PositionAvgPriceSeries().Get(0) != 100.0 {
 		t.Errorf("Expected avg price 100.0, got %.2f", sm.PositionAvgPriceSeries().Get(0))
@@ -86,15 +86,15 @@ func TestStateManagerShortPosition(t *testing.T) {
 func TestStateManagerHistoricalAccess(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.OnBarUpdate(0, 100.0, 1000)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 	sm.AdvanceCursors()
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 107.0, 103.0)
 
 	if sm.PositionAvgPriceSeries().Get(0) != 105.0 {
 		t.Errorf("Expected current avg price 105.0, got %.2f", sm.PositionAvgPriceSeries().Get(0))
@@ -107,10 +107,10 @@ func TestStateManagerHistoricalAccess(t *testing.T) {
 func TestStateManagerPositionLifecycle(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.OnBarUpdate(0, 100.0, 1000)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 	if !math.IsNaN(sm.PositionAvgPriceSeries().Get(0)) {
 		t.Error("Bar 0: Expected NaN when flat")
 	}
@@ -118,7 +118,7 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 105.0, 1001)
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 107.0, 103.0)
 	if sm.PositionSizeSeries().Get(0) != 10.0 {
 		t.Error("Bar 1: Expected long position size 10")
 	}
@@ -126,7 +126,7 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 
 	strat.Close("Long", 110.0, 1002, "")
 	strat.OnBarUpdate(2, 110.0, 1002)
-	sm.SampleCurrentBar(strat, 110.0)
+	sm.SampleCurrentBar(strat, 110.0, 112.0, 108.0)
 	if !math.IsNaN(sm.PositionAvgPriceSeries().Get(0)) {
 		t.Error("Bar 2: Expected NaN when flat after close")
 	}
@@ -138,11 +138,11 @@ func TestStateManagerPositionLifecycle(t *testing.T) {
 func TestStateManagerPositionReversal(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 	if sm.PositionSizeSeries().Get(0) != 10.0 {
 		t.Error("Expected long position")
 	}
@@ -152,7 +152,7 @@ func TestStateManagerPositionReversal(t *testing.T) {
 	strat.Entry("Short", Short, 5, "")
 	strat.OnBarUpdate(2, 105.0, 1002)
 	strat.OnBarUpdate(3, 105.0, 1003)
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 107.0, 103.0)
 	if sm.PositionSizeSeries().Get(0) != -5.0 {
 		t.Errorf("Expected short position size -5, got %.2f", sm.PositionSizeSeries().Get(0))
 	}
@@ -161,11 +161,11 @@ func TestStateManagerPositionReversal(t *testing.T) {
 func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	strat.Entry("Long", Long, 10, "")
 	strat.OnBarUpdate(1, 100.0, 1001)
-	sm.SampleCurrentBar(strat, 100.0)
+	sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 
 	initialEquity := sm.EquitySeries().Get(0)
 	if initialEquity != 10000 {
@@ -173,7 +173,7 @@ func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 	}
 	sm.AdvanceCursors()
 
-	sm.SampleCurrentBar(strat, 110.0)
+	sm.SampleCurrentBar(strat, 110.0, 112.0, 108.0)
 	equityWithProfit := sm.EquitySeries().Get(0)
 	expectedEquity := 10000.0 + 100.0
 	if equityWithProfit != expectedEquity {
@@ -184,7 +184,7 @@ func TestStateManagerEquityWithUnrealizedPL(t *testing.T) {
 func TestStateManagerMultipleClosedTrades(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	barIndex := 0
 	for i := 0; i < 3; i++ {
@@ -196,9 +196,11 @@ func TestStateManagerMultipleClosedTrades(t *testing.T) {
 
 		barIndex++
 		strat.Close(tradeID, 105.0, int64(1000+barIndex), "")
+		barIndex++
+		strat.OnBarUpdate(barIndex, 105.0, int64(1000+barIndex))
 	}
 
-	sm.SampleCurrentBar(strat, 105.0)
+	sm.SampleCurrentBar(strat, 105.0, 107.0, 103.0)
 
 	if sm.ClosedTradesSeries().Get(0) != 3 {
 		t.Errorf("Expected 3 closed trades, got %.0f", sm.ClosedTradesSeries().Get(0))
@@ -213,10 +215,10 @@ func TestStateManagerMultipleClosedTrades(t *testing.T) {
 func TestStateManagerNaNPropagation(t *testing.T) {
 	sm := NewStateManager(100)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	for i := 0; i < 5; i++ {
-		sm.SampleCurrentBar(strat, 100.0)
+		sm.SampleCurrentBar(strat, 100.0, 102.0, 98.0)
 		if !math.IsNaN(sm.PositionAvgPriceSeries().Get(0)) {
 			t.Errorf("Bar %d: Expected NaN when no position", i)
 		}
@@ -227,7 +229,7 @@ func TestStateManagerNaNPropagation(t *testing.T) {
 func TestStateManagerCursorAdvancement(t *testing.T) {
 	sm := NewStateManager(10)
 	strat := NewStrategy()
-	strat.Call("Test", 10000)
+	strat.CallWithPyramiding("Test", 10000, 0)
 
 	values := []float64{100, 105, 110, 115, 120}
 
@@ -236,7 +238,7 @@ func TestStateManagerCursorAdvancement(t *testing.T) {
 			strat.Entry("Long", Long, 10, "")
 			strat.OnBarUpdate(i, price, int64(1000+i))
 		}
-		sm.SampleCurrentBar(strat, price)
+		sm.SampleCurrentBar(strat, price, price+2.0, price-2.0)
 		if i < len(values)-1 {
 			sm.AdvanceCursors()
 		}

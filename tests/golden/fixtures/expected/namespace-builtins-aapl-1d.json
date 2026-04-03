@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "strategy": "NamespaceBuiltins",
+  "dataSource": "AAPL_1D.json",
+  "generatedAt": "2026-02-13T12:42:40Z",
+  "result": {
+    "trades": [],
+    "openTrades": [
+      {
+        "entryId": "Long",
+        "entryBar": 1,
+        "entryTime": 1453213800,
+        "entryPrice": 24.602500915527344,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 411.8192230113794,
+        "profit": 0,
+        "direction": "long"
+      }
+    ],
+    "equity": 106982.39960763563,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

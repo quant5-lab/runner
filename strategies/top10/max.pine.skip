@@ -1,0 +1,8 @@
+PMax Explorer (v4) — multi-MA trend strategy with 20-symbol screener
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ❌ (label.new codegen fails — unknown function label)
+Compile: ❌ Not reached
+Execute: ❌ Not reached
+
+Blocker: #10 (label/line drawing objects). Resolved: 8-digit RGBA hex, input.symbol

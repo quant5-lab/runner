@@ -1,0 +1,14 @@
+//@version=4
+strategy("Order Net Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=15, initial_capital=10000)
+
+if strategy.position_size == 0 and close < 104
+    strategy.order("buy", strategy.long)
+
+if strategy.position_size > 12
+    strategy.order("reduce1", strategy.short, 5)
+
+if strategy.position_size > 7 and strategy.position_size <= 12
+    strategy.order("reduce2", strategy.short, 5)
+
+if strategy.position_size > 2 and strategy.position_size <= 7
+    strategy.order("reduce3", strategy.short, 5)

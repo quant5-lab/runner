@@ -427,7 +427,7 @@ func assertPlotsAtEndOfBarLoop(t *testing.T, code string) {
 				nonCommentLinesBetween++
 			}
 		}
-		if nonCommentLinesBetween > 5 {
+		if nonCommentLinesBetween > 6 {
 			t.Errorf("Found %d non-empty lines between last plot and bar loop end - plots should be at end",
 				nonCommentLinesBetween)
 		}

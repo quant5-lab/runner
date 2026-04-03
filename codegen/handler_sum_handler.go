@@ -24,10 +24,14 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 	var period int
 
 	if condExpr, ok := sourceArg.(*ast.ConditionalExpression); ok {
+		/* Use content-based hash for stable temp var naming across runs */
+		hasher := &ExpressionHasher{}
+		argHash := hasher.Hash(condExpr)
+
 		tempVarName := g.tempVarMgr.GetOrCreate(CallInfo{
 			FuncName: "ternary",
 			Call:     call,
-			ArgHash:  fmt.Sprintf("%p", condExpr),
+			ArgHash:  argHash,
 		})
 
 		condCode, err := g.generateConditionExpression(condExpr.Test)
@@ -53,12 +57,14 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 			VariableName: tempVarName,
 		}
 
-		extractor := NewTAArgumentExtractor(g)
-		extractedPeriod, err := extractor.extractPeriod(call.Arguments[1], "sum")
-		if err != nil {
-			return "", err
+		periodResult := evaluatePeriodExpression(g, call.Arguments[1])
+		if periodResult.IsFailed() {
+			return "", fmt.Errorf("sum: %s", periodResult.FailureReason)
 		}
-		period = extractedPeriod
+		if periodResult.IsRuntimeDynamic() {
+			return "", fmt.Errorf("sum period must be compile-time constant (got dynamic expression)")
+		}
+		period = periodResult.StaticValue
 	} else {
 		extractor := NewTAArgumentExtractor(g)
 		comp, err := extractor.Extract(call, "sum")
@@ -67,6 +73,8 @@ func (h *SumHandler) GenerateCode(g *generator, varName string, call *ast.CallEx
 		}
 		sourceInfo = comp.SourceInfo
 		period = comp.Period
+
+		code += comp.Preamble
 	}
 
 	accessGen := CreateAccessGenerator(sourceInfo)

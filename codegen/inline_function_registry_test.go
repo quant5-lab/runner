@@ -12,14 +12,14 @@ func TestInlineFunctionRegistry_IsInlineOnly(t *testing.T) {
 		want     bool
 	}{
 		{
-			name:     "valuewhen without namespace",
+			name:     "valuewhen not inline-only (uses Series temp vars)",
 			funcName: "valuewhen",
-			want:     true,
+			want:     false,
 		},
 		{
-			name:     "valuewhen with namespace",
+			name:     "ta.valuewhen not inline-only (uses Series temp vars)",
 			funcName: "ta.valuewhen",
-			want:     true,
+			want:     false,
 		},
 		{
 			name:     "sma is not inline-only",
@@ -105,7 +105,7 @@ func TestInlineFunctionRegistry_CaseSensitivity(t *testing.T) {
 		funcName string
 		want     bool
 	}{
-		{"lowercase valuewhen", "valuewhen", true},
+		{"lowercase valuewhen", "valuewhen", false},
 		{"uppercase VALUEWHEN", "VALUEWHEN", false},
 		{"mixed case ValueWhen", "ValueWhen", false},
 		{"mixed case Valuewhen", "Valuewhen", false},
@@ -212,8 +212,8 @@ func TestInlineFunctionRegistry_NamespaceVariations(t *testing.T) {
 		funcName string
 		want     bool
 	}{
-		{"ta.valuewhen with namespace", "ta.valuewhen", true},
-		{"valuewhen without ta prefix", "valuewhen", true},
+		{"ta.valuewhen not inline-only", "ta.valuewhen", false},
+		{"valuewhen not inline-only", "valuewhen", false},
 		{"custom.valuewhen wrong namespace", "custom.valuewhen", false},
 		{"barstate.isfirst not registered", "barstate.isfirst", false},
 		{"isfirst without namespace", "isfirst", false},

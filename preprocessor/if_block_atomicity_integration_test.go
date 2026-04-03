@@ -3,15 +3,12 @@ package preprocessor
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/quant5-lab/runner/parser"
 )
 
-/* Integration tests for if block atomicity using actual .pine files */
-
-func parseAndNormalize(t *testing.T, filename string) *parser.Script {
+func parsePineFile(t *testing.T, filename string) *parser.Script {
 	t.Helper()
 
 	filePath := filepath.Join("..", "e2e", "fixtures", "strategies", filename)
@@ -33,44 +30,30 @@ func parseAndNormalize(t *testing.T, filename string) *parser.Script {
 	return result
 }
 
-func countIfStatementsInScript(script *parser.Script) int {
-	count := 0
-	var visitStatements func([]*parser.Statement)
-	visitStatements = func(statements []*parser.Statement) {
-		for _, stmt := range statements {
-			if stmt.If != nil {
-				count++
-				visitStatements(stmt.If.Body)
-			}
-			if stmt.FunctionDecl != nil && stmt.FunctionDecl.MultiLineBody != nil {
-				visitStatements(stmt.FunctionDecl.MultiLineBody)
-			}
+func collectIfStatements(statements []*parser.Statement) []*parser.IfStatement {
+	var result []*parser.IfStatement
+	for _, stmt := range statements {
+		if stmt.Core.If != nil {
+			result = append(result, stmt.Core.If)
+			result = append(result, collectIfStatements(stmt.Core.If.Body)...)
+		}
+		if stmt.Core.FunctionDecl != nil && stmt.Core.FunctionDecl.MultiLineBody != nil {
+			result = append(result, collectIfStatements(stmt.Core.FunctionDecl.MultiLineBody)...)
 		}
 	}
-	visitStatements(script.Statements)
-	return count
+	return result
 }
 
 func findIfStatementsInScript(script *parser.Script) []*parser.IfStatement {
-	var ifNodes []*parser.IfStatement
-	var visitStatements func([]*parser.Statement)
-	visitStatements = func(statements []*parser.Statement) {
-		for _, stmt := range statements {
-			if stmt.If != nil {
-				ifNodes = append(ifNodes, stmt.If)
-				visitStatements(stmt.If.Body)
-			}
-			if stmt.FunctionDecl != nil && stmt.FunctionDecl.MultiLineBody != nil {
-				visitStatements(stmt.FunctionDecl.MultiLineBody)
-			}
-		}
-	}
-	visitStatements(script.Statements)
-	return ifNodes
+	return collectIfStatements(script.Statements)
 }
 
-func TestIfBlockAtomicity_BasicMultipleAssignments(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-basic.pine")
+func countIfStatementsInScript(script *parser.Script) int {
+	return len(findIfStatementsInScript(script))
+}
+
+func TestIfBlockParsing_BasicMultipleAssignments(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-basic.pine")
 
 	ifCount := countIfStatementsInScript(result)
 	if ifCount != 1 {
@@ -88,14 +71,14 @@ func TestIfBlockAtomicity_BasicMultipleAssignments(t *testing.T) {
 	}
 
 	for i, stmt := range body {
-		if stmt.Reassignment == nil {
-			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Assignment != nil)
+		if stmt.Core.Reassignment == nil {
+			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Core.Assignment != nil)
 		}
 	}
 }
 
-func TestIfBlockAtomicity_StateMachine(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-state-machine.pine")
+func TestIfBlockParsing_StateMachine(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-state-machine.pine")
 
 	ifNodes := findIfStatementsInScript(result)
 
@@ -115,15 +98,15 @@ func TestIfBlockAtomicity_StateMachine(t *testing.T) {
 
 	for blockIdx, block := range ifNodes {
 		for stmtIdx, stmt := range block.Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", blockIdx, stmtIdx)
 			}
 		}
 	}
 }
 
-func TestIfBlockAtomicity_ComplexConditions(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-complex.pine")
+func TestIfBlockParsing_ComplexConditions(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-complex.pine")
 
 	ifNodes := findIfStatementsInScript(result)
 
@@ -147,8 +130,8 @@ func TestIfBlockAtomicity_ComplexConditions(t *testing.T) {
 	}
 }
 
-func TestIfBlockAtomicity_NestedBlocks(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-nested.pine")
+func TestIfBlockParsing_NestedBlocks(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-nested.pine")
 
 	ifNodes := findIfStatementsInScript(result)
 
@@ -164,10 +147,10 @@ func TestIfBlockAtomicity_NestedBlocks(t *testing.T) {
 	hasReassignment := false
 	hasNestedIf := false
 	for _, stmt := range outerBlock.Body {
-		if stmt.Reassignment != nil {
+		if stmt.Core.Reassignment != nil {
 			hasReassignment = true
 		}
-		if stmt.If != nil {
+		if stmt.Core.If != nil {
 			hasNestedIf = true
 		}
 	}
@@ -185,8 +168,8 @@ func TestIfBlockAtomicity_NestedBlocks(t *testing.T) {
 	}
 }
 
-func TestIfBlockAtomicity_ConsecutiveBlocks(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-consecutive.pine")
+func TestIfBlockParsing_ConsecutiveBlocks(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-consecutive.pine")
 
 	ifNodes := findIfStatementsInScript(result)
 
@@ -200,7 +183,7 @@ func TestIfBlockAtomicity_ConsecutiveBlocks(t *testing.T) {
 		}
 
 		for stmtIdx, stmt := range ifNodes[i].Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", i, stmtIdx)
 			}
 		}
@@ -212,8 +195,8 @@ func TestIfBlockAtomicity_ConsecutiveBlocks(t *testing.T) {
 	}
 }
 
-func TestIfBlockAtomicity_MixedStatements(t *testing.T) {
-	result := parseAndNormalize(t, "test-if-atomicity-mixed.pine")
+func TestIfBlockParsing_MixedStatements(t *testing.T) {
+	result := parsePineFile(t, "test-if-atomicity-mixed.pine")
 
 	ifNodes := findIfStatementsInScript(result)
 
@@ -233,14 +216,14 @@ func TestIfBlockAtomicity_MixedStatements(t *testing.T) {
 
 	for blockIdx, block := range ifNodes {
 		for stmtIdx, stmt := range block.Body {
-			if stmt.Reassignment == nil {
+			if stmt.Core.Reassignment == nil {
 				t.Errorf("Block[%d] Statement[%d]: expected Reassignment", blockIdx, stmtIdx)
 			}
 		}
 	}
 }
 
-func TestIfBlockAtomicity_NoRegressionOnExistingStrategies(t *testing.T) {
+func TestIfBlockParsing_NoRegressionOnExistingStrategies(t *testing.T) {
 	strategies := []struct {
 		filename string
 		minIfs   int
@@ -251,7 +234,7 @@ func TestIfBlockAtomicity_NoRegressionOnExistingStrategies(t *testing.T) {
 
 	for _, tc := range strategies {
 		t.Run(tc.filename, func(t *testing.T) {
-			filePath := filepath.Join("..", "..", "strategies", tc.filename)
+			filePath := filepath.Join("..", "strategies", tc.filename)
 			content, err := os.ReadFile(filePath)
 			if err != nil {
 				t.Skipf("Cannot read %s: %v", tc.filename, err)
@@ -272,65 +255,5 @@ func TestIfBlockAtomicity_NoRegressionOnExistingStrategies(t *testing.T) {
 				t.Errorf("%s: expected at least %d if statements, got %d", tc.filename, tc.minIfs, ifCount)
 			}
 		})
-	}
-}
-
-func TestIfBlockAtomicity_ConditionEvaluationCount(t *testing.T) {
-	pineCode := `
-if trigger
-    var1 := 1
-    var2 := 2
-    var3 := 3
-`
-
-	normalized := NormalizeIfBlocks(pineCode)
-
-	lines := strings.Split(normalized, "\n")
-	ifLines := []string{}
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "if ") {
-			ifLines = append(ifLines, line)
-		}
-	}
-
-	if len(ifLines) != 1 {
-		t.Errorf("Expected 1 'if' line in normalized output, got %d", len(ifLines))
-	}
-}
-
-func TestIfBlockAtomicity_RealWorldPattern(t *testing.T) {
-	pineCode := `
-if close_all_avg
-    pos_size_long := 0
-    pos_size_short := 0
-`
-
-	normalized := NormalizeIfBlocks(pineCode)
-
-	p, err := parser.NewParser()
-	if err != nil {
-		t.Fatalf("Failed to create parser: %v", err)
-	}
-
-	result, err := p.ParseString("test", normalized)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	ifNodes := findIfStatementsInScript(result)
-	if len(ifNodes) != 1 {
-		t.Fatalf("Expected 1 if statement, got %d", len(ifNodes))
-	}
-
-	body := ifNodes[0].Body
-	if len(body) != 2 {
-		t.Errorf("Expected 2 reassignments in single if block, got %d", len(body))
-	}
-
-	for i, stmt := range body {
-		if stmt.Reassignment == nil {
-			t.Errorf("Statement[%d]: expected Reassignment, got Assignment=%v", i, stmt.Assignment != nil)
-		}
 	}
 }

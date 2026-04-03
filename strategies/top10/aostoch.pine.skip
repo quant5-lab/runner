@@ -1,0 +1,8 @@
+AO+Stoch+RSI+ATR strategy (v4) — multi-indicator with stop/take-profit
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅ (WARNING: ta.stoch has no handler — producing NaN stub)
+Compile: ✅
+Execute: ✅ (0 trades — ta.stoch stubbed as NaN, conditions never trigger)
+
+Blocker: ~~#5~~ resolved. Remaining: ta.stoch handler produces NaN stub (no runtime implementation)

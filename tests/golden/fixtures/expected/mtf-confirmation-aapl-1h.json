@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "strategy": "MTF Confirmation",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-01-21T07:51:52Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 29,
+        "entryTime": 1759941000,
+        "entryPrice": 258.19000244140625,
+        "entryComment": "",
+        "exitBar": 483,
+        "exitTime": 1768318200,
+        "exitPrice": 260.1400146484375,
+        "exitComment": "Position reversal",
+        "size": 3.872966509382559,
+        "profit": 7.552331970719201,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [
+      {
+        "entryId": "Short",
+        "entryBar": 483,
+        "entryTime": 1768318200,
+        "entryPrice": 260.1400146484375,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 3.845878885370632,
+        "profit": 0,
+        "direction": "short"
+      }
+    ],
+    "equity": 10007.821571660754,
+    "netProfit": 7.552331970719201,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

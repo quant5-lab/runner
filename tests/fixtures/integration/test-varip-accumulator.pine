@@ -1,0 +1,7 @@
+//@version=5
+indicator("Varip Accumulator", overlay=false)
+
+varip cumClose = 0.0
+cumClose := cumClose + close
+
+plot(cumClose, "Cumulative Close")

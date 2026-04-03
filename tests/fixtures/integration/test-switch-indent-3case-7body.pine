@@ -1,0 +1,11 @@
+//@version=5
+indicator("Switch 3-Case 7-Body Indent", overlay=false)
+val = 1
+result = switch val
+   1 =>
+       50.0
+   2 =>
+       60.0
+   =>
+       0.0
+plot(result, "Result")

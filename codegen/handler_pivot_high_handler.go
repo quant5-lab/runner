@@ -6,7 +6,7 @@ import "github.com/quant5-lab/runner/ast"
 type PivotHighHandler struct{}
 
 func (h *PivotHighHandler) CanHandle(funcName string) bool {
-	return funcName == "ta.pivothigh"
+	return funcName == "ta.pivothigh" || funcName == "pivothigh"
 }
 
 func (h *PivotHighHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {

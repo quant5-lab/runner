@@ -350,3 +350,11 @@ func (m *MockAccessGenerator) GenerateInitialValueAccess(period int) string {
 	}
 	return "mockInitialAccess"
 }
+
+func (m *MockAccessGenerator) GenerateCurrentValueAccess() string {
+	return "mockCurrentAccess"
+}
+
+func (m *MockAccessGenerator) GetBaseOffset() int {
+	return 0
+}

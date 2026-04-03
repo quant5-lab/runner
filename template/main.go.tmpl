@@ -5,31 +5,41 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
 	"github.com/quant5-lab/runner/runtime/clock"
 	"encoding/json"
 
+	"github.com/quant5-lab/runner/runtime/arrayops"
 	"github.com/quant5-lab/runner/runtime/chartdata"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/calendar"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/request"
 	"github.com/quant5-lab/runner/runtime/series"
 	"github.com/quant5-lab/runner/runtime/session"
 	"github.com/quant5-lab/runner/runtime/strategy"
+	"github.com/quant5-lab/runner/runtime/ta"
 	"github.com/quant5-lab/runner/runtime/value"
+	"github.com/quant5-lab/runner/runtime/visual"
 	"github.com/quant5-lab/runner/datafetcher"
 )
 
 /* Prevent unused import errors */
 var (
 	_ = math.IsNaN
+	_ = rand.Float64
 	_ = log.Printf
+	_ = arrayops.NewMutator
 	_ = session.Parse
 	_ = series.NewSeries
 	_ = datafetcher.NewFileFetcher
+	_ = ta.Ema
 	_ = value.Nz
+	_ = visual.PineColorNew
+	_ = calendar.Year
 )
 
 /* CLI flags */

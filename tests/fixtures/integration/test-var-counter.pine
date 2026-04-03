@@ -1,0 +1,7 @@
+//@version=5
+indicator("Var Counter", overlay=false)
+
+var counter = 0.0
+counter := counter + 1
+
+plot(counter, "Counter")

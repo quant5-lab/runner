@@ -1,0 +1,27 @@
+//@version=5
+strategy("Conditional Numeric Coercion - Main Context", overlay=true)
+
+bullish = close > open ? true : false
+bearish = close < open ? true : false
+
+bull_count = 0.0
+bear_count = 0.0
+bull_count := bull_count + bullish
+bear_count := bear_count + bearish
+
+// Entry signals based on accumulated boolean conversions
+if bull_count > 5 and bullish
+    strategy.entry("Long", strategy.long)
+
+if bear_count > 5 and bearish
+    strategy.entry("Short", strategy.short)
+
+// Exit on reversal
+if strategy.position_size > 0 and bearish
+    strategy.close("Long")
+
+if strategy.position_size < 0 and bullish
+    strategy.close("Short")
+
+plot(bull_count, "Bull Count", color=color.green)
+plot(bear_count, "Bear Count", color=color.red)

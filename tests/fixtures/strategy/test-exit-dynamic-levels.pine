@@ -1,0 +1,12 @@
+//@version=5
+strategy("Exit Dynamic Levels", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Entry on first bar
+if bar_index == 1
+    strategy.entry("Long", strategy.long)
+
+// Exit levels update each bar - trailing stop pattern
+trailingStop = close * 0.95
+
+if strategy.position_size > 0
+    strategy.exit("Exit", "Long", stop=trailingStop)

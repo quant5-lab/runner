@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "strategy": "BB9",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-01-21T07:51:48Z",
+  "result": {
+    "trades": [],
+    "openTrades": [
+      {
+        "entryId": "BB entry",
+        "entryBar": 470,
+        "entryTime": 1767976200,
+        "entryPrice": 256.9512939453125,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 1167.4969254987936,
+        "profit": 0,
+        "direction": "long"
+      }
+    ],
+    "equity": 2003641.088281385,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

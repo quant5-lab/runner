@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "strategy": "Supertrend",
+  "dataSource": "SBERP-1h.json",
+  "generatedAt": "2026-01-21T07:51:56Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 70,
+        "entryTime": 1734541200,
+        "entryPrice": 231,
+        "entryComment": "",
+        "exitBar": 93,
+        "exitTime": 1734688800,
+        "exitPrice": 237.42,
+        "exitComment": "",
+        "size": 0.43284421936545037,
+        "profit": 2.778859888326186,
+        "direction": "long"
+      },
+      {
+        "entryId": "Long",
+        "entryBar": 241,
+        "entryTime": 1736323200,
+        "entryPrice": 276.1,
+        "entryComment": "",
+        "exitBar": 257,
+        "exitTime": 1736413200,
+        "exitPrice": 273.42,
+        "exitComment": "",
+        "size": 0.36324670719710433,
+        "profit": -0.9735011752882421,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [
+      {
+        "entryId": "Long",
+        "entryBar": 274,
+        "entryTime": 1736506800,
+        "entryPrice": 276.34,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 0.36243455689484383,
+        "profit": 0,
+        "direction": "long"
+      }
+    ],
+    "equity": 1009.5832043040012,
+    "netProfit": 1.805358713037944,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

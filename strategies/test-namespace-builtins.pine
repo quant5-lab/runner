@@ -1,0 +1,36 @@
+//@version=5
+strategy("Namespace Builtins Integration Test", overlay=false, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Bool namespace properties
+bl = barstate.islast
+bf = barstate.isfirst
+bh = barstate.ishistory
+tf_daily = timeframe.isdaily
+tf_dwm = timeframe.isdwm
+sm = session.ismarket
+cs = chart.is_standard
+
+// Float64 namespace properties
+mt = syminfo.mintick
+pv = syminfo.pointvalue
+tm = timeframe.multiplier
+pi_val = math.pi
+
+// dayofweek constants
+dow_mon = dayofweek.monday
+dow_fri = dayofweek.friday
+
+// Conditions using bool variables
+longCondition = bh and close > open and mt > 0
+shortCondition = bf and close < open
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+// Plot numeric values for golden verification
+plot(mt, "MinTick")
+plot(tm, "Multiplier")
+plot(pi_val, "Pi")
+plot(dow_mon, "Monday")

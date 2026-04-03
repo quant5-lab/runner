@@ -1,0 +1,5 @@
+//@version=5
+// TEST: nz() inline in plot - FAILS (BLOCKER #21-A)
+// Error: "unsupported inline function in plot: nz"
+indicator("Composition: plot(nz())")
+plot(nz(ta.sma(close, 14), 0))

@@ -1,0 +1,10 @@
+//@version=5
+strategy("Exit Persistence Multibar", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Entry on first bar where close > 105
+if close > 105.0 and strategy.position_size == 0
+    strategy.entry("Long", strategy.long)
+
+// Exit registered immediately but triggers later when price drops
+if strategy.position_size > 0
+    strategy.exit("StopExit", "Long", stop=104.0)

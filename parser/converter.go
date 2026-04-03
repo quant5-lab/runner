@@ -12,7 +12,6 @@ type Converter struct {
 	factory *StatementConverterFactory
 }
 
-/* Builds nested MemberExpression from object and property chain (strategy.commission.percent) */
 func buildNestedMemberExpression(object string, properties []string) ast.Expression {
 	var current ast.Expression = &ast.Identifier{
 		NodeType: ast.TypeIdentifier,
@@ -39,7 +38,9 @@ func NewConverter() *Converter {
 	c.factory = NewStatementConverterFactory(
 		c.convertExpression,
 		c.convertOrExpr,
+		c.convertArithExpr,
 		c.convertStatement,
+		c,
 	)
 	return c
 }
@@ -68,6 +69,21 @@ func (c *Converter) convertStatement(stmt *Statement) (ast.Node, error) {
 }
 
 func (c *Converter) convertExpression(expr *Expression) (ast.Expression, error) {
+	if expr.ForInExpr != nil {
+		return c.convertForInExprToStatement(expr.ForInExpr)
+	}
+	if expr.ForExpr != nil {
+		return c.convertForExprToStatement(expr.ForExpr)
+	}
+	if expr.WhileExpr != nil {
+		return c.convertWhileExprToStatement(expr.WhileExpr)
+	}
+	if expr.IfExpr != nil {
+		return c.convertIfExprToStatement(expr.IfExpr)
+	}
+	if expr.SwitchExpr != nil {
+		return c.convertSwitchExprToStatement(expr.SwitchExpr)
+	}
 	if expr.Array != nil {
 		elements := []ast.Expression{}
 		for _, elem := range expr.Array.Elements {
@@ -229,7 +245,7 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 	namedArgs := make(map[string]ast.Expression)
 
 	for _, arg := range call.Args {
-		converted, err := c.convertTernaryExpr(arg.Value)
+		converted, err := c.convertExpression(arg.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +290,12 @@ func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, er
 	var baseExpr ast.Expression
 	var err error
 
-	if postfix.Primary.Call != nil {
+	if postfix.Primary.Paren != nil {
+		baseExpr, err = c.convertExpression(postfix.Primary.Paren)
+		if err != nil {
+			return nil, err
+		}
+	} else if postfix.Primary.Call != nil {
 		baseExpr, err = c.convertCallExpr(postfix.Primary.Call)
 		if err != nil {
 			return nil, err
@@ -287,7 +308,7 @@ func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, er
 			Name:     *postfix.Primary.Ident,
 		}
 	} else {
-		return nil, fmt.Errorf("postfix primary must have call, member access, or ident")
+		return nil, fmt.Errorf("postfix primary must have paren, call, member access, or ident")
 	}
 
 	if postfix.Subscript != nil {
@@ -483,6 +504,72 @@ func (c *Converter) convertCompExpr(comp *CompExpr) (ast.Expression, error) {
 	}, nil
 }
 
+func (c *Converter) buildLeftAssociativeArithExpr(leftOperand ast.Expression, op string, rightGrammar *ArithExpr) (ast.Expression, error) {
+	operands := []ast.Expression{leftOperand}
+	operators := []string{op}
+
+	current := rightGrammar
+	for current != nil {
+		operand, err := c.convertTerm(current.Left)
+		if err != nil {
+			return nil, err
+		}
+		operands = append(operands, operand)
+
+		if current.Op != nil && current.Right != nil {
+			operators = append(operators, *current.Op)
+			current = current.Right
+		} else {
+			current = nil
+		}
+	}
+
+	result := operands[0]
+	for i := 0; i < len(operators); i++ {
+		result = &ast.BinaryExpression{
+			NodeType: ast.TypeBinaryExpression,
+			Operator: operators[i],
+			Left:     result,
+			Right:    operands[i+1],
+		}
+	}
+
+	return result, nil
+}
+
+func (c *Converter) buildLeftAssociativeTerm(leftOperand ast.Expression, op string, rightGrammar *Term) (ast.Expression, error) {
+	operands := []ast.Expression{leftOperand}
+	operators := []string{op}
+
+	current := rightGrammar
+	for current != nil {
+		operand, err := c.convertFactor(current.Left)
+		if err != nil {
+			return nil, err
+		}
+		operands = append(operands, operand)
+
+		if current.Op != nil && current.Right != nil {
+			operators = append(operators, *current.Op)
+			current = current.Right
+		} else {
+			current = nil
+		}
+	}
+
+	result := operands[0]
+	for i := 0; i < len(operators); i++ {
+		result = &ast.BinaryExpression{
+			NodeType: ast.TypeBinaryExpression,
+			Operator: operators[i],
+			Left:     result,
+			Right:    operands[i+1],
+		}
+	}
+
+	return result, nil
+}
+
 func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
 	left, err := c.convertTerm(arith.Left)
 	if err != nil {
@@ -493,17 +580,7 @@ func (c *Converter) convertArithExpr(arith *ArithExpr) (ast.Expression, error) {
 		return left, nil
 	}
 
-	right, err := c.convertArithExpr(arith.Right)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ast.BinaryExpression{
-		NodeType: ast.TypeBinaryExpression,
-		Operator: *arith.Op,
-		Left:     left,
-		Right:    right,
-	}, nil
+	return c.buildLeftAssociativeArithExpr(left, *arith.Op, arith.Right)
 }
 
 func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
@@ -516,22 +593,24 @@ func (c *Converter) convertTerm(term *Term) (ast.Expression, error) {
 		return left, nil
 	}
 
-	right, err := c.convertTerm(term.Right)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ast.BinaryExpression{
-		NodeType: ast.TypeBinaryExpression,
-		Operator: *term.Op,
-		Left:     left,
-		Right:    right,
-	}, nil
+	return c.buildLeftAssociativeTerm(left, *term.Op, term.Right)
 }
 
 func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
-	if factor.Paren != nil {
-		return c.convertTernaryExpr(factor.Paren)
+	if factor.Array != nil {
+		elements := []ast.Expression{}
+		for _, elem := range factor.Array.Elements {
+			astExpr, err := c.convertTernaryExpr(elem)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, astExpr)
+		}
+		return &ast.Literal{
+			NodeType: ast.TypeLiteral,
+			Value:    elements,
+			Raw:      "[...]",
+		}, nil
 	}
 
 	if factor.Unary != nil {
@@ -623,6 +702,164 @@ func (c *Converter) convertFactor(factor *Factor) (ast.Expression, error) {
 	}
 
 	return nil, fmt.Errorf("empty factor")
+}
+
+func (c *Converter) convertForExprToStatement(forExpr *ForExpr) (ast.Expression, error) {
+	fromExpr, err := c.convertArithExpr(forExpr.From)
+	if err != nil {
+		return nil, fmt.Errorf("converting for-loop from expression: %w", err)
+	}
+
+	toExpr, err := c.convertArithExpr(forExpr.To)
+	if err != nil {
+		return nil, fmt.Errorf("converting for-loop to expression: %w", err)
+	}
+
+	var stepExpr ast.Expression
+	if forExpr.Step != nil {
+		stepExpr, err = c.convertArithExpr(forExpr.Step)
+		if err != nil {
+			return nil, fmt.Errorf("converting for-loop step expression: %w", err)
+		}
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range forExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting for-loop body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	return &ast.ForStatement{
+		NodeType: ast.TypeForStatement,
+		Counter:  forExpr.Counter,
+		From:     fromExpr,
+		To:       toExpr,
+		Step:     stepExpr,
+		Body:     body,
+	}, nil
+}
+
+func (c *Converter) convertForInExprToStatement(forInExpr *ForInExpr) (ast.Expression, error) {
+	return convertForInToAST(
+		forInExpr.Vars, forInExpr.Collection, forInExpr.Body,
+		c.convertArithExpr, c.convertStatement,
+	)
+}
+
+func (c *Converter) convertWhileExprToStatement(whileExpr *WhileExpr) (ast.Expression, error) {
+	condition, err := c.convertOrExpr(whileExpr.Condition)
+	if err != nil {
+		return nil, fmt.Errorf("converting while-expression condition: %w", err)
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range whileExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting while-expression body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	return &ast.WhileStatement{
+		NodeType:  ast.TypeWhileStatement,
+		Condition: condition,
+		Body:      body,
+	}, nil
+}
+
+func (c *Converter) convertIfExprToStatement(ifExpr *IfExpr) (ast.Expression, error) {
+	test, err := c.convertOrExpr(ifExpr.Condition)
+	if err != nil {
+		return nil, fmt.Errorf("converting if-expression condition: %w", err)
+	}
+
+	body := []ast.Node{}
+	for _, stmt := range ifExpr.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("converting if-expression body statement: %w", err)
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+
+	alternate, err := c.convertIfExprElseClause(ifExpr.ElseClause)
+	if err != nil {
+		return nil, fmt.Errorf("converting if-expression else clause: %w", err)
+	}
+
+	return &ast.IfStatement{
+		NodeType:   ast.TypeIfStatement,
+		Test:       test,
+		Consequent: body,
+		Alternate:  alternate,
+	}, nil
+}
+
+func (c *Converter) convertIfExprElseClause(ec *ElseClause) ([]ast.Node, error) {
+	if ec == nil {
+		return []ast.Node{}, nil
+	}
+	if ec.ElseIf != nil {
+		node, err := c.convertIfGrammarNode(ec.ElseIf)
+		if err != nil {
+			return nil, err
+		}
+		return []ast.Node{node}, nil
+	}
+	nodes := []ast.Node{}
+	for _, stmt := range ec.ElseBody {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes, nil
+}
+
+func (c *Converter) convertIfGrammarNode(ifGram *IfStatement) (ast.Node, error) {
+	test, err := c.convertOrExpr(ifGram.Condition)
+	if err != nil {
+		return nil, err
+	}
+	body := []ast.Node{}
+	for _, stmt := range ifGram.Body {
+		node, err := c.convertStatement(stmt)
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+	}
+	alternate, err := c.convertIfExprElseClause(ifGram.ElseClause)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.IfStatement{
+		NodeType:   ast.TypeIfStatement,
+		Test:       test,
+		Consequent: body,
+		Alternate:  alternate,
+	}, nil
+}
+
+func (c *Converter) convertSwitchExprToStatement(switchExpr *SwitchExpr) (ast.Expression, error) {
+	bodyResolver := NewSwitchCaseBodyResolver(c.convertStatement, c.convertExpression)
+	lowering := NewSwitchLowering(c.convertOrExpr, bodyResolver)
+	return lowering.Lower(switchExpr)
 }
 
 func (c *Converter) ToJSON(program *ast.Program) ([]byte, error) {

@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "strategy": "BB9",
+  "dataSource": "SBERP-1h.json",
+  "generatedAt": "2026-01-21T07:51:50Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "BB entry",
+        "entryBar": 16,
+        "entryTime": 1734076800,
+        "entryPrice": 229.76,
+        "entryComment": "",
+        "exitBar": 1295,
+        "exitTime": 1743393600,
+        "exitPrice": 298.75,
+        "exitComment": "",
+        "size": 1305.4830287206266,
+        "profit": 90065.27415143604,
+        "direction": "long"
+      },
+      {
+        "entryId": "BB entry",
+        "entryBar": 2916,
+        "entryTime": 1752912000,
+        "entryPrice": 312.46,
+        "entryComment": "",
+        "exitBar": 5414,
+        "exitTime": 1767931200,
+        "exitPrice": 297.2,
+        "exitComment": "",
+        "size": 960.1536245799329,
+        "profit": -14651.944311089766,
+        "direction": "long"
+      },
+      {
+        "entryId": "BB entry",
+        "entryBar": 3886,
+        "entryTime": 1758614400,
+        "entryPrice": 296.4,
+        "entryComment": "",
+        "exitBar": 5414,
+        "exitTime": 1767931200,
+        "exitPrice": 297.2,
+        "exitComment": "",
+        "size": 1012.1457489878543,
+        "profit": 809.7165991902949,
+        "direction": "long"
+      },
+      {
+        "entryId": "BB entry",
+        "entryBar": 4198,
+        "entryTime": 1760342400,
+        "entryPrice": 283.06,
+        "entryComment": "",
+        "exitBar": 5414,
+        "exitTime": 1767931200,
+        "exitPrice": 297.2,
+        "exitComment": "",
+        "size": 1059.9208592425098,
+        "profit": 14987.280949689073,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [],
+    "equity": 2091210.3273892256,
+    "netProfit": 91210.32738922564,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

@@ -6,8 +6,6 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-// TestSecurityBarMapper_NonOverlappingDateRanges tests the fix for when Daily and Hourly data
-// have different start dates (e.g., Daily starts Aug 15, Hourly starts Jul 8)
 func TestSecurityBarMapper_NonOverlappingDateRanges(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -104,7 +102,6 @@ func TestSecurityBarMapper_NonOverlappingDateRanges(t *testing.T) {
 	}
 }
 
-// TestSecurityBarMapper_DownscalingModes tests all three security() modes with deterministic data
 func TestSecurityBarMapper_DownscalingModes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -154,11 +151,11 @@ func TestSecurityBarMapper_DownscalingModes(t *testing.T) {
 			}{
 				// First range (Day 0) - Critical edge case for first-bar fix
 				{0, true, 0, "First hourly bar, lookahead=true → current Daily bar (Day 0)"},
-				{0, false, 0, "First hourly bar, lookahead=false → current Daily bar (Day 0, FIXED)"},
+				{0, false, 0, "First hourly bar, lookahead=false → current Daily bar (Day 0)"},
 				{1, true, 0, "Second hourly bar, lookahead=true → current Daily bar (Day 0)"},
-				{1, false, 0, "Second hourly bar, lookahead=false → current Daily bar (Day 0, FIXED)"},
+				{1, false, 0, "Second hourly bar, lookahead=false → current Daily bar (Day 0)"},
 				{6, true, 0, "Last hourly of Day 0, lookahead=true → current Daily bar"},
-				{6, false, 0, "Last hourly of Day 0, lookahead=false → current Daily bar (FIXED)"},
+				{6, false, 0, "Last hourly of Day 0, lookahead=false → current Daily bar"},
 
 				// Second range (Day 1)
 				{7, true, 1, "First hourly of Day 1, lookahead=true → current Daily bar (Day 1)"},
@@ -226,11 +223,9 @@ func TestSecurityBarMapper_DownscalingModes(t *testing.T) {
 			name: "Same timeframe (special case)",
 			mode: ModeDownscaling,
 			setupMapper: func(m *SecurityBarMapper) {
-				// When security() uses same timeframe, BuildMappingWithDateFilter creates 3 ranges:
-				// Range 0: hourly 0 → daily 0
-				// Range 1: hourly 1 → daily 1
-				// Range 2: hourly 2 → daily 2
-				// All bars are on same date, so each gets its own range
+				// Same-TF in production uses BuildIdentityMapping, not BuildMappingWithDateFilter.
+				// When forced through BuildMappingWithDateFilter with same-date bars,
+				// time-range matching assigns all bars to the last higher TF bar on that date.
 				bars := []context.OHLCV{
 					{Time: parseTime("2025-01-01 14:30:00"), Close: 100},
 					{Time: parseTime("2025-01-01 15:30:00"), Close: 101},
@@ -244,13 +239,13 @@ func TestSecurityBarMapper_DownscalingModes(t *testing.T) {
 				expected    int
 				description string
 			}{
-				// When same TF, all bars on same date creates single range [0-2]→0
-				{0, true, 0, "Same TF, index 0, lookahead=true → daily bar 0"},
-				{0, false, 0, "Same TF, index 0, lookahead=false → daily bar 0 (FIXED)"},
-				{1, true, 0, "Same TF, index 1, lookahead=true → daily bar 0 (all in same day)"},
-				{1, false, 0, "Same TF, index 1, lookahead=false → daily bar 0 (previous in same day)"},
-				{2, true, 0, "Same TF, index 2, lookahead=true → daily bar 0 (all in same day)"},
-				{2, false, 0, "Same TF, index 2, lookahead=false → daily bar 0 (previous in same day)"},
+				/* Last higher TF bar on same date absorbs all lower TF bars */
+				{0, true, 2, "Same TF, index 0, lookahead=true → daily bar 2"},
+				{0, false, 2, "Same TF, index 0, lookahead=false → daily bar 2 (first range)"},
+				{1, true, 2, "Same TF, index 1, lookahead=true → daily bar 2 (all in same day)"},
+				{1, false, 2, "Same TF, index 1, lookahead=false → daily bar 2 (first range)"},
+				{2, true, 2, "Same TF, index 2, lookahead=true → daily bar 2 (all in same day)"},
+				{2, false, 2, "Same TF, index 2, lookahead=false → daily bar 2 (first range)"},
 			},
 		},
 	}
@@ -277,7 +272,6 @@ func TestSecurityBarMapper_DownscalingModes(t *testing.T) {
 	}
 }
 
-// TestSecurityBarMapper_TimezoneMarketHours tests date boundary handling across timezones
 func TestSecurityBarMapper_TimezoneMarketHours(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -344,7 +338,6 @@ func TestSecurityBarMapper_TimezoneMarketHours(t *testing.T) {
 	}
 }
 
-// TestSecurityBarMapper_ExtremeCases tests pathological edge cases
 func TestSecurityBarMapper_ExtremeCases(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -380,7 +373,7 @@ func TestSecurityBarMapper_ExtremeCases(t *testing.T) {
 			testIndex:   0,
 			lookahead:   false,
 			expected:    0,
-			description: "single bar should return itself (FIXED: was returning -1)",
+			description: "single bar should map to itself",
 		},
 		{
 			name: "Large index beyond all ranges",
@@ -417,7 +410,7 @@ func TestSecurityBarMapper_ExtremeCases(t *testing.T) {
 			testIndex:   0,
 			lookahead:   false,
 			expected:    0,
-			description: "dense hourly data should still work correctly (FIXED)",
+			description: "dense hourly data should work correctly",
 		},
 	}
 
@@ -434,7 +427,6 @@ func TestSecurityBarMapper_ExtremeCases(t *testing.T) {
 	}
 }
 
-// TestSecurityBarMapper_RangeIntegrity validates that ranges maintain internal consistency
 func TestSecurityBarMapper_RangeIntegrity(t *testing.T) {
 	mapper := NewSecurityBarMapper()
 

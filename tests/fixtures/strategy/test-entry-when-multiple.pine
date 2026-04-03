@@ -1,0 +1,13 @@
+//@version=5
+strategy("Entry When Multiple Conditions", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000, pyramiding=2)
+
+// Different entries with different when conditions
+longCondition = close > 105.0
+shortCondition = close < 105.0
+
+strategy.entry("Long", strategy.long, when=longCondition)
+strategy.entry("Short", strategy.short, when=shortCondition)
+
+// Exit to allow multiple entries
+if strategy.position_size != 0
+    strategy.close_all()

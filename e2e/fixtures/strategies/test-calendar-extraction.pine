@@ -1,0 +1,27 @@
+//@version=5
+indicator("Calendar Extraction Functions", overlay=false)
+
+// All 8 calendar extraction functions with bar timestamp
+yr = year(time)
+mo = month(time)
+dow = dayofweek(time)
+dom = dayofmonth(time)
+hr = hour(time)
+mn = minute(time)
+sc = second(time)
+wk = weekofyear(time)
+
+// Explicit timezone overload
+yr_utc = year(time, "UTC")
+hr_utc = hour(time, "UTC")
+
+plot(yr, "year")
+plot(mo, "month")
+plot(dow, "dayofweek")
+plot(dom, "dayofmonth")
+plot(hr, "hour")
+plot(mn, "minute")
+plot(sc, "second")
+plot(wk, "weekofyear")
+plot(yr_utc, "year_utc")
+plot(hr_utc, "hour_utc")

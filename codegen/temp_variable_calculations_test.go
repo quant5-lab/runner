@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -142,14 +143,14 @@ func TestTempVariableManager_GenerateCalculations_DifferentSources(t *testing.T)
 			sourceExpr: &ast.Identifier{Name: "close"},
 			funcName:   "ta.sma",
 			period:     50,
-			wantAccess: "ctx.Data[ctx.BarIndex-j].Close",
+			wantAccess: "closeSeries.Get(j)",
 		},
 		{
 			name:       "SMA of high",
 			sourceExpr: &ast.Identifier{Name: "high"},
 			funcName:   "ta.sma",
 			period:     20,
-			wantAccess: "ctx.Data[ctx.BarIndex-j].High",
+			wantAccess: "highSeries.Get(j)",
 		},
 		{
 			name: "SMA of close[4]",
@@ -160,7 +161,7 @@ func TestTempVariableManager_GenerateCalculations_DifferentSources(t *testing.T)
 			},
 			funcName:   "ta.sma",
 			period:     200,
-			wantAccess: "ctx.Data[ctx.BarIndex-(j+4)].Close",
+			wantAccess: "closeSeries.Get(j+4)",
 		},
 	}
 
@@ -221,53 +222,51 @@ func TestTempVariableManager_GenerateCalculations_EmptyManager(t *testing.T) {
 	}
 }
 
-/* TestTempVariableManager_GenerateCalculations_ATRFunction tests ATR-specific calculation */
+/* TestTempVariableManager_GenerateCalculations_ATRFunction verifies that
+ * GenerateCalculations emits the canonical Pine ATR algorithm for each period:
+ *
+ *  - NaN warmup (bars 0..period-2), SMA seed (bar period-1), RMA recursive (bar period+)
+ *  - TR uses handle_na=true: bar 0 returns high-low so the seed window is always valid
+ *  - RMA alpha is 1/period (not EMA's 2/(period+1))
+ */
 func TestTempVariableManager_GenerateCalculations_ATRFunction(t *testing.T) {
-	g := &generator{
-		variables: make(map[string]string),
-		constants: make(map[string]interface{}),
-		indent:    2,
-	}
-	g.taRegistry = NewTAFunctionRegistry()
+	for _, period := range []int{1, 2, 5, 14} {
+		period := period
+		t.Run(fmt.Sprintf("period_%d", period), func(t *testing.T) {
+			g := &generator{
+				variables: make(map[string]string),
+				constants: make(map[string]interface{}),
+				indent:    2,
+			}
+			g.taRegistry = NewTAFunctionRegistry()
+			mgr := NewTempVariableManager(g)
 
-	mgr := NewTempVariableManager(g)
+			call := &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "atr"},
+				},
+				Arguments: []ast.Expression{&ast.Literal{Value: period}},
+			}
+			varName := mgr.GetOrCreate(CallInfo{Call: call, FuncName: "ta.atr", ArgHash: "atr_test"})
+			code, err := mgr.GenerateCalculations()
+			if err != nil {
+				t.Fatalf("GenerateCalculations() error = %v", err)
+			}
 
-	call := &ast.CallExpression{
-		Callee: &ast.MemberExpression{
-			Object:   &ast.Identifier{Name: "ta"},
-			Property: &ast.Identifier{Name: "atr"},
-		},
-		Arguments: []ast.Expression{
-			&ast.Literal{Value: 2}, // ATR period
-		},
-	}
-
-	info := CallInfo{Call: call, FuncName: "ta.atr", ArgHash: "atr_test"}
-	varName := mgr.GetOrCreate(info)
-
-	code, err := mgr.GenerateCalculations()
-	if err != nil {
-		t.Fatalf("GenerateCalculations() error = %v", err)
-	}
-
-	// ATR-specific checks
-	if !strings.Contains(code, "Inline ATR(2)") {
-		t.Errorf("Expected ATR comment not found in:\n%s", code)
-	}
-
-	// Should calculate True Range
-	if !strings.Contains(code, "hl := ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low") {
-		t.Error("Expected True Range calculation not found")
-	}
-
-	// Should use RMA smoothing
-	if !strings.Contains(code, "alpha := 1.0 / 2.0") {
-		t.Error("Expected RMA alpha calculation not found")
-	}
-
-	// Should set temp variable
-	if !strings.Contains(code, varName+"Series.Set(") {
-		t.Errorf("Expected Series.Set() for %s not found", varName)
+			boundary := period - 1
+			for _, want := range []string{
+				fmt.Sprintf("ctx.BarIndex < %d", boundary),
+				fmt.Sprintf("ctx.BarIndex == %d", boundary),
+				fmt.Sprintf("alpha := 1.0 / float64(%d)", period),
+				"if idx == 0 { return h - l }",
+				varName + "Series.Set(",
+			} {
+				if !strings.Contains(code, want) {
+					t.Errorf("missing %q\n%s", want, code)
+				}
+			}
+		})
 	}
 }
 
@@ -415,11 +414,201 @@ func TestTempVariableManager_FullLifecycle(t *testing.T) {
 		t.Errorf("Calculation not found for %s in:\n%s", varName, calcs)
 	}
 
+	// Phase 4b: Per-statement calculation
+	perStmtCalcs, err := mgr.GenerateCalculationsForStatement(info.StmtIndex)
+	if err != nil {
+		t.Fatalf("GenerateCalculationsForStatement(%d) error = %v", info.StmtIndex, err)
+	}
+	if !strings.Contains(perStmtCalcs, varName+"Series.Set(") {
+		t.Errorf("Per-statement calculation not found for %s at index %d in:\n%s",
+			varName, info.StmtIndex, perStmtCalcs)
+	}
+	wrongIdx, err := mgr.GenerateCalculationsForStatement(info.StmtIndex + 99)
+	if err != nil {
+		t.Fatalf("GenerateCalculationsForStatement(%d) error = %v", info.StmtIndex+99, err)
+	}
+	if wrongIdx != "" {
+		t.Errorf("Expected empty output for wrong index %d, got:\n%s", info.StmtIndex+99, wrongIdx)
+	}
+
 	// Phase 5: Advancement
 	nexts := mgr.GenerateNextCalls()
 	if !strings.Contains(nexts, varName+"Series.Next()") {
 		t.Errorf("Next() call not found for %s in:\n%s", varName, nexts)
 	}
+}
+
+/* Validates per-statement filtering, insertion order, and nil-generator safety */
+func TestTempVariableManager_GenerateCalculationsForStatement(t *testing.T) {
+	makeCallInfo := func(fn, hash string, stmtIdx int) (CallInfo, *ast.CallExpression) {
+		call := &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: fn},
+			},
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Literal{Value: 14},
+			},
+		}
+		return CallInfo{
+			Call:      call,
+			FuncName:  "ta." + fn,
+			ArgHash:   hash,
+			StmtIndex: stmtIdx,
+		}, call
+	}
+
+	newMgr := func() *TempVariableManager {
+		g := &generator{
+			variables: make(map[string]string),
+			constants: make(map[string]interface{}),
+			indent:    2,
+		}
+		g.taRegistry = NewTAFunctionRegistry()
+		return NewTempVariableManager(g)
+	}
+
+	t.Run("empty manager returns empty", func(t *testing.T) {
+		mgr := newMgr()
+		code, err := mgr.GenerateCalculationsForStatement(0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != "" {
+			t.Errorf("expected empty, got %q", code)
+		}
+	})
+
+	t.Run("single var at matching index emits calc", func(t *testing.T) {
+		mgr := newMgr()
+		info, _ := makeCallInfo("sma", "a1", 3)
+		varName := mgr.GetOrCreate(info)
+
+		code, err := mgr.GenerateCalculationsForStatement(3)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(code, varName+"Series.Set(") {
+			t.Errorf("expected calc for %s at index 3, got:\n%s", varName, code)
+		}
+	})
+
+	t.Run("single var at non-matching index emits nothing", func(t *testing.T) {
+		mgr := newMgr()
+		info, _ := makeCallInfo("sma", "b2", 5)
+		mgr.GetOrCreate(info)
+
+		code, err := mgr.GenerateCalculationsForStatement(0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != "" {
+			t.Errorf("expected empty for wrong index, got:\n%s", code)
+		}
+	})
+
+	t.Run("multiple vars at different indices are correctly filtered", func(t *testing.T) {
+		mgr := newMgr()
+		info0, _ := makeCallInfo("sma", "c0", 0)
+		info2, _ := makeCallInfo("ema", "c2", 2)
+		info0b, _ := makeCallInfo("rma", "c0b", 0)
+
+		name0 := mgr.GetOrCreate(info0)
+		name2 := mgr.GetOrCreate(info2)
+		name0b := mgr.GetOrCreate(info0b)
+
+		// Index 0: should contain sma and rma, not ema
+		code0, err := mgr.GenerateCalculationsForStatement(0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(code0, name0+"Series.Set(") {
+			t.Errorf("expected calc for %s at index 0", name0)
+		}
+		if !strings.Contains(code0, name0b+"Series.Set(") {
+			t.Errorf("expected calc for %s at index 0", name0b)
+		}
+		if strings.Contains(code0, name2+"Series.Set(") {
+			t.Errorf("should NOT contain calc for %s at index 0", name2)
+		}
+
+		// Index 2: should contain ema only
+		code2, err := mgr.GenerateCalculationsForStatement(2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(code2, name2+"Series.Set(") {
+			t.Errorf("expected calc for %s at index 2", name2)
+		}
+		if strings.Contains(code2, name0+"Series.Set(") {
+			t.Errorf("should NOT contain calc for %s at index 2", name0)
+		}
+
+		// Index 99: should be empty
+		code99, err := mgr.GenerateCalculationsForStatement(99)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code99 != "" {
+			t.Errorf("expected empty for index 99, got:\n%s", code99)
+		}
+	})
+
+	t.Run("preserves insertion order within same index", func(t *testing.T) {
+		mgr := newMgr()
+		infoA, _ := makeCallInfo("sma", "first", 1)
+		infoB, _ := makeCallInfo("ema", "second", 1)
+
+		nameA := mgr.GetOrCreate(infoA)
+		nameB := mgr.GetOrCreate(infoB)
+
+		code, err := mgr.GenerateCalculationsForStatement(1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		posA := strings.Index(code, nameA+"Series.Set(")
+		posB := strings.Index(code, nameB+"Series.Set(")
+		if posA < 0 || posB < 0 {
+			t.Fatalf("expected both calcs in output, got:\n%s", code)
+		}
+		if posA >= posB {
+			t.Errorf("expected %s (pos %d) before %s (pos %d) - insertion order not preserved",
+				nameA, posA, nameB, posB)
+		}
+	})
+
+	t.Run("nil generator returns error", func(t *testing.T) {
+		mgr := &TempVariableManager{
+			orderedVars:   []string{"someVar"},
+			varToCallInfo: map[string]CallInfo{"someVar": {StmtIndex: 0}},
+		}
+		_, err := mgr.GenerateCalculationsForStatement(0)
+		if err == nil {
+			t.Error("expected error for nil generator")
+		}
+	})
+
+	t.Run("GenerateCalculations still emits all regardless of index", func(t *testing.T) {
+		mgr := newMgr()
+		info0, _ := makeCallInfo("sma", "all0", 0)
+		info5, _ := makeCallInfo("ema", "all5", 5)
+
+		name0 := mgr.GetOrCreate(info0)
+		name5 := mgr.GetOrCreate(info5)
+
+		allCode, err := mgr.GenerateCalculations()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(allCode, name0+"Series.Set(") {
+			t.Errorf("GenerateCalculations should emit %s", name0)
+		}
+		if !strings.Contains(allCode, name5+"Series.Set(") {
+			t.Errorf("GenerateCalculations should emit %s", name5)
+		}
+	})
 }
 
 /* BenchmarkGenerateCalculations measures calculation generation performance */

@@ -1,0 +1,20 @@
+//@version=5
+indicator("RSI Basic Test", overlay=false)
+
+// Test 1: Standard RSI(14)
+rsi14 = ta.rsi(close, 14)
+
+// Test 2: Different period - RSI(9)
+rsi9 = ta.rsi(close, 9)
+
+// Test 3: Long period - RSI(50)
+rsi50 = ta.rsi(close, 50)
+
+// Test 4: Minimal period - RSI(1)
+rsi1 = ta.rsi(close, 1)
+
+plot(rsi14, "RSI 14", color=color.blue)
+plot(rsi9, "RSI 9", color=color.green)
+plot(rsi50, "RSI 50", color=color.orange)
+plot(rsi1, "RSI 1", color=color.red)
+

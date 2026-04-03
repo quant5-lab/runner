@@ -1,0 +1,7 @@
+//@version=5
+indicator("Security Tuple OHLCV", overlay=false)
+
+[c, v] = request.security(syminfo.tickerid, "1D", [close, volume])
+
+plot(c, "Close")
+plot(v, "Volume")

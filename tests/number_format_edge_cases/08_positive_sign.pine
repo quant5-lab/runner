@@ -1,0 +1,6 @@
+//@version=5
+indicator("Positive Sign Test", overlay=true)
+x = +42
+y = +3.14
+z = +.5
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

@@ -80,24 +80,37 @@ func Rma(source []float64, period int) []float64 {
 	result := make([]float64, len(source))
 	alpha := 1.0 / float64(period)
 
-	// First value is SMA
 	sum := 0.0
-	for i := 0; i < period; i++ {
-		if i >= len(source) {
-			result[i] = math.NaN()
-			continue
-		}
+	validCount := 0
+	firstValidIdx := -1
+
+	for i := 0; i < len(source); i++ {
 		result[i] = math.NaN()
-		sum += source[i]
+
+		if !math.IsNaN(source[i]) {
+			if firstValidIdx == -1 {
+				firstValidIdx = i
+			}
+			sum += source[i]
+			validCount++
+
+			if validCount == period {
+				result[i] = sum / float64(period)
+				break
+			}
+		}
 	}
 
-	if period <= len(source) {
-		result[period-1] = sum / float64(period)
+	if validCount < period {
+		return result
 	}
 
-	// RMA calculation
-	for i := period; i < len(source); i++ {
-		result[i] = alpha*source[i] + (1-alpha)*result[i-1]
+	startIdx := firstValidIdx + validCount - 1
+
+	for i := startIdx + 1; i < len(source); i++ {
+		if !math.IsNaN(source[i]) {
+			result[i] = alpha*source[i] + (1-alpha)*result[i-1]
+		}
 	}
 
 	return result
@@ -431,6 +444,165 @@ func Pivotlow(source []float64, leftBars, rightBars int) []float64 {
 
 		if isPivot {
 			result[i] = center
+		}
+	}
+
+	return result
+}
+
+/* Swma calculates Symmetrically Weighted Moving Average over fixed 4-bar window.
+ * Weights: [1/6, 2/6, 2/6, 1/6] applied oldest-to-newest. */
+func Swma(source []float64) []float64 {
+	result := make([]float64, len(source))
+	for i := range result {
+		if i < 3 {
+			result[i] = math.NaN()
+			continue
+		}
+		result[i] = source[i-3]*(1.0/6.0) + source[i-2]*(2.0/6.0) + source[i-1]*(2.0/6.0) + source[i]*(1.0/6.0)
+	}
+	return result
+}
+
+/* Cci calculates Commodity Channel Index: (source - sma) / (0.015 * meanDev).
+ * meanDev is the mean absolute deviation of source from its SMA over length bars. */
+func Cci(source []float64, length int) []float64 {
+	if length <= 0 || len(source) == 0 {
+		result := make([]float64, len(source))
+		for i := range result {
+			result[i] = math.NaN()
+		}
+		return result
+	}
+
+	sma := Sma(source, length)
+	result := make([]float64, len(source))
+
+	for i := range result {
+		if i < length-1 || math.IsNaN(sma[i]) {
+			result[i] = math.NaN()
+			continue
+		}
+		meanDev := 0.0
+		for j := 0; j < length; j++ {
+			meanDev += math.Abs(source[i-j] - sma[i])
+		}
+		meanDev /= float64(length)
+		if meanDev == 0 {
+			result[i] = 0
+		} else {
+			result[i] = (source[i] - sma[i]) / (0.015 * meanDev)
+		}
+	}
+	return result
+}
+
+/* Bbw calculates Bollinger Bands Width: 2 * mult * stdev / sma over length bars. */
+func Bbw(source []float64, length int, mult float64) []float64 {
+	if length <= 0 || len(source) == 0 {
+		result := make([]float64, len(source))
+		for i := range result {
+			result[i] = math.NaN()
+		}
+		return result
+	}
+
+	smaVals := Sma(source, length)
+	stdevVals := Stdev(source, length)
+	result := make([]float64, len(source))
+
+	for i := range result {
+		if math.IsNaN(smaVals[i]) || math.IsNaN(stdevVals[i]) || smaVals[i] == 0 {
+			result[i] = math.NaN()
+			continue
+		}
+		result[i] = 2.0 * mult * stdevVals[i] / smaVals[i]
+	}
+	return result
+}
+
+/* Cog calculates Center of Gravity oscillator: -sum(source[i]*(i+1)) / sum(source[i]).
+ * Index 0 is the most recent bar, length-1 is the oldest within the window. */
+func Cog(source []float64, length int) []float64 {
+	if length <= 0 || len(source) == 0 {
+		result := make([]float64, len(source))
+		for i := range result {
+			result[i] = math.NaN()
+		}
+		return result
+	}
+
+	result := make([]float64, len(source))
+
+	for i := range result {
+		if i < length-1 {
+			result[i] = math.NaN()
+			continue
+		}
+		num, denom := 0.0, 0.0
+		for j := 0; j < length; j++ {
+			num += source[i-j] * float64(j+1)
+			denom += source[i-j]
+		}
+		if denom == 0 {
+			result[i] = 0
+		} else {
+			result[i] = -num / denom
+		}
+	}
+	return result
+}
+
+/* Tsi calculates True Strength Index: 100 * doubleEMA(momentum) / doubleEMA(|momentum|).
+ * momentum = source - source[1]; short/long EMA periods control smoothing. */
+func Tsi(source []float64, shortLength, longLength int) []float64 {
+	if shortLength <= 0 || longLength <= 0 || len(source) < 2 {
+		result := make([]float64, len(source))
+		for i := range result {
+			result[i] = math.NaN()
+		}
+		return result
+	}
+
+	momentum := make([]float64, len(source))
+	absMomentum := make([]float64, len(source))
+	momentum[0] = math.NaN()
+	absMomentum[0] = math.NaN()
+	for i := 1; i < len(source); i++ {
+		m := source[i] - source[i-1]
+		momentum[i] = m
+		absMomentum[i] = math.Abs(m)
+	}
+
+	smoothed := Ema(Ema(momentum, longLength), shortLength)
+	smoothedAbs := Ema(Ema(absMomentum, longLength), shortLength)
+
+	result := make([]float64, len(source))
+	for i := range result {
+		if math.IsNaN(smoothed[i]) || math.IsNaN(smoothedAbs[i]) || smoothedAbs[i] == 0 {
+			result[i] = math.NaN()
+			continue
+		}
+		result[i] = 100.0 * smoothed[i] / smoothedAbs[i]
+	}
+	return result
+}
+
+/* Cum calculates cumulative sum of source (PineScript compatible) */
+func Cum(source []float64) []float64 {
+	if len(source) == 0 {
+		return source
+	}
+
+	result := make([]float64, len(source))
+	cumSum := 0.0
+
+	for i := range source {
+		if math.IsNaN(source[i]) {
+			result[i] = math.NaN()
+		} else {
+			cumSum += source[i]
+			result[i] = cumSum
 		}
 	}
 

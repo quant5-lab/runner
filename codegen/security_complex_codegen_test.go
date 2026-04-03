@@ -218,15 +218,14 @@ func TestSecurityATRGeneration(t *testing.T) {
 	}
 	code := generated.FunctionBody
 
-	/* Verify ATR-specific patterns */
+	// ta.atr(14) inside security() is evaluated at runtime via the bar evaluator.
+	// Verify the security evaluation plumbing is emitted (not inline ATR computation).
 	expectedPatterns := []string{
-		"Inline ATR(14)",
-		"ctx.Data[ctx.BarIndex].High",
-		"ctx.Data[ctx.BarIndex].Low",
-		"ctx.Data[ctx.BarIndex-1].Close",       // Previous close for TR
-		"tr := math.Max(hl, math.Max(hc, lc))", // True Range calculation
-		"alpha := 1.0 / 14",                    // RMA smoothing
-		"prevATR :=",                           // RMA uses previous value
+		"secKey",
+		"secBarEvaluator",
+		"EvaluateAtBar",
+		"atr_valSeries.Set(secValue)",
+		"security.NewStreamingBarEvaluator()",
 	}
 
 	for _, pattern := range expectedPatterns {
@@ -235,12 +234,13 @@ func TestSecurityATRGeneration(t *testing.T) {
 		}
 	}
 
-	/* Verify warmup handling */
-	if !strings.Contains(code, "if ctx.BarIndex < 1") {
-		t.Error("Expected warmup check for first bar (need previous close)")
-	}
-	if !strings.Contains(code, "if ctx.BarIndex < 14") {
-		t.Error("Expected warmup check for ATR period")
+	// Inline ATR computation must NOT appear — it belongs in the bar evaluator, not the main loop.
+	// These patterns are what ATRHandler would generate if ta.atr were incorrectly inlined here.
+	inlineATRPatterns := []string{"Inline RMA(14)", "alpha := 1.0 / float64(14)", "currentSource :="}
+	for _, pattern := range inlineATRPatterns {
+		if strings.Contains(code, pattern) {
+			t.Errorf("Inline ATR pattern %q must not appear in main loop (evaluated by bar evaluator)\nGenerated code:\n%s", pattern, code)
+		}
 	}
 }
 
@@ -291,20 +291,27 @@ func TestSecuritySTDEVGeneration(t *testing.T) {
 	}
 	code := generated.FunctionBody
 
-	/* Verify STDEV algorithm steps */
+	// ta.stdev(close, 20) inside security() is evaluated at runtime via the bar evaluator.
+	// Verify the security evaluation plumbing is emitted (not inline STDEV computation).
 	expectedPatterns := []string{
-		"ta.stdev(20)",
-		"sum := 0.0",                // Mean calculation
-		"mean := sum / float64(20)", // Mean result
-		"variance := 0.0",           // Variance calculation
-		"diff := ctx.Data[ctx.BarIndex-j].Close - mean", // Uses built-in with relative offset
-		"variance += diff * diff",                       // Squared deviation
-		"math.Sqrt(variance / float64(20))",             // Final STDEV
+		"secKey",
+		"secBarEvaluator",
+		"EvaluateAtBar",
+		"stdev_valSeries.Set(secValue)",
+		"security.NewStreamingBarEvaluator()",
 	}
 
 	for _, pattern := range expectedPatterns {
 		if !strings.Contains(code, pattern) {
 			t.Errorf("Expected STDEV code to contain %q\nGenerated code:\n%s", pattern, code)
+		}
+	}
+
+	// Inline STDEV computation must NOT appear — it belongs in the bar evaluator, not the main loop.
+	inlineSTDEVPatterns := []string{"ta.stdev(20)", "variance := 0.0", "math.Sqrt(variance"}
+	for _, pattern := range inlineSTDEVPatterns {
+		if strings.Contains(code, pattern) {
+			t.Errorf("Inline STDEV pattern %q must not appear in main loop (evaluated by bar evaluator)\nGenerated code:\n%s", pattern, code)
 		}
 	}
 }

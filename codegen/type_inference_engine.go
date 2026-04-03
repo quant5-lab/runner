@@ -7,14 +7,18 @@ import (
 // TypeInferenceEngine determines variable types from AST expressions.
 // Type system: "float64" (default), "bool", "string"
 type TypeInferenceEngine struct {
-	variables map[string]string
-	constants map[string]interface{}
+	variables                map[string]string
+	constants                map[string]interface{}
+	pineRegistry             *PineConstantRegistry
+	arrayConstructorResolver *ArrayConstructorTypeResolver
 }
 
 func NewTypeInferenceEngine() *TypeInferenceEngine {
 	return &TypeInferenceEngine{
-		variables: make(map[string]string),
-		constants: make(map[string]interface{}),
+		variables:                make(map[string]string),
+		constants:                make(map[string]interface{}),
+		pineRegistry:             NewPineConstantRegistry(),
+		arrayConstructorResolver: NewArrayConstructorTypeResolver(),
 	}
 }
 
@@ -32,6 +36,19 @@ func (te *TypeInferenceEngine) InferType(expr ast.Expression) string {
 	}
 
 	switch e := expr.(type) {
+	case *ast.Literal:
+		if _, isString := e.Value.(string); isString {
+			return "string"
+		}
+		if _, isBool := e.Value.(bool); isBool {
+			return "bool"
+		}
+		return "float64"
+	case *ast.Identifier:
+		if te.pineRegistry.IsColorName(e.Name) {
+			return "string"
+		}
+		return "float64"
 	case *ast.MemberExpression:
 		return te.inferMemberExpressionType(e)
 	case *ast.BinaryExpression:
@@ -65,6 +82,9 @@ func (te *TypeInferenceEngine) inferMemberExpressionType(e *ast.MemberExpression
 				}
 			}
 		}
+		if obj.Name == "color" {
+			return "string"
+		}
 	}
 	return "float64"
 }
@@ -90,11 +110,23 @@ func (te *TypeInferenceEngine) inferUnaryExpressionType(e *ast.UnaryExpression) 
 func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) string {
 	funcName := extractFunctionName(e.Callee)
 
-	if funcName == "ta.crossover" || funcName == "ta.crossunder" {
+	if isBoolReturningTAFunction(funcName) {
 		return "bool"
 	}
 	if funcName == "input.bool" {
 		return "bool"
+	}
+	if elemType, ok := te.arrayConstructorResolver.ResolveVariableType(funcName); ok {
+		return elemType.TypeTag()
+	}
+	if IsTickerConstructorFunction(funcName) {
+		return "string"
+	}
+	if retType := ColorFunctionReturnType(funcName); retType != "" {
+		return retType
+	}
+	if funcName == "array.join" {
+		return "string"
 	}
 
 	return "float64"
@@ -123,6 +155,21 @@ func (te *TypeInferenceEngine) IsBoolConstant(name string) bool {
 func (te *TypeInferenceEngine) GetVariableType(name string) (string, bool) {
 	varType, exists := te.variables[name]
 	return varType, exists
+}
+
+// isBoolReturningTAFunction reports whether funcName is a ta.* function
+// whose return type is series bool per the Pine reference manual.
+// Pine guarantees bool is never na, so callers must use NewBoolSeries.
+func isBoolReturningTAFunction(funcName string) bool {
+	switch funcName {
+	case "ta.crossover", "crossover",
+		"ta.crossunder", "crossunder",
+		"ta.cross", "cross",
+		"ta.rising", "rising",
+		"ta.falling", "falling":
+		return true
+	}
+	return false
 }
 
 func extractFunctionName(callee ast.Expression) string {

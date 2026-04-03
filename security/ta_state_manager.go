@@ -8,235 +8,237 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
+// TAStateManager guarantees sequential state accumulation via a catch-up loop,
+// allowing arbitrary-barIdx queries via historical look-back inside security().
 type TAStateManager interface {
-	ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error)
+	ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error)
 }
 
+// ── SMA ───────────────────────────────────────────────────────────────────────
+
 type SMAStateManager struct {
-	cacheKey string
-	period   int
-	buffer   []float64
-	computed int
+	cacheKey  string
+	period    int
+	buf       forwardBufferE
+	evaluator BarEvaluator
 }
+
+func newSMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *SMAStateManager {
+	return &SMAStateManager{
+		cacheKey:  cacheKey,
+		period:    period,
+		buf:       newForwardBufferE(capacity),
+		evaluator: evaluator,
+	}
+}
+
+func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		if bar < s.period-1 {
+			return math.NaN(), nil
+		}
+		sum := 0.0
+		for i := 0; i < s.period; i++ {
+			v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar-s.period+1+i)
+			if err != nil {
+				return math.NaN(), err
+			}
+			sum += v
+		}
+		return sum / float64(s.period), nil
+	}); err != nil {
+		return math.NaN(), err
+	}
+	return s.buf.at(barIdx), nil
+}
+
+// ── EMA ───────────────────────────────────────────────────────────────────────
 
 type EMAStateManager struct {
 	cacheKey   string
 	period     int
-	prevEMA    float64
 	multiplier float64
-	computed   int
+	buf        forwardBufferE
+	evaluator  BarEvaluator
 }
+
+func newEMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *EMAStateManager {
+	return &EMAStateManager{
+		cacheKey:   cacheKey,
+		period:     period,
+		multiplier: 2.0 / float64(period+1),
+		buf:        newForwardBufferE(capacity),
+		evaluator:  evaluator,
+	}
+}
+
+func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar)
+		if err != nil {
+			return math.NaN(), err
+		}
+		switch {
+		case bar == 0:
+			return v, nil
+		case bar < s.period:
+			return (s.buf.prev()*float64(bar) + v) / float64(bar+1), nil
+		default:
+			return v*s.multiplier + s.buf.prev()*(1-s.multiplier), nil
+		}
+	}); err != nil {
+		return math.NaN(), err
+	}
+	if barIdx < s.period-1 {
+		return math.NaN(), nil
+	}
+	return s.buf.at(barIdx), nil
+}
+
+// ── RMA ───────────────────────────────────────────────────────────────────────
 
 type RMAStateManager struct {
-	cacheKey string
-	period   int
-	prevRMA  float64
-	computed int
+	cacheKey  string
+	period    int
+	buf       forwardBufferE
+	evaluator BarEvaluator
 }
+
+func newRMAStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *RMAStateManager {
+	return &RMAStateManager{
+		cacheKey:  cacheKey,
+		period:    period,
+		buf:       newForwardBufferE(capacity),
+		evaluator: evaluator,
+	}
+}
+
+func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		v, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar)
+		if err != nil {
+			return math.NaN(), err
+		}
+		switch {
+		case bar == 0:
+			return v, nil
+		case bar < s.period:
+			return (s.buf.prev()*float64(bar) + v) / float64(bar+1), nil
+		default:
+			alpha := 1.0 / float64(s.period)
+			return alpha*v + (1-alpha)*s.buf.prev(), nil
+		}
+	}); err != nil {
+		return math.NaN(), err
+	}
+	if barIdx < s.period-1 {
+		return math.NaN(), nil
+	}
+	return s.buf.at(barIdx), nil
+}
+
+// ── RSI ───────────────────────────────────────────────────────────────────────
 
 type RSIStateManager struct {
-	cacheKey string
-	period   int
-	rmaGain  *RMAStateManager
-	rmaLoss  *RMAStateManager
-	computed int
+	cacheKey    string
+	period      int
+	prevAvgGain float64
+	prevAvgLoss float64
+	buf         forwardBufferE
+	evaluator   BarEvaluator
 }
 
-func NewTAStateManager(cacheKey string, period int, capacity int) TAStateManager {
-	if contains(cacheKey, "sma") {
-		return &SMAStateManager{
-			cacheKey: cacheKey,
-			period:   period,
-			buffer:   make([]float64, period),
-			computed: 0,
-		}
+func newRSIStateManager(cacheKey string, period, capacity int, evaluator BarEvaluator) *RSIStateManager {
+	return &RSIStateManager{
+		cacheKey:  cacheKey,
+		period:    period,
+		buf:       newForwardBufferE(capacity),
+		evaluator: evaluator,
 	}
-
-	if contains(cacheKey, "ema") {
-		multiplier := 2.0 / float64(period+1)
-		return &EMAStateManager{
-			cacheKey:   cacheKey,
-			period:     period,
-			multiplier: multiplier,
-			computed:   0,
-		}
-	}
-
-	if contains(cacheKey, "rma") {
-		return &RMAStateManager{
-			cacheKey: cacheKey,
-			period:   period,
-			computed: 0,
-		}
-	}
-
-	if contains(cacheKey, "rsi") {
-		return &RSIStateManager{
-			cacheKey: cacheKey,
-			period:   period,
-			rmaGain: &RMAStateManager{
-				cacheKey: cacheKey + "_gain",
-				period:   period,
-				computed: 0,
-			},
-			rmaLoss: &RMAStateManager{
-				cacheKey: cacheKey + "_loss",
-				period:   period,
-				computed: 0,
-			},
-			computed: 0,
-		}
-	}
-
-	if contains(cacheKey, "atr") {
-		return NewATRStateManager(cacheKey, period)
-	}
-
-	if contains(cacheKey, "stdev") {
-		return NewSTDEVStateManager(cacheKey, period)
-	}
-
-	panic(fmt.Sprintf("unknown TA function in cache key: %s", cacheKey))
 }
 
-func (s *SMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	/* Fill buffer up to requested bar */
-	for s.computed <= barIdx {
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
-		if err != nil {
-			return math.NaN(), err
-		}
-
-		idx := s.computed % s.period
-		s.buffer[idx] = sourceVal
-		s.computed++
+func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceExpr ast.Expression, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+		s.prevAvgGain = 0
+		s.prevAvgLoss = 0
 	}
-
-	if barIdx < s.period-1 {
-		return math.NaN(), nil
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		return s.evalBar(secCtx, sourceExpr, bar)
+	}); err != nil {
+		return math.NaN(), err
 	}
-
-	/* Compute SMA using the last `period` bars ending at barIdx */
-	sum := 0.0
-	for i := 0; i < s.period; i++ {
-		barOffset := barIdx - s.period + 1 + i
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, barOffset)
-		if err != nil {
-			return math.NaN(), err
-		}
-		sum += sourceVal
-	}
-
-	return sum / float64(s.period), nil
-}
-
-func (s *EMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
-		if err != nil {
-			return math.NaN(), err
-		}
-
-		if s.computed == 0 {
-			s.prevEMA = sourceVal
-		} else if s.computed < s.period {
-			s.prevEMA = (s.prevEMA*float64(s.computed) + sourceVal) / float64(s.computed+1)
-		} else {
-			s.prevEMA = (sourceVal * s.multiplier) + (s.prevEMA * (1 - s.multiplier))
-		}
-
-		s.computed++
-	}
-
-	if barIdx < s.period-1 {
-		return math.NaN(), nil
-	}
-
-	return s.prevEMA, nil
-}
-
-func (s *RMAStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		sourceVal, err := evaluateOHLCVAtBar(sourceID, secCtx, s.computed)
-		if err != nil {
-			return math.NaN(), err
-		}
-
-		if s.computed == 0 {
-			s.prevRMA = sourceVal
-		} else if s.computed < s.period {
-			s.prevRMA = (s.prevRMA*float64(s.computed) + sourceVal) / float64(s.computed+1)
-		} else {
-			alpha := 1.0 / float64(s.period)
-			s.prevRMA = alpha*sourceVal + (1-alpha)*s.prevRMA
-		}
-
-		s.computed++
-	}
-
-	if barIdx < s.period-1 {
-		return math.NaN(), nil
-	}
-
-	return s.prevRMA, nil
-}
-
-func (s *RSIStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
 	if barIdx < s.period {
 		return math.NaN(), nil
 	}
+	return s.buf.at(barIdx), nil
+}
 
-	var prevSource float64
-	if barIdx > 0 {
-		val, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx-1)
-		if err != nil {
-			return math.NaN(), err
-		}
-		prevSource = val
+func (s *RSIStateManager) evalBar(secCtx *context.Context, sourceExpr ast.Expression, bar int) (float64, error) {
+	if bar < s.period {
+		return math.NaN(), nil
 	}
-
-	currentSource, err := evaluateOHLCVAtBar(sourceID, secCtx, barIdx)
+	prev, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar-1)
 	if err != nil {
 		return math.NaN(), err
 	}
-
-	change := currentSource - prevSource
-	gain := 0.0
-	loss := 0.0
-
-	if change > 0 {
-		gain = change
-	} else {
-		loss = -change
+	curr, err := s.evaluator.EvaluateAtBar(sourceExpr, secCtx, bar)
+	if err != nil {
+		return math.NaN(), err
 	}
-
-	avgGain := s.rmaGain.prevRMA
-	avgLoss := s.rmaLoss.prevRMA
-
-	if s.computed == 0 {
-		avgGain = gain
-		avgLoss = loss
-	} else if s.computed < s.period {
-		avgGain = (avgGain*float64(s.computed) + gain) / float64(s.computed+1)
-		avgLoss = (avgLoss*float64(s.computed) + loss) / float64(s.computed+1)
-	} else {
+	change := curr - prev
+	gain := math.Max(change, 0)
+	loss := math.Max(-change, 0)
+	storageIdx := bar - s.period
+	var avgGain, avgLoss float64
+	switch {
+	case storageIdx == 0:
+		avgGain, avgLoss = gain, loss
+	case storageIdx < s.period:
+		avgGain = (s.prevAvgGain*float64(storageIdx) + gain) / float64(storageIdx+1)
+		avgLoss = (s.prevAvgLoss*float64(storageIdx) + loss) / float64(storageIdx+1)
+	default:
 		alpha := 1.0 / float64(s.period)
-		avgGain = alpha*gain + (1-alpha)*avgGain
-		avgLoss = alpha*loss + (1-alpha)*avgLoss
+		avgGain = alpha*gain + (1-alpha)*s.prevAvgGain
+		avgLoss = alpha*loss + (1-alpha)*s.prevAvgLoss
 	}
-
-	s.rmaGain.prevRMA = avgGain
-	s.rmaLoss.prevRMA = avgLoss
-	s.computed++
-
+	s.prevAvgGain = avgGain
+	s.prevAvgLoss = avgLoss
 	if avgLoss == 0 {
 		return 100.0, nil
 	}
-
 	rs := avgGain / avgLoss
-	rsi := 100.0 - (100.0 / (1.0 + rs))
+	return 100.0 - (100.0 / (1.0 + rs)), nil
+}
 
-	return rsi, nil
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+func NewTAStateManager(cacheKey string, period int, capacity int, evaluator BarEvaluator) TAStateManager {
+	switch {
+	case contains(cacheKey, "sma"):
+		return newSMAStateManager(cacheKey, period, capacity, evaluator)
+	case contains(cacheKey, "ema"):
+		return newEMAStateManager(cacheKey, period, capacity, evaluator)
+	case contains(cacheKey, "rma"):
+		return newRMAStateManager(cacheKey, period, capacity, evaluator)
+	case contains(cacheKey, "rsi"):
+		return newRSIStateManager(cacheKey, period, capacity, evaluator)
+	case contains(cacheKey, "atr"):
+		return NewATRStateManager(cacheKey, period, capacity)
+	case contains(cacheKey, "stdev"):
+		return NewSTDEVStateManager(cacheKey, period, capacity, evaluator)
+	default:
+		panic(fmt.Sprintf("unknown TA function in cache key: %s", cacheKey))
+	}
 }
 
 func contains(s, substr string) bool {

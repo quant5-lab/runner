@@ -15,7 +15,7 @@ func NewValueHandler() *ValueHandler {
 
 func (vh *ValueHandler) CanHandle(funcName string) bool {
 	switch funcName {
-	case "na", "nz", "fixnan":
+	case "na", "nz":
 		return true
 	default:
 		return false

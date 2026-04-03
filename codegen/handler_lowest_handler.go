@@ -2,12 +2,10 @@ package codegen
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* LowestHandler generates inline code for lowest value over period */
 type LowestHandler struct{}
 
 func (h *LowestHandler) CanHandle(funcName string) bool {
@@ -15,45 +13,39 @@ func (h *LowestHandler) CanHandle(funcName string) bool {
 }
 
 func (h *LowestHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
+	var sourceExpr ast.Expression
+	var periodResult PeriodEvaluationResult
 	var accessGen AccessGenerator
-	var period int
 
 	if len(call.Arguments) == 1 {
 		periodArg := call.Arguments[0]
-		periodLit, ok := periodArg.(*ast.Literal)
-		if !ok {
-			periodValue := g.constEvaluator.EvaluateConstant(periodArg)
-			if math.IsNaN(periodValue) || periodValue <= 0 {
-				if g.inArrowFunctionBody {
-					period = -1
-				} else {
-					return "", fmt.Errorf("ta.lowest period must be compile-time constant")
-				}
-			} else {
-				period = int(periodValue)
-			}
-		} else {
-			var err error
-			period, err = extractPeriod(periodLit)
-			if err != nil {
-				return "", err
-			}
-		}
-
-		lowIdent := &ast.Identifier{Name: "low"}
+		periodResult = evaluatePeriodExpression(g, periodArg)
+		sourceExpr = &ast.Identifier{Name: "low"}
 		classifier := NewSeriesSourceClassifier()
-		lowInfo := classifier.ClassifyAST(lowIdent)
+		lowInfo := classifier.ClassifyAST(sourceExpr)
 		accessGen = CreateAccessGenerator(lowInfo)
 	} else if len(call.Arguments) >= 2 {
-		extractor := NewTAArgumentExtractor(g)
-		comp, err := extractor.Extract(call, "ta.lowest")
+		sourceExpr = call.Arguments[0]
+		periodArg := call.Arguments[1]
+		periodResult = evaluatePeriodExpression(g, periodArg)
+		classifier := NewSeriesSourceClassifier()
+		sourceInfo := classifier.ClassifyAST(sourceExpr)
+		accessGen = CreateAccessGenerator(sourceInfo)
+	} else {
+		return "", fmt.Errorf("ta.lowest requires 1 or 2 arguments")
+	}
+
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("ta.lowest: %s", periodResult.FailureReason)
+	}
+
+	if periodResult.IsRuntimeDynamic() {
+		dynamicGen := NewDynamicPeriodTAGenerator(g)
+		code, err := dynamicGen.Generate(varName, "ta.lowest", sourceExpr, periodResult)
 		if err != nil {
 			return "", err
 		}
-		accessGen = comp.AccessGen
-		period = comp.Period
-	} else {
-		return "", fmt.Errorf("ta.lowest requires 1 or 2 arguments")
+		return g.indentCode(code), nil
 	}
 
 	registry := NewInlineTAIIFERegistry()
@@ -62,7 +54,7 @@ func (h *LowestHandler) GenerateCode(g *generator, varName string, call *ast.Cal
 	if len(call.Arguments) > 0 {
 		sourceHash = hasher.Hash(call.Arguments[0])
 	}
-	iifeCode, ok := registry.Generate("ta.lowest", accessGen, NewConstantPeriod(period), sourceHash)
+	iifeCode, ok := registry.Generate("ta.lowest", accessGen, NewConstantPeriod(periodResult.StaticValue), sourceHash)
 	if !ok {
 		return "", fmt.Errorf("ta.lowest IIFE generation failed")
 	}

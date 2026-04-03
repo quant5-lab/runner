@@ -1,0 +1,55 @@
+//@version=5
+strategy("Conditional Accumulation Strategy", overlay=true)
+
+// Count bullish/bearish bars using for loops
+lookback = input.int(20, "Lookback Period", minval=5)
+threshold = input.float(0.6, "Bullish Threshold", minval=0.5, maxval=1.0, step=0.05)
+
+// Count bullish bars in lookback period
+countBullish(len) =>
+    count = 0
+    for i = 0 to len - 1
+        if close[i] > open[i]
+            count := count + 1
+    count
+
+// Calculate average gain of bullish bars
+avgBullishGain(len) =>
+    sumGain = 0.0
+    count = 0
+    for i = 0 to len - 1
+        if close[i] > open[i]
+            gain = ((close[i] - open[i]) / open[i]) * 100
+            sumGain := sumGain + gain
+            count := count + 1
+    count > 0 ? sumGain / count : 0.0
+
+// Calculate bullish strength
+bullishCount = countBullish(lookback)
+bullishRatio = bullishCount / lookback
+avgGain = avgBullishGain(lookback)
+
+// Entry logic
+longCondition = bullishRatio > threshold and avgGain > 0.5
+shortCondition = bullishRatio < (1 - threshold) and avgGain < -0.5
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+    label.new(bar_index, low, "LONG\n" + str.tostring(math.round(bullishRatio * 100, 0)) + "%", 
+              style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+    label.new(bar_index, high, "SHORT\n" + str.tostring(math.round(bullishRatio * 100, 0)) + "%", 
+              style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+
+// Exit when ratio normalizes
+if strategy.position_size > 0 and bullishRatio < 0.5
+    strategy.close("Long")
+
+if strategy.position_size < 0 and bullishRatio > 0.5
+    strategy.close("Short")
+
+// Plot indicators
+plot(bullishRatio, "Bullish Ratio", color=color.new(color.blue, 0), display=display.none)
+plot(avgGain, "Avg Bullish Gain", color=color.new(color.green, 0), display=display.none)

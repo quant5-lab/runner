@@ -1,358 +1,308 @@
 package codegen
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
 )
 
-func TestBuiltinTrueRangeAccessor_GenerateLoopValueAccess(t *testing.T) {
+// TestBuiltinTrueRangeAccessor_CodeGeneration covers all three generate methods:
+// the IIFE structure, the three-component true-range formula, and the bar-0 NaN
+// guard required by Pine's ta.tr default (handle_na=false, no previous close).
+func TestBuiltinTrueRangeAccessor_CodeGeneration(t *testing.T) {
 	accessor := NewBuiltinTrueRangeAccessor()
 
-	tests := []struct {
-		name    string
-		loopVar string
-	}{
-		{"loop with j", "j"},
-		{"loop with i", "i"},
-		{"loop with idx", "idx"},
-	}
+	t.Run("GenerateLoopValueAccess", func(t *testing.T) {
+		for _, loopVar := range []string{"j", "i", "idx", "0"} {
+			result := accessor.GenerateLoopValueAccess(loopVar)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := accessor.GenerateLoopValueAccess(tt.loopVar)
-
-			/* Verify inline IIFE with loop offset */
-			expectedComponents := []string{
+			requiredParts := []string{
 				"func() float64",
-				"barIdx := ctx.BarIndex-" + tt.loopVar,
-				"math.Max",
-				"High", "Low", "Close",
+				"barIdx := ctx.BarIndex-" + loopVar,
+				"if barIdx < 1 { return math.NaN() }",
+				"prevClose := ctx.Data[barIdx-1].Close",
+				"currentBar := ctx.Data[barIdx]",
+				"math.Max(currentBar.High - currentBar.Low",
+				"math.Abs(currentBar.High - prevClose)",
+				"math.Abs(currentBar.Low - prevClose)",
 			}
-
-			for _, component := range expectedComponents {
-				if !contains(result, component) {
-					t.Errorf("GenerateLoopValueAccess(%s) missing expected component: %s\nGot: %s", tt.loopVar, component, result)
+			for _, part := range requiredParts {
+				if !contains(result, part) {
+					t.Errorf("loopVar=%q missing %q\nGot: %s", loopVar, part, result)
 				}
 			}
-
-			/* Verify first bar edge case handling */
-			if !contains(result, "if barIdx < 1") {
-				t.Errorf("GenerateLoopValueAccess(%s) missing first bar check\nGot: %s", tt.loopVar, result)
-			}
-		})
-	}
-}
-
-func TestBuiltinTrueRangeAccessor_GenerateInitialValueAccess(t *testing.T) {
-	accessor := NewBuiltinTrueRangeAccessor()
-
-	tests := []struct {
-		name   string
-		period int
-	}{
-		{"period 14", 14},
-		{"period 20", 20},
-		{"period 1", 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := accessor.GenerateInitialValueAccess(tt.period)
-
-			/* Verify inline IIFE with period offset */
-			expectedComponents := []string{
-				"func() float64",
-				"math.Max",
-				"High", "Low", "Close",
-			}
-
-			for _, component := range expectedComponents {
-				if !contains(result, component) {
-					t.Errorf("GenerateInitialValueAccess(%d) missing expected component: %s\nGot: %s", tt.period, component, result)
-				}
-			}
-
-			/* Verify first bar edge case handling */
-			if !contains(result, "if barIdx < 1") {
-				t.Errorf("GenerateInitialValueAccess(%d) missing first bar check\nGot: %s", tt.period, result)
-			}
-		})
-	}
-}
-
-func TestBuiltinTrueRangeAccessor_EdgeCases(t *testing.T) {
-	accessor := NewBuiltinTrueRangeAccessor()
-
-	t.Run("Loop access with offset 0", func(t *testing.T) {
-		result := accessor.GenerateLoopValueAccess("0")
-		if !contains(result, "barIdx := ctx.BarIndex-0") {
-			t.Errorf("GenerateLoopValueAccess(0) should handle zero offset correctly\nGot: %s", result)
 		}
 	})
 
-	t.Run("Initial value with period 1", func(t *testing.T) {
-		result := accessor.GenerateInitialValueAccess(1)
-		/* Period 1 means offset 0, should still have tr calculation */
-		if !contains(result, "math.Max") {
-			t.Errorf("GenerateInitialValueAccess(1) should generate tr calculation\nGot: %s", result)
-		}
-	})
-}
+	t.Run("GenerateInitialValueAccess embeds period-1 offset", func(t *testing.T) {
+		for _, period := range []int{1, 5, 14, 20} {
+			result := accessor.GenerateInitialValueAccess(period)
+			offset := fmt.Sprintf("%d", period-1)
 
-func TestBuiltinTrueRangeAccessor_FirstBarFormula(t *testing.T) {
-	accessor := NewBuiltinTrueRangeAccessor()
-
-	t.Run("First bar uses High-Low", func(t *testing.T) {
-		result := accessor.GenerateLoopValueAccess("j")
-
-		/* Verify first bar formula: High - Low */
-		if !contains(result, "return ctx.Data[barIdx].High - ctx.Data[barIdx].Low") {
-			t.Errorf("First bar case should use High - Low\nGot: %s", result)
+			if !contains(result, "ctx.BarIndex-"+offset) {
+				t.Errorf("period=%d: expected offset ctx.BarIndex-%s\nGot: %s", period, offset, result)
+			}
+			if !contains(result, "math.Max(currentBar.High - currentBar.Low") {
+				t.Errorf("period=%d: missing true-range formula\nGot: %s", period, result)
+			}
+			if !contains(result, "if barIdx < 1 { return math.NaN() }") {
+				t.Errorf("period=%d: missing bar-0 NaN guard\nGot: %s", period, result)
+			}
 		}
 	})
 
-	t.Run("Subsequent bars use max of three components", func(t *testing.T) {
-		result := accessor.GenerateLoopValueAccess("j")
+	t.Run("GenerateCurrentValueAccess", func(t *testing.T) {
+		result := accessor.GenerateCurrentValueAccess()
 
-		/* Verify full true range formula */
-		expectedFormulaParts := []string{
-			"prevClose := ctx.Data[barIdx-1].Close",
+		requiredParts := []string{
+			"func() float64",
+			"if ctx.BarIndex < 1 { return math.NaN() }",
+			"prevClose := ctx.Data[ctx.BarIndex-1].Close",
+			"currentBar := ctx.Data[ctx.BarIndex]",
 			"math.Max(currentBar.High - currentBar.Low",
 			"math.Abs(currentBar.High - prevClose)",
 			"math.Abs(currentBar.Low - prevClose)",
 		}
-
-		for _, part := range expectedFormulaParts {
+		for _, part := range requiredParts {
 			if !contains(result, part) {
-				t.Errorf("True range formula missing component: %s\nGot: %s", part, result)
+				t.Errorf("missing %q\nGot: %s", part, result)
 			}
 		}
 	})
 }
 
-func TestArrowFunctionTACallGenerator_CreateAccessorForTr(t *testing.T) {
-	gen := newTestGenerator()
-	taGen := newTestArrowTAGenerator(gen)
+func TestBuiltinTrueRangeAccessor_InterfaceContracts(t *testing.T) {
+	accessor := NewBuiltinTrueRangeAccessor()
 
-	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
-
-	if err != nil {
-		t.Errorf("createAccessorFromExpression(tr) returned error: %v", err)
+	if got := accessor.GetBaseOffset(); got != 0 {
+		t.Errorf("GetBaseOffset() = %d, want 0", got)
 	}
-
-	if accessor == nil {
-		t.Fatal("createAccessorFromExpression(tr) returned nil accessor")
-	}
-
-	/* Verify correct accessor type */
-	if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
-		t.Errorf("createAccessorFromExpression(tr) returned wrong type: %T, want *BuiltinTrueRangeAccessor", accessor)
+	if got := accessor.GetPreamble(); got != "" {
+		t.Errorf("GetPreamble() = %q, want empty string", got)
 	}
 }
 
-func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
-	gen := newTestGenerator()
-	gen.variables = map[string]string{"my_tr": "float"}
-	taGen := newTestArrowTAGenerator(gen)
+// TestBuiltinTrueRange_NeverGeneratesSeriesAccess enforces that tr always resolves
+// to direct OHLCV indexing — storing tr in a Series would break historical subscript
+// semantics and conflict with the AccessGenerator contract.
+func TestBuiltinTrueRange_NeverGeneratesSeriesAccess(t *testing.T) {
+	handler := NewBuiltinIdentifierHandler()
+	accessor := NewBuiltinTrueRangeAccessor()
 
-	t.Run("tr builtin returns BuiltinTrueRangeAccessor", func(t *testing.T) {
-		trIdentifier := &ast.Identifier{Name: "tr"}
-		accessor, err := taGen.createAccessorFromExpression(trIdentifier)
-
-		if err != nil {
-			t.Fatalf("createAccessorFromExpression(tr) error: %v", err)
-		}
-
-		if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
-			t.Errorf("tr should return BuiltinTrueRangeAccessor, got %T", accessor)
-		}
-	})
-
-	t.Run("my_tr parameter returns ArrowFunctionParameterAccessor", func(t *testing.T) {
-		myTrIdentifier := &ast.Identifier{Name: "my_tr"}
-		accessor, err := taGen.createAccessorFromExpression(myTrIdentifier)
-
-		if err != nil {
-			t.Fatalf("createAccessorFromExpression(my_tr) error: %v", err)
-		}
-
-		if _, ok := accessor.(*ArrowFunctionParameterAccessor); !ok {
-			t.Errorf("my_tr parameter should return ArrowFunctionParameterAccessor, got %T", accessor)
-		}
-	})
-}
-
-func TestBuiltinTrueRange_IntegrationWithTAFunctions(t *testing.T) {
-	/* Test that tr accessor is correctly used in TA function contexts */
-	gen := newTestGenerator()
-	taGen := newTestArrowTAGenerator(gen)
-
-	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
-
-	if err != nil {
-		t.Fatalf("createAccessorFromExpression(tr) error: %v", err)
+	cases := []struct {
+		name   string
+		result func() string
+	}{
+		{"current bar", func() string { return handler.GenerateCurrentBarAccess("tr") }},
+		{"security context", func() string { return handler.GenerateSecurityContextAccess("tr") }},
+		{"historical offset 1", func() string { return handler.GenerateHistoricalAccess("tr", 1) }},
+		{"loop value access", func() string { return accessor.GenerateLoopValueAccess("j") }},
+		{"initial value access", func() string { return accessor.GenerateInitialValueAccess(14) }},
 	}
 
-	t.Run("tr with RMA loop iteration", func(t *testing.T) {
-		loopAccess := accessor.GenerateLoopValueAccess("j")
-
-		/* Verify inline calculation in loop */
-		expectedPatterns := []string{
-			"func() float64",
-			"barIdx := ctx.BarIndex-j",
-			"math.Max",
-			"prevClose",
-		}
-
-		for _, pattern := range expectedPatterns {
-			if !contains(loopAccess, pattern) {
-				t.Errorf("RMA loop access missing pattern: %s", pattern)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.result()
+			if contains(result, "trSeries.Get(") {
+				t.Errorf("generated forbidden trSeries access\nGot: %s", result)
 			}
-		}
-
-		/* Verify NO Series.Get() */
-		if contains(loopAccess, "Series.Get(") || contains(loopAccess, "trSeries") {
-			t.Errorf("RMA loop should not use Series.Get(), got: %s", loopAccess)
-		}
-	})
-
-	t.Run("tr with SMA initial value", func(t *testing.T) {
-		initialAccess := accessor.GenerateInitialValueAccess(20)
-
-		/* Verify inline calculation for initial value */
-		if !contains(initialAccess, "func() float64") {
-			t.Errorf("SMA initial value should generate inline IIFE")
-		}
-
-		if !contains(initialAccess, "math.Max") {
-			t.Errorf("SMA initial value should calculate true range")
-		}
-	})
-}
-
-func TestBuiltinTrueRange_InArrowFunctionContext(t *testing.T) {
-	/* Test tr accessor in arrow function TA call generator */
-	gen := newTestGenerator()
-	taGen := newTestArrowTAGenerator(gen)
-
-	trIdentifier := &ast.Identifier{Name: "tr"}
-	accessor, err := taGen.createAccessorFromExpression(trIdentifier)
-
-	if err != nil {
-		t.Fatalf("Arrow function createAccessorFromExpression(tr) error: %v", err)
-	}
-
-	/* Verify accessor is BuiltinTrueRangeAccessor */
-	if _, ok := accessor.(*BuiltinTrueRangeAccessor); !ok {
-		t.Fatalf("Arrow function should return BuiltinTrueRangeAccessor for tr, got %T", accessor)
-	}
-
-	/* Verify inline tr in arrow context loop */
-	loopCode := accessor.GenerateLoopValueAccess("j")
-
-	expectedPatterns := []string{
-		"func() float64",
-		"barIdx := ctx.BarIndex-j",
-		"math.Max",
-		"prevClose",
-	}
-
-	for _, pattern := range expectedPatterns {
-		if !contains(loopCode, pattern) {
-			t.Errorf("Arrow function tr loop missing pattern: %s", pattern)
-		}
-	}
-
-	/* Critical: Verify NO trSeries.Get() */
-	if contains(loopCode, "trSeries.Get(") || contains(loopCode, "Series.Get(") {
-		t.Errorf("Arrow function should not generate Series.Get() for tr, got: %s", loopCode)
+			if !contains(result, "math.Max") {
+				t.Errorf("missing inline calculation (math.Max)\nGot: %s", result)
+			}
+		})
 	}
 }
 
 func TestBuiltinTrueRange_ConsistencyAcrossContexts(t *testing.T) {
 	handler := NewBuiltinIdentifierHandler()
 
-	t.Run("All contexts generate tr calculation", func(t *testing.T) {
-		contexts := []struct {
-			name   string
-			method func() string
-		}{
-			{"current bar", func() string { return handler.GenerateCurrentBarAccess("tr") }},
-			{"security context", func() string { return handler.GenerateSecurityContextAccess("tr") }},
-			{"historical", func() string { return handler.GenerateHistoricalAccess("tr", 1) }},
-		}
+	cases := []struct {
+		name            string
+		result          func() string
+		extraComponents []string
+	}{
+		{
+			name:            "current bar",
+			result:          func() string { return handler.GenerateCurrentBarAccess("tr") },
+			extraComponents: []string{"bar.High", "bar.Low"},
+		},
+		{
+			name:   "security context",
+			result: func() string { return handler.GenerateSecurityContextAccess("tr") },
+			extraComponents: []string{
+				"highSeries.GetCurrent()",
+				"lowSeries.GetCurrent()",
+			},
+		},
+		{
+			name:   "historical",
+			result: func() string { return handler.GenerateHistoricalAccess("tr", 1) },
+		},
+	}
 
-		for _, ctx := range contexts {
-			t.Run(ctx.name, func(t *testing.T) {
-				result := ctx.method()
-
-				/* All contexts should generate inline calculation */
-				requiredComponents := []string{"math.Max", "High", "Low"}
-				for _, comp := range requiredComponents {
-					if !contains(result, comp) {
-						t.Errorf("%s context missing component: %s\nGot: %s", ctx.name, comp, result)
-					}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.result()
+			if !contains(result, "math.Max") {
+				t.Errorf("%s: missing inline calculation (math.Max)\nGot: %s", c.name, result)
+			}
+			for _, comp := range c.extraComponents {
+				if !contains(result, comp) {
+					t.Errorf("%s: missing %q\nGot: %s", c.name, comp, result)
 				}
-			})
+			}
+		})
+	}
+}
+
+// TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable guards against the
+// accessor factory conflating the tr builtin with same-prefix user variables — the
+// two resolve to different accessor types with incompatible code-generation paths.
+func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
+	gen := newTestGenerator()
+	gen.variables = map[string]string{"my_tr": "float"}
+	taGen := newTestArrowTAGenerator(gen)
+
+	t.Run("bare tr returns BuiltinTrueRangeAccessor", func(t *testing.T) {
+		accessor, err := taGen.accessorFactory.CreateAccessorForExpression(&ast.Identifier{Name: "tr"})
+		if err != nil {
+			t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
+		}
+		if _, ok := accessor.(*TrueRangeAccessGenerator); !ok {
+			t.Errorf("expected TrueRangeAccessGenerator, got %T", accessor)
+		}
+	})
+
+	t.Run("user variable my_tr returns ArrowFunctionParameterAccessor", func(t *testing.T) {
+		accessor, err := taGen.accessorFactory.CreateAccessorForExpression(&ast.Identifier{Name: "my_tr"})
+		if err != nil {
+			t.Fatalf("CreateAccessorForExpression(my_tr) error: %v", err)
+		}
+		if _, ok := accessor.(*ArrowFunctionParameterAccessor); !ok {
+			t.Errorf("expected ArrowFunctionParameterAccessor, got %T", accessor)
 		}
 	})
 }
 
-func TestBuiltinTrueRange_NeverGeneratesSeriesAccess(t *testing.T) {
-	/* Regression test: tr should NEVER generate Series.Get() calls */
-	handler := NewBuiltinIdentifierHandler()
-	accessor := NewBuiltinTrueRangeAccessor()
+func TestBuiltinTrueRange_InTACallContexts(t *testing.T) {
+	gen := newTestGenerator()
+	taGen := newTestArrowTAGenerator(gen)
 
-	tests := []struct {
-		name   string
-		method func() string
-	}{
-		{
-			"current bar",
-			func() string { return handler.GenerateCurrentBarAccess("tr") },
-		},
-		{
-			"security context",
-			func() string { return handler.GenerateSecurityContextAccess("tr") },
-		},
-		{
-			"historical offset 1",
-			func() string { return handler.GenerateHistoricalAccess("tr", 1) },
-		},
-		{
-			"loop value access",
-			func() string { return accessor.GenerateLoopValueAccess("j") },
-		},
-		{
-			"initial value access",
-			func() string { return accessor.GenerateInitialValueAccess(14) },
-		},
+	accessor, err := taGen.accessorFactory.CreateAccessorForExpression(&ast.Identifier{Name: "tr"})
+	if err != nil {
+		t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tt.method()
-
-			/* Verify NO Series.Get() pattern */
-			forbiddenPatterns := []string{
-				"trSeries.Get(",
-				".Get(tr",
-				"Series.Get(",
-			}
-
-			for _, pattern := range forbiddenPatterns {
-				if contains(result, pattern) {
-					t.Errorf("%s generated forbidden Series access pattern: %s\nGot: %s", tt.name, pattern, result)
-				}
-			}
-
-			/* Verify inline calculation markers present */
-			if !contains(result, "math.Max") {
-				t.Errorf("%s should generate inline calculation with math.Max\nGot: %s", tt.name, result)
-			}
-		})
+	if _, ok := accessor.(*TrueRangeAccessGenerator); !ok {
+		t.Fatalf("expected TrueRangeAccessGenerator, got %T", accessor)
 	}
+
+	t.Run("loop access is inline with no Series.Get", func(t *testing.T) {
+		code := accessor.GenerateLoopValueAccess("j")
+		for _, required := range []string{"func() float64", "idx := ctx.BarIndex - j", "math.Max", "pc"} {
+			if !contains(code, required) {
+				t.Errorf("missing %q in loop access\nGot: %s", required, code)
+			}
+		}
+		if contains(code, "Series.Get(") || contains(code, "trSeries") {
+			t.Errorf("loop access must not reference a stored series\nGot: %s", code)
+		}
+	})
+
+	t.Run("initial value access is inline", func(t *testing.T) {
+		code := accessor.GenerateInitialValueAccess(20)
+		if !contains(code, "func() float64") {
+			t.Errorf("initial value access missing IIFE wrapper\nGot: %s", code)
+		}
+		if !contains(code, "math.Max") {
+			t.Errorf("initial value access missing true-range formula\nGot: %s", code)
+		}
+	})
+
+	t.Run("current value access is inline", func(t *testing.T) {
+		code := accessor.GenerateCurrentValueAccess()
+		if !contains(code, "func() float64") {
+			t.Errorf("current value access missing IIFE wrapper\nGot: %s", code)
+		}
+		if !contains(code, "math.Max") {
+			t.Errorf("current value access missing true-range formula\nGot: %s", code)
+		}
+	})
+}
+
+// TestTrueRangeAccessGenerator_HandleNASemantics covers TrueRangeAccessGenerator,
+// which mirrors Pine's ta.tr(true) (handle_na=true): bar 0 returns high−low because
+// there is no previous close to exclude, so the range is unambiguous.
+func TestTrueRangeAccessGenerator_HandleNASemantics(t *testing.T) {
+	g := NewTrueRangeAccessGenerator()
+
+	t.Run("bar 0 returns high minus low, not NaN", func(t *testing.T) {
+		code := g.GenerateCurrentValueAccess()
+		if contains(code, "return math.NaN()") {
+			t.Errorf("TrueRangeAccessGenerator must not return NaN on bar 0\nGot: %s", code)
+		}
+		if !contains(code, "return h - l") {
+			t.Errorf("TrueRangeAccessGenerator must return h-l on bar 0\nGot: %s", code)
+		}
+		if !contains(code, "if idx == 0") {
+			t.Errorf("missing bar-0 branch 'if idx == 0'\nGot: %s", code)
+		}
+	})
+
+	t.Run("normal bars apply full three-component formula", func(t *testing.T) {
+		code := g.GenerateLoopValueAccess("j")
+		for _, part := range []string{"math.Max(h-l", "math.Abs(h-pc)", "math.Abs(l-pc)"} {
+			if !contains(code, part) {
+				t.Errorf("missing formula component %q\nGot: %s", part, code)
+			}
+		}
+	})
+
+	t.Run("GetBaseOffset is 0", func(t *testing.T) {
+		if got := g.GetBaseOffset(); got != 0 {
+			t.Errorf("GetBaseOffset() = %d, want 0", got)
+		}
+	})
+}
+
+// TestTrueRangeAccessors_Bar0SemanticContrast enforces the semantic split between the
+// two TR accessor types at bar 0, which must be preserved to match Pine's behavior:
+//
+//   - BuiltinTrueRangeAccessor (user-facing ta.tr, handle_na=false) → NaN on bar 0
+//   - TrueRangeAccessGenerator (internal ta.atr seed, handle_na=true) → high−low on bar 0
+func TestTrueRangeAccessors_Bar0SemanticContrast(t *testing.T) {
+	handleNAFalse := NewBuiltinTrueRangeAccessor()
+	handleNATrue := NewTrueRangeAccessGenerator()
+
+	t.Run("handle_na=false bar 0 is NaN", func(t *testing.T) {
+		code := handleNAFalse.GenerateCurrentValueAccess()
+		if !contains(code, "return math.NaN()") {
+			t.Errorf("BuiltinTrueRangeAccessor bar 0 must return math.NaN()\nGot: %s", code)
+		}
+	})
+
+	t.Run("handle_na=true bar 0 is high minus low", func(t *testing.T) {
+		code := handleNATrue.GenerateCurrentValueAccess()
+		if contains(code, "return math.NaN()") {
+			t.Errorf("TrueRangeAccessGenerator must not return NaN on bar 0\nGot: %s", code)
+		}
+		if !contains(code, "return h - l") {
+			t.Errorf("TrueRangeAccessGenerator must return h-l on bar 0\nGot: %s", code)
+		}
+	})
+
+	t.Run("normal bars share identical three-component formula structure", func(t *testing.T) {
+		falseCode := handleNAFalse.GenerateLoopValueAccess("j")
+		trueCode := handleNATrue.GenerateLoopValueAccess("j")
+
+		for _, code := range []string{falseCode, trueCode} {
+			if !contains(code, "math.Max") {
+				t.Errorf("normal bar formula missing math.Max\nGot: %s", code)
+			}
+			if !contains(code, "math.Abs") {
+				t.Errorf("normal bar formula missing math.Abs\nGot: %s", code)
+			}
+		}
+	})
 }

@@ -1,0 +1,32 @@
+//@version=5
+strategy("Triple EMA Crossover", shorttitle="3EMA", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=1000000, commission_type=strategy.commission.percent, commission_value=0.1)
+
+// Triple EMA crossover: Fast=9, Med=21, Slow=50
+// Entry: Fast crosses Med while both above Slow
+// Exit: Fast crosses below Med
+
+emaFast = ta.ema(close, 9)
+emaMed = ta.ema(close, 21)
+emaSlow = ta.ema(close, 50)
+
+plot(emaFast, "EMA 9", color=color.blue, linewidth=2)
+plot(emaMed, "EMA 21", color=color.orange, linewidth=2)
+plot(emaSlow, "EMA 50", color=color.red, linewidth=2)
+
+// Long: Fast crosses above Med, both above Slow
+fastAboveMed = ta.crossover(emaFast, emaMed)
+trendBullish = emaFast > emaSlow and emaMed > emaSlow
+longCondition = fastAboveMed and trendBullish
+
+// Exit: Fast crosses below Med
+fastBelowMed = ta.crossunder(emaFast, emaMed)
+
+if longCondition
+    strategy.entry("Long", strategy.long, comment="3EMA Long")
+
+if fastBelowMed
+    strategy.close("Long", comment="EMA Exit")
+
+// Visual signals
+plotshape(longCondition, "Buy", shape.triangleup, location.belowbar, color=color.green, size=size.small)
+plotshape(fastBelowMed and strategy.position_size > 0, "Sell", shape.triangledown, location.abovebar, color=color.red, size=size.small)

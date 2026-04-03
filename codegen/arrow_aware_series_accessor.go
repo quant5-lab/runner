@@ -33,9 +33,18 @@ func (a *ArrowAwareSeriesAccessor) GenerateInitialValueAccess(period int) string
 	return fmt.Sprintf("%sSeries.Get(%d-1)", a.seriesName, period)
 }
 
+func (a *ArrowAwareSeriesAccessor) GenerateCurrentValueAccess() string {
+	return fmt.Sprintf("%sSeries.GetCurrent()", a.seriesName)
+}
+
 /*
 GetPreamble returns any setup code needed before the accessor is used.
 */
 func (a *ArrowAwareSeriesAccessor) GetPreamble() string {
 	return ""
+}
+
+/* GetBaseOffset returns 0 - arrow-aware series access is current bar relative */
+func (a *ArrowAwareSeriesAccessor) GetBaseOffset() int {
+	return 0
 }

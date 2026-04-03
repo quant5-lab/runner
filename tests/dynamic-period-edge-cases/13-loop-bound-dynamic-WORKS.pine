@@ -1,0 +1,9 @@
+//@version=5
+// TEST: Dynamic loop bound - WORKS
+// Note: For loop bounds accept dynamic values
+indicator("Dynamic loop: for i = 0 to getCount()")
+getCount() => 10
+sum = 0.0
+for i = 0 to getCount()
+    sum := sum + close[i]
+plot(sum)

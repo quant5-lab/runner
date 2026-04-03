@@ -259,15 +259,15 @@ func TestStringVariableVsFloatVariable(t *testing.T) {
 		t.Error("String variable should suppress unused warning")
 	}
 
-	/* Float variable checks */
+	/* Bool variable checks */
 	if !strings.Contains(body, "var signalSeries *series.Series") {
 		t.Error("Bool variable should declare as Series")
 	}
 	if strings.Contains(body, "var signal string") {
 		t.Error("Bool variable should NOT be string type")
 	}
-	if !strings.Contains(body, "signalSeries = series.NewSeries") {
-		t.Error("Bool variable should initialize Series")
+	if !strings.Contains(body, "signalSeries = series.NewBoolSeries") {
+		t.Error("Bool variable should initialize with NewBoolSeries")
 	}
 	if !strings.Contains(body, "_ = signalSeries") {
 		t.Error("Bool variable should suppress Series unused warning")

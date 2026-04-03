@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// ConstantRegistry manages Pine input constants (input.float, input.int, input.bool, input.string).
+// ConstantRegistry manages Pine input constants (input.float, input.int, input.bool, input.string, input.session).
 // Single source of truth for constant values during code generation.
 type ConstantRegistry struct {
 	constants map[string]interface{}
@@ -44,12 +44,16 @@ func (cr *ConstantRegistry) ExtractFromGeneratedCode(code string) interface{} {
 	var floatVal float64
 	var intVal int
 	var boolVal bool
+	var stringVal string
 
 	if _, err := fmt.Sscanf(code, "const %s = %f", &varName, &floatVal); err == nil {
 		return floatVal
 	}
 	if _, err := fmt.Sscanf(code, "const %s = %d", &varName, &intVal); err == nil {
 		return intVal
+	}
+	if n, err := fmt.Sscanf(code, "const %s = %q", &varName, &stringVal); n == 2 && err == nil {
+		return stringVal
 	}
 	if _, err := fmt.Sscanf(code, "const %s = %t", &varName, &boolVal); err == nil {
 		return boolVal

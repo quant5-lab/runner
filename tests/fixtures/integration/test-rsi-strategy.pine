@@ -1,0 +1,32 @@
+//@version=5
+strategy("RSI Strategy Test", overlay=false)
+
+// Test RSI in strategy context with entry/exit conditions
+
+rsiValue = ta.rsi(close, 14)
+
+// Test 1: Simple RSI threshold entries
+longCondition = rsiValue < 30
+shortCondition = rsiValue > 70
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+// Test 2: RSI exit conditions
+exitLong = rsiValue > 50
+exitShort = rsiValue < 50
+
+if exitLong
+    strategy.close("Long")
+
+if exitShort
+    strategy.close("Short")
+
+plot(rsiValue, "RSI", color=color.blue)
+hline(30, "Oversold", color=color.green)
+hline(70, "Overbought", color=color.red)
+hline(50, "Midline", color=color.gray)
+

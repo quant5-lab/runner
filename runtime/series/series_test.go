@@ -1,6 +1,7 @@
 package series
 
 import (
+	"math"
 	"testing"
 )
 
@@ -17,12 +18,29 @@ func TestNewSeries(t *testing.T) {
 }
 
 func TestNewSeriesInvalidCapacity(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic for zero capacity")
-		}
-	}()
-	NewSeries(0)
+	for _, cap := range []int{0, -1, -100} {
+		func(c int) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("NewSeries(%d): expected panic", c)
+				}
+			}()
+			NewSeries(c)
+		}(cap)
+	}
+}
+
+func TestNewBoolSeriesInvalidCapacity(t *testing.T) {
+	for _, cap := range []int{0, -1, -100} {
+		func(c int) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("NewBoolSeries(%d): expected panic", c)
+				}
+			}()
+			NewBoolSeries(c)
+		}(cap)
+	}
 }
 
 func TestSeriesSetGet(t *testing.T) {
@@ -61,14 +79,14 @@ func TestSeriesSetGet(t *testing.T) {
 func TestSeriesWarmupPeriod(t *testing.T) {
 	s := NewSeries(10)
 
-	// Bar 0: no history, Get(1) should return 0.0
+	// Bar 0: no history, Get(1) should return NaN (PineScript semantics)
 	s.Set(100.0)
-	if got := s.Get(1); got != 0.0 {
-		t.Errorf("Warmup: expected 0.0 for Get(1) on first bar, got %f", got)
+	if got := s.Get(1); !math.IsNaN(got) {
+		t.Errorf("Warmup: expected NaN for Get(1) on first bar, got %f", got)
 	}
 
-	if got := s.Get(5); got != 0.0 {
-		t.Errorf("Warmup: expected 0.0 for Get(5) on first bar, got %f", got)
+	if got := s.Get(5); !math.IsNaN(got) {
+		t.Errorf("Warmup: expected NaN for Get(5) on first bar, got %f", got)
 	}
 }
 
@@ -221,6 +239,78 @@ func TestSeriesLength(t *testing.T) {
 	s.Next()
 	if s.Length() != 3 {
 		t.Errorf("After 2 Next: expected 3, got %d", s.Length())
+	}
+}
+
+func TestBoolSeriesPreHistory(t *testing.T) {
+	tests := []struct {
+		name       string
+		barsToFill int
+		offset     int
+	}{
+		{"bar 0 adjacent offset", 1, 1},
+		{"bar 0 large offset", 1, 50},
+		{"bar 2 just past boundary", 3, 4},
+		{"bar 2 deep offset", 3, 20},
+		{"bar 9 just past boundary", 10, 11},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewBoolSeries(100)
+			for i := 0; i < tt.barsToFill; i++ {
+				s.Set(1.0)
+				if i < tt.barsToFill-1 {
+					s.Next()
+				}
+			}
+			if got := s.Get(tt.offset); got != 0.0 {
+				t.Errorf("Get(%d) at cursor %d: expected 0.0 (false), got %f",
+					tt.offset, tt.barsToFill-1, got)
+			}
+		})
+	}
+}
+
+func TestBoolSeriesHistoryBoundary(t *testing.T) {
+	tests := []struct {
+		name       string
+		barsToFill int
+		bar0Value  float64
+	}{
+		{"1 bar", 1, 1.0},
+		{"3 bars", 3, 1.0},
+		{"5 bars", 5, 1.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewBoolSeries(100)
+			s.Set(tt.bar0Value)
+			for i := 1; i < tt.barsToFill; i++ {
+				s.Next()
+				s.Set(0.0)
+			}
+			cursor := tt.barsToFill - 1
+
+			if got := s.Get(cursor); got != tt.bar0Value {
+				t.Errorf("last in-history Get(%d): expected %f, got %f",
+					cursor, tt.bar0Value, got)
+			}
+			if got := s.Get(cursor + 1); got != 0.0 {
+				t.Errorf("first pre-history Get(%d): expected 0.0 (false), got %f",
+					cursor+1, got)
+			}
+		})
+	}
+}
+
+func TestNewSeries_PreHistoryRemainsNaN(t *testing.T) {
+	s := NewSeries(10)
+
+	s.Set(42.0)
+	if got := s.Get(1); !math.IsNaN(got) {
+		t.Errorf("NewSeries pre-history must remain NaN, got %f", got)
 	}
 }
 

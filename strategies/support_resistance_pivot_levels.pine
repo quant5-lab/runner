@@ -1,0 +1,183 @@
+//@version=5
+indicator("Support Resistance Pivot Levels", overlay=true, max_lines_count=500, max_labels_count=500)
+
+//=== Pivot Detection Settings ===
+pivotTimeframe = input.string("15m", title="Pivot Timeframe", options=["1m", "3m", "5m", "10m", "15m", "30m", "45m", "1h", "2h", "3h", "4h", "D", "W"], group='Pivot Settings', tooltip='Timeframe for pivot detection')
+leftBarsForPivot = input.int(defval=3, title="Left Bars", minval=1, group='Pivot Settings', tooltip='Number of bars to the left to confirm pivot')
+rightBarsForPivot = input.int(defval=2, title="Right Bars", minval=1, group='Pivot Settings', tooltip='Number of bars to the right to confirm pivot')
+removeOnCloseEnabled = input.bool(defval=false, title="Remove On Close (ROC)", group='Pivot Settings', tooltip='Remove level only when price closes beyond it')
+rocTimeframe = input.string("15m", title="ROC Timeframe", options=["1m", "3m", "5m", "10m", "15m", "30m", "45m", "1h", "2h", "3h", "4h", "D", "W"], group='Pivot Settings', tooltip='Timeframe for close-based removal')
+waitForBarClose = input.bool(defval=false, title="Wait For Bar Close", group='Pivot Settings', tooltip='Remove level only after current bar closes')
+
+//=== Line Display Settings ===
+showResistance = input(true, title="Show Resistance", group="Line Settings")
+resistanceLineColor = input.color(defval=color.rgb(255, 255, 255), title='Resistance Color', group='Line Settings')
+showSupport = input(true, title="Show Support", group="Line Settings")
+supportLineColor = input.color(defval=color.rgb(255, 255, 255), title='Support Color', group='Line Settings')
+lineExtension = input.string("Current", title="Line Extension", options=["Current", "Left", "Right", "Both"], group='Line Settings')
+barOffset = input.int(defval=15, title="Bar Offset", group='Line Settings', tooltip='Offset in bars from current candle')
+lineStyle = input.string("Solid (─)", title="Line Style", options=["Solid (─)", "Dotted (┈)", "Dashed (╌)", "Arrow Left (←)", "Arrow Right (→)", "Arrows Both (↔)"], group='Line Settings')
+
+//=== Label Settings ===
+showPriceLabel = input.bool(false, title="Show Price Level", group='Label Settings', tooltip='Display price value on label')
+showPerfectBounce = input.bool(defval=false, title="Show Perfect Bounce", group='Label Settings', tooltip='Mark levels with perfect price bounce (PDB/PDT)')
+labelColor = input.color(defval=color.rgb(255, 255, 255), title='Label Color', group='Label Settings')
+labelSize = input.string("Small", title="Label Size", options=["Auto", "Tiny", "Small", "Normal", "Large", "Huge"], group='Label Settings')
+
+//=== Timeframe Conversion ===
+convertTimeframe(tf) =>
+    switch tf
+        '1m' => '1'
+        '3m' => '3'
+        '5m' => '5'
+        '10m' => '10'
+        '15m' => '15'
+        '30m' => '30'
+        '45m' => '45'
+        '1h' => '60'
+        '2h' => '120'
+        '3h' => '180'
+        '4h' => '240'
+        'D' => 'D'
+        'W' => 'W'
+
+pivotTfConverted = convertTimeframe(pivotTimeframe)
+rocTfConverted = convertTimeframe(rocTimeframe)
+
+//=== Style Conversion ===
+extensionStyle = switch lineExtension
+    'Current' => extend.none
+    'Left' => extend.left
+    'Right' => extend.right
+    'Both' => extend.both
+
+lineStyleConverted = switch lineStyle
+    'Solid (─)' => line.style_solid
+    'Dotted (┈)' => line.style_dotted
+    'Dashed (╌)' => line.style_dashed
+    'Arrow Left (←)' => line.style_arrow_left
+    'Arrow Right (→)' => line.style_arrow_right
+    'Arrows Both (↔)' => line.style_arrow_both
+
+labelSizeConverted = switch labelSize
+    'Auto' => size.auto
+    'Tiny' => size.tiny
+    'Small' => size.small
+    'Normal' => size.normal
+    'Large' => size.large
+    'Huge' => size.huge
+
+//=== Time Offset Calculation ===
+timeOffsetMs = barOffset * (1000 * 60 * (timeframe.isseconds ? timeframe.multiplier / 60 : (timeframe.isminutes ? timeframe.multiplier : (timeframe.in_seconds() / 60))))
+futureTime = time + timeOffsetMs
+
+//=== Storage Arrays ===
+var line[] resistanceLines = array.new_line()
+var line[] supportLines = array.new_line()
+var label[] resistanceLabels = array.new_label()
+var label[] supportLabels = array.new_label()
+var float[] resistancePrices = array.new_float()
+var float[] supportPrices = array.new_float()
+
+//=== Pivot Detection and Line Creation ===
+detectAndDrawPivots(tf) =>
+    [pivotHigh, pivotLow] = request.security(syminfo.tickerid, tf, [math.round_to_mintick(ta.pivothigh(leftBarsForPivot, rightBarsForPivot)), math.round_to_mintick(ta.pivotlow(leftBarsForPivot, rightBarsForPivot))], gaps=barmerge.gaps_on)
+    pivotBarTime = time(tf)[rightBarsForPivot]
+    
+    // Create resistance level
+    if not na(pivotHigh) and not array.includes(resistancePrices, pivotHigh)
+        newLine = line.new(x1=pivotBarTime, y1=pivotHigh, x2=futureTime, y2=pivotHigh, extend=extensionStyle, xloc=xloc.bar_time, color=resistanceLineColor, style=lineStyleConverted)
+        array.push(resistanceLines, newLine)
+        array.push(resistancePrices, pivotHigh)
+        if showPriceLabel
+            newLabel = label.new(x=futureTime, y=pivotHigh, style=label.style_none, text=str.tostring(pivotHigh), xloc=xloc.bar_time, textcolor=labelColor, size=labelSizeConverted)
+            array.push(resistanceLabels, newLabel)
+                        
+    // Create support level
+    if not na(pivotLow) and not array.includes(supportPrices, pivotLow)
+        newLine = line.new(x1=pivotBarTime, y1=pivotLow, x2=futureTime, y2=pivotLow, extend=extensionStyle, xloc=xloc.bar_time, color=supportLineColor, style=lineStyleConverted)
+        array.push(supportLines, newLine)
+        array.push(supportPrices, pivotLow)
+        if showPriceLabel
+            newLabel = label.new(x=futureTime, y=pivotLow, style=label.style_none, text=str.tostring(pivotLow), xloc=xloc.bar_time, textcolor=labelColor, size=labelSizeConverted)
+            array.push(supportLabels, newLabel)
+
+//=== Initialize Pivots ===
+if not timeframe.isseconds and timeframe.in_seconds() <= timeframe.in_seconds(pivotTfConverted)
+    detectAndDrawPivots(pivotTfConverted)
+
+//=== Update Resistance Levels ===
+resistanceIdx = 0
+while resistanceIdx < array.size(resistanceLines) and array.size(resistanceLines) > 0
+    currentLine = array.get(resistanceLines, resistanceIdx)
+    levelPrice = line.get_y1(currentLine)
+    
+    priceBreaksLevel = high > levelPrice and not removeOnCloseEnabled
+    closeBreaksLevel = request.security(syminfo.tickerid, rocTfConverted, close) > levelPrice and removeOnCloseEnabled
+    shouldRemove = (priceBreaksLevel or closeBreaksLevel) and ((waitForBarClose and barstate.isconfirmed) or not waitForBarClose)
+    
+    if shouldRemove
+        alert(message="Resistance Break @ " + str.tostring(levelPrice))
+        array.remove(resistanceLines, resistanceIdx)
+        if array.size(resistancePrices) > resistanceIdx
+            array.remove(resistancePrices, resistanceIdx)
+        line.delete(currentLine)
+                
+        if showPriceLabel and array.size(resistanceLabels) > resistanceIdx
+            currentLabel = array.get(resistanceLabels, resistanceIdx) 
+            array.remove(resistanceLabels, resistanceIdx)
+            label.delete(currentLabel)
+        int(na)
+    else if high == levelPrice and showPerfectBounce and showPriceLabel and array.size(resistanceLabels) > resistanceIdx and not removeOnCloseEnabled
+        currentLabel = array.get(resistanceLabels, resistanceIdx) 
+        line.set_x2(currentLine, futureTime)
+        label.set_x(currentLabel, futureTime)
+        if not str.contains(label.get_text(currentLabel), " PDT")
+            label.set_text(currentLabel, str.tostring(high) + " PDT")
+        resistanceIdx += 1
+        int(na)
+    else
+        line.set_x2(currentLine, futureTime)
+        if showPriceLabel and array.size(resistanceLabels) > resistanceIdx
+            currentLabel = array.get(resistanceLabels, resistanceIdx) 
+            label.set_x(currentLabel, futureTime)
+        resistanceIdx += 1
+        int(na)
+
+//=== Update Support Levels ===
+supportIdx = 0
+while supportIdx < array.size(supportLines) and array.size(supportLines) > 0
+    currentLine = array.get(supportLines, supportIdx)
+    levelPrice = line.get_y1(currentLine)
+    
+    priceBreaksLevel = low < levelPrice and not removeOnCloseEnabled
+    closeBreaksLevel = request.security(syminfo.tickerid, rocTfConverted, close) < levelPrice and removeOnCloseEnabled
+    shouldRemove = (priceBreaksLevel or closeBreaksLevel) and ((waitForBarClose and barstate.isconfirmed) or not waitForBarClose)
+    
+    if shouldRemove
+        alert(message="Support Break @ " + str.tostring(levelPrice))
+        array.remove(supportLines, supportIdx)
+        if array.size(supportPrices) > supportIdx
+            array.remove(supportPrices, supportIdx)
+        line.delete(currentLine)
+        
+        if showPriceLabel and array.size(supportLabels) > supportIdx
+            currentLabel = array.get(supportLabels, supportIdx) 
+            array.remove(supportLabels, supportIdx)
+            label.delete(currentLabel)
+        int(na)
+    else if low == levelPrice and showPerfectBounce and showPriceLabel and array.size(supportLabels) > supportIdx and not removeOnCloseEnabled
+        currentLabel = array.get(supportLabels, supportIdx)
+        line.set_x2(currentLine, futureTime)
+        label.set_x(currentLabel, futureTime)
+        if not str.contains(label.get_text(currentLabel), " PDB")
+            label.set_text(currentLabel, str.tostring(low) + " PDB")
+        supportIdx += 1
+        int(na)
+    else
+        line.set_x2(currentLine, futureTime)
+        if showPriceLabel and array.size(supportLabels) > supportIdx
+            currentLabel = array.get(supportLabels, supportIdx) 
+            label.set_x(currentLabel, futureTime)
+        supportIdx += 1
+        int(na)

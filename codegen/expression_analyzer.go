@@ -7,11 +7,11 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-// CallInfo contains metadata about a detected TA function call in an expression
 type CallInfo struct {
-	Call     *ast.CallExpression // Original AST call node
-	FuncName string              // Extracted function name (e.g., "ta.sma")
-	ArgHash  string              // Hash of arguments for unique identification
+	Call      *ast.CallExpression
+	FuncName  string
+	ArgHash   string
+	StmtIndex int /* top-level statement index for per-statement calc emission */
 }
 
 // ExpressionAnalyzer traverses AST expressions to find nested TA function calls.
@@ -76,7 +76,7 @@ func (ea *ExpressionAnalyzer) findSecurityCallContaining(targetCall *ast.CallExp
 
 func (ea *ExpressionAnalyzer) isSecurityCall(call *ast.CallExpression) bool {
 	funcName := ea.gen.extractFunctionName(call.Callee)
-	return funcName == "security" || funcName == "request.security"
+	return IsSecurityFunction(funcName)
 }
 
 func (ea *ExpressionAnalyzer) expressionContainsCall(targetCall *ast.CallExpression, expr ast.Expression) bool {

@@ -1,0 +1,10 @@
+//@version=4
+strategy("Allow Entry Short Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=10, initial_capital=10000)
+
+strategy.risk.allow_entry_in(strategy.direction.short)
+
+if close > open
+    strategy.entry("Long", strategy.long)
+
+if close < open
+    strategy.entry("Short", strategy.short)

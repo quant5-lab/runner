@@ -13,17 +13,17 @@ func NewReassignmentConverter(expressionConverter func(*Expression) (ast.Express
 }
 
 func (r *ReassignmentConverter) CanHandle(stmt *Statement) bool {
-	return stmt.Reassignment != nil
+	return stmt.Core != nil && stmt.Core.Reassignment != nil
 }
 
 func (r *ReassignmentConverter) Convert(stmt *Statement) (ast.Node, error) {
-	init, err := r.expressionConverter(stmt.Reassignment.Value)
+	init, err := r.expressionConverter(stmt.Core.Reassignment.Value)
 	if err != nil {
 		return nil, err
 	}
 
 	return buildVariableDeclaration(
-		buildIdentifier(stmt.Reassignment.Name),
+		buildIdentifier(stmt.Core.Reassignment.Name),
 		init,
 		"var",
 	), nil

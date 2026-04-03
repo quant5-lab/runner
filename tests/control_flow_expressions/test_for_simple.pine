@@ -1,0 +1,9 @@
+//@version=5
+indicator("For Expression Test", overlay=true)
+
+testFunc() =>
+    result = for i = 1 to 10
+        i
+    result
+
+plot(testFunc())

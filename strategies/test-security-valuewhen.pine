@@ -1,0 +1,13 @@
+//@version=5
+indicator("Security Valuewhen Test", overlay=true)
+
+condition = close > open
+vw_local = ta.valuewhen(condition, high, 0)
+
+daily_condition = request.security(syminfo.tickerid, 'D', close > open)
+vw_daily_occurrence0 = request.security(syminfo.tickerid, 'D', ta.valuewhen(close > open, high, 0))
+vw_daily_occurrence1 = request.security(syminfo.tickerid, 'D', ta.valuewhen(close > open, high, 1))
+
+plot(vw_local, title="valuewhen_local", color=color.blue)
+plot(vw_daily_occurrence0, title="valuewhen_daily_occ0", color=color.red)
+plot(vw_daily_occurrence1, title="valuewhen_daily_occ1", color=color.green)

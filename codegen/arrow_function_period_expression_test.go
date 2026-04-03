@@ -112,13 +112,53 @@ func TestArrowFunctionTACall_PeriodExpressionExtraction(t *testing.T) {
 			expectError: true,
 			description: "Unknown identifiers (not arrow parameters) should error during extraction",
 		},
+		{
+			name: "Binary expression period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "len"},
+						Operator: "/",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			arrowParams:   []string{"len"},
+			expectError:   false,
+			expectedType:  "computed",
+			expectedValue: -1,
+			description:   "Binary expressions should create ComputedPeriod with rendered Go code",
+		},
+		{
+			name: "Nested call expression period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "math.round"},
+						Arguments: []ast.Expression{
+							&ast.CallExpression{
+								Callee:    &ast.Identifier{Name: "math.sqrt"},
+								Arguments: []ast.Expression{&ast.Identifier{Name: "len"}},
+							},
+						},
+					},
+				},
+			},
+			arrowParams:   []string{"len"},
+			expectError:   false,
+			expectedType:  "computed",
+			expectedValue: -1,
+			description:   "Nested call expressions should create ComputedPeriod",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
-
-			/* Register arrow parameters */
 			for _, param := range tt.arrowParams {
 				g.variables[param] = "float"
 			}
@@ -143,37 +183,46 @@ func TestArrowFunctionTACall_PeriodExpressionExtraction(t *testing.T) {
 				t.Fatalf("%s: period is nil", tt.description)
 			}
 
-			/* Validate period type */
 			isConstant := period.IsConstant()
 			expectedConstant := (tt.expectedType == "constant")
 			if isConstant != expectedConstant {
 				t.Errorf("%s: IsConstant() = %v, want %v", tt.description, isConstant, expectedConstant)
 			}
 
-			/* Validate AsInt() behavior */
 			actualValue := period.AsInt()
 			if actualValue != tt.expectedValue {
 				t.Errorf("%s: AsInt() = %d, want %d", tt.description, actualValue, tt.expectedValue)
 			}
 
-			/* Validate Go expression generation */
 			actualExpr := period.AsGoExpr()
-			if actualExpr != tt.expectedGoExpr {
-				t.Errorf("%s: AsGoExpr() = %q, want %q", tt.description, actualExpr, tt.expectedGoExpr)
+			if tt.expectedGoExpr != "" {
+				if actualExpr != tt.expectedGoExpr {
+					t.Errorf("%s: AsGoExpr() = %q, want %q", tt.description, actualExpr, tt.expectedGoExpr)
+				}
 			}
 
-			/* Validate type cast generation for runtime periods */
 			if !isConstant {
+				if actualExpr == "" {
+					t.Errorf("%s: non-constant period has empty GoExpr", tt.description)
+				}
+
 				intCast := period.AsIntCast()
-				expectedIntCast := "int(" + tt.expectedGoExpr + ")"
+				expectedIntCast := "int(" + actualExpr + ")"
 				if intCast != expectedIntCast {
 					t.Errorf("%s: AsIntCast() = %q, want %q", tt.description, intCast, expectedIntCast)
 				}
 
 				floatCast := period.AsFloat64Cast()
-				expectedFloatCast := "float64(" + tt.expectedGoExpr + ")"
+				expectedFloatCast := "float64(" + actualExpr + ")"
 				if floatCast != expectedFloatCast {
 					t.Errorf("%s: AsFloat64Cast() = %q, want %q", tt.description, floatCast, expectedFloatCast)
+				}
+
+				if tt.expectedType == "computed" {
+					seriesPart := period.AsSeriesNamePart()
+					if seriesPart != "computed" {
+						t.Errorf("%s: AsSeriesNamePart() = %q, want %q", tt.description, seriesPart, "computed")
+					}
 				}
 			}
 		})
@@ -206,8 +255,8 @@ func TestArrowFunctionTACall_PeriodExpressionInGeneratedCode(t *testing.T) {
 				"_rma_14_",
 			},
 			mustNotContain: []string{
-				"int(14)",            // Should optimize to literal
-				"for j := 0; j < 20", // Hardcoded fallback
+				"int(14)",
+				"for j := 0; j < 20",
 			},
 			description: "Constant periods should generate optimized literal code",
 		},
@@ -227,9 +276,9 @@ func TestArrowFunctionTACall_PeriodExpressionInGeneratedCode(t *testing.T) {
 				"_rma_runtime_",
 			},
 			mustNotContain: []string{
-				"for j := 0; j < 20",         // Hardcoded fallback (THE BUG)
-				"alpha := 1.0 / float64(20)", // Hardcoded fallback (THE BUG)
-				"_rma_20_",                   // Wrong series name
+				"for j := 0; j < 20",
+				"alpha := 1.0 / float64(20)",
+				"_rma_20_",
 			},
 			description: "Runtime periods must use parameter variable, never hardcoded fallback",
 		},
@@ -244,10 +293,10 @@ func TestArrowFunctionTACall_PeriodExpressionInGeneratedCode(t *testing.T) {
 			},
 			arrowParams: []string{},
 			mustContain: []string{
-				"2.0 / float64(20+1)", // EMA alpha formula for constant
+				"2.0 / float64(20+1)",
 			},
 			mustNotContain: []string{
-				"(float64(20)+1)", // Non-optimized form
+				"(float64(20)+1)",
 			},
 			description: "EMA alpha calculation optimizes for constants",
 		},
@@ -262,33 +311,76 @@ func TestArrowFunctionTACall_PeriodExpressionInGeneratedCode(t *testing.T) {
 			},
 			arrowParams: []string{"len"},
 			mustContain: []string{
-				"(float64(len)+1)", // EMA alpha formula for runtime
+				"(float64(len)+1)",
 			},
 			mustNotContain: []string{
-				"(float64(20)+1)", // Hardcoded fallback
+				"(float64(20)+1)",
 			},
 			description: "EMA alpha calculation must use runtime parameter",
+		},
+		{
+			name: "Computed period WMA with binary expression",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "len"},
+						Operator: "/",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			arrowParams: []string{"len"},
+			mustContain: []string{
+				"lenSeries.GetCurrent() / 2",
+			},
+			mustNotContain: []string{
+				"for j := 0; j < 20",
+				"_wma_20_",
+			},
+			description: "Computed binary period must use rendered expression, not hardcoded fallback",
+		},
+		{
+			name: "Computed period SMA with call expression",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.sma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "math.round"},
+						Arguments: []ast.Expression{
+							&ast.Identifier{Name: "len"},
+						},
+					},
+				},
+			},
+			arrowParams: []string{"len"},
+			mustContain: []string{
+				"math.Round(lenSeries.GetCurrent())",
+			},
+			mustNotContain: []string{
+				"for j := 0; j < 20",
+				"_sma_20_",
+			},
+			description: "Computed call period must use rendered expression, not hardcoded fallback",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
-
-			/* Register arrow parameters */
 			for _, param := range tt.arrowParams {
 				g.variables[param] = "float"
 			}
 
 			gen := newTestArrowTAGenerator(g)
 
-			/* Generate code */
 			code, err := gen.Generate(tt.call)
 			if err != nil {
 				t.Fatalf("%s: code generation error: %v", tt.description, err)
 			}
 
-			/* Validate required patterns */
 			for _, pattern := range tt.mustContain {
 				if !strings.Contains(code, pattern) {
 					t.Errorf("%s: generated code missing required pattern %q", tt.description, pattern)
@@ -296,7 +388,6 @@ func TestArrowFunctionTACall_PeriodExpressionInGeneratedCode(t *testing.T) {
 				}
 			}
 
-			/* Validate prohibited patterns */
 			for _, pattern := range tt.mustNotContain {
 				if strings.Contains(code, pattern) {
 					t.Errorf("%s: generated code contains prohibited pattern %q", tt.description, pattern)
@@ -402,13 +493,70 @@ func TestArrowFunctionTACall_PeriodExpressionEdgeCases(t *testing.T) {
 			},
 			description: "Underscore in parameter names should be preserved",
 		},
+		{
+			name: "Computed period preserves binary structure",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "n"},
+						Operator: "/",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			arrowParams: []string{"n"},
+			validate: func(t *testing.T, period PeriodExpression, code string) {
+				if period.IsConstant() {
+					t.Error("Binary expression period must not be constant")
+				}
+				if period.AsInt() != -1 {
+					t.Errorf("AsInt() = %d, want -1", period.AsInt())
+				}
+				if period.AsSeriesNamePart() != "computed" {
+					t.Errorf("Series name part = %q, want %q", period.AsSeriesNamePart(), "computed")
+				}
+			},
+			description: "Binary expression period should create ComputedPeriod with correct properties",
+		},
+		{
+			name: "Computed period with nested function calls",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "math.round"},
+						Arguments: []ast.Expression{
+							&ast.CallExpression{
+								Callee:    &ast.Identifier{Name: "math.sqrt"},
+								Arguments: []ast.Expression{&ast.Identifier{Name: "n"}},
+							},
+						},
+					},
+				},
+			},
+			arrowParams: []string{"n"},
+			validate: func(t *testing.T, period PeriodExpression, code string) {
+				if period.IsConstant() {
+					t.Error("Call expression period must not be constant")
+				}
+				if period.AsSeriesNamePart() != "computed" {
+					t.Errorf("Series name part = %q, want %q", period.AsSeriesNamePart(), "computed")
+				}
+				goExpr := period.AsGoExpr()
+				if goExpr == "" {
+					t.Error("ComputedPeriod Go expression must not be empty")
+				}
+			},
+			description: "Nested call expression period should create ComputedPeriod",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
-
-			/* Register arrow parameters */
 			for _, param := range tt.arrowParams {
 				g.variables[param] = "float"
 			}
@@ -421,7 +569,6 @@ func TestArrowFunctionTACall_PeriodExpressionEdgeCases(t *testing.T) {
 				t.Fatalf("%s: unexpected error: %v", tt.description, err)
 			}
 
-			/* Generate code to validate usage */
 			code, err := gen.Generate(tt.call)
 			if err != nil {
 				t.Fatalf("%s: code generation error: %v", tt.description, err)
@@ -432,16 +579,17 @@ func TestArrowFunctionTACall_PeriodExpressionEdgeCases(t *testing.T) {
 	}
 }
 
-/* TestArrowFunctionTACall_NoHardcodedFallbacks guards against hardcoded period bug */
+/* TestArrowFunctionTACall_NoHardcodedFallbacks guards against hardcoded period regressions across all period types */
 func TestArrowFunctionTACall_NoHardcodedFallbacks(t *testing.T) {
 	tests := []struct {
 		name        string
 		call        *ast.CallExpression
 		arrowParams []string
+		periodType  string
 		description string
 	}{
 		{
-			name: "Identifier period in arrow function",
+			name: "RMA with runtime identifier period",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "ta.rma"},
 				Arguments: []ast.Expression{
@@ -450,10 +598,11 @@ func TestArrowFunctionTACall_NoHardcodedFallbacks(t *testing.T) {
 				},
 			},
 			arrowParams: []string{"src", "len"},
-			description: "Original bug case: ta.rma with identifier period",
+			periodType:  "runtime",
+			description: "RMA with runtime period",
 		},
 		{
-			name: "EMA with identifier period",
+			name: "EMA with runtime identifier period",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "ta.ema"},
 				Arguments: []ast.Expression{
@@ -462,10 +611,11 @@ func TestArrowFunctionTACall_NoHardcodedFallbacks(t *testing.T) {
 				},
 			},
 			arrowParams: []string{"period"},
-			description: "EMA variant of the bug",
+			periodType:  "runtime",
+			description: "EMA with runtime period",
 		},
 		{
-			name: "SMA with identifier period",
+			name: "SMA with runtime identifier period",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "ta.sma"},
 				Arguments: []ast.Expression{
@@ -474,24 +624,77 @@ func TestArrowFunctionTACall_NoHardcodedFallbacks(t *testing.T) {
 				},
 			},
 			arrowParams: []string{"length"},
-			description: "Window-based indicator with identifier period",
+			periodType:  "runtime",
+			description: "SMA with runtime period",
+		},
+		{
+			name: "WMA with computed binary period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.wma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "n"},
+						Operator: "/",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			arrowParams: []string{"n"},
+			periodType:  "computed",
+			description: "WMA with computed binary period",
+		},
+		{
+			name: "SMA with computed call period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.sma"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.CallExpression{
+						Callee: &ast.Identifier{Name: "math.round"},
+						Arguments: []ast.Expression{
+							&ast.Identifier{Name: "n"},
+						},
+					},
+				},
+			},
+			arrowParams: []string{"n"},
+			periodType:  "computed",
+			description: "SMA with computed call period",
+		},
+		{
+			name: "EMA with computed multiply period",
+			call: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "ta.ema"},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.BinaryExpression{
+						Left:     &ast.Identifier{Name: "n"},
+						Operator: "*",
+						Right:    &ast.Literal{Value: 2.0},
+					},
+				},
+			},
+			arrowParams: []string{"n"},
+			periodType:  "computed",
+			description: "EMA with computed multiply period",
 		},
 	}
 
 	prohibitedPatterns := []string{
-		"for j := 0; j < 20",         // Hardcoded loop bound
-		"alpha := 1.0 / float64(20)", // Hardcoded RMA alpha
-		"2.0 / float64(20+1)",        // Hardcoded EMA alpha
-		"_rma_20_",                   // Hardcoded series name
-		"_ema_20_",                   // Hardcoded series name
-		"_sma_20_",                   // Hardcoded series name
+		"for j := 0; j < 20",
+		"alpha := 1.0 / float64(20)",
+		"2.0 / float64(20+1)",
+		"_rma_20_",
+		"_ema_20_",
+		"_sma_20_",
+		"_wma_20_",
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := newTestGenerator()
 
-			/* Register arrow parameters */
 			for _, param := range tt.arrowParams {
 				g.variables[param] = "float"
 			}
@@ -505,18 +708,26 @@ func TestArrowFunctionTACall_NoHardcodedFallbacks(t *testing.T) {
 
 			for _, prohibited := range prohibitedPatterns {
 				if strings.Contains(code, prohibited) {
-					t.Errorf("%s: REGRESSION - generated code contains hardcoded pattern %q",
-						tt.description, prohibited)
-					t.Errorf("Hardcoded fallback bug has been reintroduced")
+					t.Errorf("%s: REGRESSION - hardcoded pattern %q found", tt.description, prohibited)
 					t.Logf("Generated code:\n%s", code)
 				}
 			}
 
-			paramName := tt.arrowParams[len(tt.arrowParams)-1]
-			if !strings.Contains(code, "int("+paramName+")") {
-				t.Errorf("%s: generated code does not use parameter %q with int() cast",
-					tt.description, paramName)
-				t.Logf("Generated code:\n%s", code)
+			switch tt.periodType {
+			case "runtime":
+				paramName := tt.arrowParams[len(tt.arrowParams)-1]
+				if !strings.Contains(code, "int("+paramName+")") {
+					t.Errorf("%s: missing int(%s) cast in generated code", tt.description, paramName)
+					t.Logf("Generated code:\n%s", code)
+				}
+			case "computed":
+				/* Stateful IIFEs (EMA/RMA) use series names; stateless IIFEs (SMA/WMA) inline the expression */
+				paramName := tt.arrowParams[len(tt.arrowParams)-1]
+				dynamicRef := paramName + "Series.GetCurrent()"
+				if !strings.Contains(code, dynamicRef) {
+					t.Errorf("%s: missing dynamic parameter reference %q in generated code", tt.description, dynamicRef)
+					t.Logf("Generated code:\n%s", code)
+				}
 			}
 		})
 	}

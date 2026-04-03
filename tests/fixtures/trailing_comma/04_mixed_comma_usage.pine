@@ -1,0 +1,6 @@
+//@version=5
+indicator("Mixed Comma Usage")
+
+a = 1, b = 2, c = 3
+result = a + b + c,
+plot(result),

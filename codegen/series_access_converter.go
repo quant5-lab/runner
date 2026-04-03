@@ -10,25 +10,28 @@ import (
 // Returns empty string if no temp var exists for the call
 type CallVarLookup func(*ast.CallExpression) string
 
-// SeriesAccessConverter transforms AST expressions by converting series variable identifiers
-// to their historical access form (e.g., "sum" → "sumSeries.Get(offset)")
-// Responsibility: AST transformation for type-aware series access
 type SeriesAccessConverter struct {
 	symbolTable   SymbolTable
 	offset        string
 	lookupCallVar CallVarLookup
+	mathExprGen   *MathExpressionGenerator
 }
 
-// NewSeriesAccessConverter creates a converter with symbol type information
 func NewSeriesAccessConverter(symbolTable SymbolTable, offset string, lookupCallVar CallVarLookup) *SeriesAccessConverter {
-	return &SeriesAccessConverter{
+	converter := &SeriesAccessConverter{
 		symbolTable:   symbolTable,
 		offset:        offset,
 		lookupCallVar: lookupCallVar,
 	}
+	converter.mathExprGen = NewMathExpressionGenerator(converter)
+	return converter
 }
 
-// ConvertExpression traverses AST and generates Go code with proper series access
+func (c *SeriesAccessConverter) ExtractSeriesExpression(expr ast.Expression) string {
+	result, _ := c.ConvertExpression(expr)
+	return result
+}
+
 func (c *SeriesAccessConverter) ConvertExpression(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.Identifier:
@@ -104,21 +107,23 @@ func (c *SeriesAccessConverter) convertMemberExpression(mem *ast.MemberExpressio
 }
 
 func (c *SeriesAccessConverter) convertCallExpression(call *ast.CallExpression) (string, error) {
-	// Check if call has materialized temp variable - reuse instead of regenerating
 	if c.lookupCallVar != nil {
 		if tempVarName := c.lookupCallVar(call); tempVarName != "" {
 			return fmt.Sprintf("%sSeries.Get(%s)", tempVarName, c.offset), nil
 		}
 	}
 
-	// Function names should not be converted with series access logic
-	// They are either builtin functions (abs → math.Abs) or user-defined functions
+	funcName := c.extractFunctionName(call.Callee)
+	if c.mathExprGen.CanHandle(funcName) {
+		return c.mathExprGen.GenerateExpression(funcName, call.Arguments)
+	}
+
 	var funcCode string
 	if id, ok := call.Callee.(*ast.Identifier); ok {
-		// Simple function name - map Pine functions to Go equivalents
-		funcCode = c.mapFunctionName(id.Name)
+		funcCode = id.Name
+	} else if mem, ok := call.Callee.(*ast.MemberExpression); ok {
+		funcCode = c.mapMemberFunctionName(mem)
 	} else {
-		// Complex callee expression (e.g., member expression) - convert it
 		var err error
 		funcCode, err = c.ConvertExpression(call.Callee)
 		if err != nil {
@@ -126,7 +131,6 @@ func (c *SeriesAccessConverter) convertCallExpression(call *ast.CallExpression) 
 		}
 	}
 
-	// Convert arguments with series access logic
 	args := make([]string, len(call.Arguments))
 	for i, arg := range call.Arguments {
 		argCode, err := c.ConvertExpression(arg)
@@ -139,37 +143,30 @@ func (c *SeriesAccessConverter) convertCallExpression(call *ast.CallExpression) 
 	return fmt.Sprintf("%s(%s)", funcCode, joinArgs(args)), nil
 }
 
-func (c *SeriesAccessConverter) mapFunctionName(name string) string {
-	// Map Pine function names to Go equivalents
-	switch name {
-	case "abs":
-		return "math.Abs"
-	case "max":
-		return "math.Max"
-	case "min":
-		return "math.Min"
-	case "pow":
-		return "math.Pow"
-	case "sqrt":
-		return "math.Sqrt"
-	case "log":
-		return "math.Log"
-	case "log10":
-		return "math.Log10"
-	case "exp":
-		return "math.Exp"
-	case "ceil":
-		return "math.Ceil"
-	case "floor":
-		return "math.Floor"
-	case "round":
-		return "math.Round"
-	case "sign":
-		return "math.Copysign(1.0,"
-	default:
-		// Already prefixed (math.Abs) or user-defined function - pass through
-		return name
+func (c *SeriesAccessConverter) extractFunctionName(callee ast.Expression) string {
+	if id, ok := callee.(*ast.Identifier); ok {
+		return id.Name
 	}
+	if mem, ok := callee.(*ast.MemberExpression); ok {
+		if obj, ok := mem.Object.(*ast.Identifier); ok {
+			if prop, ok := mem.Property.(*ast.Identifier); ok {
+				return obj.Name + "." + prop.Name
+			}
+		}
+	}
+	return ""
+}
+
+func (c *SeriesAccessConverter) mapMemberFunctionName(mem *ast.MemberExpression) string {
+	obj, ok := mem.Object.(*ast.Identifier)
+	if !ok {
+		return ""
+	}
+	prop, ok := mem.Property.(*ast.Identifier)
+	if !ok {
+		return ""
+	}
+	return obj.Name + "." + prop.Name
 }
 
 func (c *SeriesAccessConverter) convertBinaryExpression(bin *ast.BinaryExpression) (string, error) {
@@ -254,33 +251,32 @@ func (c *SeriesAccessConverter) convertLiteral(lit *ast.Literal) (string, error)
 func (c *SeriesAccessConverter) isBuiltinField(name string) bool {
 	builtins := map[string]bool{
 		"open": true, "high": true, "low": true, "close": true,
-		"volume": true, "hl2": true, "hlc3": true, "ohlc4": true,
+		"volume": true, "hl2": true, "hlc3": true, "ohlc4": true, "hlcc4": true,
 	}
 	return builtins[name]
 }
 
 func (c *SeriesAccessConverter) convertBuiltinField(field string) string {
-	// Map to ctx.Data[i-offset].Field access
-	fieldMap := map[string]string{
-		"open":   "Open",
-		"high":   "High",
-		"low":    "Low",
-		"close":  "Close",
-		"volume": "Volume",
+	if field == "open" || field == "high" || field == "low" || field == "close" || field == "volume" {
+		seriesNameMap := map[string]string{
+			"open":   "openSeries",
+			"high":   "highSeries",
+			"low":    "lowSeries",
+			"close":  "closeSeries",
+			"volume": "volumeSeries",
+		}
+		return fmt.Sprintf("%s.Get(%s)", seriesNameMap[field], c.offset)
 	}
 
-	if goField, exists := fieldMap[field]; exists {
-		return fmt.Sprintf("ctx.Data[i-%s].%s", c.offset, goField)
-	}
-
-	// Computed fields need special handling
 	switch field {
 	case "hl2":
-		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low) / 2", c.offset, c.offset)
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s)) / 2", c.offset, c.offset)
 	case "hlc3":
-		return fmt.Sprintf("(ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 3", c.offset, c.offset, c.offset)
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s)) / 3", c.offset, c.offset, c.offset)
 	case "ohlc4":
-		return fmt.Sprintf("(ctx.Data[i-%s].Open + ctx.Data[i-%s].High + ctx.Data[i-%s].Low + ctx.Data[i-%s].Close) / 4", c.offset, c.offset, c.offset, c.offset)
+		return fmt.Sprintf("(openSeries.Get(%s) + highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s)) / 4", c.offset, c.offset, c.offset, c.offset)
+	case "hlcc4":
+		return fmt.Sprintf("(highSeries.Get(%s) + lowSeries.Get(%s) + closeSeries.Get(%s) + closeSeries.Get(%s)) / 4", c.offset, c.offset, c.offset, c.offset)
 	}
 
 	return field

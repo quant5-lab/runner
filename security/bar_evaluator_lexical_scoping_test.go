@@ -29,7 +29,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 		setupFallback bool
 		expected      float64
 		expectError   bool
-		description   string
 	}{
 		{
 			name:          "OHLCV_field_takes_precedence",
@@ -38,7 +37,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 			setupFallback: true,
 			expected:      102, // From OHLCV data
 			expectError:   false,
-			description:   "OHLCV fields should be resolved first, ignoring registry/fallback",
 		},
 		{
 			name:          "registry_variable_without_fallback",
@@ -47,7 +45,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 			setupFallback: false,
 			expected:      999.0,
 			expectError:   false,
-			description:   "Registry should be checked before fallback",
 		},
 		{
 			name:          "fallback_when_not_in_registry",
@@ -56,7 +53,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 			setupFallback: true,
 			expected:      888.0,
 			expectError:   false,
-			description:   "VarLookup fallback should be used when variable not in registry",
 		},
 		{
 			name:          "error_when_variable_not_found",
@@ -65,7 +61,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 			setupFallback: false,
 			expected:      0,
 			expectError:   true,
-			description:   "Should return error when variable not found anywhere",
 		},
 		{
 			name:          "registry_overrides_fallback",
@@ -74,7 +69,6 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 			setupFallback: true,
 			expected:      999.0,
 			expectError:   false,
-			description:   "Registry should take precedence over fallback for same variable name",
 		},
 	}
 
@@ -110,14 +104,14 @@ func TestVarLookupFunc_ResolutionPriority(t *testing.T) {
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expected error for %s, got nil", tt.description)
+					t.Errorf("expected error, got nil")
 				}
 			} else {
 				if err != nil {
-					t.Fatalf("unexpected error for %s: %v", tt.description, err)
+					t.Fatalf("unexpected error: %v", err)
 				}
 				if value != tt.expected {
-					t.Errorf("%s: expected %.1f, got %.1f", tt.description, tt.expected, value)
+					t.Errorf("expected %.1f, got %.1f", tt.expected, value)
 				}
 			}
 		})
@@ -151,7 +145,6 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 		mainBarIdx     int
 		seriesPosition int
 		expectedValue  float64
-		description    string
 	}{
 		{
 			name:           "direct_mapping_current_bar",
@@ -159,7 +152,6 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 			mainBarIdx:     19,
 			seriesPosition: 19,
 			expectedValue:  1019.0,
-			description:    "Security bar 1 maps to main bar 19 (current), offset=0",
 		},
 		{
 			name:           "direct_mapping_historical_bar",
@@ -167,7 +159,6 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 			mainBarIdx:     15,
 			seriesPosition: 19,
 			expectedValue:  1015.0,
-			description:    "Security bar 1 maps to main bar 15, offset=4",
 		},
 		{
 			name:           "large_offset_historical",
@@ -175,7 +166,6 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 			mainBarIdx:     5,
 			seriesPosition: 19,
 			expectedValue:  1005.0,
-			description:    "Security bar 1 maps to main bar 5, offset=14",
 		},
 		{
 			name:           "beginning_of_series",
@@ -183,7 +173,6 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 			mainBarIdx:     0,
 			seriesPosition: 19,
 			expectedValue:  1000.0,
-			description:    "Security bar 0 maps to main bar 0 (beginning), offset=19",
 		},
 	}
 
@@ -208,11 +197,11 @@ func TestVarLookupFunc_BarIndexMapping(t *testing.T) {
 			value, err := evaluator.EvaluateAtBar(expr, ctx, tt.secBarIdx)
 
 			if err != nil {
-				t.Fatalf("%s: unexpected error: %v", tt.description, err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			if value != tt.expectedValue {
-				t.Errorf("%s: expected %.1f, got %.1f", tt.description, tt.expectedValue, value)
+				t.Errorf("expected %.1f, got %.1f", tt.expectedValue, value)
 			}
 		})
 	}
@@ -228,7 +217,6 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 		seriesPosition int
 		mainBarIdx     int
 		expectError    bool
-		description    string
 	}{
 		{
 			name:           "offset_exceeds_capacity",
@@ -236,7 +224,6 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 			seriesPosition: 5,
 			mainBarIdx:     15,
 			expectError:    true,
-			description:    "Offset > capacity falls through to unknown identifier error",
 		},
 		{
 			name:           "negative_mainBarIdx",
@@ -244,7 +231,6 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 			seriesPosition: 5,
 			mainBarIdx:     -1,
 			expectError:    false,
-			description:    "Negative main bar index returns NaN for warmup period",
 		},
 	}
 
@@ -277,15 +263,15 @@ func TestVarLookupFunc_BoundaryConditions(t *testing.T) {
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("%s: expected error, got nil", tt.description)
+					t.Errorf("expected error, got nil")
 				}
 			} else {
 				if err != nil {
-					t.Fatalf("%s: unexpected error: %v", tt.description, err)
+					t.Fatalf("unexpected error: %v", err)
 				}
 				// For negative mainBarIdx (warmup), verify NaN is returned
 				if tt.mainBarIdx < 0 && !math.IsNaN(result) {
-					t.Errorf("%s: expected NaN for warmup, got %v", tt.description, result)
+					t.Errorf("expected NaN for warmup, got %v", result)
 				}
 			}
 		})
@@ -305,7 +291,6 @@ func TestVarLookupFunc_NilSeriesHandling(t *testing.T) {
 		name        string
 		lookupFunc  VarLookupFunc
 		expectError bool
-		description string
 	}{
 		{
 			name: "nil_series_returned",
@@ -313,7 +298,6 @@ func TestVarLookupFunc_NilSeriesHandling(t *testing.T) {
 				return nil, 0, true // Returns true but nil series
 			},
 			expectError: true,
-			description: "Should handle nil series gracefully",
 		},
 		{
 			name: "not_found_false_returned",
@@ -321,7 +305,6 @@ func TestVarLookupFunc_NilSeriesHandling(t *testing.T) {
 				return nil, -1, false // Properly indicates not found
 			},
 			expectError: true,
-			description: "Should return error when variable not found",
 		},
 	}
 
@@ -333,9 +316,9 @@ func TestVarLookupFunc_NilSeriesHandling(t *testing.T) {
 			_, err := evaluator.EvaluateAtBar(expr, ctx, 0)
 
 			if tt.expectError && err == nil {
-				t.Errorf("%s: expected error, got nil", tt.description)
+				t.Errorf("expected error, got nil")
 			} else if !tt.expectError && err != nil {
-				t.Errorf("%s: unexpected error: %v", tt.description, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
@@ -373,7 +356,6 @@ func TestVarLookupFunc_MultipleSecurityContexts(t *testing.T) {
 			mainBarIdx2:      7,
 			expectedValue1:   2005.0,
 			expectedValue2:   2007.0,
-			description:      "Two security contexts map to different main bars",
 		},
 		{
 			name:             "same_security_bar_different_mappings",
@@ -383,7 +365,6 @@ func TestVarLookupFunc_MultipleSecurityContexts(t *testing.T) {
 			mainBarIdx2:      6,
 			expectedValue1:   2003.0,
 			expectedValue2:   2006.0,
-			description:      "Same security bar index can map differently in different contexts",
 		},
 	}
 
@@ -460,7 +441,6 @@ func TestVarLookupFunc_SeriesProgressionWithBarMapper(t *testing.T) {
 				}
 			},
 			expectations: []float64{500.0, 501.0, 502.0},
-			description:  "Series values should be correctly accessed as bars progress",
 		},
 	}
 

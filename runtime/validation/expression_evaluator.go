@@ -11,15 +11,20 @@ type ConstantStore interface {
 }
 
 type ExpressionEvaluator struct {
-	constants        ConstantStore
-	literalEvaluator *LiteralEvaluator
-	unaryEvaluator   *UnaryEvaluator
-	binaryEvaluator  *BinaryEvaluator
-	mathEvaluator    *MathFunctionEvaluator
-	identifierLookup *IdentifierLookup
+	constants         ConstantStore
+	literalEvaluator  *LiteralEvaluator
+	unaryEvaluator    *UnaryEvaluator
+	binaryEvaluator   *BinaryEvaluator
+	mathEvaluator     *MathFunctionEvaluator
+	userFuncEvaluator *UserFunctionEvaluator
+	identifierLookup  *IdentifierLookup
 }
 
 func NewExpressionEvaluator(constants ConstantStore) *ExpressionEvaluator {
+	return NewExpressionEvaluatorWithFunctions(constants, nil)
+}
+
+func NewExpressionEvaluatorWithFunctions(constants ConstantStore, functions FunctionStore) *ExpressionEvaluator {
 	ev := &ExpressionEvaluator{
 		constants:        constants,
 		literalEvaluator: NewLiteralEvaluator(),
@@ -29,6 +34,12 @@ func NewExpressionEvaluator(constants ConstantStore) *ExpressionEvaluator {
 	ev.unaryEvaluator = NewUnaryEvaluator(ev)
 	ev.binaryEvaluator = NewBinaryEvaluator(ev)
 	ev.mathEvaluator = NewMathFunctionEvaluator(ev)
+
+	if functions != nil {
+		if scoped, ok := constants.(ScopedConstantStore); ok {
+			ev.userFuncEvaluator = NewUserFunctionEvaluator(ev, functions, scoped)
+		}
+	}
 
 	return ev
 }
@@ -55,7 +66,14 @@ func (e *ExpressionEvaluator) Evaluate(expr ast.Expression) float64 {
 		return e.binaryEvaluator.Evaluate(node)
 
 	case *ast.CallExpression:
-		return e.mathEvaluator.Evaluate(node)
+		result := e.mathEvaluator.Evaluate(node)
+		if !math.IsNaN(result) {
+			return result
+		}
+		if e.userFuncEvaluator != nil {
+			return e.userFuncEvaluator.Evaluate(node)
+		}
+		return math.NaN()
 
 	case *ast.ConditionalExpression:
 		return math.NaN()

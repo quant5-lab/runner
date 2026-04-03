@@ -1,0 +1,32 @@
+//@version=5
+strategy("Arrow Computed Period", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+hullMA(_src, _length) =>
+    _half = ta.wma(_src, _length / 2)
+    _full = ta.wma(_src, _length)
+    _diff = 2 * _half - _full
+    ta.wma(_diff, math.round(math.sqrt(_length)))
+
+smoothEMA(_src, _length) =>
+    ta.ema(_src, _length * 2)
+
+hull = hullMA(close, 16)
+smooth = smoothEMA(close, 10)
+
+longCond = hull > smooth and close > hull
+shortCond = hull < smooth and close < hull
+
+if longCond
+    strategy.entry("Long", strategy.long)
+
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0 and hull < smooth
+    strategy.close("Long")
+
+if strategy.position_size < 0 and hull > smooth
+    strategy.close("Short")
+
+plot(hull, "Hull MA")
+plot(smooth, "Smooth EMA")

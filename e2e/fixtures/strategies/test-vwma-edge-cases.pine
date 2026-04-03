@@ -1,0 +1,21 @@
+//@version=5
+strategy("Test ta.vwma edge cases", overlay=true)
+
+vwmaShort = ta.vwma(close, 1)
+vwmaLong = ta.vwma(close, 200)
+
+vwmaWithZero = ta.vwma(close, 10)
+vwmaWithNaN = ta.vwma(close, 10)
+
+vwmaBare = vwma(close, 14)
+
+vwmaConditional = close > open ? ta.vwma(close, 20) : ta.vwma(open, 20)
+
+plot(vwmaShort, title="VWMA 1", color=color.blue)
+plot(vwmaLong, title="VWMA 200", color=color.red)
+plot(vwmaBare, title="Bare VWMA", color=color.green)
+
+if vwmaShort > vwmaLong
+    strategy.entry("Long", strategy.long)
+if vwmaShort < vwmaLong
+    strategy.close("Long")

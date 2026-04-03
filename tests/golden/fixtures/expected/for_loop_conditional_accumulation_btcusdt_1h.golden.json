@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "strategy": "Conditional Accumulation",
+  "dataSource": "BTCUSDT-1h.json",
+  "generatedAt": "2026-01-21T10:56:04Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 976,
+        "entryTime": 1752213600,
+        "entryPrice": 117860.38,
+        "entryComment": "",
+        "exitBar": 995,
+        "exitTime": 1752282000,
+        "exitPrice": 117407.99,
+        "exitComment": "",
+        "size": 1,
+        "profit": -452.3899999999994,
+        "direction": "long"
+      },
+      {
+        "entryId": "Long",
+        "entryBar": 4442,
+        "entryTime": 1764691200,
+        "entryPrice": 90850.01,
+        "entryComment": "",
+        "exitBar": 4475,
+        "exitTime": 1764810000,
+        "exitPrice": 93054.87,
+        "exitComment": "",
+        "size": 1,
+        "profit": 2204.8600000000006,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [],
+    "equity": 11752.470000000001,
+    "netProfit": 1752.4700000000012,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

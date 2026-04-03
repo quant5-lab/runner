@@ -1,0 +1,8 @@
+//@version=5
+strategy("Entry When Condition", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Conditional entry: only execute when signal is true
+buySignal = close > 105.0
+
+// Entry attempts every bar but only executes when buySignal=true
+strategy.entry("Long", strategy.long, when=buySignal)

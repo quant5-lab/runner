@@ -1,0 +1,13 @@
+//@version=5
+indicator("Linreg Offset Test", overlay=true)
+
+linreg_offset0 = ta.linreg(close, 20, 0)
+linreg_offset5 = ta.linreg(close, 20, 5)
+linreg_offset10 = ta.linreg(close, 20, 10)
+linreg_offset19 = ta.linreg(close, 20, 19)
+
+plot(close, "Close", color=color.gray, linewidth=1)
+plot(linreg_offset0, "Offset 0", color=color.blue, linewidth=2)
+plot(linreg_offset5, "Offset 5", color=color.green, linewidth=2)
+plot(linreg_offset10, "Offset 10", color=color.orange, linewidth=2)
+plot(linreg_offset19, "Offset 19", color=color.red, linewidth=2)

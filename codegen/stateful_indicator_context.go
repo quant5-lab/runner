@@ -6,6 +6,9 @@ type StatefulIndicatorContext interface {
 	// GenerateSeriesAccess returns code to access the series buffer for reading
 	GenerateSeriesAccess(varName string, offset int) string
 
+	// GenerateSeriesDynamicAccess returns code to access the series buffer with a runtime-evaluated offset
+	GenerateSeriesDynamicAccess(varName string, offsetExpr string) string
+
 	// GenerateSeriesUpdate returns code to update the series buffer
 	GenerateSeriesUpdate(varName string, value string) string
 
@@ -22,6 +25,10 @@ func NewTopLevelIndicatorContext() *TopLevelIndicatorContext {
 
 func (c *TopLevelIndicatorContext) GenerateSeriesAccess(varName string, offset int) string {
 	return formatSeriesGet(varName, offset)
+}
+
+func (c *TopLevelIndicatorContext) GenerateSeriesDynamicAccess(varName string, offsetExpr string) string {
+	return formatSeriesDynamicGet(varName, offsetExpr)
 }
 
 func (c *TopLevelIndicatorContext) GenerateSeriesUpdate(varName string, value string) string {
@@ -41,6 +48,10 @@ func NewArrowFunctionIndicatorContext() *ArrowFunctionIndicatorContext {
 
 func (c *ArrowFunctionIndicatorContext) GenerateSeriesAccess(varName string, offset int) string {
 	return formatArrowSeriesGet(varName, offset)
+}
+
+func (c *ArrowFunctionIndicatorContext) GenerateSeriesDynamicAccess(varName string, offsetExpr string) string {
+	return formatArrowSeriesDynamicGet(varName, offsetExpr)
 }
 
 func (c *ArrowFunctionIndicatorContext) GenerateSeriesUpdate(varName string, value string) string {

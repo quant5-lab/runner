@@ -1,0 +1,24 @@
+//@version=5
+indicator("Math in Arrow Functions", overlay=false)
+
+myPow(a, b) =>
+    pow(a, b)
+
+myAbs(x) =>
+    abs(x)
+
+mySqrt(x) =>
+    math.sqrt(x)
+
+myMax(a, b) =>
+    max(a, b)
+
+x = myPow(close, 2.0)
+y = myAbs(close - open)
+z = mySqrt(close)
+w = myMax(high, low)
+
+plot(x, "pow")
+plot(y, "abs")
+plot(z, "sqrt")
+plot(w, "max")

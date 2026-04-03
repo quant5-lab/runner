@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"sync"
+
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
 
@@ -17,29 +19,80 @@ type VersionDirective struct {
 }
 
 type Statement struct {
+	Core          *StatementCore `parser:"@@"`
+	TrailingComma *string        `parser:"@','?"`
+}
+
+type StatementCore struct {
 	TupleAssignment *TupleAssignment `parser:"@@"`
+	If              *IfStatement     `parser:"| @@"`
+	ForIn           *ForInStatement  `parser:"| @@"`
+	For             *ForStatement    `parser:"| @@"`
+	While           *WhileStatement  `parser:"| @@"`
+	Switch          *SwitchExpr      `parser:"| @@"`
 	FunctionDecl    *FunctionDecl    `parser:"| @@"`
+	VarAssignment   *VarAssignment   `parser:"| @@"`
+	TypedAssignment *TypedAssignment `parser:"| @@"`
 	Assignment      *Assignment      `parser:"| @@"`
 	Reassignment    *Reassignment    `parser:"| @@"`
-	If              *IfStatement     `parser:"| @@"`
+	Break           *BreakStmt       `parser:"| @@"`
+	Continue        *ContinueStmt    `parser:"| @@"`
 	Expression      *ExpressionStmt  `parser:"| @@"`
 }
 
 type IfStatement struct {
-	Condition *OrExpr      `parser:"'if' @@"`
+	Condition  *OrExpr      `parser:"'if' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	ElseClause *ElseClause  `parser:"( @@ )?"`
+}
+
+type ElseClause struct {
+	ElseIf   *IfStatement `parser:"'else' ( @@"`
+	ElseBody []*Statement `parser:"| Indent @@+ Dedent )"`
+}
+
+type ForStatement struct {
+	Counter string       `parser:"'for' @Ident '='"`
+	From    *ArithExpr   `parser:"@@"`
+	To      *ArithExpr   `parser:"'to' @@"`
+	Step    *ArithExpr   `parser:"( 'by' @@ )?"`
+	Indent  *string      `parser:"@Indent"`
+	Body    []*Statement `parser:"@@+"`
+	Dedent  *string      `parser:"@Dedent"`
+}
+
+type ForInVars struct {
+	TupleIndex    *string `parser:"'[' @Ident ','"`
+	TupleElement  *string `parser:"@Ident ']'"`
+	SingleElement *string `parser:"| @Ident"`
+}
+
+type ForInStatement struct {
+	Vars       *ForInVars   `parser:"'for' @@"`
+	Collection *ArithExpr   `parser:"'in' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+}
+
+type WhileStatement struct {
+	Condition *OrExpr      `parser:"'while' @@"`
 	Indent    *string      `parser:"@Indent"`
 	Body      []*Statement `parser:"@@+"`
 	Dedent    *string      `parser:"@Dedent"`
 }
 
 type FunctionDecl struct {
-	Name            string       `parser:"@Ident"`
-	Params          []string     `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
-	Arrow           string       `parser:"@'=>'"`
-	InlineBody      *Expression  `parser:"( Newline? @@"`
-	MultiLineIndent *string      `parser:"| Newline? @Indent"`
-	MultiLineBody   []*Statement `parser:"@@+"`
-	MultiLineDedent *string      `parser:"@Dedent )"`
+	Name                string               `parser:"@Ident"`
+	Params              []string             `parser:"'(' ( @Ident ( ',' @Ident )* )? ')'"`
+	Arrow               string               `parser:"@'=>'"`
+	MultiLineIndent     *string              `parser:"( Newline? @Indent"`
+	MultiLineBody       []*Statement         `parser:"@@+"`
+	MultiLineDedent     *string              `parser:"@Dedent"`
+	InlineStatementList *InlineStatementList `parser:"| Newline? @@"`
+	InlineBody          *Expression          `parser:"| Newline? @@ )"`
 }
 
 type TupleAssignment struct {
@@ -62,13 +115,74 @@ type ExpressionStmt struct {
 	Expr *Expression `parser:"@@"`
 }
 
+type BreakStmt struct {
+	Keyword string `parser:"@'break'"`
+}
+
+type ContinueStmt struct {
+	Keyword string `parser:"@'continue'"`
+}
+
 type ArrayLiteral struct {
 	Elements []*TernaryExpr `parser:"'[' ( @@ ( ',' @@ )* )? ']'"`
 }
 
+type ForExpr struct {
+	Counter string       `parser:"'for' @Ident '='"`
+	From    *ArithExpr   `parser:"@@"`
+	To      *ArithExpr   `parser:"'to' @@"`
+	Step    *ArithExpr   `parser:"( 'by' @@ )?"`
+	Indent  *string      `parser:"@Indent"`
+	Body    []*Statement `parser:"@@+"`
+	Dedent  *string      `parser:"@Dedent"`
+}
+
+type ForInExpr struct {
+	Vars       *ForInVars   `parser:"'for' @@"`
+	Collection *ArithExpr   `parser:"'in' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+}
+
+type IfExpr struct {
+	Condition  *OrExpr      `parser:"'if' @@"`
+	Indent     *string      `parser:"@Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	ElseClause *ElseClause  `parser:"( @@ )?"`
+}
+
+type SwitchExpr struct {
+	Subject *OrExpr       `parser:"'switch' @@?"`
+	Indent  *string       `parser:"@Indent"`
+	Cases   []*SwitchCase `parser:"@@*"`
+	Dedent  *string       `parser:"@Dedent"`
+}
+
+type SwitchCase struct {
+	Condition  *OrExpr      `parser:"@@? '=>'"`
+	Indent     *string      `parser:"( @Indent"`
+	Body       []*Statement `parser:"@@+"`
+	Dedent     *string      `parser:"@Dedent"`
+	InlineBody *Expression  `parser:"| @@ )"`
+}
+
+type WhileExpr struct {
+	Condition *OrExpr      `parser:"'while' @@"`
+	Indent    *string      `parser:"@Indent"`
+	Body      []*Statement `parser:"@@+"`
+	Dedent    *string      `parser:"@Dedent"`
+}
+
 type Expression struct {
-	Array        *ArrayLiteral `parser:"@@"`
+	ForInExpr    *ForInExpr    `parser:"@@"`
+	ForExpr      *ForExpr      `parser:"| @@"`
+	WhileExpr    *WhileExpr    `parser:"| @@"`
+	IfExpr       *IfExpr       `parser:"| @@"`
+	SwitchExpr   *SwitchExpr   `parser:"| @@"`
 	Ternary      *TernaryExpr  `parser:"| @@"`
+	Array        *ArrayLiteral `parser:"| @@"`
 	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
@@ -112,7 +226,7 @@ type Term struct {
 }
 
 type Factor struct {
-	Paren        *TernaryExpr  `parser:"( '(' @@ ')' )"`
+	Array        *ArrayLiteral `parser:"@@"`
 	Unary        *UnaryExpr    `parser:"| @@"`
 	True         *string       `parser:"| @'true'"`
 	False        *string       `parser:"| @'false'"`
@@ -130,7 +244,8 @@ type PostfixExpr struct {
 }
 
 type PrimaryExpr struct {
-	Call         *CallExpr     `parser:"@@"`
+	Paren        *Expression   `parser:"'(' @@ ')'"`
+	Call         *CallExpr     `parser:"| @@"`
 	MemberAccess *MemberAccess `parser:"| @@"`
 	Ident        *string       `parser:"| @Ident"`
 }
@@ -177,8 +292,8 @@ type CallCallee struct {
 }
 
 type Argument struct {
-	Name  *string      `parser:"( @Ident '=' )?"`
-	Value *TernaryExpr `parser:"@@"`
+	Name  *string     `parser:"( @Ident '=' )?"`
+	Value *Expression `parser:"@@"`
 }
 
 type Value struct {
@@ -194,10 +309,12 @@ type Value struct {
 
 var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Comment", Pattern: `//[^\n]*`},
-	{Name: "Whitespace", Pattern: `[ \t\r\n]+`},
+	{Name: "Newline", Pattern: `\r?\n`},
+	{Name: "Whitespace", Pattern: `[ \t]+`},
+	{Name: "Keyword", Pattern: `\b(if|for|in|to|by|while|switch|and|or|not|true|false|break|continue|var|varip)\b`},
 	{Name: "String", Pattern: `"[^"]*"|'[^']*'`},
-	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}`},
-	{Name: "Float", Pattern: `\d+\.\d+`},
+	{Name: "HexColor", Pattern: `#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?`},
+	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
 	{Name: "Punct", Pattern: `:=|=>|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
@@ -205,10 +322,20 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 
 var indentAwareLexer = indentlexer.NewIndentationDefinition(pineLexer)
 
+/* Singleton — grammar is static, concurrent Build() on shared lexer definition races */
+var (
+	cachedParser    *participle.Parser[Script]
+	cachedParserErr error
+	parserOnce      sync.Once
+)
+
 func NewParser() (*participle.Parser[Script], error) {
-	return participle.Build[Script](
-		participle.Lexer(indentAwareLexer),
-		participle.Elide("Comment", "Whitespace"),
-		participle.UseLookahead(8),
-	)
+	parserOnce.Do(func() {
+		cachedParser, cachedParserErr = participle.Build[Script](
+			participle.Lexer(indentAwareLexer),
+			participle.Elide("Comment", "Whitespace", "Newline"),
+			participle.UseLookahead(16),
+		)
+	})
+	return cachedParser, cachedParserErr
 }

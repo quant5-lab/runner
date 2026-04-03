@@ -17,7 +17,7 @@ func TestValueHandlerCanHandle(t *testing.T) {
 	}{
 		{"na function", "na", true},
 		{"nz function", "nz", true},
-		{"fixnan function", "fixnan", true},
+		{"fixnan function", "fixnan", false}, /* fixnan requires cross-bar state → always hoisted, not inlined */
 		{"ta.sma function", "sma", false},
 		{"close builtin", "close", false},
 		{"math.abs function", "math.abs", false},
@@ -38,8 +38,9 @@ func TestValueHandlerCanHandle(t *testing.T) {
 func TestValueHandlerGenerateNa(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {
@@ -102,8 +103,9 @@ func TestValueHandlerGenerateNa(t *testing.T) {
 func TestValueHandlerGenerateNz(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {
@@ -195,8 +197,9 @@ func TestValueHandlerGenerateNz(t *testing.T) {
 func TestValueHandlerGenerateInlineCall(t *testing.T) {
 	handler := NewValueHandler()
 	gen := &generator{
-		variables: make(map[string]string),
-		varInits:  make(map[string]ast.Expression),
+		variables:      make(map[string]string),
+		varInits:       make(map[string]ast.Expression),
+		builtinHandler: NewBuiltinIdentifierHandler(),
 	}
 
 	tests := []struct {

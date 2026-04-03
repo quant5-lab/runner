@@ -136,6 +136,13 @@ func (c *Context) RegisterSeries(name string, series *series.Series) {
 	c.seriesRegistry.Set(name, series)
 }
 
+func (c *Context) LookupSeries(name string) (*series.Series, bool) {
+	if c.seriesRegistry == nil {
+		return nil, false
+	}
+	return c.seriesRegistry.Get(name)
+}
+
 func (c *Context) GetParent() *Context {
 	return c.parent
 }

@@ -424,6 +424,232 @@ func TestBarEvaluator_NestedOffsetExpressions(t *testing.T) {
 	})
 }
 
+// TestBarEvaluator_TAFunctionStatePreservation verifies historical values remain stable
+// after forward computation - critical for FSB-backed storage (TSI, SMA, STDEV)
+func TestBarEvaluator_TAFunctionStatePreservation(t *testing.T) {
+	ctx := &context.Context{
+		Data: make([]context.OHLCV, 50),
+	}
+	for i := range ctx.Data {
+		phase := float64(100 + i*2)
+		if i >= 20 {
+			phase = float64(100 + 20*2 - (i - 20))
+		}
+		ctx.Data[i] = context.OHLCV{Close: phase}
+	}
+
+	evaluator := NewStreamingBarEvaluator()
+
+	tests := []struct {
+		name          string
+		taFunc        string
+		period1       float64
+		period2       float64
+		earlyBar      int
+		lateBar       int
+		minDivergence float64
+	}{
+		{
+			name:          "tsi_historical_stability",
+			taFunc:        "tsi",
+			period1:       5.0,
+			period2:       13.0,
+			earlyBar:      20,
+			lateBar:       30,
+			minDivergence: 0.01,
+		},
+		{
+			name:          "sma_historical_stability",
+			taFunc:        "sma",
+			period1:       10.0,
+			period2:       0,
+			earlyBar:      15,
+			lateBar:       25,
+			minDivergence: 0.01,
+		},
+		{
+			name:          "stdev_historical_stability",
+			taFunc:        "stdev",
+			period1:       10.0,
+			period2:       0,
+			earlyBar:      15,
+			lateBar:       25,
+			minDivergence: 0.01,
+		},
+		{
+			name:          "ema_historical_stability",
+			taFunc:        "ema",
+			period1:       10.0,
+			period2:       0,
+			earlyBar:      15,
+			lateBar:       25,
+			minDivergence: 0.01,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var taCall *ast.CallExpression
+			if tt.period2 > 0 {
+				taCall = &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: tt.taFunc},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: tt.period1},
+						&ast.Literal{Value: tt.period2},
+					},
+				}
+			} else {
+				taCall = &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: tt.taFunc},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: tt.period1},
+					},
+				}
+			}
+
+			valEarlyFirst, err := evaluator.EvaluateAtBar(taCall, ctx, tt.earlyBar)
+			if err != nil {
+				t.Fatalf("EvaluateAtBar(%d) first call failed: %v", tt.earlyBar, err)
+			}
+			if math.IsNaN(valEarlyFirst) {
+				t.Fatalf("bar %d returned NaN (warmup issue)", tt.earlyBar)
+			}
+
+			valLate, err := evaluator.EvaluateAtBar(taCall, ctx, tt.lateBar)
+			if err != nil {
+				t.Fatalf("EvaluateAtBar(%d) failed: %v", tt.lateBar, err)
+			}
+
+			valEarlySecond, err := evaluator.EvaluateAtBar(taCall, ctx, tt.earlyBar)
+			if err != nil {
+				t.Fatalf("EvaluateAtBar(%d) second call failed: %v", tt.earlyBar, err)
+			}
+
+			if valEarlyFirst != valEarlySecond {
+				t.Errorf("Historical value changed: bar%d first=%.6f, after bar%d=%.6f",
+					tt.earlyBar, valEarlyFirst, tt.lateBar, valEarlySecond)
+			}
+
+			if math.Abs(valEarlyFirst-valLate) < tt.minDivergence {
+				t.Errorf("Phase-change source should diverge: bar%d=%.6f, bar%d=%.6f (too close)",
+					tt.earlyBar, valEarlyFirst, tt.lateBar, valLate)
+			}
+		})
+	}
+}
+
+// TestBarEvaluator_TAFunctionNonSequentialAccess verifies arbitrary access order stability
+func TestBarEvaluator_TAFunctionNonSequentialAccess(t *testing.T) {
+	ctx := &context.Context{
+		Data: make([]context.OHLCV, 40),
+	}
+	for i := range ctx.Data {
+		oscillation := float64(100 + 10*((i%5)-2))
+		ctx.Data[i] = context.OHLCV{Close: oscillation}
+	}
+
+	evaluator := NewStreamingBarEvaluator()
+
+	tests := []struct {
+		name    string
+		taFunc  string
+		period1 float64
+		period2 float64
+		warmup  int
+	}{
+		{
+			name:    "tsi_random_access",
+			taFunc:  "tsi",
+			period1: 5.0,
+			period2: 13.0,
+			warmup:  17,
+		},
+		{
+			name:    "sma_random_access",
+			taFunc:  "sma",
+			period1: 10.0,
+			period2: 0,
+			warmup:  9,
+		},
+		{
+			name:    "stdev_random_access",
+			taFunc:  "stdev",
+			period1: 10.0,
+			period2: 0,
+			warmup:  9,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var taCall *ast.CallExpression
+			if tt.period2 > 0 {
+				taCall = &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: tt.taFunc},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: tt.period1},
+						&ast.Literal{Value: tt.period2},
+					},
+				}
+			} else {
+				taCall = &ast.CallExpression{
+					Callee: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "ta"},
+						Property: &ast.Identifier{Name: tt.taFunc},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{Name: "close"},
+						&ast.Literal{Value: tt.period1},
+					},
+				}
+			}
+
+			valBar35, err := evaluator.EvaluateAtBar(taCall, ctx, 35)
+			if err != nil {
+				t.Fatalf("EvaluateAtBar(35) failed: %v", err)
+			}
+
+			accessPattern := []int{25, 30, 20, 35, 28}
+			results := make(map[int]float64)
+
+			for _, barIdx := range accessPattern {
+				v, err := evaluator.EvaluateAtBar(taCall, ctx, barIdx)
+				if err != nil {
+					t.Fatalf("EvaluateAtBar(%d) failed: %v", barIdx, err)
+				}
+				if barIdx >= tt.warmup && math.IsNaN(v) {
+					t.Errorf("bar %d (post-warmup): got NaN", barIdx)
+				}
+				results[barIdx] = v
+			}
+
+			if results[35] != valBar35 {
+				t.Errorf("Non-sequential access changed bar 35: initial=%.6f, after pattern=%.6f",
+					valBar35, results[35])
+			}
+
+			val25First := results[25]
+			val25Second, _ := evaluator.EvaluateAtBar(taCall, ctx, 25)
+			if val25First != val25Second {
+				t.Errorf("Repeated access changed bar 25: first=%.6f, second=%.6f",
+					val25First, val25Second)
+			}
+		})
+	}
+}
+
 // TestBarEvaluator_OffsetBoundaryConditions tests edge cases for offset bounds
 func TestBarEvaluator_OffsetBoundaryConditions(t *testing.T) {
 	ctx := &context.Context{

@@ -1,0 +1,5 @@
+//@version=5
+// TEST: ta.crossover with nested TA - SHOULD WORK
+strategy("Composition: crossover with inline TA")
+if ta.crossover(ta.sma(close, 14), ta.sma(close, 28))
+    strategy.entry("Long", strategy.long)

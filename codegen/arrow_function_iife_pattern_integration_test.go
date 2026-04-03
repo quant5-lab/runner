@@ -43,7 +43,7 @@ customChange(src) =>
 result = customChange(close)
 `,
 			mustContain: []string{
-				"func customChange(arrowCtx *context.ArrowContext, src float64)",
+				"func customChange(arrowCtx *context.ArrowContext, srcSeries *series.Series)",
 				"ctx.BarIndex < 2",
 				"func() float64",
 			},

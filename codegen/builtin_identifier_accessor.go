@@ -3,21 +3,14 @@ package codegen
 import "fmt"
 
 /*
-BuiltinIdentifierAccessor provides access to builtin identifiers (high, low, close, etc.) in inline TA loops.
+BuiltinIdentifierAccessor generates ForwardSeriesBuffer access for OHLCV fields in inline TA loops.
 
-Responsibility (SRP):
-  - Single purpose: generate loop-based access for builtin OHLCV fields
-  - No knowledge of identifier resolution or expression evaluation
-  - Uses pre-resolved builtin code as template
-
-Design:
-  - Implements AccessGenerator interface for compatibility with inline TA generators
-  - Adapts current-bar access code (ctx.Data[ctx.BarIndex].High) to offset-based access
-  - KISS: simple string manipulation, no complex logic
+Responsibility: Single-purpose accessor implementing AccessGenerator interface
+Design: KISS - maps field names to Series.Get() patterns
 */
 type BuiltinIdentifierAccessor struct {
-	baseCode  string // Pre-resolved builtin code (e.g., "ctx.Data[ctx.BarIndex].High")
-	fieldName string // Extracted field name (e.g., "High")
+	baseCode  string
+	fieldName string
 }
 
 func NewBuiltinIdentifierAccessor(resolvedCode string) *BuiltinIdentifierAccessor {
@@ -28,30 +21,40 @@ func NewBuiltinIdentifierAccessor(resolvedCode string) *BuiltinIdentifierAccesso
 	}
 }
 
-/*
-GenerateLoopValueAccess generates offset-based access for loop iterations.
-*/
+/* GenerateLoopValueAccess generates offset-based access for loop iterations */
 func (a *BuiltinIdentifierAccessor) GenerateLoopValueAccess(loopVar string) string {
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", loopVar, a.fieldName)
+	seriesName := a.fieldNameToSeriesName()
+	return fmt.Sprintf("%s.Get(%s)", seriesName, loopVar)
 }
 
-/*
-GenerateInitialValueAccess generates access for initial value in windowed calculations.
-*/
+/* GenerateInitialValueAccess generates access for initial value in windowed calculations */
 func (a *BuiltinIdentifierAccessor) GenerateInitialValueAccess(period int) string {
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", period-1, a.fieldName)
+	seriesName := a.fieldNameToSeriesName()
+	return fmt.Sprintf("%s.Get(%d)", seriesName, period-1)
 }
 
-/*
-GetPreamble returns any setup code needed before the accessor is used.
-*/
+/* GenerateCurrentValueAccess generates access for current bar value */
+func (a *BuiltinIdentifierAccessor) GenerateCurrentValueAccess() string {
+	seriesName := a.fieldNameToSeriesName()
+	return fmt.Sprintf("%s.GetCurrent()", seriesName)
+}
+
+/* GetPreamble returns setup code needed before accessor usage */
 func (a *BuiltinIdentifierAccessor) GetPreamble() string {
 	return ""
 }
 
+/* GetBaseOffset returns 0 - builtin identifier access is current bar relative */
+func (a *BuiltinIdentifierAccessor) GetBaseOffset() int {
+	return 0
+}
+
+func (a *BuiltinIdentifierAccessor) fieldNameToSeriesName() string {
+	return OHLCVFieldToSeriesName(a.fieldName)
+}
+
 func extractFieldName(resolvedCode string) string {
-	// Extract field name from "ctx.Data[ctx.BarIndex].High" → "High"
-	// This is a simple heuristic - assumes last dotted component is the field name
+	/* Extract last dotted component as field name */
 	for i := len(resolvedCode) - 1; i >= 0; i-- {
 		if resolvedCode[i] == '.' {
 			return resolvedCode[i+1:]

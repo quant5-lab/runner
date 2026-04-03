@@ -1,0 +1,10 @@
+//@version=5
+indicator("For Loop Nested Test", overlay=false)
+
+// Expected: 60.0 (sum of i*j for nested loops)
+result = 0.0
+for i = 1 to 3
+	for j = 1 to 4
+		result := result + (i * j)
+
+plot(result, "Nested Sum", color=color.purple)

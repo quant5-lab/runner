@@ -172,6 +172,186 @@ func TestTypeInferenceEngine_InferType_CallExpression(t *testing.T) {
 			},
 			expected: "float64",
 		},
+		{
+			name: "color.new returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "red"},
+					&ast.Literal{Value: 50.0},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.rgb returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "rgb"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: 255.0},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: 0.0},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.from_gradient returns string",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "from_gradient"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "rsi"},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: 100.0},
+					&ast.Identifier{Name: "red"},
+					&ast.Identifier{Name: "green"},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "ta.cross returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "cross"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "fast"},
+					&ast.Identifier{Name: "slow"},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "ta.rising returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "rising"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: 3.0},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "ta.falling returns bool",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "falling"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "volume"},
+					&ast.Literal{Value: 2.0},
+				},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare crossover returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "crossover"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare crossunder returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "crossunder"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare cross returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "cross"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "a"}, &ast.Identifier{Name: "b"}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare rising returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "rising"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: 3.0}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "bare falling returns bool",
+			expr: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "falling"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: 3.0}},
+			},
+			expected: "bool",
+		},
+		{
+			name: "color.r returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "r"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.g returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "g"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.b returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "b"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
+		{
+			name: "color.t returns float64",
+			expr: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "t"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "myColor"},
+				},
+			},
+			expected: "float64",
+		},
 	}
 
 	for _, tt := range tests {
@@ -395,6 +575,126 @@ func TestTypeInferenceEngine_MultipleVariables(t *testing.T) {
 
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v (var=%v, const=%v)", tt.expected, result, varResult, constResult)
+			}
+		})
+	}
+}
+
+func TestTypeInferenceEngine_InferType_ColorMemberExpression(t *testing.T) {
+	// Test type inference for string constants (color.*, strategy.*)
+	tests := []struct {
+		name     string
+		expr     *ast.MemberExpression
+		expected string
+	}{
+		{
+			name: "color.red returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "red"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.blue returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "blue"},
+			},
+			expected: "string",
+		},
+		{
+			name: "color.silver returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "silver"},
+			},
+			expected: "string",
+		},
+		{
+			name: "strategy.long returns string",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "strategy"},
+				Property: &ast.Identifier{Name: "long"},
+			},
+			expected: "string",
+		},
+		{
+			name: "ta.sma returns float64",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "sma"},
+			},
+			expected: "float64",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewTypeInferenceEngine()
+			result := engine.InferType(tt.expr)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTypeInferenceEngine_InferType_ColorConditionalExpression(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     *ast.ConditionalExpression
+		expected string
+	}{
+		{
+			name: "conditional with color branches returns string",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.BinaryExpression{
+					Operator: ">",
+					Left:     &ast.Identifier{Name: "close"},
+					Right:    &ast.Identifier{Name: "open"},
+				},
+				Consequent: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "lime"},
+				},
+				Alternate: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "red"},
+				},
+			},
+			expected: "string",
+		},
+		{
+			name: "nested conditional with color branches returns string",
+			expr: &ast.ConditionalExpression{
+				Test: &ast.Identifier{Name: "cond1"},
+				Consequent: &ast.ConditionalExpression{
+					Test: &ast.Identifier{Name: "cond2"},
+					Consequent: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "lime"},
+					},
+					Alternate: &ast.MemberExpression{
+						Object:   &ast.Identifier{Name: "color"},
+						Property: &ast.Identifier{Name: "maroon"},
+					},
+				},
+				Alternate: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "color"},
+					Property: &ast.Identifier{Name: "red"},
+				},
+			},
+			expected: "string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewTypeInferenceEngine()
+			result := engine.InferType(tt.expr)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
 	}

@@ -1,0 +1,8 @@
+Hull Suite Strategy (v4) — HMA/EHMA/THMA with mode switch
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅ (ComputedPeriod handles arithmetic and call expressions)
+Compile: ❌ (testPeriodStart/testPeriodStop undefined, wma/ema as function-scoped calls)
+Execute: ❌ Not reached
+
+Blocker: #5 (wma/ema function-scoped calls), date filtering (testPeriodStart/testPeriodStop)

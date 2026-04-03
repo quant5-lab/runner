@@ -106,6 +106,37 @@ func TestIsIntradayTimeframe(t *testing.T) {
 	}
 }
 
+func TestTimeframeMultiplier(t *testing.T) {
+	tests := []struct {
+		name     string
+		tf       string
+		expected int64
+	}{
+		{"5 minute", "5m", 5},
+		{"1 minute", "1m", 1},
+		{"15 minute", "15m", 15},
+		{"1 hour", "1h", 1},
+		{"4 hour", "4h", 4},
+		{"daily D", "D", 1},
+		{"daily 1D", "1D", 1},
+		{"weekly W", "W", 1},
+		{"weekly 1W", "1W", 1},
+		{"monthly M", "M", 1},
+		{"monthly 1M", "1M", 1},
+		{"3 monthly", "3M", 3},
+		{"30 seconds", "30s", 30},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TimeframeMultiplier(tt.tf)
+			if got != tt.expected {
+				t.Errorf("TimeframeMultiplier(%q) = %v, want %v", tt.tf, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestContextTimeframeFlags(t *testing.T) {
 	tests := []struct {
 		name           string

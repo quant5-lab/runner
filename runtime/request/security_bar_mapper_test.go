@@ -151,7 +151,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   0,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "mid day 1 with lookahead on",
@@ -165,7 +165,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   1,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "last bar of day 1 with lookahead on",
@@ -179,7 +179,7 @@ func TestSecurityBarMapper_FindDailyBarIndex(t *testing.T) {
 			hourlyIndex:   2,
 			lookahead:     false,
 			expectedDaily: 0,
-			description:   "lookahead=off returns current Daily bar for first range (FIXED)",
+			description:   "lookahead=off at first range returns current Daily bar",
 		},
 		{
 			name:          "first bar of day 2 with lookahead on",
@@ -533,29 +533,6 @@ func TestSecurityBarMapper_DateBoundaries(t *testing.T) {
 	}
 }
 
-func TestBarRange_Contains(t *testing.T) {
-	t.Skip("replaced by TestBarRange_Predicates for comprehensive predicate testing")
-	r := NewBarRange(0, 10, 20)
-
-	tests := []struct {
-		hourlyIndex int
-		expected    bool
-	}{
-		{5, false},
-		{10, true},
-		{15, true},
-		{20, true},
-		{25, false},
-	}
-
-	for _, tt := range tests {
-		result := r.Contains(tt.hourlyIndex)
-		if result != tt.expected {
-			t.Errorf("Contains(%d) = %v, expected %v", tt.hourlyIndex, result, tt.expected)
-		}
-	}
-}
-
 func parseTime(layout string) int64 {
 	t, _ := timeFromString(layout)
 	return t
@@ -572,4 +549,76 @@ func timeFromString(s string) (int64, error) {
 
 func parseUTC(value, layout string) (t time.Time, err error) {
 	return time.Parse(layout, value)
+}
+
+func TestSecurityBarMapper_FindDailyBarIndex_Transformed(t *testing.T) {
+	tests := []struct {
+		name            string
+		mainToSynthetic []int
+		mainBarIdx      int
+		lookahead       bool
+		want            int
+	}{
+		// Valid forward mapping: returns the synthetic bar index for that main bar.
+		{"first main bar maps to first brick", []int{0, 0, 0, 1, 1, 2}, 0, false, 0},
+		{"last main bar of first brick", []int{0, 0, 0, 1, 1, 2}, 2, false, 0},
+		{"first main bar of second brick", []int{0, 0, 0, 1, 1, 2}, 3, false, 1},
+		{"last main bar in mapping", []int{0, 0, 0, 1, 1, 2}, 5, false, 2},
+
+		// lookahead is ignored for ModeTransformed.
+		{"lookahead=true ignored", []int{0, 0, 1, 2}, 1, true, 0},
+		{"lookahead=false same result", []int{0, 0, 1, 2}, 1, false, 0},
+
+		// Pre-formation sentinel: no synthetic bar has formed yet.
+		{"pre-formation entry returns -1", []int{-1, -1, 0, 1}, 0, false, -1},
+		{"all pre-formation returns -1", []int{-1, -1, -1}, 2, false, -1},
+
+		// Out-of-bounds access returns -1.
+		{"index beyond mapping length", []int{0, 1, 2}, 5, false, -1},
+		{"negative index", []int{0, 1, 2}, -1, false, -1},
+
+		// Empty mapping.
+		{"empty mapping any index", []int{}, 0, false, -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewSecurityBarMapper()
+			m.BuildMappingFromTransform(tt.mainToSynthetic)
+			got := m.FindDailyBarIndex(tt.mainBarIdx, tt.lookahead)
+			if got != tt.want {
+				t.Errorf("FindDailyBarIndex(%d, %v) = %d, want %d", tt.mainBarIdx, tt.lookahead, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSecurityBarMapper_BuildIdentityMapping(t *testing.T) {
+	mapper := NewSecurityBarMapper()
+	mapper.BuildIdentityMapping(1000)
+
+	if mapper.mode != ModeIdentity {
+		t.Errorf("expected ModeIdentity, got %v", mapper.mode)
+	}
+
+	tests := []struct {
+		barIndex  int
+		lookahead bool
+		expected  int
+	}{
+		{0, false, 0},
+		{0, true, 0},
+		{100, false, 100},
+		{100, true, 100},
+		{999, false, 999},
+		{999, true, 999},
+	}
+
+	for _, tt := range tests {
+		result := mapper.FindDailyBarIndex(tt.barIndex, tt.lookahead)
+		if result != tt.expected {
+			t.Errorf("FindDailyBarIndex(%d, %v) = %d, want %d",
+				tt.barIndex, tt.lookahead, result, tt.expected)
+		}
+	}
 }

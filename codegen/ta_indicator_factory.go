@@ -34,8 +34,6 @@ func NewTAIndicatorFactory() *TAIndicatorFactory {
 //   - varName: Variable name for the output Series
 //   - period: Lookback period
 //   - accessor: AccessGenerator for data source
-//
-// Returns a configured builder ready to generate code, or an error if the indicator type is not supported.
 func (f *TAIndicatorFactory) CreateBuilder(
 	indicatorType string,
 	varName string,
@@ -63,13 +61,11 @@ func (f *TAIndicatorFactory) CreateBuilder(
 		return builder, nil
 
 	case "ta.dev":
-		// DEV requires special handling like STDEV - return builder without accumulator
-		// Caller must handle two-pass calculation (mean then absolute deviation)
+		// DEV requires two-pass calculation: mean then absolute deviation
 		return builder, nil
 
 	case "ta.stdev":
-		// STDEV requires special handling - return builder without accumulator
-		// Caller must handle two-pass calculation (mean then variance)
+		// STDEV requires two-pass calculation: mean then variance
 		return builder, nil
 
 	default:
@@ -82,11 +78,6 @@ func (f *TAIndicatorFactory) CreateBuilder(
 // STDEV requires two passes:
 //  1. Calculate mean (using SumAccumulator)
 //  2. Calculate variance from mean (using VarianceAccumulator)
-//
-// Returns:
-//   - meanBuilder: Builder for mean calculation
-//   - varianceBuilder: Builder for variance calculation
-//   - error: If creation fails
 func (f *TAIndicatorFactory) CreateSTDEVBuilders(
 	varName string,
 	period int,
@@ -94,7 +85,6 @@ func (f *TAIndicatorFactory) CreateSTDEVBuilders(
 ) (meanBuilder *TAIndicatorBuilder, varianceBuilder *TAIndicatorBuilder, err error) {
 	needsNaN := f.shouldCheckNaN(accessor)
 
-	// Pass 1: Calculate mean
 	meanBuilder = NewTAIndicatorBuilder("STDEV_MEAN", varName, period, accessor, needsNaN)
 	meanBuilder.WithAccumulator(NewSumAccumulator())
 
@@ -106,9 +96,8 @@ func (f *TAIndicatorFactory) CreateSTDEVBuilders(
 }
 
 // shouldCheckNaN determines if NaN checking is needed based on accessor type.
-//
-// Series variables need NaN checking because they can contain calculated values
-// that might be NaN. OHLCV fields from raw data typically don't need NaN checks.
+// Series variables need NaN checking because they can contain calculated values.
+// OHLCV fields from raw data typically don't need NaN checks.
 func (f *TAIndicatorFactory) shouldCheckNaN(accessor AccessGenerator) bool {
 	// Check if accessor is a Series variable accessor
 	switch accessor.(type) {

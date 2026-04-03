@@ -23,20 +23,24 @@ import (
 //   - Deduplication: Same call expression → same temp var
 //   - Unique naming: funcName + period + argHash
 //   - Series lifecycle: Declaration, initialization, .Next() calls
+//   - Ordered generation: insertion order preserved for dependency correctness
 type TempVariableManager struct {
-	gen           *generator                     // Generator context
-	callToVar     map[*ast.CallExpression]string // Deduplication map
-	varToCallInfo map[string]CallInfo            // Reverse mapping for code generation
-	declaredVars  map[string]bool                // Track which vars need declaration
+	gen             *generator
+	callToVar       map[*ast.CallExpression]string
+	varToCallInfo   map[string]CallInfo
+	conditionalVars map[string]*ast.ConditionalExpression
+	orderedVars     []string
+	emissionTracker *TempVarEmissionTracker
 }
 
 // NewTempVariableManager creates manager with generator context
 func NewTempVariableManager(g *generator) *TempVariableManager {
 	return &TempVariableManager{
-		gen:           g,
-		callToVar:     make(map[*ast.CallExpression]string),
-		varToCallInfo: make(map[string]CallInfo),
-		declaredVars:  make(map[string]bool),
+		gen:             g,
+		callToVar:       make(map[*ast.CallExpression]string),
+		varToCallInfo:   make(map[string]CallInfo),
+		conditionalVars: make(map[string]*ast.ConditionalExpression),
+		emissionTracker: NewTempVarEmissionTracker(),
 	}
 }
 
@@ -50,7 +54,7 @@ func NewTempVariableManager(g *generator) *TempVariableManager {
 //	sma(close, 50)  → ta_sma_50_a1b2c3d4
 //	sma(close, 200) → ta_sma_200_e5f6g7h8
 func (m *TempVariableManager) GetOrCreate(info CallInfo) string {
-	// Check if already created (deduplication)
+	// Check if already created (deduplication by AST pointer)
 	if varName, exists := m.callToVar[info.Call]; exists {
 		return varName
 	}
@@ -58,13 +62,16 @@ func (m *TempVariableManager) GetOrCreate(info CallInfo) string {
 	// Generate unique name: funcName + extracted params + hash
 	varName := m.generateUniqueName(info)
 
+	// Deduplicate by generated name (different AST nodes, same content)
+	if _, exists := m.varToCallInfo[varName]; exists {
+		m.callToVar[info.Call] = varName
+		return varName
+	}
+
 	// Store mappings
 	m.callToVar[info.Call] = varName
 	m.varToCallInfo[varName] = info
-	m.declaredVars[varName] = true
-
-	// Temp vars managed exclusively by TempVariableManager (not g.variables)
-	// Prevents double declaration: g.variables loop + GenerateDeclarations()
+	m.orderedVars = append(m.orderedVars, varName)
 
 	return varName
 }
@@ -115,7 +122,7 @@ func (m *TempVariableManager) extractPeriodFromCall(call *ast.CallExpression) in
 //	var ta_sma_50_a1b2c3d4Series *series.Series
 //	var ta_sma_200_e5f6g7h8Series *series.Series
 func (m *TempVariableManager) GenerateDeclarations() string {
-	if len(m.declaredVars) == 0 {
+	if len(m.orderedVars) == 0 {
 		return ""
 	}
 
@@ -127,8 +134,34 @@ func (m *TempVariableManager) GenerateDeclarations() string {
 	code := ""
 	code += indent + "// Temp variables for inline TA calls in expressions\n"
 
-	for varName := range m.declaredVars {
+	hasFixnan := false
+	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("var %sSeries *series.Series\n", varName)
+
+		/* Generate internal Series for composite indicators (RSI needs gains/losses Series) */
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("var %sSeries *series.Series\n", internalName)
+				}
+				if info.FuncName == "fixnan" {
+					hasFixnan = true
+				}
+			}
+		}
+	}
+
+	/* fixnan requires cross-bar state variable for forward-fill */
+	if hasFixnan {
+		code += indent + "// State variables for fixnan forward-fill (temp vars)\n"
+		for _, varName := range m.orderedVars {
+			info, exists := m.varToCallInfo[varName]
+			if exists && info.FuncName == "fixnan" {
+				code += indent + fmt.Sprintf("var fixnanState_%s = math.NaN()\n", varName)
+			}
+		}
 	}
 
 	return code
@@ -142,7 +175,7 @@ func (m *TempVariableManager) GenerateDeclarations() string {
 //	ta_sma_50_a1b2c3d4Series = series.NewSeries(len(ctx.Data))
 //	ta_sma_200_e5f6g7h8Series = series.NewSeries(len(ctx.Data))
 func (m *TempVariableManager) GenerateInitializations() string {
-	if len(m.declaredVars) == 0 {
+	if len(m.orderedVars) == 0 {
 		return ""
 	}
 
@@ -153,8 +186,19 @@ func (m *TempVariableManager) GenerateInitializations() string {
 
 	code := ""
 
-	for varName := range m.declaredVars {
+	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", varName)
+
+		/* Initialize internal Series for composite indicators */
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("%sSeries = series.NewSeries(len(ctx.Data))\n", internalName)
+				}
+			}
+		}
 	}
 
 	return code
@@ -174,7 +218,7 @@ func (m *TempVariableManager) GenerateInitializations() string {
 //	  ta_sma_50_a1b2c3d4Series.Set(math.NaN())
 //	}
 func (m *TempVariableManager) GenerateCalculations() (string, error) {
-	if len(m.varToCallInfo) == 0 {
+	if len(m.orderedVars) == 0 {
 		return "", nil
 	}
 
@@ -184,16 +228,54 @@ func (m *TempVariableManager) GenerateCalculations() (string, error) {
 
 	code := ""
 
-	for varName, info := range m.varToCallInfo {
-		// Use TAFunctionRegistry to generate inline calculation
-		calcCode, err := m.gen.generateVariableFromCall(varName, info.Call)
+	for _, varName := range m.orderedVars {
+		calcCode, err := m.generateCalculationForVar(varName)
 		if err != nil {
-			return "", fmt.Errorf("failed to generate temp var %s: %w", varName, err)
+			return "", err
 		}
 		code += calcCode
 	}
 
 	return code, nil
+}
+
+func (m *TempVariableManager) GenerateCalculationsForStatement(stmtIdx int) (string, error) {
+	if len(m.orderedVars) == 0 {
+		return "", nil
+	}
+
+	if m.gen == nil {
+		return "", fmt.Errorf("generator context required for calculations")
+	}
+
+	code := ""
+
+	for _, varName := range m.orderedVars {
+		info, exists := m.varToCallInfo[varName]
+		if !exists || info.StmtIndex != stmtIdx {
+			continue
+		}
+		calcCode, err := m.generateCalculationForVar(varName)
+		if err != nil {
+			return "", err
+		}
+		code += calcCode
+		m.emissionTracker.MarkAsEmitted(varName)
+	}
+
+	return code, nil
+}
+
+func (m *TempVariableManager) generateCalculationForVar(varName string) (string, error) {
+	info, exists := m.varToCallInfo[varName]
+	if !exists {
+		return "", nil
+	}
+	calcCode, err := m.gen.generateVariableFromCall(varName, info.Call)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp var %s: %w", varName, err)
+	}
+	return calcCode, nil
 }
 
 // GenerateNextCalls outputs .Next() calls for bar advancement (ForwardSeriesBuffer paradigm)
@@ -204,7 +286,7 @@ func (m *TempVariableManager) GenerateCalculations() (string, error) {
 //	if i < barCount-1 { ta_sma_50_a1b2c3d4Series.Next() }
 //	if i < barCount-1 { ta_sma_200_e5f6g7h8Series.Next() }
 func (m *TempVariableManager) GenerateNextCalls() string {
-	if len(m.declaredVars) == 0 {
+	if len(m.orderedVars) == 0 {
 		return ""
 	}
 
@@ -215,8 +297,18 @@ func (m *TempVariableManager) GenerateNextCalls() string {
 
 	code := ""
 
-	for varName := range m.declaredVars {
+	for _, varName := range m.orderedVars {
 		code += indent + fmt.Sprintf("if i < barCount-1 { %sSeries.Next() }\n", varName)
+
+		if m.gen != nil && m.gen.compositeIndicatorRegistry != nil {
+			info, exists := m.varToCallInfo[varName]
+			if exists {
+				internalNames := m.gen.compositeIndicatorRegistry.GetInternalSeriesNames(info.FuncName, varName, info.Call)
+				for _, internalName := range internalNames {
+					code += indent + fmt.Sprintf("if i < barCount-1 { %sSeries.Next() }\n", internalName)
+				}
+			}
+		}
 	}
 
 	return code
@@ -229,9 +321,46 @@ func (m *TempVariableManager) GetVarNameForCall(call *ast.CallExpression) string
 	return m.callToVar[call]
 }
 
+func (m *TempVariableManager) WasAlreadyEmitted(varName string) bool {
+	return m.emissionTracker.WasEmitted(varName)
+}
+
 // Reset clears all state (for testing or multiple strategy generation)
 func (m *TempVariableManager) Reset() {
 	m.callToVar = make(map[*ast.CallExpression]string)
 	m.varToCallInfo = make(map[string]CallInfo)
-	m.declaredVars = make(map[string]bool)
+	m.conditionalVars = make(map[string]*ast.ConditionalExpression)
+	m.orderedVars = nil
+	m.emissionTracker.Reset()
+}
+
+func (m *TempVariableManager) RegisterConditional(hash string, cond *ast.ConditionalExpression) string {
+	if existingVar, exists := m.conditionalVars[hash]; exists {
+		for varName, storedCond := range m.conditionalVars {
+			if storedCond == existingVar {
+				return varName
+			}
+		}
+	}
+
+	varName := fmt.Sprintf("conditional_%s", hash)
+	m.conditionalVars[varName] = cond
+	return varName
+}
+
+func (m *TempVariableManager) GetConditionalByHash(hash string) *ast.ConditionalExpression {
+	varName := fmt.Sprintf("conditional_%s", hash)
+	return m.conditionalVars[varName]
+}
+
+func (m *TempVariableManager) GetConditionalVarName(hash string) string {
+	varName := fmt.Sprintf("conditional_%s", hash)
+	if _, exists := m.conditionalVars[varName]; exists {
+		return varName
+	}
+	return ""
+}
+
+func (m *TempVariableManager) GetAllConditionals() map[string]*ast.ConditionalExpression {
+	return m.conditionalVars
 }

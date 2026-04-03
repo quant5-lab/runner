@@ -6,7 +6,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* ATRHandler generates inline code for Average True Range calculations */
 type ATRHandler struct{}
 
 func (h *ATRHandler) CanHandle(funcName string) bool {
@@ -15,18 +14,23 @@ func (h *ATRHandler) CanHandle(funcName string) bool {
 
 func (h *ATRHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
 	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("ta.atr requires 1 argument (period)")
+		return "", fmt.Errorf("ta.atr requires period argument")
 	}
 
-	periodArg, ok := call.Arguments[0].(*ast.Literal)
-	if !ok {
-		return "", fmt.Errorf("ta.atr period must be literal")
+	periodResult := evaluatePeriodExpression(g, call.Arguments[0])
+
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("ta.atr: %s", periodResult.FailureReason)
 	}
 
-	period, err := extractPeriod(periodArg)
-	if err != nil {
-		return "", fmt.Errorf("ta.atr: %w", err)
+	if periodResult.IsRuntimeDynamic() {
+		dynamicGen := NewDynamicPeriodTAGenerator(g)
+		code, err := dynamicGen.Generate(varName, "ta.atr", nil, periodResult)
+		if err != nil {
+			return "", err
+		}
+		return g.indentCode(code), nil
 	}
 
-	return g.generateInlineATR(varName, period)
+	return g.generateRMA(varName, periodResult.StaticValue, NewTrueRangeAccessGenerator(), false)
 }

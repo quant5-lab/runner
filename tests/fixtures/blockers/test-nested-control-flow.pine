@@ -1,0 +1,227 @@
+//@version=4
+strategy("Nested Control Flow Comprehensive Test")
+
+// ============================================================================
+// Nested IF statements
+// ============================================================================
+if close > open
+    if volume > volume[1]
+        if high > high[1]
+            strategy.entry("LONG", strategy.long)
+
+// ============================================================================
+// IF with FOR inside
+// ============================================================================
+sum = 0.0
+if close > sma(close, 20)
+    for i = 0 to 5
+        sum := sum + close[i]
+
+// ============================================================================
+// FOR with nested IF
+// ============================================================================
+count = 0
+for i = 0 to 10
+    if close[i] > open[i]
+        count := count + 1
+
+// ============================================================================
+// Arrow function with nested IF
+// ============================================================================
+calcSignal(price, threshold) =>
+    result = 0
+    if price > threshold
+        if volume > 1000000
+            result := 1
+    result
+
+signal = calcSignal(close, 50)
+
+// ============================================================================
+// Arrow function with nested FOR
+// ============================================================================
+sumRange(start, end) =>
+    total = 0.0
+    for i = start to end
+        total := total + close[i]
+    total
+
+rangeSum = sumRange(0, 5)
+
+// ============================================================================
+// Triple nested IF
+// ============================================================================
+deepCondition = false
+if close > open
+    if high > high[1]
+        if low > low[1]
+            deepCondition := true
+
+// ============================================================================
+// Mixed nesting with comments
+// ============================================================================
+mixedResult = 0
+if close > sma(close, 50)
+    for j = 0 to 3
+        if close[j] > open[j]
+            mixedResult := mixedResult + 1
+
+// ============================================================================
+// Arrow function after control flow DEDENT
+// ============================================================================
+getValue() =>
+    if close > open
+        close
+    else
+        open
+
+value = getValue()
+
+// ============================================================================
+// Statements before nested control
+// ============================================================================
+if close > open
+    a = high - low
+    if a > atr(14)
+        b = a * 2
+        strategy.entry("WIDE", strategy.long)
+
+// ============================================================================
+// FOR with nested FOR
+// ============================================================================
+matrix_sum = 0.0
+for i = 0 to 2
+    for j = 0 to 2
+        matrix_sum := matrix_sum + close[i] + volume[j]
+
+// ============================================================================
+// Mixed 2-space and 4-space indentation
+// ============================================================================
+edgeCase1 = 0
+if close > open
+  edgeCase1 := 1
+  if high > high[1]
+    edgeCase1 := 2
+
+// ============================================================================
+// 8-space indentation
+// ============================================================================
+edgeCase2 = 0
+if volume > 1000000
+        edgeCase2 := 1
+        for k = 0 to 2
+                edgeCase2 := edgeCase2 + k
+
+// ============================================================================
+// Tab indentation
+// ============================================================================
+tabTest = 0
+if close > sma(close, 10)
+	tabTest := 1
+	if volume > volume[1]
+		tabTest := 2
+
+// ============================================================================
+// Comments with zero indentation
+// ============================================================================
+commentTest1 = 0
+if close > open
+    commentTest1 := 1
+// Comment at column 0
+    if high > low
+        commentTest1 := 2
+
+// ============================================================================
+// Comments with excessive indentation
+// ============================================================================
+commentTest2 = 0
+if close < open
+    commentTest2 := 1
+                        // Excessive indent
+    for m = 0 to 3
+        commentTest2 := commentTest2 + m
+
+// ============================================================================
+// Multiple misaligned comments
+// ============================================================================
+commentTest3 = 0
+if volume > sma(volume, 20)
+// Zero indent
+    commentTest3 := 1
+  // Two spaces
+    if close > high[1]
+      // Six spaces
+        commentTest3 := 2
+            // Twelve spaces
+
+// ============================================================================
+// Arrow function with misaligned comments
+// ============================================================================
+edgeArrow(val) =>
+// Zero indent
+    res = 0
+     // Five spaces
+    if val > 100
+          // Ten spaces
+        res := 1
+    res
+
+edgeResult = edgeArrow(close)
+
+// ============================================================================
+// 1-space indentation
+// ============================================================================
+oneSpace = 0
+if close > 50
+ oneSpace := 1
+ if volume > 500000
+  oneSpace := 2
+
+// ============================================================================
+// 3-space indentation
+// ============================================================================
+threeSpace = 0
+if close < 100
+   threeSpace := 1
+   for n = 0 to 2
+      threeSpace := threeSpace + n
+
+// ============================================================================
+// 5-space indentation
+// ============================================================================
+fiveSpace = 0
+if high > low
+     fiveSpace := 1
+     if open < close
+          fiveSpace := 2
+
+// ============================================================================
+// 6-space indentation
+// ============================================================================
+sixSpace = 0
+if volume > 1000
+      sixSpace := 1
+      for p = 0 to 2
+            sixSpace := sixSpace + p
+
+// ============================================================================
+// Alternating tabs and spaces within block
+// ============================================================================
+mixedWithinBlock = 0
+if close > open
+	mixedWithinBlock := 1
+    anotherVar = 2
+	yetAnother := 3
+
+// ============================================================================
+// Spaces first level, tabs nested
+// ============================================================================
+spacesThenTab = 0
+if low < high
+    spacesThenTab := 1
+	if volume > 0
+		spacesThenTab := 2
+
+plot(signal, "Signal", color=color.blue)
+plot(mixedResult, "Mixed", color=color.orange)
+plot(edgeResult, "EdgeArrow", color=color.green)

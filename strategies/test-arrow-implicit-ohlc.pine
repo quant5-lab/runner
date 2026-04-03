@@ -1,0 +1,19 @@
+//@version=5
+strategy("Test Arrow Implicit OHLC", overlay=true)
+
+// Pattern: implicit OHLC in arrow context
+
+atrValue = request.security(syminfo.tickerid, "1D", ta.atr(14))
+trValue = request.security(syminfo.tickerid, "1D", ta.tr(true))
+
+volatilityHigh = atrValue > ta.sma(atrValue, 20)
+longCondition = close > ta.sma(close, 20) and volatilityHigh
+shortCondition = close < ta.sma(close, 20) and volatilityHigh
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+plot(atrValue, color=color.blue, title="ATR")
+plot(trValue, color=color.orange, title="TR")

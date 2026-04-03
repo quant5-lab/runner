@@ -1,0 +1,6 @@
+//@version=5
+indicator("Negative Numbers Test Simple", overlay=true)
+x = -42
+y = -3.14
+z = -0.5
+strategy.entry("test", strategy.long)

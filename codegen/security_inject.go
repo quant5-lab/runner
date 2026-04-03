@@ -10,11 +10,79 @@ import (
 
 /* SecurityInjection holds prefetch code to inject before bar loop */
 type SecurityInjection struct {
-	PrefetchCode string   // Code to execute before bar loop
-	ImportPaths  []string // Additional imports needed
+	PrefetchCode string // Code to execute before bar loop
+	ImportPaths  []string
 }
 
-/* AnalyzeAndGeneratePrefetch analyzes AST for security() calls and generates prefetch code */
+type resolvedSecurityCall struct {
+	call           security.SecurityCall
+	resolvedSym    string
+	resolvedTf     string
+	isSymRuntime   bool
+	isTfRuntime    bool
+	modifierPrefix string // e.g., "HEIKINASHI" if symbol was "HEIKINASHI:syminfo.tickerid"
+}
+
+func buildVariableMap(program *ast.Program) map[string]string {
+	vars := make(map[string]string)
+	if program == nil {
+		return vars
+	}
+
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, decl := range varDecl.Declarations {
+				if decl.Init == nil {
+					continue
+				}
+				id, ok := decl.ID.(*ast.Identifier)
+				if !ok {
+					continue
+				}
+				if lit, ok := decl.Init.(*ast.Literal); ok {
+					if s, ok := lit.Value.(string); ok {
+						vars[id.Name] = strings.Trim(s, "\"'")
+					}
+					continue
+				}
+				if call, ok := decl.Init.(*ast.CallExpression); ok {
+					if isInputCallExpr(call) {
+						if defval := extractInputDefvalLiteral(call); defval != "" {
+							vars[id.Name] = strings.Trim(defval, "\"'")
+						}
+					}
+				}
+			}
+		}
+	}
+	return vars
+}
+
+func resolveSecurityArgument(expr ast.Expression, rawValue string, vars map[string]string) (resolved string, isRuntime bool) {
+	if isRuntimeSymbol(rawValue) || isRuntimeTimeframe(rawValue) {
+		return rawValue, true
+	}
+
+	if lit, ok := expr.(*ast.Literal); ok {
+		if s, ok := lit.Value.(string); ok {
+			return strings.Trim(s, "\"'"), false
+		}
+	}
+
+	if id, ok := expr.(*ast.Identifier); ok {
+		if val, found := vars[id.Name]; found {
+			return val, false
+		}
+		return rawValue, true
+	}
+
+	if _, ok := expr.(*ast.MemberExpression); ok {
+		return rawValue, true
+	}
+
+	return rawValue, false
+}
+
 func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error) {
 	calls := security.AnalyzeAST(program)
 
@@ -31,37 +99,57 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		return nil, err
 	}
 
-	var codeBuilder strings.Builder
+	/* Build variable map for user variable resolution */
+	vars := buildVariableMap(program)
 
-	codeBuilder.WriteString("\n\t/* === request.security() Prefetch === */\n")
-	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
+	/* Resolve symbol/timeframe for each call */
+	resolved := make([]resolvedSecurityCall, len(calls))
+	for i, call := range calls {
+		sym, symRuntime := resolveSecurityArgument(call.SymbolExpr, call.Symbol, vars)
+		tf, tfRuntime := resolveSecurityArgument(call.TimeframeExpr, call.Timeframe, vars)
 
-	/* Generate prefetch request map (deduplicated symbol:timeframe pairs) */
-	codeBuilder.WriteString("\t/* Fetch and cache multi-timeframe data */\n")
-
-	/* Build deduplicated map of symbol:timeframe → expressions */
-	dedupMap := make(map[string][]security.SecurityCall)
-	for _, call := range calls {
-		sym := call.Symbol
-		isRuntimeSymbol := sym == "" || sym == "tickerid" || sym == "syminfo.tickerid"
-
-		if isRuntimeSymbol {
-			sym = "%s"
+		/* Extract modifier prefix from symbol (e.g., HEIKINASHI:syminfo.tickerid → prefix=HEIKINASHI, sym=syminfo.tickerid) */
+		modPrefix, baseSym, hasModifier := extractModifierPrefix(sym)
+		if hasModifier {
+			sym = baseSym
 		}
 
-		tf := normalizeTimeframe(call.Timeframe)
-		key := fmt.Sprintf("%s:%s", sym, tf)
-		dedupMap[key] = append(dedupMap[key], call)
+		resolved[i] = resolvedSecurityCall{
+			call:           call,
+			resolvedSym:    sym,
+			resolvedTf:     normalizeTimeframe(tf),
+			isSymRuntime:   symRuntime,
+			isTfRuntime:    tfRuntime,
+			modifierPrefix: modPrefix,
+		}
 	}
 
-	/* Don't create new map - use parameter passed to function */
+	var codeBuilder strings.Builder
 
-	codeBuilder.WriteString("\n\t/* Calculate base timeframe in seconds for warmup comparison */\n")
+	codeBuilder.WriteString("\n\t// request.security() Prefetch\n")
+	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
+	codeBuilder.WriteString("\t// Fetch and cache multi-timeframe data\n")
+
+	dedupMap := make(map[string][]resolvedSecurityCall)
+	for _, r := range resolved {
+		sym := r.resolvedSym
+		if r.isSymRuntime {
+			sym = runtimePlaceholder()
+		}
+
+		tf := r.resolvedTf
+		if r.isTfRuntime {
+			tf = runtimePlaceholder()
+		}
+
+		key := fmt.Sprintf("%s:%s", sym, tf)
+		dedupMap[key] = append(dedupMap[key], r)
+	}
+
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
 	codeBuilder.WriteString("\tvar secTimeframeSeconds int64\n")
 	codeBuilder.WriteString("\tbaseDateRange := request.NewDateRangeFromBars(ctx.Data, ctx.Timezone)\n")
 
-	/* Generate fetch and store code for each unique symbol:timeframe */
 	for key, callsForKey := range dedupMap {
 		firstCall := callsForKey[0]
 
@@ -69,34 +157,48 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		tf := parts[len(parts)-1]
 		sym := strings.Join(parts[:len(parts)-1], ":")
 
-		isPlaceholder := sym == "%s"
+		isSymbolPlaceholder := sym == runtimePlaceholder()
+		isTimeframePlaceholder := tf == runtimePlaceholder()
 
 		symbolCode := "ctx.Symbol"
-		if !isPlaceholder {
-			symbolCode = fmt.Sprintf("%q", firstCall.Symbol)
+		if !isSymbolPlaceholder {
+			symbolCode = fmt.Sprintf("%q", firstCall.resolvedSym)
 		}
 
-		timeframe := normalizeTimeframe(tf)
-		varName := generateContextVarName(key, isPlaceholder)
+		timeframeCode := "ctx.Timeframe"
+		timeframe := firstCall.resolvedTf
+		if !isTimeframePlaceholder {
+			timeframeCode = fmt.Sprintf("%q", timeframe)
+		}
+
+		varName := generateContextVarName(key, isSymbolPlaceholder, isTimeframePlaceholder)
 
 		runtimeKey := key
-		if isPlaceholder {
+		if isSymbolPlaceholder && isTimeframePlaceholder {
+			runtimeKey = fmt.Sprintf("%%s:%%s")
+		} else if isSymbolPlaceholder {
 			runtimeKey = fmt.Sprintf("%%s:%s", tf)
+		} else if isTimeframePlaceholder {
+			runtimeKey = fmt.Sprintf("%s:%%s", sym)
 		}
 
-		codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
+		if isTimeframePlaceholder {
+			codeBuilder.WriteString("\tsecTimeframeSeconds = context.TimeframeToSeconds(ctx.Timeframe)\n")
+		} else {
+			codeBuilder.WriteString(fmt.Sprintf("\tsecTimeframeSeconds = context.TimeframeToSeconds(%q)\n", timeframe))
+		}
 		codeBuilder.WriteString("\tif secTimeframeSeconds == 0 {\n")
 		codeBuilder.WriteString("\t\tsecTimeframeSeconds = baseTimeframeSeconds\n")
 		codeBuilder.WriteString("\t}\n")
-		/* Calculate dynamic warmup based on indicator periods in expressions */
+
 		maxPeriod := 0
-		for _, call := range callsForKey {
-			period := security.ExtractMaxPeriod(call.Expression)
+		for _, r := range callsForKey {
+			period := security.ExtractMaxPeriod(r.call.Expression)
 			if period > maxPeriod {
 				maxPeriod = period
 			}
 		}
-		/* Minimum warmup if no periods found or very small periods */
+
 		warmupBars := maxPeriod
 		if warmupBars < 50 {
 			warmupBars = 50
@@ -116,44 +218,59 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\t\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = baseSecurityBars + requiredWarmup\n", varName))
 		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %q, %s_limit)\n",
-			varName, varName, symbolCode, timeframe, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %s, %s_limit)\n",
+			varName, varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_err != nil {\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %q, %s_err)\n", symbolCode, timeframe, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %s, %s_err)\n", symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
 		codeBuilder.WriteString("\t}\n")
 
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %q, len(%s_data))\n",
-			varName, symbolCode, timeframe, varName))
+		hasModifier := firstCall.modifierPrefix != ""
+
+		// Transform data if modifier present; capture TransformResult for bar-mapping.
+		if hasModifier {
+			ctorCode := transformerConstructorCode(firstCall.call.SymbolExpr, firstCall.modifierPrefix)
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_transformResult := (%s).Transform(%s_data)\n",
+				varName, ctorCode, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\t%s_data = %s_transformResult.Bars\n", varName, varName))
+		}
+
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
+			varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")
 
-		if isPlaceholder {
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[fmt.Sprintf(%q, ctx.Symbol)] = %s_ctx\n", runtimeKey, varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t} else {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t}\n")
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[fmt.Sprintf(%q, ctx.Symbol)] = %s_mapper\n\n", runtimeKey, varName))
+		resolvedKey := fmt.Sprintf("%s:%s", firstCall.resolvedSym, firstCall.resolvedTf)
+
+		mapperCode := buildMapperCode(varName, hasModifier && isVariableBarCountModifier(firstCall.modifierPrefix))
+
+		if isSymbolPlaceholder || isTimeframePlaceholder {
+			var runtimeKeyArgs []string
+			symbolArg := "ctx.Symbol"
+			if hasModifier {
+				symbolArg = generateModifierCall(firstCall.modifierPrefix, "ctx.Symbol", firstCall.call.SymbolExpr)
+			}
+			if isSymbolPlaceholder {
+				runtimeKeyArgs = append(runtimeKeyArgs, symbolArg)
+			}
+			if isTimeframePlaceholder {
+				runtimeKeyArgs = append(runtimeKeyArgs, "ctx.Timeframe")
+			}
+			keyExpr := fmt.Sprintf("fmt.Sprintf(%q, %s)", runtimeKey, strings.Join(runtimeKeyArgs, ", "))
+
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%s] = %s_ctx\n", keyExpr, varName))
+			codeBuilder.WriteString(mapperCode)
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%s] = %s_mapper\n\n", keyExpr, varName))
 		} else {
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", key, varName))
-			codeBuilder.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-			codeBuilder.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t} else {\n")
-			codeBuilder.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
-			codeBuilder.WriteString("\t}\n")
-			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", key, varName))
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", resolvedKey, varName))
+			codeBuilder.WriteString(mapperCode)
+			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", resolvedKey, varName))
 		}
 	}
 
-	codeBuilder.WriteString("\t_ = fetcher\n")
-	codeBuilder.WriteString("\t/* === End Prefetch === */\n\n")
+	codeBuilder.WriteString("\t_ = fetcher\n\n")
 
-	/* Required imports */
 	imports := []string{
 		"github.com/quant5-lab/runner/datafetcher",
 		"github.com/quant5-lab/runner/security",
@@ -166,19 +283,10 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	}, nil
 }
 
-/* GenerateSecurityLookup generates runtime cache lookup code for security() calls */
+// GenerateSecurityLookup generates runtime cache lookup code for security() calls
 func GenerateSecurityLookup(call *security.SecurityCall, varName string) string {
-	/* Generate cache lookup:
-	 * entry, found := securityCache.Get(symbol, timeframe)
-	 * if !found { return NaN }
-	 * values, err := securityCache.GetExpression(symbol, timeframe, exprName)
-	 * if err != nil { return NaN }
-	 * value := values[ctx.BarIndex] // Index matching logic
-	 */
-
 	var code strings.Builder
 
-	code.WriteString(fmt.Sprintf("\t/* security(%q, %q, ...) lookup */\n", call.Symbol, call.Timeframe))
 	code.WriteString(fmt.Sprintf("\t%s_values, err := securityCache.GetExpression(%q, %q, %q)\n",
 		varName, call.Symbol, call.Timeframe, call.ExprName))
 	code.WriteString(fmt.Sprintf("\tif err != nil {\n"))
@@ -194,45 +302,70 @@ func GenerateSecurityLookup(call *security.SecurityCall, varName string) string 
 	return code.String()
 }
 
-/* InjectSecurityCode updates StrategyCode with security prefetch and lookups */
+// InjectSecurityCode updates StrategyCode with security prefetch and lookups
 func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode, error) {
-	/* Analyze and generate prefetch code */
 	injection, err := AnalyzeAndGeneratePrefetch(program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze security calls: %w", err)
 	}
 
 	if injection.PrefetchCode == "" {
-		/* No security() calls - return unchanged */
 		return code, nil
 	}
 
-	/* Inject prefetch code before strategy execution */
-	/* Expected structure:
-	 * func executeStrategy(ctx *context.Context) (*output.Collector, *strategy.Strategy) {
-	 *     collector := output.NewCollector()
-	 *     strat := strategy.NewStrategy()
-	 *
-	 *     <<< INJECT PREFETCH HERE >>>
-	 *
-	 *     for i := 0; i < len(ctx.Data); i++ {
-	 *         ...
-	 *     }
-	 * }
-	 */
-
-	/* Find insertion point: after strat initialization, before for loop */
 	functionBody := code.FunctionBody
-
-	/* Simple injection: prepend before existing body */
 	updatedBody := injection.PrefetchCode + functionBody
+	mergedImports := mergeImports(code.AdditionalImports, injection.ImportPaths)
 
 	return &StrategyCode{
 		UserDefinedFunctions: code.UserDefinedFunctions,
 		FunctionBody:         updatedBody,
 		StrategyName:         code.StrategyName,
-		AdditionalImports:    injection.ImportPaths,
+		AdditionalImports:    mergedImports,
 	}, nil
+}
+
+// buildMapperCode emits the mapper initialisation block for one security symbol.
+//
+// For variable-bar-count modifiers (Renko, Kagi, …) the same-TF branch uses
+// BuildMappingFromTransform; all other same-TF cases use BuildIdentityMapping.
+func buildMapperCode(varName string, variableBarCount bool) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
+	b.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
+	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
+	b.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
+	if variableBarCount {
+		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingFromTransform(%s_transformResult.MainToSynthetic)\n", varName, varName))
+	} else {
+		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
+	}
+	b.WriteString("\t} else {\n")
+	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
+	b.WriteString("\t}\n")
+	return b.String()
+}
+
+/* mergeImports combines two import lists without duplicates */
+func mergeImports(existing, additional []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(existing)+len(additional))
+
+	for _, imp := range existing {
+		if !seen[imp] {
+			seen[imp] = true
+			result = append(result, imp)
+		}
+	}
+
+	for _, imp := range additional {
+		if !seen[imp] {
+			seen[imp] = true
+			result = append(result, imp)
+		}
+	}
+
+	return result
 }
 
 /* normalizeTimeframe converts short forms to canonical format */
@@ -249,18 +382,27 @@ func normalizeTimeframe(tf string) string {
 	}
 }
 
-/* generateContextVarName creates unique variable name for each symbol:timeframe */
-func generateContextVarName(key string, isPlaceholder bool) string {
-	if isPlaceholder {
-		parts := strings.Split(key, ":")
-		return sanitizeVarName(fmt.Sprintf("sec_%s", parts[1]))
+// generateContextVarName creates unique variable name for each symbol:timeframe
+func generateContextVarName(key string, isSymbolPlaceholder, isTimeframePlaceholder bool) string {
+	parts := strings.Split(key, ":")
+	if len(parts) < 2 {
+		return sanitizeVarName(key)
+	}
+	sym := strings.Join(parts[:len(parts)-1], ":")
+	tf := parts[len(parts)-1]
+
+	if isSymbolPlaceholder && isTimeframePlaceholder {
+		return "sec_runtime"
+	} else if isSymbolPlaceholder {
+		return sanitizeVarName(fmt.Sprintf("sec_runtime_%s", tf))
+	} else if isTimeframePlaceholder {
+		return sanitizeVarName(fmt.Sprintf("sec_%s_runtime", sym))
 	}
 	return sanitizeVarName(key)
 }
 
-/* sanitizeVarName converts "SYMBOL:TIMEFRAME" to valid Go variable name */
+// sanitizeVarName converts "SYMBOL:TIMEFRAME" to valid Go variable name
 func sanitizeVarName(s string) string {
-	// Replace colons and special chars with underscores
 	s = strings.ReplaceAll(s, ":", "_")
 	s = strings.ReplaceAll(s, "-", "_")
 	s = strings.ReplaceAll(s, ".", "_")

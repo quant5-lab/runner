@@ -17,13 +17,6 @@ func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
 func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	if g.inArrowFunctionBody {
-		if h.isUnprefixedTAFunction(funcName) {
-			taHandler := &TAIndicatorCallHandler{}
-			return taHandler.generateArrowFunctionTACall(g, call)
-		}
-	}
-
 	detector := NewUserDefinedFunctionDetector(g.variables)
 	if !detector.IsUserDefinedFunction(funcName) {
 		return "", nil
@@ -38,7 +31,12 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 }
 
 func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName string, args []ast.Expression) (string, error) {
-	contextArg := h.selectContextArgument(g)
+	var contextArg string
+	if g.inArrowFunctionBody {
+		contextArg = "arrowCtx"
+	} else {
+		contextArg = g.arrowContextLifecycle.AllocateContextVariable(funcName)
+	}
 	argStrings := []string{contextArg}
 
 	for idx, arg := range args {
@@ -50,21 +48,11 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 		argStrings = append(argStrings, argCode)
 	}
 
+	if g.arrowCaptureRegistry != nil {
+		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
+			argStrings = append(argStrings, cap.GoParamName())
+		}
+	}
+
 	return strings.Join(argStrings, ", "), nil
-}
-
-func (h *UserDefinedFunctionHandler) selectContextArgument(g *generator) string {
-	if g.inArrowFunctionBody {
-		return "arrowCtx"
-	}
-	return "ctx"
-}
-
-func (h *UserDefinedFunctionHandler) isUnprefixedTAFunction(funcName string) bool {
-	switch funcName {
-	case "sma", "ema", "stdev", "rma", "wma":
-		return true
-	default:
-		return false
-	}
 }

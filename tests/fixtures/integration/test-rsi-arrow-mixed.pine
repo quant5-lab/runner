@@ -1,0 +1,18 @@
+//@version=5
+indicator("RSI Arrow Mixed TopLevel", overlay=false)
+
+// Test RSI in both TopLevel and arrow function contexts
+
+// TopLevel RSI
+rsi14 = ta.rsi(close, 14)
+
+// Arrow function RSI
+calcRSI(src) => ta.rsi(src, 21)
+rsi21 = calcRSI(close)
+
+// Combination
+avgRSI = (rsi14 + rsi21) / 2
+
+plot(rsi14, "RSI 14 TopLevel", color=color.blue)
+plot(rsi21, "RSI 21 Arrow", color=color.red)
+plot(avgRSI, "Average RSI", color=color.yellow)

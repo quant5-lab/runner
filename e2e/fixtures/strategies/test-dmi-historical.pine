@@ -1,0 +1,18 @@
+//@version=4
+indicator("DMI Historical", overlay=false)
+
+[diplus, diminus, adx] = dmi(14, 14)
+
+diplusPrev = diplus[1]
+diminusPrev = diminus[1]
+adxPrev = adx[1]
+
+diplusChange = diplus - diplusPrev
+diminusChange = diminus - diminusPrev
+adxChange = adx - adxPrev
+
+plot(diplus, title="+DI", color=color.green)
+plot(diminus, title="-DI", color=color.red)
+plot(adx, title="ADX", color=color.blue)
+plot(diplusChange, title="+DI Change", color=color.lime, style=plot.style_histogram)
+plot(diminusChange, title="-DI Change", color=color.maroon, style=plot.style_histogram)

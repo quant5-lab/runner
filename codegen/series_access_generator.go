@@ -38,6 +38,17 @@ func (g *SeriesVariableAccessGenerator) GenerateLoopValueAccess(loopVar string) 
 	return fmt.Sprintf("%sSeries.Get(%s+%d)", g.variableName, loopVar, g.baseOffset)
 }
 
+func (g *SeriesVariableAccessGenerator) GenerateCurrentValueAccess() string {
+	if g.baseOffset == 0 {
+		return fmt.Sprintf("%sSeries.GetCurrent()", g.variableName)
+	}
+	return fmt.Sprintf("%sSeries.Get(%d)", g.variableName, g.baseOffset)
+}
+
+func (g *SeriesVariableAccessGenerator) GetBaseOffset() int {
+	return g.baseOffset
+}
+
 // OHLCVFieldAccessGenerator generates access code for built-in OHLCV fields.
 type OHLCVFieldAccessGenerator struct {
 	fieldName  string
@@ -62,14 +73,32 @@ func NewOHLCVFieldAccessGeneratorWithOffset(fieldName string, baseOffset int) *O
 
 func (g *OHLCVFieldAccessGenerator) GenerateInitialValueAccess(period int) string {
 	totalOffset := period - 1 + g.baseOffset
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-%d].%s", totalOffset, g.fieldName)
+	seriesName := g.fieldNameToSeriesName()
+	return fmt.Sprintf("%s.Get(%d)", seriesName, totalOffset)
 }
 
 func (g *OHLCVFieldAccessGenerator) GenerateLoopValueAccess(loopVar string) string {
+	seriesName := g.fieldNameToSeriesName()
 	if g.baseOffset == 0 {
-		return fmt.Sprintf("ctx.Data[ctx.BarIndex-%s].%s", loopVar, g.fieldName)
+		return fmt.Sprintf("%s.Get(%s)", seriesName, loopVar)
 	}
-	return fmt.Sprintf("ctx.Data[ctx.BarIndex-(%s+%d)].%s", loopVar, g.baseOffset, g.fieldName)
+	return fmt.Sprintf("%s.Get(%s+%d)", seriesName, loopVar, g.baseOffset)
+}
+
+func (g *OHLCVFieldAccessGenerator) GenerateCurrentValueAccess() string {
+	seriesName := g.fieldNameToSeriesName()
+	if g.baseOffset == 0 {
+		return fmt.Sprintf("%s.GetCurrent()", seriesName)
+	}
+	return fmt.Sprintf("%s.Get(%d)", seriesName, g.baseOffset)
+}
+
+func (g *OHLCVFieldAccessGenerator) GetBaseOffset() int {
+	return g.baseOffset
+}
+
+func (g *OHLCVFieldAccessGenerator) fieldNameToSeriesName() string {
+	return OHLCVFieldToSeriesName(g.fieldName)
 }
 
 // CreateAccessGenerator creates the appropriate access generator based on source info.
@@ -80,5 +109,19 @@ func CreateAccessGenerator(source SourceInfo) SeriesAccessCodeGenerator {
 		}
 		return NewSeriesVariableAccessGenerator(source.VariableName)
 	}
+	if source.IsDerivedPrice() {
+		return NewDerivedPriceAccessor(source.PriceName, source.BaseOffset)
+	}
 	return NewOHLCVFieldAccessGeneratorWithOffset(source.FieldName, source.BaseOffset)
+}
+
+/* CreatePreviousBarAccessGenerator creates accessor shifted 1 bar back for crossover previous bar calculation */
+func CreatePreviousBarAccessGenerator(source SourceInfo) SeriesAccessCodeGenerator {
+	if source.IsSeriesVariable() {
+		return NewSeriesVariableAccessGeneratorWithOffset(source.VariableName, source.BaseOffset+1)
+	}
+	if source.IsDerivedPrice() {
+		return NewDerivedPriceAccessor(source.PriceName, source.BaseOffset+1)
+	}
+	return NewOHLCVFieldAccessGeneratorWithOffset(source.FieldName, source.BaseOffset+1)
 }

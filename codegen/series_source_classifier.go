@@ -14,6 +14,7 @@ const (
 	SourceTypeUnknown        SourceType = iota
 	SourceTypeSeriesVariable            // User variable: myVar, cagr5
 	SourceTypeOHLCVField                // Built-in field: close, high, low, open, volume
+	SourceTypeDerivedPrice              // Derived price: hl2, hlc3, ohlc4, hlcc4
 )
 
 // SourceInfo encapsulates classified source expression metadata for code generation.
@@ -21,6 +22,7 @@ type SourceInfo struct {
 	Type         SourceType
 	VariableName string
 	FieldName    string
+	PriceName    string // For derived prices: hl2, hlc3, ohlc4, hlcc4
 	OriginalExpr string
 	BaseOffset   int // Historical lookback offset
 }
@@ -33,6 +35,11 @@ func (s SourceInfo) IsSeriesVariable() bool {
 // IsOHLCVField returns true if the source is a built-in OHLCV field.
 func (s SourceInfo) IsOHLCVField() bool {
 	return s.Type == SourceTypeOHLCVField
+}
+
+// IsDerivedPrice returns true if the source is a derived price builtin.
+func (s SourceInfo) IsDerivedPrice() bool {
+	return s.Type == SourceTypeDerivedPrice
 }
 
 // SeriesSourceClassifier determines source expression type from AST nodes.
@@ -55,6 +62,12 @@ func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
 
 	switch e := expr.(type) {
 	case *ast.Identifier:
+		if c.isDerivedPrice(e.Name) {
+			info.Type = SourceTypeDerivedPrice
+			info.PriceName = e.Name
+			info.BaseOffset = 0
+			return info
+		}
 		if c.isBuiltinOHLCVField(e.Name) {
 			info.Type = SourceTypeOHLCVField
 			info.FieldName = c.capitalizeOHLCVField(e.Name)
@@ -78,6 +91,12 @@ func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
 				}
 			}
 
+			if c.isDerivedPrice(obj.Name) {
+				info.Type = SourceTypeDerivedPrice
+				info.PriceName = obj.Name
+				info.BaseOffset = offset
+				return info
+			}
 			if c.isBuiltinOHLCVField(obj.Name) {
 				info.Type = SourceTypeOHLCVField
 				info.FieldName = c.capitalizeOHLCVField(obj.Name)
@@ -100,6 +119,11 @@ func (c *SeriesSourceClassifier) ClassifyAST(expr ast.Expression) SourceInfo {
 // isBuiltinOHLCVField checks if identifier is built-in OHLCV field.
 func (c *SeriesSourceClassifier) isBuiltinOHLCVField(name string) bool {
 	return name == "close" || name == "open" || name == "high" || name == "low" || name == "volume"
+}
+
+// isDerivedPrice checks if identifier is a derived price builtin (hl2, hlc3, ohlc4, hlcc4).
+func (c *SeriesSourceClassifier) isDerivedPrice(name string) bool {
+	return name == "hl2" || name == "hlc3" || name == "ohlc4" || name == "hlcc4"
 }
 
 // capitalizeOHLCVField converts Pine field name to Go struct field name.

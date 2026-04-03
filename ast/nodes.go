@@ -15,11 +15,16 @@ const (
 	TypeProperty                NodeType = "Property"
 	TypeBinaryExpression        NodeType = "BinaryExpression"
 	TypeIfStatement             NodeType = "IfStatement"
+	TypeForStatement            NodeType = "ForStatement"
+	TypeForInStatement          NodeType = "ForInStatement"
+	TypeWhileStatement          NodeType = "WhileStatement"
 	TypeConditionalExpression   NodeType = "ConditionalExpression"
 	TypeLogicalExpression       NodeType = "LogicalExpression"
 	TypeUnaryExpression         NodeType = "UnaryExpression"
 	TypeArrayPattern            NodeType = "ArrayPattern"
 	TypeArrowFunctionExpression NodeType = "ArrowFunctionExpression"
+	TypeBreakStatement          NodeType = "BreakStatement"
+	TypeContinueStatement       NodeType = "ContinueStatement"
 )
 
 type Node interface {
@@ -27,8 +32,9 @@ type Node interface {
 }
 
 type Program struct {
-	NodeType NodeType `json:"type"`
-	Body     []Node   `json:"body"`
+	NodeType    NodeType `json:"type"`
+	Body        []Node   `json:"body"`
+	PineVersion int      `json:"pineVersion,omitempty"`
 }
 
 func (p *Program) Type() NodeType { return TypeProgram }
@@ -58,6 +64,7 @@ type VariableDeclaration struct {
 	NodeType     NodeType             `json:"type"`
 	Declarations []VariableDeclarator `json:"declarations"`
 	Kind         string               `json:"kind"`
+	Persistence  string               `json:"persistence,omitempty"` // "", "var", "varip"
 }
 
 func (v *VariableDeclaration) Type() NodeType { return TypeVariableDeclaration }
@@ -149,7 +156,40 @@ type IfStatement struct {
 	Alternate  []Node     `json:"alternate,omitempty"`
 }
 
-func (i *IfStatement) Type() NodeType { return TypeIfStatement }
+func (i *IfStatement) Type() NodeType  { return TypeIfStatement }
+func (i *IfStatement) expressionNode() {}
+
+type ForStatement struct {
+	NodeType NodeType   `json:"type"`
+	Counter  string     `json:"counter"`
+	From     Expression `json:"from"`
+	To       Expression `json:"to"`
+	Step     Expression `json:"step,omitempty"`
+	Body     []Node     `json:"body"`
+}
+
+func (f *ForStatement) Type() NodeType  { return TypeForStatement }
+func (f *ForStatement) expressionNode() {}
+
+type ForInStatement struct {
+	NodeType   NodeType   `json:"type"`
+	IndexVar   string     `json:"indexVar,omitempty"`
+	ElementVar string     `json:"elementVar"`
+	Collection Expression `json:"collection"`
+	Body       []Node     `json:"body"`
+}
+
+func (f *ForInStatement) Type() NodeType  { return TypeForInStatement }
+func (f *ForInStatement) expressionNode() {}
+
+type WhileStatement struct {
+	NodeType  NodeType   `json:"type"`
+	Condition Expression `json:"condition"`
+	Body      []Node     `json:"body"`
+}
+
+func (w *WhileStatement) Type() NodeType  { return TypeWhileStatement }
+func (w *WhileStatement) expressionNode() {}
 
 type ConditionalExpression struct {
 	NodeType   NodeType   `json:"type"`
@@ -189,3 +229,15 @@ type ArrowFunctionExpression struct {
 
 func (a *ArrowFunctionExpression) Type() NodeType  { return TypeArrowFunctionExpression }
 func (a *ArrowFunctionExpression) expressionNode() {}
+
+type BreakStatement struct {
+	NodeType NodeType `json:"type"`
+}
+
+func (b *BreakStatement) Type() NodeType { return TypeBreakStatement }
+
+type ContinueStatement struct {
+	NodeType NodeType `json:"type"`
+}
+
+func (c *ContinueStatement) Type() NodeType { return TypeContinueStatement }

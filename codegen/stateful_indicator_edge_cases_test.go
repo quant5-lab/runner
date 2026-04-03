@@ -191,7 +191,8 @@ func TestStatefulIndicatorBuilder_NaNPropagation(t *testing.T) {
 				"val := ",
 				"if math.IsNaN(val)",
 				"break", // Break loop on NaN (not return which exits function)
-				"if math.IsNaN(currentSource) || math.IsNaN(previousValue)",
+				"if math.IsNaN(currentSource)",
+				"else if math.IsNaN(previousValue)",
 			},
 			shouldNotHave: []string{},
 		},
@@ -255,7 +256,6 @@ func TestStatefulIndicatorBuilder_AlgorithmCorrectness(t *testing.T) {
 	t.Run("Three-phase structure", func(t *testing.T) {
 		builder := NewStatefulIndicatorBuilder("ta.rma", "rma20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
 		code := builder.BuildRMA()
-		t.Logf("Generated code:\n%s", code)
 
 		if !strings.Contains(code, "if ctx.BarIndex < 19") {
 			t.Error("Missing warmup condition")

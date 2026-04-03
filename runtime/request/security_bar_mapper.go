@@ -9,6 +9,8 @@ type MappingMode int
 const (
 	ModeDownscaling MappingMode = iota // Security TF < Base TF (e.g., H→D)
 	ModeUpscaling                      // Security TF > Base TF (e.g., M→D, W→D)
+	ModeIdentity                       // Same TF — bar-count-preserving transform (HA) or no modifier
+	ModeTransformed                    // Same TF — variable-bar-count transform (Renko, Kagi, LineBreak, PointFig)
 )
 
 /*
@@ -21,8 +23,9 @@ Mode determines lookup algorithm:
 Thread-safe for reads after initialization (immutable ranges and mode).
 */
 type SecurityBarMapper struct {
-	ranges []BarRange
-	mode   MappingMode
+	ranges          []BarRange
+	mode            MappingMode
+	mainToSynthetic []int // populated only in ModeTransformed
 }
 
 func NewSecurityBarMapper() *SecurityBarMapper {
@@ -42,18 +45,13 @@ func (m *SecurityBarMapper) BuildMapping(
 /*
 BuildMappingWithDateFilter creates downscaling mappings (Higher TF → Lower TF bar ranges).
 
-Used when security timeframe < base timeframe (e.g., Daily base with Hourly security).
-Maps each higher TF bar to all lower TF bars occurring on the same calendar date.
+Each higher TF bar owns lower TF bars from its date up to the next higher TF bar's date.
+Gaps in higher TF data (weekends, holidays) extend the previous bar's range, matching
+TradingView behavior.
 
-Example: Daily → Hourly downscaling
-  - Daily bar 2023-01-15 → Hourly bars [09:00..16:00] on 2023-01-15
-  - Daily bar 2023-01-16 → Hourly bars [09:00..16:00] on 2023-01-16
-
-Parameters:
-  - higherTimeframeBars: Target security timeframe bars (e.g., Daily)
-  - lowerTimeframeBars: Base execution timeframe bars (e.g., Hourly)
-  - baseDateRange: Optional date filter (empty = no filter)
-  - timezone: Timezone for date extraction (default "UTC")
+Example (with weekend gap):
+  - Daily Fri 2025-01-03 → Hourly [Fri 09:00..Sun 18:00] (extends through weekend)
+  - Daily Mon 2025-01-06 → Hourly [Mon 09:00..Mon 18:00]
 */
 func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 	higherTimeframeBars []context.OHLCV,
@@ -73,8 +71,6 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 	m.ranges = make([]BarRange, 0, len(higherTimeframeBars))
 	lowerIdx := 0
 
-	// Skip lower TF bars that are before the first higher TF bar
-	// This handles cases where data ranges don't fully overlap
 	if len(higherTimeframeBars) > 0 && len(lowerTimeframeBars) > 0 {
 		firstHigherDate := ExtractDateInTimezone(higherTimeframeBars[0].Time, timezone)
 		for lowerIdx < len(lowerTimeframeBars) {
@@ -86,14 +82,18 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 		}
 	}
 
-	for dailyIdx, dailyBar := range higherTimeframeBars {
+	for dailyIdx := range higherTimeframeBars {
 		startIdx := lowerIdx
-		dailyDate := ExtractDateInTimezone(dailyBar.Time, timezone)
+
+		nextDailyDate := ""
+		if dailyIdx+1 < len(higherTimeframeBars) {
+			nextDailyDate = ExtractDateInTimezone(higherTimeframeBars[dailyIdx+1].Time, timezone)
+		}
 
 		for lowerIdx < len(lowerTimeframeBars) {
 			lowerBarDate := ExtractDateInTimezone(lowerTimeframeBars[lowerIdx].Time, timezone)
 
-			if lowerBarDate != dailyDate {
+			if nextDailyDate != "" && lowerBarDate >= nextDailyDate {
 				break
 			}
 
@@ -106,6 +106,36 @@ func (m *SecurityBarMapper) BuildMappingWithDateFilter(
 			m.ranges = append(m.ranges, NewBarRange(dailyIdx, startIdx, endIdx))
 		}
 	}
+}
+
+/*
+BuildIdentityMapping creates 1:1 mappings for same-timeframe security calls.
+
+Used when security and base timeframes are identical (e.g., HA on same TF).
+Each bar index maps directly to itself: secBarIdx = mainBarIdx.
+
+Parameters:
+  - barCount: Number of bars to map
+*/
+func (m *SecurityBarMapper) BuildIdentityMapping(barCount int) {
+	m.mode = ModeIdentity
+	m.ranges = nil
+	m.mainToSynthetic = nil
+}
+
+/*
+BuildMappingFromTransform stores the per-source-bar synthetic index mapping
+produced by variable-bar-count transformers (Renko, Kagi, LineBreak, PointFig).
+
+mainToSynthetic[i] is the index of the last closed synthetic bar when source bar i
+was processed (-1 means no synthetic bar has formed yet at that point).
+
+Used when security TF equals base TF but the modifier reduces bar count.
+*/
+func (m *SecurityBarMapper) BuildMappingFromTransform(mainToSynthetic []int) {
+	m.mode = ModeTransformed
+	m.ranges = nil
+	m.mainToSynthetic = mainToSynthetic
 }
 
 /*
@@ -172,6 +202,10 @@ func (m *SecurityBarMapper) BuildMappingForUpscaling(
 /*
 FindDailyBarIndex dispatches to the appropriate lookup algorithm based on mapping mode.
 
+IDENTITY MODE (same TF, e.g., HA on same TF):
+  - Direct 1:1 mapping: returns barIndex unchanged
+  - Ignores lookahead parameter
+
 UPSCALING MODE (security TF > base TF, e.g., M→D, W→D):
   - Direct index lookup: ranges[baseBarIndex] contains the security bar range
   - Returns StartIdx (first bar in period) by default
@@ -187,10 +221,23 @@ Returns -1 if no valid mapping found.
 Thread-safe after mapper initialization.
 */
 func (m *SecurityBarMapper) FindDailyBarIndex(barIndex int, lookahead bool) int {
-	if m.mode == ModeUpscaling {
+	switch m.mode {
+	case ModeIdentity:
+		return barIndex
+	case ModeTransformed:
+		return m.findTransformedIndex(barIndex)
+	case ModeUpscaling:
 		return m.findUpscalingIndex(barIndex, lookahead)
+	default:
+		return m.findDownscalingIndex(barIndex, lookahead)
 	}
-	return m.findDownscalingIndex(barIndex, lookahead)
+}
+
+func (m *SecurityBarMapper) findTransformedIndex(mainBarIdx int) int {
+	if mainBarIdx < 0 || mainBarIdx >= len(m.mainToSynthetic) {
+		return -1
+	}
+	return m.mainToSynthetic[mainBarIdx]
 }
 
 func (m *SecurityBarMapper) findUpscalingIndex(baseBarIndex int, lookahead bool) int {
@@ -222,8 +269,7 @@ func (m *SecurityBarMapper) findDownscalingIndex(sourceBarIndex int, lookahead b
 			if i > 0 {
 				return m.ranges[i-1].DailyBarIndex
 			}
-			// For first range with lookahead=false, return current Daily bar
-			// since there is no previous Daily bar to reference
+			/* First range with lookahead=false returns current daily bar (no previous available) */
 			return r.DailyBarIndex
 		}
 	}
@@ -253,4 +299,12 @@ func (m *SecurityBarMapper) FindTargetBarIndexByContainment(sourceBarIndex int, 
 
 func (m *SecurityBarMapper) GetRanges() []BarRange {
 	return m.ranges
+}
+
+func (m *SecurityBarMapper) Mode() MappingMode {
+	return m.mode
+}
+
+func (m *SecurityBarMapper) MainToSynthetic() []int {
+	return m.mainToSynthetic
 }

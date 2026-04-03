@@ -35,8 +35,8 @@ calc(threshold) =>
 plot(calc(100))
 `,
 			mustContainAll: []string{
-				"x := (bar.Close + 10)",
-				"y := (bar.Open - 5)",
+				"x := (ctx.Data[ctx.BarIndex].Close + 10)",
+				"y := (ctx.Data[ctx.BarIndex].Open - 5)",
 				"if (x > y)", // Ternary test uses scalar
 				"return x",   // Ternary consequent uses scalar
 				"return y",   // Ternary alternate uses scalar
@@ -90,7 +90,7 @@ compare(threshold) =>
 plot(compare(100))
 `,
 			mustContainAll: []string{
-				"value := (bar.Close * 1.1)",
+				"value := (ctx.Data[ctx.BarIndex].Close * 1.1)",
 				"if (value > threshold)", // Both scalar
 				"return value",           // Scalar return
 				"return threshold",       // Parameter remains scalar
@@ -174,9 +174,9 @@ check(threshold) =>
 plot(check(100))
 `,
 			mustContainAll: []string{
-				"above_threshold := (bar.Close > threshold)",
-				"below_high := (bar.Close < bar.High)",
-				"(above_threshold && below_high)", // Logical AND uses scalars
+				"above_threshold := func() float64 { if (ctx.Data[ctx.BarIndex].Close > threshold) { return 1.0 } else { return 0.0 } }()",
+				"below_high := func() float64 { if (ctx.Data[ctx.BarIndex].Close < ctx.Data[ctx.BarIndex].High) { return 1.0 } else { return 0.0 } }()",
+				"((above_threshold != 0) && (below_high != 0))",
 			},
 			forbiddenPattern: []string{
 				"above_thresholdSeries.GetCurrent()",
@@ -198,10 +198,10 @@ validate(min_val, max_val) =>
 plot(validate(10, 100))
 `,
 			mustContainAll: []string{
-				"current := (bar.Close + bar.Open)",
-				"too_low := (current < min_val)",
-				"too_high := (current > max_val)",
-				"invalid := (too_low || too_high)", // Logical OR uses scalars
+				"current := (ctx.Data[ctx.BarIndex].Close + ctx.Data[ctx.BarIndex].Open)",
+				"too_low := func() float64 { if (current < min_val) { return 1.0 } else { return 0.0 } }()",
+				"too_high := func() float64 { if (current > max_val) { return 1.0 } else { return 0.0 } }()",
+				"((too_low != 0) || (too_high != 0))",
 			},
 			forbiddenPattern: []string{
 				"currentSeries.GetCurrent()",
@@ -224,11 +224,11 @@ select_value(threshold) =>
 plot(select_value(5))
 `,
 			mustContainAll: []string{
-				"up_move := (bar.High - bar.Low)",
-				"down_move := (bar.Low - bar.Open)",
-				"condition := ((up_move > down_move) && (up_move > threshold))",
-				"if condition",   // Ternary test uses scalar boolean
-				"return up_move", // Scalar return
+				"up_move := (ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low)",
+				"down_move := (ctx.Data[ctx.BarIndex].Low - ctx.Data[ctx.BarIndex].Open)",
+				"((up_move > down_move) && (up_move > threshold))",
+				"(condition != 0)", // Ternary test converts float64 to bool
+				"return up_move",
 			},
 			forbiddenPattern: []string{
 				"up_moveSeries.GetCurrent()",
@@ -311,8 +311,8 @@ calc(len) =>
 plot(calc(14))
 `,
 			mustContainAll: []string{
-				"up := (bar.High - bar.Low)",
-				"down := (bar.Low - bar.Open)",
+				"up := (ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low)",
+				"down := (ctx.Data[ctx.BarIndex].Low - ctx.Data[ctx.BarIndex].Open)",
 				"source := func() float64 { if (up > down)", // Variable assigned to IIFE
 				"return up",
 				"return down",
@@ -362,10 +362,10 @@ dual_smooth(len) =>
 plot(dual_smooth(10))
 `,
 			mustContainAll: []string{
-				"if (bar.Close > bar.Open)",
-				"return (bar.Close - bar.Open)",
-				"if (bar.Open > bar.Close)",
-				"return (bar.Open - bar.Close)",
+				"if (ctx.Data[ctx.BarIndex].Close > ctx.Data[ctx.BarIndex].Open)",
+				"return (ctx.Data[ctx.BarIndex].Close - ctx.Data[ctx.BarIndex].Open)",
+				"if (ctx.Data[ctx.BarIndex].Open > ctx.Data[ctx.BarIndex].Close)",
+				"return (ctx.Data[ctx.BarIndex].Open - ctx.Data[ctx.BarIndex].Close)",
 			},
 			forbiddenPattern: []string{
 				"trend_upSeries.GetCurrent()",
@@ -387,7 +387,7 @@ adaptive(len, threshold) =>
 plot(adaptive(14, 10))
 `,
 			mustContainAll: []string{
-				"range_val := (bar.High - bar.Low)",
+				"range_val := (ctx.Data[ctx.BarIndex].High - ctx.Data[ctx.BarIndex].Low)",
 				"if (range_val > threshold)",
 				"if (range_val > (threshold * 2))",
 				"return (range_val * 1.5)",
@@ -447,7 +447,7 @@ momentum(len) =>
 plot(momentum(14))
 `,
 			mustContainAll: []string{
-				"diff := (bar.Close - bar.Open)",
+				"diff := (ctx.Data[ctx.BarIndex].Close - ctx.Data[ctx.BarIndex].Open)",
 				"scaled := (diff * 100)",
 				"scaledSeries.Get(j)", // TA loop uses Series for historical access
 			},
@@ -564,10 +564,10 @@ complex_condition(threshold) =>
 plot(complex_condition(100))
 `,
 			mustContainAll: []string{
-				"a := (bar.Close > threshold)",
-				"b := (bar.High > bar.Open)",
-				"c := (bar.Low < bar.Close)",
-				"((a && b) || c)", // Chained logical with scalars
+				"a := func() float64 { if (ctx.Data[ctx.BarIndex].Close > threshold) { return 1.0 } else { return 0.0 } }()",
+				"b := func() float64 { if (ctx.Data[ctx.BarIndex].High > ctx.Data[ctx.BarIndex].Open) { return 1.0 } else { return 0.0 } }()",
+				"c := func() float64 { if (ctx.Data[ctx.BarIndex].Low < ctx.Data[ctx.BarIndex].Close) { return 1.0 } else { return 0.0 } }()",
+				"(((a != 0) && (b != 0)) || (c != 0))",
 			},
 			forbiddenPattern: []string{
 				"aSeries.GetCurrent()",
@@ -588,7 +588,7 @@ calc(p) =>
 plot(calc(2))
 `,
 			mustContainAll: []string{
-				"x := (bar.Close * p)",
+				"x := (ctx.Data[ctx.BarIndex].Close * p)",
 				"if (x > 100)",
 				"return x",
 			},

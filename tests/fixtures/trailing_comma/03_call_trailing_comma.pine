@@ -1,0 +1,5 @@
+//@version=5
+indicator("Call Expression Trailing Comma")
+
+plot(close),
+plot(open, color=color.green),

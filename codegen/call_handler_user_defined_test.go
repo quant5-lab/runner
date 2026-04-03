@@ -37,8 +37,8 @@ func TestUserDefinedFunctionHandler_GenerateCode(t *testing.T) {
 		t.Fatalf("GenerateCode() error: %v", err)
 	}
 
-	if code != "double(ctx, closeSeries.Get(0))" {
-		t.Errorf("Expected 'double(ctx, closeSeries.Get(0))', got %q", code)
+	if code != "double(arrowCtx_double_1, closeSeries.Get(0))" {
+		t.Errorf("Expected 'double(arrowCtx_double_1, closeSeries.Get(0))', got %q", code)
 	}
 }
 

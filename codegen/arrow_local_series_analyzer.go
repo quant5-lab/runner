@@ -39,6 +39,8 @@ func NewLocalSeriesAnalyzer() *LocalSeriesAnalyzer {
 			"lowest":       true,
 			"ta.highest":   true,
 			"ta.lowest":    true,
+			"tsi":          true,
+			"ta.tsi":       true,
 		},
 	}
 }

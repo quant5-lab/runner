@@ -19,6 +19,10 @@ func (r *ConstantRegistry) Get(name string) (float64, bool) {
 	return value, exists
 }
 
+func (r *ConstantRegistry) Delete(name string) {
+	delete(r.store, name)
+}
+
 func (r *ConstantRegistry) Clear() {
 	r.store = make(map[string]float64)
 }

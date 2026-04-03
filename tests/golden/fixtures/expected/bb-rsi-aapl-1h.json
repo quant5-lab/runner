@@ -1,0 +1,72 @@
+{
+  "version": "1.0",
+  "strategy": "BB+RSI",
+  "dataSource": "AAPL-1h.json",
+  "generatedAt": "2026-03-23T06:57:39Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 34,
+        "entryTime": 1760020200,
+        "entryPrice": 254.5800018310547,
+        "entryComment": "",
+        "exitBar": 62,
+        "exitTime": 1760538600,
+        "exitPrice": 250.8699951171875,
+        "exitComment": "",
+        "size": 392.1876291301527,
+        "profit": -1455.018737168521,
+        "direction": "long"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 83,
+        "entryTime": 1760970600,
+        "entryPrice": 259.489990234375,
+        "entryComment": "",
+        "exitBar": 153,
+        "exitTime": 1762183800,
+        "exitPrice": 267.6400146484375,
+        "exitComment": "",
+        "size": 379.74212215033197,
+        "profit": -3094.9075665731098,
+        "direction": "short"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 289,
+        "entryTime": 1764685800,
+        "entryPrice": 283,
+        "entryComment": "",
+        "exitBar": 308,
+        "exitTime": 1764876600,
+        "exitPrice": 278.8599853515625,
+        "exitComment": "",
+        "size": 336.898458381831,
+        "profit": 1394.7645527367918,
+        "direction": "short"
+      }
+    ],
+    "openTrades": [
+      {
+        "entryId": "Long",
+        "entryBar": 443,
+        "entryTime": 1767634200,
+        "entryPrice": 266.989990234375,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 362.75550738352024,
+        "profit": 0,
+        "direction": "long"
+      }
+    ],
+    "equity": 94334.57633733614,
+    "netProfit": -3155.1617510048395,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

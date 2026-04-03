@@ -11,7 +11,6 @@ import (
 func TestCallExpressionRouter_Registration(t *testing.T) {
 	router := NewCallExpressionRouter()
 
-	// Verify router initializes with handlers
 	if router == nil {
 		t.Fatal("NewCallExpressionRouter() returned nil")
 	}
@@ -20,8 +19,6 @@ func TestCallExpressionRouter_Registration(t *testing.T) {
 		t.Error("Router has no registered handlers")
 	}
 
-	// Verify handler order (critical for chain of responsibility)
-	// UnknownFunctionHandler should be last (catch-all)
 	lastHandler := router.handlers[len(router.handlers)-1]
 	if _, ok := lastHandler.(*UnknownFunctionHandler); !ok {
 		t.Error("Last handler should be UnknownFunctionHandler (catch-all)")
@@ -44,24 +41,42 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"strategy.entry", 2, "StrategyActionHandler"},
 		{"strategy.close", 2, "StrategyActionHandler"},
 		{"strategy.close_all", 2, "StrategyActionHandler"},
-		{"abs", 3, "MathCallHandler"},
-		{"math.abs", 3, "MathCallHandler"},
-		{"ta.sma", 4, "TAIndicatorCallHandler"},
-		{"ta.ema", 4, "TAIndicatorCallHandler"},
-		{"ta.crossover", 4, "TAIndicatorCallHandler"},
-		{"valuewhen", 4, "TAIndicatorCallHandler"},
-		{"unknown_function", 6, "UnknownFunctionHandler"},
+		{"strategy.default_entry_qty", 2, "StrategyActionHandler"},
+		{"strategy.convert_to_account", 3, "CurrencyConverterHandler"},
+		{"strategy.convert_to_symbol", 3, "CurrencyConverterHandler"},
+		{"strategy.closedtrades.profit", 4, "TradeCollectionCallHandler"},
+		{"strategy.opentrades.size", 4, "TradeCollectionCallHandler"},
+		{"abs", 5, "MathCallHandler"},
+		{"math.abs", 5, "MathCallHandler"},
+		{"nz", 6, "ValueCallHandler"},
+		{"na", 6, "ValueCallHandler"},
+		{"ta.sma", 7, "TAIndicatorCallHandler"},
+		{"ta.ema", 7, "TAIndicatorCallHandler"},
+		{"ta.crossover", 7, "TAIndicatorCallHandler"},
+		{"valuewhen", 7, "TAIndicatorCallHandler"},
+		{"color.new", 9, "ColorCallHandler"},
+		{"color.rgb", 9, "ColorCallHandler"},
+		{"color.from_gradient", 9, "ColorCallHandler"},
+		{"color.r", 9, "ColorCallHandler"},
+		{"color.g", 9, "ColorCallHandler"},
+		{"color.b", 9, "ColorCallHandler"},
+		{"color.t", 9, "ColorCallHandler"},
+		{"year", 10, "CalendarCallHandler"},
+		{"timestamp", 10, "CalendarCallHandler"},
+		{"dayofweek", 10, "CalendarCallHandler"},
+		{"timeframe.in_seconds", 11, "TimeframeFuncCallHandler"},
+		{"timeframe.from_seconds", 11, "TimeframeFuncCallHandler"},
+		{"timeframe.change", 11, "TimeframeFuncCallHandler"},
+		{"unknown_function", 15, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.funcName, func(t *testing.T) {
-			// Find the first handler that can handle this function
-			// (mimics router behavior - first match wins)
 			foundHandlerIdx := -1
 			for i, handler := range router.handlers {
 				if handler.CanHandle(tt.funcName) {
 					foundHandlerIdx = i
-					break // First match wins
+					break
 				}
 			}
 
@@ -230,7 +245,7 @@ func TestExtractCallFunctionName(t *testing.T) {
 					Property: &ast.Identifier{Name: "prop"},
 				},
 			},
-			want: "", // Nested member not supported - returns empty
+			want: "outer.inner.prop", // Nested member expressions now supported (for strategy.closedtrades.profit etc)
 		},
 		{
 			name: "non-identifier property",
@@ -279,7 +294,6 @@ func TestCallExpressionRouter_NilSafety(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Should not panic, should handle gracefully
 			code, err := router.RouteCall(g, tt.call)
 			if err != nil {
 				// Error is acceptable for invalid input

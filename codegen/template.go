@@ -41,7 +41,7 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 			for _, imp := range code.AdditionalImports {
 				if imp != "github.com/quant5-lab/runner/datafetcher" {
 					if imp == "github.com/quant5-lab/runner/ast" {
-						if !strings.Contains(code.FunctionBody, "&ast.") {
+						if !strings.Contains(code.FunctionBody, "&ast.") && !strings.Contains(code.UserDefinedFunctions, "&ast.") {
 							continue
 						}
 					}

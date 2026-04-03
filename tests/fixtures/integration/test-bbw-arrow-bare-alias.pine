@@ -1,0 +1,7 @@
+//@version=5
+indicator("BBW Arrow Bare Alias", overlay=false)
+
+widthDefault(period, mult) => bbw(period, mult)
+
+defaultSource = widthDefault(14, 2.0)
+plot(defaultSource, "BBW Default Source")

@@ -234,6 +234,14 @@ func (m *mockAccessorWithoutPreamble) GenerateInitialValueAccess(period int) str
 	return m.value
 }
 
+func (m *mockAccessorWithoutPreamble) GenerateCurrentValueAccess() string {
+	return m.value
+}
+
+func (m *mockAccessorWithoutPreamble) GetBaseOffset() int {
+	return 0
+}
+
 func containsPattern(text, pattern string) bool {
 	return len(pattern) > 0 && len(text) > 0 && containsSubstring(text, pattern)
 }

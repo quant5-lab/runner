@@ -7,141 +7,99 @@ import (
 )
 
 /*
-InputHandler manages Pine Script input.* function code generation.
-
-Design: Input values are compile-time constants (don't change per bar).
+Input values are compile-time constants (don't change per bar).
 Exception: input.source returns a runtime series reference.
-Rationale: Aligns with Pine Script's input semantics.
-
-Reusability: Delegates argument parsing to unified ArgumentParser framework.
 */
 type InputHandler struct {
-	inputConstants map[string]string // varName -> constant value
-	argParser      *ArgumentParser   // Unified parsing infrastructure
+	inputConstants map[string]string
+	argParser      *ArgumentParser
+	colorResolver  *ColorConstantResolver
 }
 
 func NewInputHandler() *InputHandler {
 	return &InputHandler{
 		inputConstants: make(map[string]string),
 		argParser:      NewArgumentParser(),
+		colorResolver:  NewColorConstantResolver(),
 	}
 }
 
-/*
-DetectInputFunction checks if a call expression is an input.* function.
-*/
 func (ih *InputHandler) DetectInputFunction(call *ast.CallExpression) bool {
-	funcName := extractFunctionNameFromCall(call)
-	return funcName == "input.float" || funcName == "input.int" ||
-		funcName == "input.bool" || funcName == "input.string" ||
-		funcName == "input.session" || funcName == "input.source"
+	return IsInputFuncName(extractFunctionNameFromCall(call))
 }
 
-/*
-GenerateInputFloat generates code for input.float(defval, title, ...).
-Extracts defval from positional OR named parameter.
-Returns const declaration.
-
-Reusability: Uses ArgumentParser.ParseFloat for type-safe extraction.
-*/
 func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName string) (string, error) {
 	defval := 0.0
 
-	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
 		result := ih.argParser.ParseFloat(call.Arguments[0])
 		if result.IsValid {
 			defval = result.MustBeFloat()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
-			// Named parameters in first argument
 			defval = ih.extractFloatFromObject(obj, "defval", 0.0)
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %.2f\n", varName, defval)
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %.2f\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
 
-/*
-GenerateInputInt generates code for input.int(defval, title, ...).
-Extracts defval from positional OR named parameter.
-Returns const declaration.
-
-Reusability: Uses ArgumentParser.ParseInt for type-safe extraction.
-*/
 func (ih *InputHandler) GenerateInputInt(call *ast.CallExpression, varName string) (string, error) {
 	defval := 0
 
-	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
 		result := ih.argParser.ParseInt(call.Arguments[0])
 		if result.IsValid {
 			defval = result.MustBeInt()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
-			// Named parameters in first argument
 			defval = int(ih.extractFloatFromObject(obj, "defval", 0.0))
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %d\n", varName, defval)
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %d\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
 
-/*
-GenerateInputBool generates code for input.bool(defval, title, ...).
-Extracts defval from positional OR named parameter.
-Returns const declaration.
-
-Reusability: Uses ArgumentParser.ParseBool for type-safe extraction.
-*/
 func (ih *InputHandler) GenerateInputBool(call *ast.CallExpression, varName string) (string, error) {
 	defval := false
 
-	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
 		result := ih.argParser.ParseBool(call.Arguments[0])
 		if result.IsValid {
 			defval = result.MustBeBool()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
-			// Named parameters in first argument
 			defval = ih.extractBoolFromObject(obj, "defval", false)
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %t\n", varName, defval)
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %t\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
 
-/*
-GenerateInputString generates code for input.string(defval, title, ...).
-Extracts defval from positional OR named parameter.
-Returns const declaration.
-
-Reusability: Uses ArgumentParser.ParseString for type-safe extraction.
-*/
 func (ih *InputHandler) GenerateInputString(call *ast.CallExpression, varName string) (string, error) {
 	defval := ""
 
-	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
 		result := ih.argParser.ParseString(call.Arguments[0])
 		if result.IsValid {
 			defval = result.MustBeString()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
-			// Named parameters in first argument
 			defval = ih.extractStringFromObject(obj, "defval", "")
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %q\n", varName, defval)
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %q\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
 
-/* Helper: extract float from ObjectExpression property */
 func (ih *InputHandler) extractFloatFromObject(obj *ast.ObjectExpression, key string, defaultVal float64) float64 {
 	parser := NewPropertyParser()
 	if val, ok := parser.ParseFloat(obj, key); ok {
@@ -166,17 +124,10 @@ func (ih *InputHandler) extractStringFromObject(obj *ast.ObjectExpression, key s
 	return defaultVal
 }
 
-/*
-GenerateInputSession generates code for input.session(defval, title, ...).
-Session format: "HHMM-HHMM" (e.g., "0950-1345").
-Returns const declaration.
-
-Reusability: Uses ArgumentParser.ParseString for type-safe extraction.
-*/
+/* Session format: "HHMM-HHMM" (e.g., "0950-1345") */
 func (ih *InputHandler) GenerateInputSession(call *ast.CallExpression, varName string) (string, error) {
-	defval := "0000-2359" // Default: full day
+	defval := "0000-2359"
 
-	// Try positional argument first using ArgumentParser
 	if len(call.Arguments) > 0 {
 		result := ih.argParser.ParseString(call.Arguments[0])
 		if result.IsValid {
@@ -186,7 +137,8 @@ func (ih *InputHandler) GenerateInputSession(call *ast.CallExpression, varName s
 		}
 	}
 
-	code := fmt.Sprintf("const %s = %q\n", varName, defval)
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %q\n", sanitizedName, defval)
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -198,10 +150,38 @@ func (ih *InputHandler) GenerateInputSource(call *ast.CallExpression, varName st
 			source = id.Name
 		}
 	}
-	return fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", varName, source), nil
+	sanitizedName := SanitizeGoIdentifier(varName)
+	return fmt.Sprintf("// %s = input.source(defval=%s) - using source directly\n", sanitizedName, source), nil
 }
 
-/* GetInputConstantsMap returns all input constants as map[varName]value for security evaluator */
+func (ih *InputHandler) GenerateInputColor(call *ast.CallExpression, varName string) (string, error) {
+	defval := ""
+
+	if len(call.Arguments) > 0 {
+		if resolved, ok := ih.colorResolver.ResolveExpression(call.Arguments[0]); ok {
+			defval = resolved
+		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+			defval = ih.extractColorFromObject(obj, "defval")
+		}
+	}
+
+	sanitizedName := SanitizeGoIdentifier(varName)
+	code := fmt.Sprintf("const %s = %q\n", sanitizedName, defval)
+	ih.inputConstants[varName] = code
+	return code, nil
+}
+
+func (ih *InputHandler) extractColorFromObject(obj *ast.ObjectExpression, key string) string {
+	parser := NewPropertyParser()
+	if expr, ok := parser.ParseExpression(obj, key); ok {
+		if resolved, ok := ih.colorResolver.ResolveExpression(expr); ok {
+			return resolved
+		}
+	}
+	return ""
+}
+
+/* Converts input constants to float64 map for security evaluator */
 func (ih *InputHandler) GetInputConstantsMap() map[string]float64 {
 	result := make(map[string]float64)
 	for varName, code := range ih.inputConstants {
@@ -223,7 +203,11 @@ func (ih *InputHandler) GetInputConstantsMap() map[string]float64 {
 	return result
 }
 
-/* Helper function to extract function name from CallExpression */
+func (ih *InputHandler) IsInputConstant(varName string) bool {
+	_, exists := ih.inputConstants[varName]
+	return exists
+}
+
 func extractFunctionNameFromCall(call *ast.CallExpression) string {
 	if member, ok := call.Callee.(*ast.MemberExpression); ok {
 		if obj, ok := member.Object.(*ast.Identifier); ok {

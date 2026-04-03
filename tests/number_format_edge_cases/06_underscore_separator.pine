@@ -1,0 +1,8 @@
+//@version=5
+indicator("Underscore Separator Test", overlay=true)
+x = 1_000_000
+y = 100_000
+z = 1_234_567_890
+w = 1_000.50
+v = 0.123_456
+strategy.entry("test", x > 0 ? strategy.long : strategy.short)

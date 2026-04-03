@@ -1,0 +1,22 @@
+//@version=4
+strategy("DMI Strategy", overlay=true)
+
+[diplus, diminus, adx] = dmi(14, 14)
+
+adxThreshold = input(25, title="ADX Threshold")
+
+trendUp = diplus > diminus and adx > adxThreshold
+trendDown = diminus > diplus and adx > adxThreshold
+
+longEntry = trendUp and not trendUp[1]
+shortEntry = trendDown and not trendDown[1]
+
+if longEntry
+    strategy.entry("Long", strategy.long)
+if shortEntry
+    strategy.entry("Short", strategy.short)
+
+if not trendUp
+    strategy.close("Long")
+if not trendDown
+    strategy.close("Short")

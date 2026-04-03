@@ -284,11 +284,23 @@ func TestPineConstantRegistry_AllNamespaces(t *testing.T) {
 		{
 			namespace: "color",
 			constants: map[string]interface{}{
-				"red":   "#FF0000",
-				"green": "#00FF00",
-				"blue":  "#0000FF",
-				"black": "#000000",
-				"white": "#FFFFFF",
+				"aqua":    "#00BCD4",
+				"black":   "#363A45",
+				"blue":    "#2962FF",
+				"fuchsia": "#E040FB",
+				"gray":    "#787B86",
+				"green":   "#4CAF50",
+				"lime":    "#00E676",
+				"maroon":  "#880E4F",
+				"navy":    "#311B92",
+				"olive":   "#808000",
+				"orange":  "#FF9800",
+				"purple":  "#9C27B0",
+				"red":     "#FF5252",
+				"silver":  "#B2B5BE",
+				"teal":    "#00897B",
+				"white":   "#FFFFFF",
+				"yellow":  "#FFEB3B",
 			},
 		},
 		{
@@ -644,7 +656,79 @@ func TestConstantResolver_StringResolution(t *testing.T) {
 				Object:   &ast.Identifier{Name: "color"},
 				Property: &ast.Identifier{Name: "red"},
 			},
-			expected: "#FF0000",
+			expected: "#FF5252",
+			shouldOk: true,
+		},
+		{
+			name: "color.lime",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "lime"},
+			},
+			expected: "#00E676",
+			shouldOk: true,
+		},
+		{
+			name: "color.blue",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "blue"},
+			},
+			expected: "#2962FF",
+			shouldOk: true,
+		},
+		{
+			name: "color.maroon",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "maroon"},
+			},
+			expected: "#880E4F",
+			shouldOk: true,
+		},
+		{
+			name: "color.fuchsia",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "fuchsia"},
+			},
+			expected: "#E040FB",
+			shouldOk: true,
+		},
+		{
+			name: "color.aqua",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "aqua"},
+			},
+			expected: "#00BCD4",
+			shouldOk: true,
+		},
+		{
+			name: "color.navy",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "navy"},
+			},
+			expected: "#311B92",
+			shouldOk: true,
+		},
+		{
+			name: "color.olive",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "olive"},
+			},
+			expected: "#808000",
+			shouldOk: true,
+		},
+		{
+			name: "color.silver",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "color"},
+				Property: &ast.Identifier{Name: "silver"},
+			},
+			expected: "#B2B5BE",
 			shouldOk: true,
 		},
 		{
@@ -760,6 +844,84 @@ func TestConstantResolver_EdgeCases(t *testing.T) {
 
 		if _, ok := resolver.ResolveToBool(expr); ok {
 			t.Error("should fail for member expression with non-identifier property")
+		}
+	})
+}
+
+func TestPineConstantRegistry_ColorNameResolution(t *testing.T) {
+	registry := NewPineConstantRegistry()
+
+	allColors := []string{
+		"aqua", "black", "blue", "fuchsia", "gray", "green", "lime",
+		"maroon", "navy", "olive", "orange", "purple", "red",
+		"silver", "teal", "white", "yellow",
+	}
+
+	t.Run("IsColorName positive cases", func(t *testing.T) {
+		for _, colorName := range allColors {
+			if !registry.IsColorName(colorName) {
+				t.Errorf("IsColorName(%q) should return true", colorName)
+			}
+		}
+	})
+
+	t.Run("IsColorName negative cases", func(t *testing.T) {
+		nonColors := []string{
+			"close", "open", "high", "low", "volume",
+			"strategy", "plot", "ta", "barmerge",
+			"RED", "Blue", "GREEN",
+			"blu", "red_var", "color_blue",
+			"", "notacolor",
+		}
+		for _, name := range nonColors {
+			if registry.IsColorName(name) {
+				t.Errorf("IsColorName(%q) should return false", name)
+			}
+		}
+	})
+
+	t.Run("GetColorHex positive cases", func(t *testing.T) {
+		for _, colorName := range allColors {
+			hex, found := registry.GetColorHex(colorName)
+			if !found {
+				t.Errorf("GetColorHex(%q) should find color", colorName)
+				continue
+			}
+			if len(hex) != 7 || hex[0] != '#' {
+				t.Errorf("GetColorHex(%q) returned invalid hex format: %q", colorName, hex)
+			}
+			for i, ch := range hex[1:] {
+				if !((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F')) {
+					t.Errorf("GetColorHex(%q) hex %q has invalid char at pos %d: %c", colorName, hex, i+1, ch)
+				}
+			}
+		}
+	})
+
+	t.Run("GetColorHex negative cases", func(t *testing.T) {
+		nonColors := []string{"close", "RED", "notacolor", "", "blu"}
+		for _, name := range nonColors {
+			if hex, found := registry.GetColorHex(name); found {
+				t.Errorf("GetColorHex(%q) should not find color, got %q", name, hex)
+			}
+		}
+	})
+
+	t.Run("GetColorHex consistency with Get", func(t *testing.T) {
+		for _, colorName := range allColors {
+			hexFromGet, foundGet := registry.Get("color." + colorName)
+			hexFromMethod, foundMethod := registry.GetColorHex(colorName)
+
+			if foundGet != foundMethod {
+				t.Errorf("Inconsistency for %q: Get found=%v, GetColorHex found=%v", colorName, foundGet, foundMethod)
+			}
+
+			if foundGet && foundMethod {
+				hexStringFromGet, _ := hexFromGet.AsString()
+				if hexStringFromGet != hexFromMethod {
+					t.Errorf("Inconsistency for %q: Get returned %q, GetColorHex returned %q", colorName, hexStringFromGet, hexFromMethod)
+				}
+			}
 		}
 	})
 }

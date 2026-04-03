@@ -1,0 +1,17 @@
+//@version=5
+strategy("Color Functions", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+smaFast = ta.sma(close, 10)
+smaSlow = ta.sma(close, 30)
+
+longCond = ta.crossover(smaFast, smaSlow)
+shortCond = ta.crossunder(smaFast, smaSlow)
+
+if longCond
+    strategy.entry("Long", strategy.long)
+
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+plot(smaFast, "Fast SMA", color=color.new(color.blue, 20))
+plot(smaSlow, "Slow SMA", color=color.rgb(255, 140, 0, 30))

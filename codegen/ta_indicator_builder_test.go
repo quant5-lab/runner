@@ -73,30 +73,54 @@ func TestTAIndicatorBuilder_SMAWithNaN(t *testing.T) {
 	}
 }
 
-func TestTAIndicatorBuilder_EMA(t *testing.T) {
+func TestTAIndicatorBuilder_EMA_Stateful(t *testing.T) {
 	mockAccessor := &MockAccessGenerator{
 		loopAccessFn: func(loopVar string) string {
 			return "closeSeries.Get(" + loopVar + ")"
 		},
+		initialAccessFn: func(period int) string {
+			return "closeSeries.Get(19)"
+		},
 	}
 
-	builder := NewTAIndicatorBuilder("EMA", "ema20", 20, mockAccessor, false)
-	builder.WithAccumulator(NewEMAAccumulator(20))
+	builder := NewStatefulIndicatorBuilder("ta.ema", "ema20", P(20), mockAccessor, false, NewTopLevelIndicatorContext())
 
-	code := builder.Build()
+	code := builder.BuildEMA()
 
+	// Test elements for the new STATEFUL EMA implementation
+	// EMA uses SMA as initial value (same as RMA) per TradingView behavior
 	requiredElements := []string{
-		"/* Inline EMA(20) */",
+		"/* Inline EMA(20) - Stateful recursive calculation */",
 		"alpha := 2.0 / float64(20+1)",
-		"for j := 0; j < 20; j++",
-		"ema = alpha*closeSeries.Get(j) + (1-alpha)*ema",
-		"ema20Series.Set(",
+		"if ctx.BarIndex < 19",
+		"ema20Series.Set(math.NaN())",
+		"if ctx.BarIndex == 19",
+		"/* First valid value: calculate SMA as initial state */",
+		"_sma_accumulator := 0.0",
+		"initialValue := _sma_accumulator / float64(20)",
+		"ema20Series.Set(initialValue)",
+		"/* Recursive phase: use previous indicator value */",
+		"previousValue := ema20Series.Get(1)",
+		"currentSource := closeSeries.Get(0)",
+		"newValue := alpha*currentSource + (1-alpha)*previousValue",
+		"ema20Series.Set(newValue)",
 	}
 
 	for _, elem := range requiredElements {
 		if !strings.Contains(code, elem) {
-			t.Errorf("EMA builder missing %q\nGenerated code:\n%s", elem, code)
+			t.Errorf("Stateful EMA builder missing %q\nGenerated code:\n%s", elem, code)
 		}
+	}
+
+	// CRITICAL: Verify we do NOT have the old backward loop pattern that recalculates every bar
+	// This was the bug that caused trade exit discrepancies
+	if strings.Contains(code, "for j := 20-2; j >= 0; j--") {
+		t.Error("EMA should NOT use backward loop recalculation - must be stateful using previous EMA value")
+	}
+
+	// Verify we reference previous EMA value for recursion (stateful)
+	if !strings.Contains(code, "previousValue := ema20Series.Get(1)") {
+		t.Error("EMA must reference previous EMA value (Get(1)) for correct stateful calculation")
 	}
 }
 

@@ -1,0 +1,9 @@
+//@version=4
+strategy("Cancel All Test", overlay=true, default_qty_type=strategy.fixed, default_qty_value=10, initial_capital=10000)
+
+if close > 104
+    strategy.entry("Long1", strategy.long, stop=120)
+    strategy.entry("Long2", strategy.long, stop=125)
+
+if close < 102
+    strategy.cancel_all()

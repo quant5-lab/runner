@@ -372,7 +372,7 @@ func TestSeriesExpressionAccessor_CallVarLookup(t *testing.T) {
 		code := accessor.GenerateLoopValueAccess("i")
 
 		// volume is builtin field, not series variable
-		if !strings.Contains(code, "ctx.Data[i-i].Volume") {
+		if !strings.Contains(code, "volumeSeries.Get(i)") {
 			t.Errorf("Should contain builtin volume access, got: %s", code)
 		}
 

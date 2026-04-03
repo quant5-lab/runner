@@ -8,928 +8,443 @@ import (
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-func TestFixnanState_ForwardFillProgression(t *testing.T) {
-	state := NewFixnanState()
+// ── AST builders ──────────────────────────────────────────────────────────────
 
-	tests := []struct {
-		barIdx   int
-		input    float64
-		expected float64
-		desc     string
-	}{
-		{0, math.NaN(), math.NaN(), "first bar NaN - no prior valid value"},
-		{1, 100.0, 100.0, "first valid value propagates"},
-		{2, math.NaN(), 100.0, "forward-fill from bar 1"},
-		{3, math.NaN(), 100.0, "forward-fill continues"},
-		{4, 105.0, 105.0, "new valid value replaces"},
-		{5, math.NaN(), 105.0, "forward-fill from bar 4"},
-		{6, math.NaN(), 105.0, "forward-fill continues"},
-		{7, 110.0, 110.0, "another valid value"},
-		{8, math.NaN(), 110.0, "forward-fill from bar 7"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			result := state.ForwardFill(tt.input)
-			if math.IsNaN(tt.expected) {
-				if !math.IsNaN(result) {
-					t.Errorf("bar %d: expected NaN, got %.2f", tt.barIdx, result)
-				}
-			} else {
-				if result != tt.expected {
-					t.Errorf("bar %d: expected %.2f, got %.2f", tt.barIdx, tt.expected, result)
-				}
-			}
-		})
+func makeFixnanCall(inner ast.Expression) *ast.CallExpression {
+	return &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "fixnan"},
+		Arguments: []ast.Expression{inner},
 	}
 }
 
-func TestFixnanState_ConsecutiveNaNs(t *testing.T) {
-	state := NewFixnanState()
-
-	state.ForwardFill(100.0)
-
-	for i := 0; i < 100; i++ {
-		result := state.ForwardFill(math.NaN())
-		if result != 100.0 {
-			t.Errorf("bar %d: forward-fill should persist 100.0, got %.2f", i+1, result)
-		}
-	}
-}
-
-func TestFixnanState_IsolationBetweenInstances(t *testing.T) {
-	state1 := NewFixnanState()
-	state2 := NewFixnanState()
-
-	state1.ForwardFill(100.0)
-	state2.ForwardFill(200.0)
-
-	result1 := state1.ForwardFill(math.NaN())
-	result2 := state2.ForwardFill(math.NaN())
-
-	if result1 != 100.0 {
-		t.Errorf("state1: expected 100.0, got %.2f", result1)
-	}
-	if result2 != 200.0 {
-		t.Errorf("state2: expected 200.0, got %.2f", result2)
-	}
-}
-
-func TestFixnanEvaluator_BasicForwardFill(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{High: 100}, {High: 105}, {High: 110},
-			{High: 108}, {High: 103}, {High: 102},
-			{High: 104}, {High: 107}, {High: 106}, {High: 101},
+func makeTAFixnanCall(inner ast.Expression) *ast.CallExpression {
+	return &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "ta"},
+			Property: &ast.Identifier{Name: "fixnan"},
 		},
+		Arguments: []ast.Expression{inner},
 	}
+}
 
-	evaluator := NewStreamingBarEvaluator()
-
-	pivotCall := &ast.CallExpression{
+func makePivotHighExpr(source ast.Expression, left, right int) *ast.CallExpression {
+	return &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
 			Property: &ast.Identifier{Name: "pivothigh"},
 		},
 		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "high"},
-			&ast.Literal{Value: float64(2)},
-			&ast.Literal{Value: float64(2)},
+			source,
+			&ast.Literal{Value: float64(left)},
+			&ast.Literal{Value: float64(right)},
 		},
-	}
-
-	fixnanCall := &ast.CallExpression{
-		Callee:    &ast.Identifier{Name: "fixnan"},
-		Arguments: []ast.Expression{pivotCall},
-	}
-
-	t.Run("first_valid_pivot", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 4)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected first pivot 110, got %.2f", result)
-		}
-	})
-
-	t.Run("forward_fill_after_pivot", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 5)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected forward-fill 110, got %.2f", result)
-		}
-	})
-
-	t.Run("forward_fill_continues", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 6)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected forward-fill 110, got %.2f", result)
-		}
-	})
-
-	t.Run("new_pivot_replaces", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 9)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 107 {
-			t.Errorf("expected new pivot 107, got %.2f", result)
-		}
-	})
-}
-
-func TestFixnanEvaluator_WithMemberExpression(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{High: 100}, {High: 105}, {High: 110},
-			{High: 108}, {High: 103}, {High: 102},
-			{High: 104}, {High: 107}, {High: 106}, {High: 101},
-		},
-	}
-
-	evaluator := NewStreamingBarEvaluator()
-
-	pivotMember := &ast.MemberExpression{
-		Object: &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "pivothigh"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
-				&ast.Literal{Value: float64(2)},
-				&ast.Literal{Value: float64(2)},
-			},
-		},
-		Property: &ast.Literal{Value: float64(1)},
-	}
-
-	fixnanCall := &ast.CallExpression{
-		Callee:    &ast.Identifier{Name: "fixnan"},
-		Arguments: []ast.Expression{pivotMember},
-	}
-
-	t.Run("fixnan_with_subscript", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 5)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected fixnan(pivot[1]) = 110 at bar 5, got %.2f", result)
-		}
-	})
-
-	t.Run("forward_fill_after_subscript", func(t *testing.T) {
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 6)
-		if err != nil {
-			t.Fatalf("EvaluateAtBar failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected forward-fill 110, got %.2f", result)
-		}
-	})
-}
-
-func TestFixnanEvaluator_StateCaching(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{High: 100}, {High: 105}, {High: 110},
-			{High: 108}, {High: 103}, {High: 102},
-		},
-	}
-
-	evaluator := NewStreamingBarEvaluator()
-
-	pivotCall := &ast.CallExpression{
-		Callee: &ast.MemberExpression{
-			Object:   &ast.Identifier{Name: "ta"},
-			Property: &ast.Identifier{Name: "pivothigh"},
-		},
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "high"},
-			&ast.Literal{Value: float64(2)},
-			&ast.Literal{Value: float64(2)},
-		},
-	}
-
-	fixnanCall := &ast.CallExpression{
-		Callee:    &ast.Identifier{Name: "fixnan"},
-		Arguments: []ast.Expression{pivotCall},
-	}
-
-	identifier := NewHashExpressionIdentifier()
-	hash := "fixnan_" + identifier.Identify(pivotCall)
-	storage := evaluator.fixnanEvaluator.stateStorage
-
-	_, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 2)
-	if err != nil {
-		t.Fatalf("first call failed: %v", err)
-	}
-
-	if !storage.Has(hash) {
-		t.Error("expected fixnan state to be cached")
-	}
-
-	cachedState, _ := storage.Get(hash)
-
-	_, err = evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 3)
-	if err != nil {
-		t.Fatalf("second call failed: %v", err)
-	}
-
-	newCachedState, _ := storage.Get(hash)
-	if newCachedState != cachedState {
-		t.Error("expected same cached state instance to be reused")
 	}
 }
 
-func TestFixnanEvaluator_EdgeCases(t *testing.T) {
-	evaluator := NewStreamingBarEvaluator()
-
-	t.Run("no_arguments", func(t *testing.T) {
-		ctx := &context.Context{Data: []context.OHLCV{{High: 100}}}
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{},
-		}
-
-		_, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 0)
-		if err == nil {
-			t.Error("expected error for no arguments")
-		}
-	})
-
-	t.Run("all_nan_sequence", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{
-				{High: 100}, {High: 102}, {High: 103}, {High: 101},
-			},
-		}
-
-		pivotCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "pivothigh"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
-				&ast.Literal{Value: float64(2)},
-				&ast.Literal{Value: float64(2)},
-			},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{pivotCall},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 1)
-		if err != nil {
-			t.Fatalf("evaluateFixnanAtBar failed: %v", err)
-		}
-		if !math.IsNaN(result) {
-			t.Errorf("expected NaN when no pivots exist yet, got %.2f", result)
-		}
-	})
-
-	t.Run("single_valid_then_all_nan", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{
-				{High: 100}, {High: 105}, {High: 110},
-				{High: 108}, {High: 103}, {High: 102},
-				{High: 101}, {High: 100}, {High: 99}, {High: 98},
-			},
-		}
-
-		pivotCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "pivothigh"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
-				&ast.Literal{Value: float64(2)},
-				&ast.Literal{Value: float64(2)},
-			},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{pivotCall},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 4)
-		if err != nil {
-			t.Fatalf("bar 4 failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("bar 4: expected 110, got %.2f", result)
-		}
-
-		for i := 5; i <= 9; i++ {
-			result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, i)
-			if err != nil {
-				t.Fatalf("bar %d failed: %v", i, err)
-			}
-			if result != 110 {
-				t.Errorf("bar %d: expected forward-fill 110, got %.2f", i, result)
-			}
-		}
-	})
-}
-
-func TestFixnanEvaluator_MultipleSeriesIsolation(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{High: 100, Low: 90},
-			{High: 105, Low: 85},
-			{High: 110, Low: 80},
-			{High: 108, Low: 82},
-			{High: 103, Low: 87},
-		},
-	}
-
-	evaluator := NewStreamingBarEvaluator()
-
-	pivotHighCall := &ast.CallExpression{
-		Callee: &ast.MemberExpression{
-			Object:   &ast.Identifier{Name: "ta"},
-			Property: &ast.Identifier{Name: "pivothigh"},
-		},
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "high"},
-			&ast.Literal{Value: float64(2)},
-			&ast.Literal{Value: float64(2)},
-		},
-	}
-
-	pivotLowCall := &ast.CallExpression{
+func makePivotLowExpr(source ast.Expression, left, right int) *ast.CallExpression {
+	return &ast.CallExpression{
 		Callee: &ast.MemberExpression{
 			Object:   &ast.Identifier{Name: "ta"},
 			Property: &ast.Identifier{Name: "pivotlow"},
 		},
 		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "low"},
-			&ast.Literal{Value: float64(2)},
-			&ast.Literal{Value: float64(2)},
+			source,
+			&ast.Literal{Value: float64(left)},
+			&ast.Literal{Value: float64(right)},
 		},
-	}
-
-	fixnanHighCall := &ast.CallExpression{
-		Callee:    &ast.Identifier{Name: "fixnan"},
-		Arguments: []ast.Expression{pivotHighCall},
-	}
-
-	fixnanLowCall := &ast.CallExpression{
-		Callee:    &ast.Identifier{Name: "fixnan"},
-		Arguments: []ast.Expression{pivotLowCall},
-	}
-
-	highResult, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanHighCall, ctx, 4)
-	if err != nil {
-		t.Fatalf("fixnan(pivothigh) failed: %v", err)
-	}
-	if highResult != 110 {
-		t.Errorf("expected pivothigh fixnan 110, got %.2f", highResult)
-	}
-
-	lowResult, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanLowCall, ctx, 4)
-	if err != nil {
-		t.Fatalf("fixnan(pivotlow) failed: %v", err)
-	}
-	if lowResult != 80 {
-		t.Errorf("expected pivotlow fixnan 80, got %.2f", lowResult)
-	}
-
-	highForward, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanHighCall, ctx, 5)
-	lowForward, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanLowCall, ctx, 5)
-
-	if highForward != 110 {
-		t.Errorf("pivothigh forward-fill should be 110, got %.2f", highForward)
-	}
-	if lowForward != 80 {
-		t.Errorf("pivotlow forward-fill should be 80, got %.2f", lowForward)
 	}
 }
 
-func TestFixnanState_ExtremeValues(t *testing.T) {
+func subscriptExpr(expr ast.Expression, offset int) *ast.MemberExpression {
+	return &ast.MemberExpression{
+		Object:   expr,
+		Property: &ast.Literal{Value: float64(offset)},
+	}
+}
+
+// ── context builders ──────────────────────────────────────────────────────────
+
+func ohlcvFromHighs(highs []float64) *context.Context {
+	data := make([]context.OHLCV, len(highs))
+	for i, h := range highs {
+		data[i].High = h
+	}
+	return &context.Context{Data: data}
+}
+
+func ohlcvFromHighsLows(highs, lows []float64) *context.Context {
+	data := make([]context.OHLCV, len(highs))
+	for i := range highs {
+		data[i].High = highs[i]
+		data[i].Low = lows[i]
+	}
+	return &context.Context{Data: data}
+}
+
+// ── evaluation helper ─────────────────────────────────────────────────────────
+
+func evalFixnanAt(t *testing.T, ev *StreamingBarEvaluator, call *ast.CallExpression, ctx *context.Context, barIdx int) float64 {
+	t.Helper()
+	result, err := ev.EvaluateAtBar(call, ctx, barIdx)
+	if err != nil {
+		t.Fatalf("EvaluateAtBar(bar=%d): %v", barIdx, err)
+	}
+	return result
+}
+
+// ── output sequence ───────────────────────────────────────────────────────────
+
+// TestFixnan_ForwardFillsLastValidValue verifies the full per-bar output
+// sequence: NaN before any valid value appears, the pivot value on its first
+// detection bar, the carried value on every subsequent NaN bar, and the
+// updated value when a new pivot appears.
+func TestFixnan_ForwardFillsLastValidValue(t *testing.T) {
+	// high: [100,105,110,108,103,102,104,107,106,101]
+	// pivothigh(2,2): NaN×4, 110 at bar4, NaN×4, 107 at bar9
+	ctx := ohlcvFromHighs([]float64{100, 105, 110, 108, 103, 102, 104, 107, 106, 101})
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+
+	tests := []struct {
+		name string
+		bar  int
+		want float64
+	}{
+		{"bar0_no_pivot_yet", 0, math.NaN()},
+		{"bar1_no_pivot_yet", 1, math.NaN()},
+		{"bar2_no_pivot_yet", 2, math.NaN()},
+		{"bar3_no_pivot_yet", 3, math.NaN()},
+		{"bar4_first_pivot", 4, 110},
+		{"bar5_carry_110", 5, 110},
+		{"bar6_carry_110", 6, 110},
+		{"bar7_carry_110", 7, 110},
+		{"bar8_carry_110", 8, 110},
+		{"bar9_second_pivot", 9, 107},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFloat64(t, tt.name, evalFixnanAt(t, ev, call, ctx, tt.bar), tt.want, 0)
+		})
+	}
+}
+
+// ── correctness under arbitrary query order ───────────────────────────────────
+
+// TestFixnan_OutOfOrderQueryConsistency verifies that querying bars in any
+// order — including querying a later bar before an earlier one — always returns
+// the value that would be produced by a strictly sequential 0…N scan. It covers
+// both sparse sources (with NaN pivot gaps) and dense sources (never NaN).
+func TestFixnan_OutOfOrderQueryConsistency(t *testing.T) {
+	t.Run("sparse_source_with_nan_gaps", func(t *testing.T) {
+		// high: [100,105,110,108,103,102,104,107,106,101]
+		// pivothigh(2,2): bar4=110, bar9=107, all others NaN
+		// fixnan sequence: NaN×4, 110, 110, 110, 110, 110, 107
+		ctx := ohlcvFromHighs([]float64{100, 105, 110, 108, 103, 102, 104, 107, 106, 101})
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+
+		assertFloat64(t, "bar9_first", evalFixnanAt(t, ev, call, ctx, 9), 107, 0)
+		assertFloat64(t, "bar6_after_bar9", evalFixnanAt(t, ev, call, ctx, 6), 110, 0)
+		assertFloat64(t, "bar4_pivot_bar", evalFixnanAt(t, ev, call, ctx, 4), 110, 0)
+		assertFloat64(t, "bar1_before_any_pivot", evalFixnanAt(t, ev, call, ctx, 1), math.NaN(), 0)
+	})
+
+	t.Run("dense_source_always_valid", func(t *testing.T) {
+		// close is always valid: fixnan is a pass-through, each bar holds its own value.
+		ctx := closesOnlyCtx(100, 110, 120, 115, 125, 130)
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(&ast.Identifier{Name: "close"})
+
+		assertFloat64(t, "bar5_first", evalFixnanAt(t, ev, call, ctx, 5), 130, 0)
+		assertFloat64(t, "bar2_after_bar5", evalFixnanAt(t, ev, call, ctx, 2), 120, 0)
+		assertFloat64(t, "bar4_after_bar2", evalFixnanAt(t, ev, call, ctx, 4), 125, 0)
+	})
+}
+
+// ── NaN boundary conditions ───────────────────────────────────────────────────
+
+// TestFixnan_AllNaNSourceRemainsNaN verifies fixnan never fabricates a value
+// when no non-NaN input has appeared on any bar up to the queried point.
+func TestFixnan_AllNaNSourceRemainsNaN(t *testing.T) {
+	ctx := ohlcvFromHighs([]float64{100, 102, 103, 101})
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+
+	assertFloat64(t, "bar1_no_pivot_exists", evalFixnanAt(t, ev, call, ctx, 1), math.NaN(), 0)
+}
+
+// TestFixnan_SingleValidThenAllNaN verifies the carried value persists
+// indefinitely once set, without any decay or reset.
+func TestFixnan_SingleValidThenAllNaN(t *testing.T) {
+	ctx := ohlcvFromHighs([]float64{100, 105, 110, 108, 103, 102, 101, 100, 99, 98})
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+
+	assertFloat64(t, "bar4_pivot", evalFixnanAt(t, ev, call, ctx, 4), 110, 0)
+	for i := 5; i <= 9; i++ {
+		got := evalFixnanAt(t, ev, call, ctx, i)
+		if !floatEq(got, 110) {
+			t.Errorf("bar %d: expected forward-fill 110, got %.6f", i, got)
+		}
+	}
+}
+
+// TestFixnan_ExtremeValues verifies that zero, negative, and magnitude-extreme
+// values are not misidentified as NaN sentinels and are correctly forward-filled.
+func TestFixnan_ExtremeValues(t *testing.T) {
+	nan := math.NaN()
 	tests := []struct {
 		name     string
-		values   []float64
+		closes   []float64
 		expected []float64
 	}{
 		{
 			name:     "negative_values",
-			values:   []float64{-100.0, math.NaN(), math.NaN(), -50.0, math.NaN()},
+			closes:   []float64{-100.0, nan, nan, -50.0, nan},
 			expected: []float64{-100.0, -100.0, -100.0, -50.0, -50.0},
 		},
 		{
-			name:     "zero_vs_nan",
-			values:   []float64{0.0, math.NaN(), 10.0, 0.0, math.NaN()},
+			name:     "zero_is_not_na",
+			closes:   []float64{0.0, nan, 10.0, 0.0, nan},
 			expected: []float64{0.0, 0.0, 10.0, 0.0, 0.0},
 		},
 		{
 			name:     "large_positive",
-			values:   []float64{1e10, math.NaN(), 1e11, math.NaN()},
+			closes:   []float64{1e10, nan, 1e11, nan},
 			expected: []float64{1e10, 1e10, 1e11, 1e11},
 		},
 		{
 			name:     "very_small",
-			values:   []float64{1e-10, math.NaN(), 1e-11, math.NaN()},
+			closes:   []float64{1e-10, nan, 1e-11, nan},
 			expected: []float64{1e-10, 1e-10, 1e-11, 1e-11},
 		},
 		{
 			name:     "alternating_valid_nan",
-			values:   []float64{10.0, math.NaN(), 20.0, math.NaN(), 30.0, math.NaN()},
+			closes:   []float64{10.0, nan, 20.0, nan, 30.0, nan},
 			expected: []float64{10.0, 10.0, 20.0, 20.0, 30.0, 30.0},
+		},
+		{
+			name:     "leading_nan_then_valid",
+			closes:   []float64{nan, nan, 5.0, nan},
+			expected: []float64{nan, nan, 5.0, 5.0},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewFixnanState()
-			for i, val := range tt.values {
-				result := state.ForwardFill(val)
-				expected := tt.expected[i]
-				if math.IsNaN(expected) {
-					if !math.IsNaN(result) {
-						t.Errorf("bar %d: expected NaN, got %.10f", i, result)
-					}
-				} else {
-					if math.Abs(result-expected) > 1e-9 {
-						t.Errorf("bar %d: expected %.10f, got %.10f", i, expected, result)
-					}
-				}
+			ctx := closesOnlyCtx(tt.closes...)
+			ev := NewStreamingBarEvaluator()
+			call := makeFixnanCall(&ast.Identifier{Name: "close"})
+
+			for i, want := range tt.expected {
+				assertFloat64(t, tt.name, evalFixnanAt(t, ev, call, ctx, i), want, 1e-9)
 			}
 		})
 	}
 }
 
-func TestFixnanEvaluator_WarmupBehavior(t *testing.T) {
-	t.Run("target_bar_zero", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{{Close: 100.0}},
-		}
-		evaluator := NewStreamingBarEvaluator()
+// ── cache isolation ───────────────────────────────────────────────────────────
 
-		closeExpr := &ast.Identifier{Name: "close"}
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{closeExpr},
-		}
+// TestFixnan_TwoExpressionsAreIsolated verifies that fixnan(pivothigh) and
+// fixnan(pivotlow) maintain independent series on the same StreamingBarEvaluator.
+func TestFixnan_TwoExpressionsAreIsolated(t *testing.T) {
+	ctx := ohlcvFromHighsLows(
+		[]float64{100, 105, 110, 108, 103},
+		[]float64{90, 85, 80, 82, 87},
+	)
+	ev := NewStreamingBarEvaluator()
 
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 0)
-		if err != nil {
-			t.Fatalf("bar 0 evaluation failed: %v", err)
+	highCall := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+	lowCall := makeFixnanCall(makePivotLowExpr(&ast.Identifier{Name: "low"}, 2, 2))
+
+	assertFloat64(t, "fixnan(pivothigh) bar4", evalFixnanAt(t, ev, highCall, ctx, 4), 110, 0)
+	assertFloat64(t, "fixnan(pivotlow) bar4", evalFixnanAt(t, ev, lowCall, ctx, 4), 80, 0)
+}
+
+// ── access pattern invariants ─────────────────────────────────────────────────
+
+// TestFixnan_IdempotentRequery verifies that re-querying the same bar multiple
+// times never mutates the buffered result.
+func TestFixnan_IdempotentRequery(t *testing.T) {
+	ctx := closesOnlyCtx(10, math.NaN(), 30, math.NaN(), 50)
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(&ast.Identifier{Name: "close"})
+
+	first := evalFixnanAt(t, ev, call, ctx, 4)
+	for rep := 1; rep <= 5; rep++ {
+		got := evalFixnanAt(t, ev, call, ctx, 4)
+		if !floatEq(got, first) {
+			t.Errorf("rep %d: value mutated %.6f → %.6f", rep, first, got)
 		}
-		if result != 100.0 {
-			t.Errorf("expected 100.0 at bar 0, got %.2f", result)
+	}
+}
+
+// TestFixnan_FullHistoricalConsistency verifies that every buffered bar value
+// remains stable after the full sequence has been computed and re-queried.
+func TestFixnan_FullHistoricalConsistency(t *testing.T) {
+	closes := []float64{math.NaN(), 10, math.NaN(), 20, math.NaN(), 30, math.NaN(), 40}
+	ctx := closesOnlyCtx(closes...)
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(&ast.Identifier{Name: "close"})
+
+	n := len(closes)
+	saved := make([]float64, n)
+	for i := 0; i < n; i++ {
+		saved[i] = evalFixnanAt(t, ev, call, ctx, i)
+	}
+
+	for i := 0; i < n; i++ {
+		got := evalFixnanAt(t, ev, call, ctx, i)
+		if !floatEq(got, saved[i]) {
+			t.Errorf("bar %d: historical value changed %.6f → %.6f", i, saved[i], got)
 		}
+	}
+}
+
+// ── context growth ────────────────────────────────────────────────────────────
+
+// TestFixnan_GrowsWhenContextExpands verifies that presenting a larger context
+// after initial computation produces correct results for all bars, including
+// those computed under the original smaller context.
+func TestFixnan_GrowsWhenContextExpands(t *testing.T) {
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(&ast.Identifier{Name: "close"})
+
+	smallCtx := closesOnlyCtx(10, math.NaN(), 30, math.NaN(), 50)
+	assertFloat64(t, "bar4_small_ctx", evalFixnanAt(t, ev, call, smallCtx, 4), 50, 0)
+
+	largeCtx := closesOnlyCtx(10, math.NaN(), 30, math.NaN(), 50, math.NaN(), 70, math.NaN())
+	assertFloat64(t, "bar7_large_ctx", evalFixnanAt(t, ev, call, largeCtx, 7), 70, 0)
+	assertFloat64(t, "bar4_recheck_after_growth", evalFixnanAt(t, ev, call, largeCtx, 4), 50, 0)
+}
+
+// ── large gap ─────────────────────────────────────────────────────────────────
+
+// TestFixnan_LargeGapForwardFill verifies that a value set early in a long series
+// is correctly carried to a bar queried far later without accumulating error.
+func TestFixnan_LargeGapForwardFill(t *testing.T) {
+	data := make([]context.OHLCV, 1002)
+	data[0].High = 100
+	data[1].High = 105
+	data[2].High = 110
+	data[3].High = 108
+	data[4].High = 103
+	for i := 5; i < 1002; i++ {
+		data[i].High = 102
+	}
+	ctx := &context.Context{Data: data}
+	ev := NewStreamingBarEvaluator()
+	call := makeFixnanCall(makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2))
+
+	result, err := ev.EvaluateAtBar(call, ctx, 1000)
+	if err != nil {
+		t.Fatalf("large gap forward-fill: %v", err)
+	}
+	assertFloat64(t, "bar1000", result, 110, 0)
+}
+
+// ── argument validation ───────────────────────────────────────────────────────
+
+// TestFixnan_NoArgumentsReturnsError verifies that calling fixnan with no
+// arguments produces an error rather than a silent NaN or panic.
+func TestFixnan_NoArgumentsReturnsError(t *testing.T) {
+	ctx := &context.Context{Data: []context.OHLCV{{High: 100}}}
+	ev := NewStreamingBarEvaluator()
+	call := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "fixnan"},
+		Arguments: []ast.Expression{},
+	}
+
+	_, err := ev.EvaluateAtBar(call, ctx, 0)
+	if err == nil {
+		t.Error("expected error for zero arguments")
+	}
+}
+
+// ── subscripted inner expression ──────────────────────────────────────────────
+
+// TestFixnan_SubscriptedInnerExpression verifies fixnan(expr[N]) where the inner
+// expression carries a historical subscript: the subscript shifts which bar's
+// value is visible at each position, and out-of-range subscripts at early bars
+// are treated as na (forward-fill) without error.
+func TestFixnan_SubscriptedInnerExpression(t *testing.T) {
+	ctx := ohlcvFromHighs([]float64{100, 105, 110, 108, 103, 102, 104, 107, 106, 101})
+	pivotBase := makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2)
+
+	t.Run("offset_1_shifts_pivot_into_view", func(t *testing.T) {
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(subscriptExpr(pivotBase, 1))
+		// pivot fires at bar 4; with [1] shift, it is visible at bar 5
+		assertFloat64(t, "bar5", evalFixnanAt(t, ev, call, ctx, 5), 110, 0)
+		assertFloat64(t, "bar6_carry", evalFixnanAt(t, ev, call, ctx, 6), 110, 0)
 	})
 
-	t.Run("single_bar_context", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{{Close: 50.0}},
-		}
-		evaluator := NewStreamingBarEvaluator()
-
-		closeExpr := &ast.Identifier{Name: "close"}
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{closeExpr},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 0)
+	t.Run("offset_2_no_error", func(t *testing.T) {
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(subscriptExpr(pivotBase, 2))
+		// out-of-range subscripts at early bars must not produce an error
+		_, err := ev.EvaluateAtBar(call, ctx, 9)
 		if err != nil {
-			t.Fatalf("single bar failed: %v", err)
-		}
-		if result != 50.0 {
-			t.Errorf("expected 50.0, got %.2f", result)
-		}
-	})
-
-	t.Run("non_sequential_bar_access", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{
-				{Close: 100}, {Close: 110}, {Close: 120},
-				{Close: 115}, {Close: 125}, {Close: 130},
-			},
-		}
-		evaluator := NewStreamingBarEvaluator()
-
-		closeExpr := &ast.Identifier{Name: "close"}
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{closeExpr},
-		}
-
-		result5, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 5)
-		result2, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 2)
-		result4, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 4)
-
-		if result5 != 130.0 {
-			t.Errorf("bar 5: expected 130.0, got %.2f", result5)
-		}
-		if result2 != 120.0 {
-			t.Errorf("bar 2: expected 120.0, got %.2f", result2)
-		}
-		if result4 != 125.0 {
-			t.Errorf("bar 4: expected 125.0, got %.2f", result4)
-		}
-	})
-
-	t.Run("large_gap_forward_fill", func(t *testing.T) {
-		data := make([]context.OHLCV, 1002)
-		data[0].High = 100
-		data[1].High = 105
-		data[2].High = 110
-		data[3].High = 108
-		data[4].High = 103
-		for i := 5; i < 1002; i++ {
-			data[i].High = 102
-		}
-
-		ctx := &context.Context{Data: data}
-		evaluator := NewStreamingBarEvaluator()
-
-		pivotCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "pivothigh"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "high"},
-				&ast.Literal{Value: float64(2)},
-				&ast.Literal{Value: float64(2)},
-			},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{pivotCall},
-		}
-
-		result1000, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 1000)
-		if err != nil {
-			t.Fatalf("bar 1000 failed: %v", err)
-		}
-		if result1000 != 110 {
-			t.Errorf("expected forward-fill 110 after 1000 bars, got %.2f", result1000)
+			t.Errorf("offset_2 at bar 9 should not error: %v", err)
 		}
 	})
 }
 
-func TestFixnanEvaluator_DifferentTAFunctions(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{Close: 100}, {Close: 102}, {Close: 104}, {Close: 106},
-			{Close: 108}, {Close: 110}, {Close: 112}, {Close: 114},
-		},
-	}
+// ── arbitrary source expressions ──────────────────────────────────────────────
 
-	evaluator := NewStreamingBarEvaluator()
+// TestFixnan_WithTAFunctions verifies fixnan handles TA function inner
+// expressions, forward-filling through their warmup NaN period, and that two
+// distinct TA expressions backed by the same evaluator maintain independent
+// state.
+func TestFixnan_WithTAFunctions(t *testing.T) {
+	ctx := closesOnlyCtx(100, 102, 104, 106, 108, 110, 112, 114)
+	closeIdent := &ast.Identifier{Name: "close"}
 
-	t.Run("fixnan_with_sma", func(t *testing.T) {
-		smaCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(3)},
-			},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{smaCall},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 2)
-		if err != nil {
-			t.Fatalf("fixnan(sma) failed: %v", err)
-		}
-		expectedSMA := (100.0 + 102.0 + 104.0) / 3.0
-		if math.Abs(result-expectedSMA) > 0.01 {
-			t.Errorf("expected SMA %.2f, got %.2f", expectedSMA, result)
-		}
+	t.Run("sma_warmup_nans_filled", func(t *testing.T) {
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(makeCallWithExprSource("sma", closeIdent, 3))
+		want := (100.0 + 102.0 + 104.0) / 3.0
+		assertFloat64(t, "bar2_sma3", evalFixnanAt(t, ev, call, ctx, 2), want, 0.01)
 	})
 
-	t.Run("fixnan_with_ema", func(t *testing.T) {
-		emaCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "ema"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(3)},
-			},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{emaCall},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 5)
-		if err != nil {
-			t.Fatalf("fixnan(ema) failed: %v", err)
-		}
+	t.Run("ema_produces_valid_result", func(t *testing.T) {
+		ev := NewStreamingBarEvaluator()
+		call := makeFixnanCall(makeCallWithExprSource("ema", closeIdent, 3))
+		result := evalFixnanAt(t, ev, call, ctx, 5)
 		if math.IsNaN(result) || result <= 0 {
-			t.Errorf("expected valid EMA result, got %.2f", result)
+			t.Errorf("expected valid EMA at bar 5, got %.6f", result)
 		}
 	})
 
-	t.Run("multiple_fixnan_different_expressions", func(t *testing.T) {
-		smaCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(3)},
-			},
-		}
+	t.Run("two_distinct_expressions_use_separate_state", func(t *testing.T) {
+		ev := NewStreamingBarEvaluator()
+		smaCall := makeFixnanCall(makeCallWithExprSource("sma", closeIdent, 3))
+		emaCall := makeFixnanCall(makeCallWithExprSource("ema", closeIdent, 3))
 
-		emaCall := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "ema"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(3)},
-			},
-		}
-
-		fixnanSMA := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{smaCall},
-		}
-
-		fixnanEMA := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{emaCall},
-		}
-
-		smaResult, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanSMA, ctx, 5)
-		emaResult, _ := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanEMA, ctx, 5)
-
-		if math.IsNaN(smaResult) || math.IsNaN(emaResult) {
-			t.Error("neither result should be NaN at bar 5")
-		}
-
-		if math.Abs(smaResult-emaResult) < 0.01 {
-			t.Logf("SMA=%.2f EMA=%.2f - values very close but both valid", smaResult, emaResult)
-		}
+		// Compute ema first; then verify sma at the same bar reflects only sma
+		// state — proving the two expressions use independent cache entries.
+		evalFixnanAt(t, ev, emaCall, ctx, 5)
+		// sma(close,3) at bar 5: (close[3]+close[4]+close[5])/3 = (106+108+110)/3 = 108
+		assertFloat64(t, "sma3_bar5_after_ema", evalFixnanAt(t, ev, smaCall, ctx, 5), 108, 0.01)
 	})
 }
 
-func TestStateStorage_EdgeCases(t *testing.T) {
-	t.Run("get_nonexistent_key", func(t *testing.T) {
-		storage := NewMapStateStorage()
-		_, exists := storage.Get("nonexistent")
-		if exists {
-			t.Error("expected false for nonexistent key")
-		}
-	})
+// ── namespace alias ───────────────────────────────────────────────────────────
 
-	t.Run("has_empty_storage", func(t *testing.T) {
-		storage := NewMapStateStorage()
-		if storage.Has("anything") {
-			t.Error("empty storage should not have any keys")
-		}
-	})
+// TestFixnan_TANamespaceAliasIsEquivalent verifies that ta.fixnan and fixnan are
+// registered to the same handler and produce identical results.
+func TestFixnan_TANamespaceAliasIsEquivalent(t *testing.T) {
+	ctx := ohlcvFromHighs([]float64{100, 105, 110, 108, 103, 102, 104, 107, 106, 101})
+	pivotExpr := makePivotHighExpr(&ast.Identifier{Name: "high"}, 2, 2)
 
-	t.Run("set_overwrite", func(t *testing.T) {
-		storage := NewMapStateStorage()
-		state1 := NewFixnanState()
-		state1.ForwardFill(100.0)
-		storage.Set("key", state1)
+	ev1 := NewStreamingBarEvaluator()
+	result1 := evalFixnanAt(t, ev1, makeFixnanCall(pivotExpr), ctx, 4)
 
-		state2 := NewFixnanState()
-		state2.ForwardFill(200.0)
-		storage.Set("key", state2)
+	ev2 := NewStreamingBarEvaluator()
+	result2 := evalFixnanAt(t, ev2, makeTAFixnanCall(pivotExpr), ctx, 4)
 
-		retrieved, _ := storage.Get("key")
-		retrievedState := retrieved.(*FixnanState)
-		result := retrievedState.ForwardFill(math.NaN())
-		if result != 200.0 {
-			t.Errorf("expected overwritten value 200.0, got %.2f", result)
-		}
-	})
-
-	t.Run("storage_isolation", func(t *testing.T) {
-		storage1 := NewMapStateStorage()
-		storage2 := NewMapStateStorage()
-
-		state1 := NewFixnanState()
-		state1.ForwardFill(100.0)
-		storage1.Set("key", state1)
-
-		if storage2.Has("key") {
-			t.Error("storage2 should not have key from storage1")
-		}
-	})
-}
-
-func TestExpressionIdentifier_Uniqueness(t *testing.T) {
-	identifier := NewHashExpressionIdentifier()
-
-	t.Run("different_arguments_different_hash", func(t *testing.T) {
-		expr1 := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(10)},
-			},
-		}
-
-		expr2 := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(20)},
-			},
-		}
-
-		hash1 := identifier.Identify(expr1)
-		hash2 := identifier.Identify(expr2)
-
-		if hash1 == hash2 {
-			t.Error("different SMA periods should produce different hashes")
-		}
-	})
-
-	t.Run("different_functions_different_hash", func(t *testing.T) {
-		expr1 := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(10)},
-			},
-		}
-
-		expr2 := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "ema"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(10)},
-			},
-		}
-
-		hash1 := identifier.Identify(expr1)
-		hash2 := identifier.Identify(expr2)
-
-		if hash1 == hash2 {
-			t.Error("SMA and EMA should produce different hashes")
-		}
-	})
-
-	t.Run("same_expression_same_hash", func(t *testing.T) {
-		expr := &ast.CallExpression{
-			Callee: &ast.MemberExpression{
-				Object:   &ast.Identifier{Name: "ta"},
-				Property: &ast.Identifier{Name: "sma"},
-			},
-			Arguments: []ast.Expression{
-				&ast.Identifier{Name: "close"},
-				&ast.Literal{Value: float64(10)},
-			},
-		}
-
-		hash1 := identifier.Identify(expr)
-		hash2 := identifier.Identify(expr)
-
-		if hash1 != hash2 {
-			t.Error("same expression should produce consistent hash")
-		}
-	})
-}
-
-func TestWarmupStrategy_ErrorHandling(t *testing.T) {
-	t.Run("warmup_with_partial_errors", func(t *testing.T) {
-		ctx := &context.Context{
-			Data: []context.OHLCV{
-				{Close: 100}, {Close: 110}, {Close: 120},
-			},
-		}
-		evaluator := NewStreamingBarEvaluator()
-		warmup := NewSequentialWarmupStrategy()
-		state := NewFixnanState()
-
-		invalidExpr := &ast.Identifier{Name: "invalid_field"}
-
-		err := warmup.Warmup(evaluator, invalidExpr, ctx, 2, state)
-		if err != nil {
-			t.Errorf("warmup should handle errors gracefully, got: %v", err)
-		}
-	})
-
-	t.Run("warmup_empty_target", func(t *testing.T) {
-		ctx := &context.Context{Data: []context.OHLCV{}}
-		evaluator := NewStreamingBarEvaluator()
-		warmup := NewSequentialWarmupStrategy()
-		state := NewFixnanState()
-
-		closeExpr := &ast.Identifier{Name: "close"}
-		err := warmup.Warmup(evaluator, closeExpr, ctx, 0, state)
-
-		if err != nil {
-			t.Errorf("warmup with target 0 should not error, got: %v", err)
-		}
-	})
-}
-
-func TestFixnanEvaluator_MemberExpressionOffsets(t *testing.T) {
-	ctx := &context.Context{
-		Data: []context.OHLCV{
-			{High: 100}, {High: 105}, {High: 110},
-			{High: 108}, {High: 103}, {High: 102},
-			{High: 104}, {High: 107}, {High: 106}, {High: 101},
-		},
+	if !floatEq(result1, result2) {
+		t.Errorf("fixnan and ta.fixnan diverge: %.6f vs %.6f", result1, result2)
 	}
-
-	evaluator := NewStreamingBarEvaluator()
-
-	t.Run("fixnan_with_pivot_offset_1", func(t *testing.T) {
-		pivotMember := &ast.MemberExpression{
-			Object: &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "ta"},
-					Property: &ast.Identifier{Name: "pivothigh"},
-				},
-				Arguments: []ast.Expression{
-					&ast.Identifier{Name: "high"},
-					&ast.Literal{Value: float64(2)},
-					&ast.Literal{Value: float64(2)},
-				},
-			},
-			Property: &ast.Literal{Value: float64(1)},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{pivotMember},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 5)
-		if err != nil {
-			t.Fatalf("fixnan(pivot[1]) failed: %v", err)
-		}
-		if result != 110 {
-			t.Errorf("expected fixnan(pivot[1]) = 110 at bar 5, got %.2f", result)
-		}
-	})
-
-	t.Run("fixnan_with_pivot_offset_2", func(t *testing.T) {
-		pivotMember := &ast.MemberExpression{
-			Object: &ast.CallExpression{
-				Callee: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "ta"},
-					Property: &ast.Identifier{Name: "pivothigh"},
-				},
-				Arguments: []ast.Expression{
-					&ast.Identifier{Name: "high"},
-					&ast.Literal{Value: float64(2)},
-					&ast.Literal{Value: float64(2)},
-				},
-			},
-			Property: &ast.Literal{Value: float64(2)},
-		}
-
-		fixnanCall := &ast.CallExpression{
-			Callee:    &ast.Identifier{Name: "fixnan"},
-			Arguments: []ast.Expression{pivotMember},
-		}
-
-		result, err := evaluator.fixnanEvaluator.EvaluateAtBar(evaluator, fixnanCall, ctx, 9)
-		if err != nil {
-			t.Fatalf("fixnan(pivot[2]) failed: %v", err)
-		}
-		if !math.IsNaN(result) || result == 110 {
-			t.Logf("fixnan(pivot[2]) at bar 9: %.2f - offset behavior as expected", result)
-		}
-	})
 }

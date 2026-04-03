@@ -370,12 +370,13 @@ func TestAddStrategy(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	// Place and execute trade
 	strat.Entry("long1", strategy.Long, 10, "")
 	strat.OnBarUpdate(1, 100, 1000)
 	strat.Close("long1", 110, 2000, "")
+	strat.OnBarUpdate(2, 110, 2000)
 
 	cd.AddStrategy(strat, 110)
 
@@ -437,7 +438,7 @@ func TestStrategyDataStructure(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	// Open trade
 	strat.Entry("long1", strategy.Long, 5, "")
@@ -445,10 +446,11 @@ func TestStrategyDataStructure(t *testing.T) {
 
 	// Close trade
 	strat.Close("long1", 110, 2000, "")
+	strat.OnBarUpdate(2, 110, 2000)
 
 	// Another open trade
 	strat.Entry("long2", strategy.Long, 3, "")
-	strat.OnBarUpdate(2, 110, 3000)
+	strat.OnBarUpdate(3, 110, 3000)
 
 	cd.AddStrategy(strat, 115)
 
@@ -484,17 +486,19 @@ func TestTradeCommentSerialization(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	/* Trade with both entry and exit comments */
 	strat.Entry("long1", strategy.Long, 10, "Buy on breakout")
 	strat.OnBarUpdate(1, 100, 1000)
 	strat.Close("long1", 110, 2000, "Take profit")
+	strat.OnBarUpdate(2, 110, 2000)
 
 	/* Trade with entry comment only */
 	strat.Entry("long2", strategy.Long, 5, "Second entry")
-	strat.OnBarUpdate(2, 110, 3000)
+	strat.OnBarUpdate(3, 110, 3000)
 	strat.Close("long2", 115, 4000, "")
+	strat.OnBarUpdate(4, 115, 4000)
 
 	cd.AddStrategy(strat, 115)
 
@@ -554,7 +558,7 @@ func TestOpenTradeCommentSerialization(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 1) // pyramiding=1 allows 2 trades
 
 	/* Open trade with entry comment */
 	strat.Entry("long1", strategy.Long, 10, "Trend entry")
@@ -607,12 +611,13 @@ func TestTradeCommentOmitEmpty(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.Call("Test Strategy", 10000)
+	strat.CallWithPyramiding("Test Strategy", 10000, 0)
 
 	/* Trade with no comments (empty strings) */
 	strat.Entry("long1", strategy.Long, 10, "")
 	strat.OnBarUpdate(1, 100, 1000)
 	strat.Close("long1", 110, 2000, "")
+	strat.OnBarUpdate(2, 110, 2000)
 
 	cd.AddStrategy(strat, 110)
 

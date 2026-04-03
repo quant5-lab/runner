@@ -1,0 +1,10 @@
+//@version=5
+indicator("Percentile Basic", overlay=false)
+
+pnr75 = ta.percentile_nearest_rank(close, 20, 75)
+pli75 = ta.percentile_linear_interpolation(close, 20, 75)
+pnr25 = ta.percentile_nearest_rank(close, 20, 25)
+
+plot(pnr75, "NR 75th")
+plot(pli75, "LI 75th")
+plot(pnr25, "NR 25th")

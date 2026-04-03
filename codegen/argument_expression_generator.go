@@ -13,7 +13,8 @@ type ArgumentExpressionGenerator struct {
 	parameterIndex    int
 	signatureRegistry *FunctionSignatureRegistry
 	builtinHandler    *BuiltinIdentifierHandler
-	inSecurityContext bool
+	scope             AccessScope
+	coercer           *NumericExpressionCoercer
 }
 
 func NewArgumentExpressionGenerator(
@@ -27,11 +28,34 @@ func NewArgumentExpressionGenerator(
 		parameterIndex:    paramIdx,
 		signatureRegistry: gen.funcSigRegistry,
 		builtinHandler:    gen.builtinHandler,
-		inSecurityContext: gen.inSecurityContext,
+		scope:             gen.accessScope(),
+		coercer:           NewNumericExpressionCoercer(gen.boolConverter),
 	}
 }
 
+/* Generate produces a correctly-typed Go expression for use as a function argument.
+ * String-typed parameters bypass float64 coercion. */
 func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, error) {
+	code, err := g.generate(expr)
+	if err != nil {
+		return "", err
+	}
+	if g.isStringParam() {
+		return code, nil
+	}
+	return g.ensureFloat64(expr, code), nil
+}
+
+func (g *ArgumentExpressionGenerator) isStringParam() bool {
+	if g.signatureRegistry == nil {
+		return false
+	}
+	paramType, ok := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+	return ok && paramType == ParamTypeString
+}
+
+/* generate produces a raw Go expression preserving its native Go type (bool stays bool) */
+func (g *ArgumentExpressionGenerator) generate(expr ast.Expression) (string, error) {
 	switch e := expr.(type) {
 	case *ast.Identifier:
 		return g.generateIdentifier(e)
@@ -43,24 +67,76 @@ func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, err
 		return g.generateBinaryExpression(e)
 	case *ast.MemberExpression:
 		return g.generator.generateMemberExpression(e)
+	case *ast.UnaryExpression:
+		return g.generateUnaryExpression(e)
+	case *ast.LogicalExpression:
+		return g.generateLogicalExpression(e)
+	case *ast.ConditionalExpression:
+		return g.generateConditionalExpression(e)
+	case *ast.IfStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateIfExpressionAsIIFE(e)
+	case *ast.ForStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateForExpressionAsIIFE(e)
+	case *ast.ForInStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateForInExpressionAsIIFE(e)
+	case *ast.WhileStatement:
+		cfGenerator := NewControlFlowExpressionGenerator(g.generator)
+		return cfGenerator.GenerateWhileExpressionAsIIFE(e)
 	default:
 		return "", fmt.Errorf("unsupported argument expression type: %T", expr)
 	}
 }
 
-func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
-	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.inSecurityContext); resolved {
-		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+func (g *ArgumentExpressionGenerator) ensureFloat64(expr ast.Expression, code string) string {
+	return g.coercer.CoerceToFloat64(expr, code)
+}
 
-		if hasSignature && paramType == ParamTypeSeries {
+func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
+	if constVal, isConstant := g.generator.constants[id.Name]; isConstant {
+		if constVal == "input.source" {
+			return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
+		}
+		return id.Name, nil
+	}
+
+	expectsSeries := false
+	if g.signatureRegistry != nil {
+		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+		expectsSeries = hasSignature && paramType == ParamTypeSeries
+	}
+
+	// Arrow resolver checked before builtins; bypassed when passing to a series-typed parameter
+	// so the identifier routes to *Series by name convention instead of scalar resolution.
+	if !expectsSeries && g.generator.arrowAccessResolver != nil {
+		if access, resolved := g.generator.arrowAccessResolver.ResolveAccess(id.Name); resolved {
+			return access, nil
+		}
+	}
+
+	if code, resolved := g.builtinHandler.TryResolveIdentifier(id, g.scope); resolved {
+		if expectsSeries {
 			return g.resolveBuiltinToSeries(id.Name, code)
 		}
 		return g.resolveBuiltinToValue(id.Name, code)
 	}
-	return id.Name, nil
+
+	if expectsSeries {
+		return fmt.Sprintf("%sSeries", id.Name), nil
+	}
+
+	return g.generator.resolveUserIdentifierAccess(id.Name), nil
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback string) (string, error) {
+	if g.scope == ArrowScope {
+		if _, ok := OHLCVFieldName(name); ok {
+			return SeriesPointerLookupIIFE(name + "Series"), nil
+		}
+		return fallback, nil
+	}
 	switch name {
 	case "close":
 		return "closeSeries", nil
@@ -78,6 +154,9 @@ func (g *ArgumentExpressionGenerator) resolveBuiltinToSeries(name, fallback stri
 }
 
 func (g *ArgumentExpressionGenerator) resolveBuiltinToValue(name, fallback string) (string, error) {
+	if g.scope != BarLoopScope {
+		return fallback, nil
+	}
 	switch name {
 	case "close":
 		return "closeSeries.Get(0)", nil
@@ -100,23 +179,79 @@ func (g *ArgumentExpressionGenerator) generateLiteral(lit *ast.Literal) (string,
 		return fmt.Sprintf("%.1f", v), nil
 	case int:
 		return fmt.Sprintf("%d.0", v), nil
+	case string:
+		return fmt.Sprintf("%q", v), nil
 	default:
 		return fmt.Sprintf("%v", v), nil
 	}
 }
 
 func (g *ArgumentExpressionGenerator) generateBinaryExpression(bin *ast.BinaryExpression) (string, error) {
-	leftGen := NewArgumentExpressionGenerator(g.generator, g.functionName, g.parameterIndex)
-	left, err := leftGen.Generate(bin.Left)
+	left, err := g.generate(bin.Left)
 	if err != nil {
 		return "", err
 	}
 
-	rightGen := NewArgumentExpressionGenerator(g.generator, g.functionName, g.parameterIndex)
-	right, err := rightGen.Generate(bin.Right)
+	right, err := g.generate(bin.Right)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("(%s %s %s)", left, bin.Operator, right), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateUnaryExpression(unary *ast.UnaryExpression) (string, error) {
+	operandCode, err := g.generate(unary.Argument)
+	if err != nil {
+		return "", err
+	}
+
+	op := unary.Operator
+	if op == "not" {
+		op = "!"
+		operandCode = g.generator.ensureBooleanOperand(unary.Argument, operandCode)
+	}
+
+	return fmt.Sprintf("%s%s", op, operandCode), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateLogicalExpression(logical *ast.LogicalExpression) (string, error) {
+	leftCode, err := g.generate(logical.Left)
+	if err != nil {
+		return "", err
+	}
+
+	rightCode, err := g.generate(logical.Right)
+	if err != nil {
+		return "", err
+	}
+
+	leftCode = g.generator.ensureBooleanOperand(logical.Left, leftCode)
+	rightCode = g.generator.ensureBooleanOperand(logical.Right, rightCode)
+
+	op := NormalizeLogicalOperator(logical.Operator)
+	return fmt.Sprintf("(%s %s %s)", leftCode, op, rightCode), nil
+}
+
+func (g *ArgumentExpressionGenerator) generateConditionalExpression(cond *ast.ConditionalExpression) (string, error) {
+	testCode, err := g.generate(cond.Test)
+	if err != nil {
+		return "", err
+	}
+	testCode = g.generator.addBoolConversionIfNeeded(cond.Test, testCode)
+
+	consequentCode, err := g.generate(cond.Consequent)
+	if err != nil {
+		return "", err
+	}
+	consequentCode = g.coercer.CoerceToFloat64(cond.Consequent, consequentCode)
+
+	alternateCode, err := g.generate(cond.Alternate)
+	if err != nil {
+		return "", err
+	}
+	alternateCode = g.coercer.CoerceToFloat64(cond.Alternate, alternateCode)
+
+	return fmt.Sprintf("func() float64 { if %s { return %s } else { return %s } }()",
+		testCode, consequentCode, alternateCode), nil
 }

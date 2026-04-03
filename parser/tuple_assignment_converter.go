@@ -13,11 +13,11 @@ func NewTupleAssignmentConverter(expressionConverter func(*Expression) (ast.Expr
 }
 
 func (t *TupleAssignmentConverter) CanHandle(stmt *Statement) bool {
-	return stmt.TupleAssignment != nil
+	return stmt.Core != nil && stmt.Core.TupleAssignment != nil
 }
 
 func (t *TupleAssignmentConverter) Convert(stmt *Statement) (ast.Node, error) {
-	tuple := stmt.TupleAssignment
+	tuple := stmt.Core.TupleAssignment
 
 	if tuple.Value == nil {
 		return t.convertArrayLiteralStatement(tuple.Names)

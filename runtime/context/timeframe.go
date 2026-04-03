@@ -5,6 +5,7 @@ var (
 	valueRetriever     = NewSecurityValueRetriever()
 	timeframeConverter = NewTimeframeConverter()
 	timestampAligner   = NewTimestampAligner()
+	boundaryAligner    = NewTimeframeBoundaryAligner()
 )
 
 func FindBarIndexByTimestamp(secCtx *Context, targetTimestamp int64) int {
@@ -19,23 +20,27 @@ func GetSecurityValue(secCtx *Context, targetTimestamp int64, getValue func(*Con
 	return valueRetriever.RetrieveValue(secCtx, targetTimestamp, getValue)
 }
 
-/* TimeframeToSeconds converts Pine timeframe string to seconds
- * Examples: "1h" → 3600, "1D" → 86400, "5m" → 300
- */
 func TimeframeToSeconds(tf string) int64 {
 	return timeframeConverter.ToSeconds(tf)
 }
 
-/* AlignTimestampToTimeframe rounds timestamp down to timeframe boundary
- * Example: 2024-01-01 14:30:00 aligned to 1D → 2024-01-01 00:00:00
- */
+func TimeframeMultiplier(tf string) int64 {
+	return timeframeConverter.extractNumericPart(tf)
+}
+
+func TimeframeFromSeconds(seconds int64) string {
+	return timeframeConverter.FromSeconds(seconds)
+}
+
 func AlignTimestampToTimeframe(timestamp int64, timeframeSeconds int64) int64 {
 	return timestampAligner.AlignToTimeframe(timestamp, timeframeSeconds)
 }
 
-/* GetAlignedTimestamp returns timestamp aligned to security timeframe
- * Used for upsampling: repeat daily value across all hourly bars of that day
- */
+/* Rounds timestamp to calendar-aware period boundary (weeks start Monday, months use actual boundaries) */
+func AlignTimestampToPeriod(timestamp int64, timeframe string) int64 {
+	return boundaryAligner.AlignToPeriod(timestamp, timeframe)
+}
+
 func GetAlignedTimestamp(ctx *Context, secTimeframe string) int64 {
 	return timestampAligner.GetAlignedTimestamp(ctx, secTimeframe, timeframeConverter)
 }

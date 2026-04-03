@@ -1,5 +1,13 @@
 package context
 
+import "fmt"
+
+/* Pine Script spec: "calculations use 2628003 as the number of seconds in one month (365/12 days)" */
+const secondsPerMonth int64 = 2628003
+
+/* Pine Script spec: "All values above 31,622,400 (366 days) return 12M" */
+const maxFromSecondsThreshold int64 = 31_622_400
+
 type TimeframeConverter struct{}
 
 func NewTimeframeConverter() *TimeframeConverter {
@@ -42,6 +50,41 @@ func (c *TimeframeConverter) extractNumericPart(timeframe string) int64 {
 	return result
 }
 
+func (c *TimeframeConverter) FromSeconds(seconds int64) string {
+	if seconds <= 0 {
+		return ""
+	}
+
+	if seconds > maxFromSecondsThreshold {
+		return "12M"
+	}
+
+	type unit struct {
+		suffix string
+		secs   int64
+	}
+	units := []unit{
+		{"M", secondsPerMonth},
+		{"W", 604800},
+		{"D", 86400},
+		{"h", 3600},
+		{"m", 60},
+		{"s", 1},
+	}
+
+	for _, u := range units {
+		if seconds >= u.secs && seconds%u.secs == 0 {
+			multiplier := seconds / u.secs
+			if multiplier == 1 {
+				return "1" + u.suffix
+			}
+			return fmt.Sprintf("%d%s", multiplier, u.suffix)
+		}
+	}
+
+	return "1s"
+}
+
 func (c *TimeframeConverter) unitToSeconds(unit byte) int64 {
 	unitMap := map[byte]int64{
 		's': 1,
@@ -51,7 +94,7 @@ func (c *TimeframeConverter) unitToSeconds(unit byte) int64 {
 		'd': 86400,
 		'W': 604800,
 		'w': 604800,
-		'M': 2592000,
+		'M': secondsPerMonth,
 	}
 
 	if seconds, exists := unitMap[unit]; exists {

@@ -21,3 +21,8 @@ func (a *ExpressionAccessGenerator) GenerateLoopValueAccess(loopVar string) stri
 func (a *ExpressionAccessGenerator) GenerateInitialValueAccess(period int) string {
 	return a.gen.convertSeriesAccessToIntOffset(a.exprCode, period-1)
 }
+
+// GenerateCurrentValueAccess returns the expression for current bar access (no transformation needed).
+func (a *ExpressionAccessGenerator) GenerateCurrentValueAccess() string {
+	return a.exprCode
+}

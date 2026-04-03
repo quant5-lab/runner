@@ -2,12 +2,15 @@ package lexer
 
 import (
 	"io"
+	"sync"
 
 	"github.com/alecthomas/participle/v2/lexer"
 )
 
 type IndentationDefinition struct {
-	base lexer.Definition
+	base        lexer.Definition
+	symbolsOnce sync.Once
+	symbolsMap  map[string]lexer.TokenType
 }
 
 func NewIndentationDefinition(base lexer.Definition) *IndentationDefinition {
@@ -15,12 +18,15 @@ func NewIndentationDefinition(base lexer.Definition) *IndentationDefinition {
 }
 
 func (d *IndentationDefinition) Symbols() map[string]lexer.TokenType {
-	symbols := d.base.Symbols()
-	nextType := lexer.TokenType(len(symbols) + 1)
-	symbols["Indent"] = nextType
-	symbols["Dedent"] = nextType + 1
-	symbols["Newline"] = nextType + 2
-	return symbols
+	d.symbolsOnce.Do(func() {
+		/* Mutate base map in-place — StatefulLexer.Next() reads token types from it */
+		d.symbolsMap = d.base.Symbols()
+		nextType := lexer.TokenType(len(d.symbolsMap) + 1)
+		d.symbolsMap["Indent"] = nextType
+		d.symbolsMap["Dedent"] = nextType + 1
+		d.symbolsMap["Newline"] = nextType + 2
+	})
+	return d.symbolsMap
 }
 
 func (d *IndentationDefinition) Lex(filename string, r io.Reader) (lexer.Lexer, error) {
@@ -40,24 +46,16 @@ type IndentationLexer struct {
 	atLineStart     bool
 	whitespaceType  lexer.TokenType
 	lastTokenValue  string
-	expectingIndent bool // Set to true after => or if
-	inTernary       bool
-	parenDepth      int
+	expectingIndent bool
 }
 
 func NewIndentationLexer(base lexer.Lexer, symbols map[string]lexer.TokenType) *IndentationLexer {
 	return &IndentationLexer{
-		base:            base,
-		symbols:         symbols,
-		indentStack:     []int{0},
-		pending:         []lexer.Token{},
-		previousLine:    0,
-		atLineStart:     true,
-		whitespaceType:  symbols["Whitespace"],
-		lastTokenValue:  "",
-		expectingIndent: false,
-		inTernary:       false,
-		parenDepth:      0,
+		base:           base,
+		symbols:        symbols,
+		indentStack:    []int{0},
+		pending:        []lexer.Token{},
+		whitespaceType: symbols["Whitespace"],
 	}
 }
 
@@ -66,9 +64,11 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 		if len(l.pending) > 0 {
 			token := l.pending[0]
 			l.pending = l.pending[1:]
-			// Update lastTokenValue even for pending tokens
 			if token.Type != l.symbols["Indent"] && token.Type != l.symbols["Dedent"] {
 				l.lastTokenValue = token.Value
+				if isControlFlowKeyword(token.Value) {
+					l.expectingIndent = true
+				}
 			}
 			return token, nil
 		}
@@ -90,20 +90,26 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 			continue
 		}
 
-		// Skip whitespace but track lines
 		if token.Type == l.whitespaceType {
 			continue
 		}
 
-		// Track if we just saw => keyword or if keyword
+		if newlineType, exists := l.symbols["Newline"]; exists && token.Type == newlineType {
+			continue
+		}
+
+		if commentType, exists := l.symbols["Comment"]; exists && token.Type == commentType {
+			return token, nil
+		}
+
 		tokenValue := token.Value
 
-		// Set expectingIndent flag when we see => or if
-		if tokenValue == "=>" || tokenValue == "if" {
+		previousTokenValue := l.lastTokenValue
+
+		if isControlFlowKeyword(tokenValue) {
 			l.expectingIndent = true
 		}
 
-		// Update last token value for next iteration
 		l.lastTokenValue = tokenValue
 
 		if token.Pos.Line > l.previousLine {
@@ -111,15 +117,27 @@ func (l *IndentationLexer) Next() (lexer.Token, error) {
 			indent := token.Pos.Column - 1
 			currentIndent := l.indentStack[len(l.indentStack)-1]
 
-			// Only emit INDENT if we're expecting it
-			if l.expectingIndent && indent > currentIndent {
+			// Resolve block expectation at the line boundary: a keyword whose body
+			// sits on the same line never produces indent > current, so the flag
+			// must not carry forward past that line.
+			wasExpectingIndent := l.expectingIndent
+			l.expectingIndent = isControlFlowKeyword(tokenValue)
+
+			if wasExpectingIndent && indent > currentIndent {
+				if isContinuationOperator(previousTokenValue) {
+					// Block body comes after the continuation; keep expectingIndent
+					// so the body line claims the INDENT.
+					l.expectingIndent = true
+					return token, nil
+				}
+
 				l.indentStack = append(l.indentStack, indent)
 				l.pending = append(l.pending, lexer.Token{
 					Type: l.symbols["Indent"],
 					Pos:  token.Pos,
 				})
 				l.pending = append(l.pending, token)
-				l.expectingIndent = false // Reset after emitting INDENT
+				l.expectingIndent = isControlFlowKeyword(token.Value)
 				continue
 			}
 

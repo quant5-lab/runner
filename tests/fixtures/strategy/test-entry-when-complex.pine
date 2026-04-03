@@ -1,0 +1,14 @@
+//@version=5
+strategy("Entry When Complex Expression", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// Complex boolean expression with multiple operators
+fastMA = ta.sma(close, 5)
+slowMA = ta.sma(close, 10)
+crossoverCondition = ta.crossover(fastMA, slowMA)
+priceCondition = close > 105.0
+volumeCondition = volume > 1000
+
+// When condition with AND/OR logic
+complexCondition = (crossoverCondition and priceCondition) or volumeCondition
+
+strategy.entry("Long", strategy.long, when=complexCondition)

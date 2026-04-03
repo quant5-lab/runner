@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "Ternary Literal Conversion - Main Context",
+  "dataSource": "BTCUSDT-1h.json",
+  "generatedAt": "2026-02-04T13:56:55Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

@@ -1,0 +1,11 @@
+//@version=5
+indicator("Security Tuple Coexist", overlay=false)
+
+daily_close = request.security(syminfo.tickerid, "1D", close)
+[ema_d, sma_d] = request.security(syminfo.tickerid, "1D", [ta.ema(close, 10), ta.sma(close, 20)])
+daily_vol = request.security(syminfo.tickerid, "1D", volume)
+
+plot(daily_close, "Single Close")
+plot(ema_d, "Tuple EMA 10")
+plot(sma_d, "Tuple SMA 20")
+plot(daily_vol, "Single Volume")

@@ -461,3 +461,245 @@ func TestStrategyConfigExtractor_MixedArgumentTypes(t *testing.T) {
 		t.Errorf("Expected default_qty_value 4.0 from object expression, got %.2f", config.DefaultQtyValue)
 	}
 }
+
+/* TestStrategyConfigExtractor_CommissionType verifies commission_type extraction */
+func TestStrategyConfigExtractor_CommissionType(t *testing.T) {
+	tests := []struct {
+		name                   string
+		commissionTypeExpr     ast.Expression
+		expectedCommissionType string
+	}{
+		{
+			name: "strategy.commission.percent (3-level)",
+			commissionTypeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			expectedCommissionType: "percent",
+		},
+		{
+			name: "strategy.commission.cash_per_order (3-level)",
+			commissionTypeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "cash_per_order"},
+			},
+			expectedCommissionType: "cash_per_order",
+		},
+		{
+			name: "strategy.commission.cash_per_contract (3-level)",
+			commissionTypeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "cash_per_contract"},
+			},
+			expectedCommissionType: "cash_per_contract",
+		},
+		{
+			name: "commission.percent (2-level)",
+			commissionTypeExpr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "commission"},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			expectedCommissionType: "percent",
+		},
+		{
+			name:                   "bare identifier percent",
+			commissionTypeExpr:     &ast.Identifier{Name: "percent"},
+			expectedCommissionType: "percent",
+		},
+		{
+			name:                   "bare identifier cash_per_order",
+			commissionTypeExpr:     &ast.Identifier{Name: "cash_per_order"},
+			expectedCommissionType: "cash_per_order",
+		},
+		{
+			name:                   "unknown identifier passes through",
+			commissionTypeExpr:     &ast.Identifier{Name: "my_custom_commission"},
+			expectedCommissionType: "my_custom_commission",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewStrategyConfigExtractor()
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "strategy"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Commission Test"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "commission_type"},
+								Value: tt.commissionTypeExpr,
+							},
+						},
+					},
+				},
+			}
+
+			config := extractor.ExtractFromCall(call)
+
+			if config.CommissionType != tt.expectedCommissionType {
+				t.Errorf("Expected commission_type '%s', got '%s'", tt.expectedCommissionType, config.CommissionType)
+			}
+		})
+	}
+}
+
+/* TestStrategyConfigExtractor_CommissionValue verifies commission_value extraction */
+func TestStrategyConfigExtractor_CommissionValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    interface{}
+		expected float64
+	}{
+		{"positive fractional", 0.1, 0.1},
+		{"positive whole", 5.0, 5.0},
+		{"large value", 100.0, 100.0},
+		{"zero stays default", 0.0, defaultCommissionValue},
+		{"negative extracted as-is", -1.0, -1.0},
+		{"string not extracted", "0.1", defaultCommissionValue},
+		{"nil not extracted", nil, defaultCommissionValue},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewStrategyConfigExtractor()
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "strategy"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Commission Value Test"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "commission_value"},
+								Value: &ast.Literal{Value: tt.value},
+							},
+						},
+					},
+				},
+			}
+
+			config := extractor.ExtractFromCall(call)
+
+			if config.CommissionValue != tt.expected {
+				t.Errorf("commission_value: got %.4f, want %.4f", config.CommissionValue, tt.expected)
+			}
+		})
+	}
+}
+
+/* TestStrategyConfigExtractor_CommissionTypeAndValue verifies both fields extracted together */
+func TestStrategyConfigExtractor_CommissionTypeAndValue(t *testing.T) {
+	tests := []struct {
+		name         string
+		typeExpr     ast.Expression
+		valueExpr    ast.Expression
+		expectedType string
+		expectedVal  float64
+	}{
+		{
+			name: "percent with value",
+			typeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "percent"},
+			},
+			valueExpr:    &ast.Literal{Value: 0.1},
+			expectedType: "percent",
+			expectedVal:  0.1,
+		},
+		{
+			name: "cash_per_order with value",
+			typeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "cash_per_order"},
+			},
+			valueExpr:    &ast.Literal{Value: 1.5},
+			expectedType: "cash_per_order",
+			expectedVal:  1.5,
+		},
+		{
+			name: "cash_per_contract with value",
+			typeExpr: &ast.MemberExpression{
+				Object: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "strategy"},
+					Property: &ast.Identifier{Name: "commission"},
+				},
+				Property: &ast.Identifier{Name: "cash_per_contract"},
+			},
+			valueExpr:    &ast.Literal{Value: 0.5},
+			expectedType: "cash_per_contract",
+			expectedVal:  0.5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewStrategyConfigExtractor()
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "strategy"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "Commission Combined Test"},
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{Key: &ast.Identifier{Name: "commission_type"}, Value: tt.typeExpr},
+							{Key: &ast.Identifier{Name: "commission_value"}, Value: tt.valueExpr},
+						},
+					},
+				},
+			}
+
+			config := extractor.ExtractFromCall(call)
+
+			if config.CommissionType != tt.expectedType {
+				t.Errorf("commission_type: got %q, want %q", config.CommissionType, tt.expectedType)
+			}
+			if config.CommissionValue != tt.expectedVal {
+				t.Errorf("commission_value: got %.4f, want %.4f", config.CommissionValue, tt.expectedVal)
+			}
+		})
+	}
+}
+
+/* TestNormalizeCommissionType verifies all Pine commission identifier forms */
+func TestNormalizeCommissionType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"strategy.commission.percent", "percent"},
+		{"commission.percent", "percent"},
+		{"percent", "percent"},
+		{"strategy.commission.cash_per_order", "cash_per_order"},
+		{"commission.cash_per_order", "cash_per_order"},
+		{"cash_per_order", "cash_per_order"},
+		{"strategy.commission.cash_per_contract", "cash_per_contract"},
+		{"commission.cash_per_contract", "cash_per_contract"},
+		{"cash_per_contract", "cash_per_contract"},
+		{"unknown_type", "unknown_type"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizeCommissionType(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeCommissionType(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

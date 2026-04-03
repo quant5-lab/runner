@@ -49,8 +49,8 @@ func TestStreamingBarEvaluator_ATR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EvaluateAtBar at bar 12 failed: %v", err)
 	}
-	if result12 != 0.0 {
-		t.Errorf("bar 12 warmup: expected 0, got %.2f", result12)
+	if !math.IsNaN(result12) {
+		t.Errorf("bar 12 warmup: expected NaN (Pine ta.atr returns na before period-1), got %.2f", result12)
 	}
 
 	result13, err := evaluator.EvaluateAtBar(atrCall, ctx, 13)

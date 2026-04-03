@@ -184,7 +184,8 @@ __pycache__/
 *.dylib
 bin/
 dist/
-pine-gen
+/pine-gen
+/build/pine-gen
 
 # Test binary, built with `go test -c`
 *.test
@@ -203,7 +204,7 @@ vendor/
 # Temporary files and build artifacts
 tmp/
 temp/
-output/
+/output/
 
 # IDE files
 .idea/
@@ -225,3 +226,7 @@ Thumbs.db
 testdata/output.json
 testdata/sma-output.json
 testdata/*-output.json
+
+# Contribot
+contribot.*.json
+transcripts/

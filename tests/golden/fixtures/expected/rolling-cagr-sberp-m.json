@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "RollingCAGR",
+  "dataSource": "SBERP-M.json",
+  "generatedAt": "2026-01-21T07:51:55Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

@@ -1,0 +1,1 @@
+Runtime limitation: Requires multi-symbol OHLCV data (SBERP_1W.json not available in CI fixtures)

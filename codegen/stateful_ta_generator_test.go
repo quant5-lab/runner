@@ -6,7 +6,7 @@ import (
 )
 
 func TestStatefulRMAGenerator_GeneratesForwardSeriesPattern(t *testing.T) {
-	accessor := NewBuiltinIdentifierAccessor("ctx.Data[ctx.BarIndex].Close")
+	accessor := NewBuiltinIdentifierAccessor("closeSeries.GetCurrent()")
 	context := NewTopLevelIndicatorContext()
 	generator := NewStatefulRMAGenerator("rma14", 14, accessor, context)
 
@@ -50,7 +50,7 @@ func TestStatefulRMAGenerator_GeneratesForwardSeriesPattern(t *testing.T) {
 }
 
 func TestStatefulEMAGenerator_GeneratesForwardSeriesPattern(t *testing.T) {
-	accessor := NewBuiltinIdentifierAccessor("ctx.Data[ctx.BarIndex].High")
+	accessor := NewBuiltinIdentifierAccessor("highSeries.GetCurrent()")
 	context := NewTopLevelIndicatorContext()
 	generator := NewStatefulEMAGenerator("ema20", 20, accessor, context)
 
@@ -74,7 +74,7 @@ func TestStatefulEMAGenerator_GeneratesForwardSeriesPattern(t *testing.T) {
 }
 
 func TestStatefulRMAGenerator_DirectSeriesAccess(t *testing.T) {
-	accessor := NewBuiltinIdentifierAccessor("ctx.Data[ctx.BarIndex].Close")
+	accessor := NewBuiltinIdentifierAccessor("closeSeries.GetCurrent()")
 	context := NewTopLevelIndicatorContext()
 	generator := NewStatefulRMAGenerator("test", 10, accessor, context)
 

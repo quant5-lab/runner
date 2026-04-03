@@ -1,0 +1,19 @@
+//@version=5
+indicator("Test ta.cum edge cases", overlay=false)
+
+nanSource = bar_index % 3 == 0 ? na : close - open
+cumNaN = ta.cum(nanSource)
+
+negSource = bar_index % 2 == 0 ? -1 : 1
+cumNeg = ta.cum(negSource)
+
+zeroSource = bar_index < 5 ? 0 : close - close[1]
+cumZero = ta.cum(zeroSource)
+
+leadingNaN = bar_index < 3 ? na : 1
+cumLeading = ta.cum(leadingNaN)
+
+plot(cumNaN, title="cum_nan", color=color.orange)
+plot(cumNeg, title="cum_negative", color=color.red)
+plot(cumZero, title="cum_zero_start", color=color.green)
+plot(cumLeading, title="cum_leading_nan", color=color.blue)

@@ -1,0 +1,15 @@
+//@version=5
+indicator("RSI Arrow Multiple Instances", overlay=false)
+
+// Test multiple RSI instances in arrow functions with different periods and sources
+
+calcRSI(src) => ta.rsi(src, 14)
+calcShortRSI(src) => ta.rsi(src, 7)
+
+rsi14Close = calcRSI(close)
+rsi14High = calcRSI(high)
+rsi7Close = calcShortRSI(close)
+
+plot(rsi14Close, "RSI 14 Close", color=color.blue)
+plot(rsi14High, "RSI 14 High", color=color.red)
+plot(rsi7Close, "RSI 7 Close", color=color.green)

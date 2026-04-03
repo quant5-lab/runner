@@ -95,6 +95,41 @@ func TestSeriesSourceClassifier_ClassifyAST_Identifiers(t *testing.T) {
 			wantVarName:    "CLOSE",
 			wantBaseOffset: 0,
 		},
+		{
+			name:           "hl2 derived price",
+			expr:           &ast.Identifier{Name: "hl2"},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "hl2",
+			wantBaseOffset: 0,
+		},
+		{
+			name:           "hlc3 derived price",
+			expr:           &ast.Identifier{Name: "hlc3"},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "hlc3",
+			wantBaseOffset: 0,
+		},
+		{
+			name:           "ohlc4 derived price",
+			expr:           &ast.Identifier{Name: "ohlc4"},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "ohlc4",
+			wantBaseOffset: 0,
+		},
+		{
+			name:           "hlcc4 derived price",
+			expr:           &ast.Identifier{Name: "hlcc4"},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "hlcc4",
+			wantBaseOffset: 0,
+		},
+		{
+			name:           "HL2 uppercase not derived price",
+			expr:           &ast.Identifier{Name: "HL2"},
+			wantType:       SourceTypeSeriesVariable,
+			wantVarName:    "HL2",
+			wantBaseOffset: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -115,6 +150,21 @@ func TestSeriesSourceClassifier_ClassifyAST_Identifiers(t *testing.T) {
 				}
 				if !result.IsOHLCVField() {
 					t.Error("IsOHLCVField() = false, want true")
+				}
+			}
+
+			if tt.wantType == SourceTypeDerivedPrice {
+				if result.PriceName != tt.wantFieldName {
+					t.Errorf("ClassifyAST() PriceName = %q, want %q", result.PriceName, tt.wantFieldName)
+				}
+				if !result.IsDerivedPrice() {
+					t.Error("IsDerivedPrice() = false, want true")
+				}
+				if result.IsOHLCVField() {
+					t.Error("IsDerivedPrice should not be OHLCV field")
+				}
+				if result.IsSeriesVariable() {
+					t.Error("IsDerivedPrice should not be series variable")
 				}
 			}
 
@@ -208,6 +258,39 @@ func TestSeriesSourceClassifier_ClassifyAST_MemberExpressions(t *testing.T) {
 			wantVarName:    "ta_sma_50_xyz",
 			wantBaseOffset: 5,
 		},
+		{
+			name: "hl2[1] - derived price with offset",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "hl2"},
+				Property: &ast.Literal{Value: 1},
+				Computed: true,
+			},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "hl2",
+			wantBaseOffset: 1,
+		},
+		{
+			name: "hlc3[2] - derived price multi-bar",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "hlc3"},
+				Property: &ast.Literal{Value: 2},
+				Computed: true,
+			},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "hlc3",
+			wantBaseOffset: 2,
+		},
+		{
+			name: "ohlc4[0] - derived price current bar",
+			expr: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ohlc4"},
+				Property: &ast.Literal{Value: 0},
+				Computed: true,
+			},
+			wantType:       SourceTypeDerivedPrice,
+			wantFieldName:  "ohlc4",
+			wantBaseOffset: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -224,6 +307,10 @@ func TestSeriesSourceClassifier_ClassifyAST_MemberExpressions(t *testing.T) {
 
 			if tt.wantType == SourceTypeOHLCVField && result.FieldName != tt.wantFieldName {
 				t.Errorf("ClassifyAST() fieldName = %q, want %q", result.FieldName, tt.wantFieldName)
+			}
+
+			if tt.wantType == SourceTypeDerivedPrice && result.PriceName != tt.wantFieldName {
+				t.Errorf("ClassifyAST() PriceName = %q, want %q", result.PriceName, tt.wantFieldName)
 			}
 
 			if tt.wantType == SourceTypeSeriesVariable && result.VariableName != tt.wantVarName {
@@ -467,11 +554,11 @@ func TestSeriesSourceClassifier_ClassifyAST_BaseOffsetEdgeCases(t *testing.T) {
 	}
 }
 
-/* TestSeriesSourceClassifier_ClassifyAST_AllOHLCVFields validates all OHLCV field mappings */
-func TestSeriesSourceClassifier_ClassifyAST_AllOHLCVFields(t *testing.T) {
+/* TestSeriesSourceClassifier_ClassifyAST_AllBuiltinFields validates all builtin field mappings */
+func TestSeriesSourceClassifier_ClassifyAST_AllBuiltinFields(t *testing.T) {
 	classifier := NewSeriesSourceClassifier()
 
-	fields := []struct {
+	ohlcvFields := []struct {
 		input    string
 		expected string
 	}{
@@ -482,8 +569,8 @@ func TestSeriesSourceClassifier_ClassifyAST_AllOHLCVFields(t *testing.T) {
 		{"volume", "Volume"},
 	}
 
-	for _, field := range fields {
-		t.Run(field.input, func(t *testing.T) {
+	for _, field := range ohlcvFields {
+		t.Run("OHLCV:"+field.input, func(t *testing.T) {
 			expr := &ast.Identifier{Name: field.input}
 			result := classifier.ClassifyAST(expr)
 
@@ -493,6 +580,23 @@ func TestSeriesSourceClassifier_ClassifyAST_AllOHLCVFields(t *testing.T) {
 
 			if result.FieldName != field.expected {
 				t.Errorf("FieldName = %q, want %q", result.FieldName, field.expected)
+			}
+		})
+	}
+
+	derivedPrices := []string{"hl2", "hlc3", "ohlc4", "hlcc4"}
+
+	for _, price := range derivedPrices {
+		t.Run("DerivedPrice:"+price, func(t *testing.T) {
+			expr := &ast.Identifier{Name: price}
+			result := classifier.ClassifyAST(expr)
+
+			if result.Type != SourceTypeDerivedPrice {
+				t.Errorf("Expected SourceTypeDerivedPrice, got %v", result.Type)
+			}
+
+			if result.PriceName != price {
+				t.Errorf("PriceName = %q, want %q", result.PriceName, price)
 			}
 		})
 	}

@@ -54,15 +54,14 @@ type TAIndicatorBuilder struct {
 //   - period: Lookback period for the indicator
 //   - accessor: AccessGenerator for retrieving data values (Series or OHLCV field)
 //   - needsNaN: Whether to add NaN checking in the accumulation loop
-//
-// Returns a builder that must be configured with an accumulator before calling Build().
 func NewTAIndicatorBuilder(name, varName string, period int, accessor AccessGenerator, needsNaN bool) *TAIndicatorBuilder {
-	// Extract base offset from accessor if available
 	baseOffset := 0
 	if ohlcvAccessor, ok := accessor.(*OHLCVFieldAccessGenerator); ok {
 		baseOffset = ohlcvAccessor.baseOffset
 	} else if seriesAccessor, ok := accessor.(*SeriesVariableAccessGenerator); ok {
 		baseOffset = seriesAccessor.baseOffset
+	} else if derivedPriceAccessor, ok := accessor.(*DerivedPriceAccessor); ok {
+		baseOffset = derivedPriceAccessor.GetBaseOffset()
 	}
 
 	return &TAIndicatorBuilder{
@@ -205,16 +204,22 @@ func (b *TAIndicatorBuilder) Build() string {
 	return code
 }
 
-// BuildEMA generates EMA-specific code with backward loop and initial value handling
+/* BuildEMA generates stateful EMA maintaining previous bar history */
 func (b *TAIndicatorBuilder) BuildEMA() string {
 	b.indenter.IncreaseIndent() // Start at indent level 1
 
 	code := b.BuildHeader()
-	code += b.BuildWarmupCheck()
 
+	// Generate warmup check with additional "else if" for first calculation
+	totalWarmup := b.period - 1
+	code += b.indenter.Line(fmt.Sprintf("if ctx.BarIndex < %d {", totalWarmup))
+	b.indenter.IncreaseIndent()
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line(fmt.Sprintf("} else if ctx.BarIndex == %d {", totalWarmup))
 	b.indenter.IncreaseIndent()
 
-	// Calculate alpha and initialize EMA with oldest value
+	// First calculation: compute EMA from scratch using backward loop
 	code += b.indenter.Line(fmt.Sprintf("alpha := 2.0 / float64(%d+1)", b.period))
 	initialAccess := b.loopGen.accessor.GenerateInitialValueAccess(b.period)
 	code += b.indenter.Line(fmt.Sprintf("ema := %s", initialAccess))
@@ -227,7 +232,7 @@ func (b *TAIndicatorBuilder) BuildEMA() string {
 	code += b.indenter.Line("} else {")
 	b.indenter.IncreaseIndent()
 
-	// Loop backwards from period-2 to 0
+	// Loop backwards from period-2 to 0 for initial calculation
 	code += b.loopGen.GenerateBackwardLoop(&b.indenter)
 	b.indenter.IncreaseIndent()
 
@@ -249,14 +254,52 @@ func (b *TAIndicatorBuilder) BuildEMA() string {
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}")
 
-	// Set final result
+	// Set initial result
 	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "ema"))
 
 	b.indenter.DecreaseIndent()
-	code += b.indenter.Line("}") // end else (initial value check)
+	code += b.indenter.Line("}") // end else (initial value NaN check)
 
-	code += b.CloseBlock()
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else {")
+	b.indenter.IncreaseIndent()
 
+	// Subsequent bars: use previous EMA for proper stateful calculation
+	code += b.indenter.Line(fmt.Sprintf("alpha := 2.0 / float64(%d+1)", b.period))
+	code += b.indenter.Line(fmt.Sprintf("prevEMA := %s", b.seriesStrategy.GenerateGet(b.varName, 1)))
+
+	currentAccess := b.loopGen.accessor.GenerateCurrentValueAccess()
+
+	code += b.indenter.Line("if math.IsNaN(prevEMA) {")
+	b.indenter.IncreaseIndent()
+	code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, currentAccess))
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else {")
+	b.indenter.IncreaseIndent()
+	if b.loopGen.RequiresNaNCheck() {
+		code += b.indenter.Line(fmt.Sprintf("val := %s", currentAccess))
+		code += b.indenter.Line("if math.IsNaN(val) {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "math.NaN()"))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line("ema := alpha*val + (1-alpha)*prevEMA")
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "ema"))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+	} else {
+		code += b.indenter.Line(fmt.Sprintf("ema := alpha*%s + (1-alpha)*prevEMA", currentAccess))
+		code += b.indenter.Line(b.seriesStrategy.GenerateSet(b.varName, "ema"))
+	}
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}") // end else (prevEMA NaN check)
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}") // end else (subsequent bars)
+
+	b.indenter.DecreaseIndent()
 	return code
 }
 

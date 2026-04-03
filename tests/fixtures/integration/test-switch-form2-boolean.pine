@@ -1,0 +1,11 @@
+//@version=5
+indicator("Switch Form2 Boolean", overlay=false)
+x = 5
+result = switch
+    x > 10 =>
+        3.0
+    x > 0 =>
+        2.0
+    =>
+        1.0
+plot(result, "Result")

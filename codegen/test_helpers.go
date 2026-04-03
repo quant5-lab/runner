@@ -15,25 +15,46 @@ func newTestGenerator() *generator {
 	boolConverter := NewBooleanConverter(typeSystem)
 
 	gen := &generator{
-		imports:           make(map[string]bool),
-		variables:         make(map[string]string),
-		varInits:          make(map[string]ast.Expression),
-		constants:         make(map[string]interface{}),
-		strategyConfig:    NewStrategyConfig(),
-		taRegistry:        NewTAFunctionRegistry(),
-		typeSystem:        typeSystem,
-		boolConverter:     boolConverter,
-		constantRegistry:  constantRegistry,
-		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
-		constEvaluator:    validation.NewWarmupAnalyzer(),
-		plotCollector:     NewPlotCollector(),
-		callRouter:        NewCallExpressionRouter(),
-		funcSigRegistry:   NewFunctionSignatureRegistry(),
+		imports:                    make(map[string]bool),
+		variables:                  make(map[string]string),
+		varInits:                   make(map[string]ast.Expression),
+		constants:                  make(map[string]interface{}),
+		strategyConfig:             NewStrategyConfig(),
+		taRegistry:                 NewTAFunctionRegistry(),
+		compositeIndicatorRegistry: NewCompositeIndicatorRegistry(),
+		builtinHandler:             NewBuiltinIdentifierHandler(),
+		typeSystem:                 typeSystem,
+		boolConverter:              boolConverter,
+		constantRegistry:           constantRegistry,
+		arrayVariableRegistry:      NewArrayVariableRegistry(),
+		runtimeOnlyFilter:          NewRuntimeOnlyFunctionFilter(),
+		constEvaluator:             validation.NewWarmupAnalyzer(),
+		plotCollector:              NewPlotCollector(),
+		callRouter:                 NewCallExpressionRouter(),
+		funcSigRegistry:            NewFunctionSignatureRegistry(),
+		arrowContextLifecycle:      NewArrowContextLifecycleManager(),
+		mathHandler:                NewMathHandler(),
+		colorHandler:               NewColorHandler(),
 	}
+	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
+	gen.compositeIndicatorRegistry.Register("rsi", &RSIHandler{})
+	gen.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
+	gen.compositeIndicatorRegistry.Register("mfi", &MFIHandler{})
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
+	gen.arrowCaptureRegistry = NewArrowCaptureRegistry()
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.barFieldRegistry = NewBarFieldSeriesRegistry()
+	gen.calendarHandler = NewCalendarHandler()
+	gen.timeframeFuncHandler = NewTimeframeFuncCallHandler()
+
+	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
+	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)
+	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
+	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
+	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
+	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.builtinSeriesLifecycle = NewCompositeSeriesLifecycle()
 
 	return gen
 }
@@ -127,7 +148,6 @@ func generateMultiSecurityProgram(t *testing.T, vars map[string]ast.Expression) 
 	return generated.FunctionBody
 }
 
-/* compilePineScript parses PineScript source and generates Go code for integration testing */
 func compilePineScript(source string) (string, error) {
 	p, err := parser.NewParser()
 	if err != nil {
@@ -150,6 +170,5 @@ func compilePineScript(source string) (string, error) {
 		return "", err
 	}
 
-	// Return both user-defined functions and function body for comprehensive validation
 	return result.UserDefinedFunctions + "\n" + result.FunctionBody, nil
 }

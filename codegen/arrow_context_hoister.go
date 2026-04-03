@@ -32,5 +32,18 @@ func (h *ArrowContextHoister) GeneratePreLoopDeclarations(callSites []ArrowCallS
 }
 
 func (h *ArrowContextHoister) generateSingleDeclaration(site ArrowCallSite) string {
-	return h.indentation + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", site.ContextVar)
+	code := h.indentation + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", site.ContextVar)
+	if site.NeedsSecurity {
+		code += h.generateSecurityBridge(site.ContextVar)
+	}
+	return code
+}
+
+func (h *ArrowContextHoister) generateSecurityBridge(contextVar string) string {
+	code := h.indentation + fmt.Sprintf("%s.SecurityContexts = securityContexts\n", contextVar)
+	code += h.indentation + fmt.Sprintf("for secKey, mapper := range securityBarMappers {\n")
+	code += h.indentation + fmt.Sprintf("\t%s.SetBarMapper(secKey, mapper)\n", contextVar)
+	code += h.indentation + fmt.Sprintf("\t%s.SetConcreteBarMapper(secKey, mapper)\n", contextVar)
+	code += h.indentation + "}\n"
+	return code
 }

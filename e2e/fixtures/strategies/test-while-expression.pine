@@ -1,0 +1,15 @@
+//@version=5
+strategy("While Expression", overlay=true)
+
+lookback = input.int(10, "Lookback")
+
+val = while lookback > 0
+    lookback := lookback - 1
+    lookback
+
+threshold = 5.0
+if bar_index > 0 and close > open and val < threshold
+    strategy.entry("Long", strategy.long)
+
+if strategy.position_size > 0 and bar_index % 20 == 0
+    strategy.close("Long")

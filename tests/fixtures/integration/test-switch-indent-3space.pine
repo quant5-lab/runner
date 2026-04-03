@@ -1,0 +1,11 @@
+//@version=5
+indicator("Switch 3-Space Indent", overlay=false)
+val = 1
+result = switch val
+   1 =>
+      100.0
+   2 =>
+      200.0
+   =>
+      0.0
+plot(result, "Result")

@@ -1,46 +1,58 @@
 package security
 
 import (
+	"math"
+
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
-type FixnanEvaluator struct {
-	stateStorage StateStorage
-	warmup       WarmupStrategy
-	identifier   ExpressionIdentifier
+// FixnanStateManager ensures forward-fill semantics are order-independent: any bar
+// index query returns the value a strictly sequential 0…N scan would produce at that bar.
+type FixnanStateManager struct {
+	innerExpr ast.Expression
+	buf       forwardBufferE
+	evaluator BarEvaluator
 }
 
-func NewFixnanEvaluator(storage StateStorage, warmup WarmupStrategy, identifier ExpressionIdentifier) *FixnanEvaluator {
-	return &FixnanEvaluator{
-		stateStorage: storage,
-		warmup:       warmup,
-		identifier:   identifier,
+func newFixnanStateManager(innerExpr ast.Expression, capacity int, evaluator BarEvaluator) *FixnanStateManager {
+	return &FixnanStateManager{
+		innerExpr: innerExpr,
+		buf:       newForwardBufferE(capacity),
+		evaluator: evaluator,
 	}
 }
 
-func (e *FixnanEvaluator) EvaluateAtBar(evaluator BarEvaluator, call *ast.CallExpression, ctx *context.Context, barIdx int) (float64, error) {
+func (s *FixnanStateManager) ComputeAtBar(secCtx *context.Context, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+	}
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		val, err := s.evaluator.EvaluateAtBar(s.innerExpr, secCtx, bar)
+		if err != nil || math.IsNaN(val) {
+			return s.buf.prev(), nil
+		}
+		return val, nil
+	}); err != nil {
+		return math.NaN(), err
+	}
+	return s.buf.at(barIdx), nil
+}
+
+func evaluateFixnanAtBar(e *StreamingBarEvaluator, call *ast.CallExpression, secCtx *context.Context, barIdx int) (float64, error) {
 	if len(call.Arguments) < 1 {
 		return 0.0, newInsufficientArgumentsError("fixnan", 1, len(call.Arguments))
 	}
-
-	cacheKey := "fixnan_" + e.identifier.Identify(call.Arguments[0])
-
-	var state *FixnanState
-	if cached, exists := e.stateStorage.Get(cacheKey); exists {
-		state = cached.(*FixnanState)
-	} else {
-		state = NewFixnanState()
-		e.stateStorage.Set(cacheKey, state)
-		if err := e.warmup.Warmup(evaluator, call.Arguments[0], ctx, barIdx, state); err != nil {
-			return 0.0, err
-		}
+	innerExpr := call.Arguments[0]
+	cacheKey := "fixnan:" + expressionKey(innerExpr)
+	state, exists := e.fixnanCache[cacheKey]
+	if !exists {
+		state = newFixnanStateManager(innerExpr, len(secCtx.Data), e)
+		e.fixnanCache[cacheKey] = state
 	}
+	return state.ComputeAtBar(secCtx, barIdx)
+}
 
-	value, err := evaluator.EvaluateAtBar(call.Arguments[0], ctx, barIdx)
-	if err != nil {
-		return 0.0, err
-	}
-
-	return state.ForwardFill(value), nil
+func init() {
+	registerCallHandlerAliases(evaluateFixnanAtBar, "fixnan", "ta.fixnan")
 }

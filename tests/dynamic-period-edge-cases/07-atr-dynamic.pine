@@ -1,0 +1,4 @@
+//@version=5
+indicator("Dynamic period: ta.atr(getPeriod())")
+getPeriod() => 14
+plot(ta.atr(getPeriod()))

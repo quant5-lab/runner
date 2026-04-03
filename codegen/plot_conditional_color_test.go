@@ -280,12 +280,12 @@ func TestBuildPlotOptions_ColorExtractionFromConstant(t *testing.T) {
 		{
 			name:      "color.red constant",
 			colorExpr: MemberExpr("color", "red"),
-			wantColor: "#FF0000",
+			wantColor: "#FF5252",
 		},
 		{
 			name:      "color.lime constant",
 			colorExpr: MemberExpr("color", "lime"),
-			wantColor: "#00FF00",
+			wantColor: "#00E676",
 		},
 		{
 			name:      "color literal string",
@@ -307,6 +307,24 @@ func TestBuildPlotOptions_ColorExtractionFromConstant(t *testing.T) {
 }
 
 // Tests for buildPlotOptionsWithNullColor method
+
+func TestBuildPlotOptions_ColorCallExpression(t *testing.T) {
+	gen := newTestGenerator()
+
+	opts := PlotOptions{
+		Title: "Test",
+		ColorExpr: CallExpr(
+			MemberExpr("color", "new"),
+			MemberExpr("color", "red"),
+			Lit(50.0),
+		),
+	}
+	result := gen.buildPlotOptions(opts)
+
+	if !strings.Contains(result, "visual.PineColorNew") {
+		t.Errorf("Expected color call expression in result, got %q", result)
+	}
+}
 
 func TestBuildPlotOptionsWithNullColor_NoOffset(t *testing.T) {
 	gen := &generator{
@@ -357,7 +375,7 @@ func TestBuildPlotOptionsWithNullColor_PositiveOffset(t *testing.T) {
 	}
 }
 
-// Tests for buildPlotOptionsWithColor method
+/* Tests for buildPlotOptionsWithColor */
 
 func TestBuildPlotOptionsWithColor_ColorOnly(t *testing.T) {
 	gen := &generator{
@@ -365,7 +383,7 @@ func TestBuildPlotOptionsWithColor_ColorOnly(t *testing.T) {
 	}
 
 	opts := PlotOptions{Title: "Test"}
-	result := gen.buildPlotOptionsWithColor(opts, "#FF0000")
+	result := gen.buildPlotOptionsWithColor(opts, `"#FF0000"`)
 
 	expected := `map[string]interface{}{"color": "#FF0000"}`
 	if result != expected {
@@ -382,13 +400,27 @@ func TestBuildPlotOptionsWithColor_ColorAndOffset(t *testing.T) {
 		Title:      "Test",
 		OffsetExpr: Lit(float64(-3)),
 	}
-	result := gen.buildPlotOptionsWithColor(opts, "#00FF00")
+	result := gen.buildPlotOptionsWithColor(opts, `"#00FF00"`)
 
 	if !strings.Contains(result, `"color": "#00FF00"`) {
 		t.Error("Result should contain color")
 	}
 	if !strings.Contains(result, `"offset": -3`) {
 		t.Error("Result should contain offset")
+	}
+}
+
+func TestBuildPlotOptionsWithColor_RuntimeColorExpression(t *testing.T) {
+	gen := &generator{
+		constEvaluator: validation.NewWarmupAnalyzer(),
+	}
+
+	opts := PlotOptions{Title: "Test"}
+	result := gen.buildPlotOptionsWithColor(opts, `visual.PineColorNew("#FF5252", 50.0)`)
+
+	expected := `map[string]interface{}{"color": visual.PineColorNew("#FF5252", 50.0)}`
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
 	}
 }
 
@@ -424,49 +456,96 @@ func TestBuildPlotOptionsWithColor_EmptyColorWithOffset(t *testing.T) {
 	}
 }
 
-// Tests for extractColorLiteral method
+/* Tests for ColorHandler.ResolveColorExpression — all expression types */
 
-func TestExtractColorLiteral_StringValue(t *testing.T) {
-	gen := &generator{}
+func TestResolveColorExpression(t *testing.T) {
+	ch := NewColorHandler()
+	gen := &generator{builtinHandler: NewBuiltinIdentifierHandler()}
 
-	expr := Lit("#FF0000")
-	result := gen.extractColorLiteral(expr)
-
-	if result != "#FF0000" {
-		t.Errorf("Expected '#FF0000', got %q", result)
+	tests := []struct {
+		name           string
+		expr           ast.Expression
+		expected       string
+		expectNonEmpty bool
+	}{
+		{
+			name:     "hex literal",
+			expr:     Lit("#FF0000"),
+			expected: `"#FF0000"`,
+		},
+		{
+			name:     "hex literal with alpha",
+			expr:     Lit("#FF000080"),
+			expected: `"#FF000080"`,
+		},
+		{
+			name:     "member expression color.red",
+			expr:     MemberExpr("color", "red"),
+			expected: `"#FF5252"`,
+		},
+		{
+			name:     "member expression color.blue",
+			expr:     MemberExpr("color", "blue"),
+			expected: `"#2962FF"`,
+		},
+		{
+			name:     "bare identifier red",
+			expr:     Ident("red"),
+			expected: `"#FF5252"`,
+		},
+		{
+			name:     "bare identifier lime",
+			expr:     Ident("lime"),
+			expected: `"#00E676"`,
+		},
+		{
+			name: "color.new call expression",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "new"),
+				Arguments: []ast.Expression{
+					MemberExpr("color", "red"),
+					Lit(float64(50)),
+				},
+			},
+			expected: `visual.PineColorNew("#FF5252", 50)`,
+		},
+		{
+			name: "color.rgb call expression",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("color", "rgb"),
+				Arguments: []ast.Expression{
+					Lit(float64(255)),
+					Lit(float64(128)),
+					Lit(float64(0)),
+				},
+			},
+			expected: "visual.PineColorRGB(255, 128, 0, 0.0)",
+		},
+		{
+			name:           "unknown identifier falls back to series expression",
+			expr:           Ident("myDynamicColor"),
+			expectNonEmpty: true,
+		},
+		{
+			name:           "numeric literal falls back to series expression",
+			expr:           Lit(123.45),
+			expectNonEmpty: true,
+		},
 	}
-}
 
-func TestExtractColorLiteral_NonLiteral(t *testing.T) {
-	gen := &generator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ch.ResolveColorExpression(tt.expr, gen)
 
-	expr := Ident("myColor")
-	result := gen.extractColorLiteral(expr)
-
-	if result != "" {
-		t.Errorf("Expected empty string for non-literal, got %q", result)
-	}
-}
-
-func TestExtractColorLiteral_NonStringLiteral(t *testing.T) {
-	gen := &generator{}
-
-	expr := Lit(123.45)
-	result := gen.extractColorLiteral(expr)
-
-	if result != "" {
-		t.Errorf("Expected empty string for non-string literal, got %q", result)
-	}
-}
-
-func TestExtractColorLiteral_NamedColor(t *testing.T) {
-	gen := &generator{}
-
-	expr := Lit("#00FF00")
-	result := gen.extractColorLiteral(expr)
-
-	if result != "#00FF00" {
-		t.Errorf("Expected '#00FF00', got %q", result)
+			if tt.expected != "" {
+				if result != tt.expected {
+					t.Errorf("ResolveColorExpression() = %q, want %q", result, tt.expected)
+				}
+			}
+			if tt.expectNonEmpty && result == "" {
+				t.Error("ResolveColorExpression() returned empty, expected non-empty fallback")
+			}
+		})
 	}
 }
 
@@ -831,29 +910,135 @@ func TestPlotConditionalColor_PositiveOffset(t *testing.T) {
 	verifier.MustContain(`"color": "#00FFFF"`)
 }
 
+func TestPlotConditionalColor_MemberExpressionColor(t *testing.T) {
+	gen := createPlotTestGenerator()
+
+	plotCall := &ast.CallExpression{
+		Callee: Ident("plot"),
+		Arguments: []ast.Expression{
+			Ident("value"),
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{
+						Key: Ident("color"),
+						Value: ConditionalExpr(
+							Ident("condition"),
+							MemberExpr("color", "lime"),
+							NaIdent(),
+						),
+					},
+					{Key: Ident("title"), Value: Lit("MemberColor")},
+				},
+			},
+		},
+	}
+
+	code, err := gen.generateVariableInit("test", plotCall)
+	if err != nil {
+		t.Fatalf("generateVariableInit failed: %v", err)
+	}
+
+	verifier := NewCodeVerifier(code, t)
+	verifier.MustContain(`"color": "#00E676"`)
+	verifier.MustContain(`"color": nil`)
+	verifier.CountOccurrences("collector.Add", 2)
+}
+
+func TestPlotConditionalColor_ColorNewCallExpression(t *testing.T) {
+	gen := createPlotTestGenerator()
+
+	plotCall := &ast.CallExpression{
+		Callee: Ident("plot"),
+		Arguments: []ast.Expression{
+			Ident("value"),
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{
+						Key: Ident("color"),
+						Value: ConditionalExpr(
+							Ident("condition"),
+							NaIdent(),
+							&ast.CallExpression{
+								Callee: MemberExpr("color", "new"),
+								Arguments: []ast.Expression{
+									MemberExpr("color", "red"),
+									Lit(float64(50)),
+								},
+							},
+						),
+					},
+					{Key: Ident("title"), Value: Lit("ColorNewTest")},
+				},
+			},
+		},
+	}
+
+	code, err := gen.generateVariableInit("test", plotCall)
+	if err != nil {
+		t.Fatalf("generateVariableInit failed: %v", err)
+	}
+
+	verifier := NewCodeVerifier(code, t)
+	verifier.MustContain(`visual.PineColorNew`)
+	verifier.MustContain(`"color": nil`)
+	verifier.CountOccurrences("collector.Add", 2)
+}
+
+func TestPlotConditionalColor_BareIdentifierColor(t *testing.T) {
+	gen := createPlotTestGenerator()
+
+	plotCall := &ast.CallExpression{
+		Callee: Ident("plot"),
+		Arguments: []ast.Expression{
+			Ident("value"),
+			&ast.ObjectExpression{
+				Properties: []ast.Property{
+					{
+						Key: Ident("color"),
+						Value: ConditionalExpr(
+							Ident("condition"),
+							NaIdent(),
+							Ident("blue"),
+						),
+					},
+					{Key: Ident("title"), Value: Lit("BareColor")},
+				},
+			},
+		},
+	}
+
+	code, err := gen.generateVariableInit("test", plotCall)
+	if err != nil {
+		t.Fatalf("generateVariableInit failed: %v", err)
+	}
+
+	verifier := NewCodeVerifier(code, t)
+	verifier.MustContain(`"#2962FF"`)
+	verifier.MustContain(`"color": nil`)
+}
+
 // Test helpers
 
 // createPlotTestGenerator creates a fully initialized generator for plot testing
 func createPlotTestGenerator() *generator {
 	gen := &generator{
-		variables:               make(map[string]string),
-		varInits:                make(map[string]ast.Expression),
-		constants:               make(map[string]interface{}),
-		taRegistry:              NewTAFunctionRegistry(),
-		mathHandler:             NewMathHandler(),
-		runtimeOnlyFilter:       NewRuntimeOnlyFunctionFilter(),
-		barFieldRegistry:        NewBarFieldSeriesRegistry(),
-		constEvaluator:          validation.NewWarmupAnalyzer(),
-		inlineConditionRegistry: NewInlineConditionHandlerRegistry(),
-		indent:                  1,
+		variables:         make(map[string]string),
+		varInits:          make(map[string]ast.Expression),
+		constants:         make(map[string]interface{}),
+		taRegistry:        NewTAFunctionRegistry(),
+		mathHandler:       NewMathHandler(),
+		colorHandler:      NewColorHandler(),
+		runtimeOnlyFilter: NewRuntimeOnlyFunctionFilter(),
+		barFieldRegistry:  NewBarFieldSeriesRegistry(),
+		constEvaluator:    validation.NewWarmupAnalyzer(),
+		indent:            1,
 	}
 	gen.typeSystem = NewTypeInferenceEngine()
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)
 	gen.tempVarMgr = NewTempVariableManager(gen)
+	gen.inlineConditionRegistry = NewInlineConditionHandlerRegistry(gen.tempVarMgr)
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
-	gen.boolConverter = NewBooleanConverter(gen.typeSystem)
-
-	// Setup built-in variables
+	gen.boolConverter = NewBooleanConverter(gen.typeSystem) // Setup built-in variables
 	gen.variables["close"] = "float64"
 	gen.variables["open"] = "float64"
 	gen.variables["high"] = "float64"

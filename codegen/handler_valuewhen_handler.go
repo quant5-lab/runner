@@ -26,7 +26,7 @@ func (h *ValuewhenHandler) GenerateCode(g *generator, varName string, call *ast.
 		return "", fmt.Errorf("valuewhen occurrence must be literal")
 	}
 
-	occurrence, err := extractPeriod(occurrenceArg)
+	occurrence, err := extractIntegerValue(occurrenceArg)
 	if err != nil {
 		return "", fmt.Errorf("valuewhen: %w", err)
 	}

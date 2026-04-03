@@ -12,9 +12,13 @@ ArrowContext provides isolated Series storage for arrow function local variables
 	Created once per call site, lazily initializes Series, advances cursors via AdvanceAll() after each bar.
 */
 type ArrowContext struct {
-	Context     *Context
-	LocalSeries map[string]*series.Series
-	capacity    int
+	Context            *Context
+	LocalSeries        map[string]*series.Series
+	SecurityContexts   map[string]*Context
+	SecurityBarMappers map[string]BarIndexMapper
+	ConcreteBarMappers map[string]interface{}
+	SecurityEvaluators map[string]interface{}
+	capacity           int
 }
 
 /* NewArrowContext wraps Context with isolated Series map for arrow function local variables */
@@ -58,4 +62,36 @@ func (ac *ArrowContext) Reset(position int) {
 	for _, s := range ac.LocalSeries {
 		s.Reset(position)
 	}
+}
+
+/* SetSecurityContext registers a security context by cache key */
+func (ac *ArrowContext) SetSecurityContext(key string, ctx *Context) {
+	if ac.SecurityContexts == nil {
+		ac.SecurityContexts = make(map[string]*Context)
+	}
+	ac.SecurityContexts[key] = ctx
+}
+
+/* SetBarMapper registers a bar index mapper by cache key */
+func (ac *ArrowContext) SetBarMapper(key string, mapper BarIndexMapper) {
+	if ac.SecurityBarMappers == nil {
+		ac.SecurityBarMappers = make(map[string]BarIndexMapper)
+	}
+	ac.SecurityBarMappers[key] = mapper
+}
+
+/* SetConcreteBarMapper stores the concrete bar mapper (e.g. *request.SecurityBarMapper) for arrow security eval */
+func (ac *ArrowContext) SetConcreteBarMapper(key string, mapper interface{}) {
+	if ac.ConcreteBarMappers == nil {
+		ac.ConcreteBarMappers = make(map[string]interface{})
+	}
+	ac.ConcreteBarMappers[key] = mapper
+}
+
+/* GetOrCreateSecurityEvaluator returns the cached evaluator or nil */
+func (ac *ArrowContext) GetOrCreateSecurityEvaluators() map[string]interface{} {
+	if ac.SecurityEvaluators == nil {
+		ac.SecurityEvaluators = make(map[string]interface{})
+	}
+	return ac.SecurityEvaluators
 }

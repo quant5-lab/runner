@@ -1,0 +1,4 @@
+//@version=5
+indicator("Dynamic period: ta.ema(close, getPeriod())")
+getPeriod() => 14
+plot(ta.ema(close, getPeriod()))

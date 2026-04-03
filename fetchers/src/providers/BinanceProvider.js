@@ -1,58 +1,127 @@
-import { Provider } from 'pinets';
 import { TimeframeParser, SUPPORTED_TIMEFRAMES } from '../utils/timeframeParser.js';
 import { TimeframeError } from '../errors/TimeframeError.js';
+
+const BINANCE_API_URL = 'https://api.binance.com/api/v3';
+
+class CacheManager {
+  constructor(cacheDuration = 5 * 60 * 1000) {
+    this.cache = new Map();
+    this.cacheDuration = cacheDuration;
+  }
+
+  generateKey(params) {
+    return Object.entries(params)
+      .filter(([_, value]) => value !== undefined)
+      .map(([key, value]) => `${key}:${value}`)
+      .join('|');
+  }
+
+  get(params) {
+    const key = this.generateKey(params);
+    const cached = this.cache.get(key);
+
+    if (!cached) return null;
+
+    if (Date.now() - cached.timestamp > this.cacheDuration) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return cached.data;
+  }
+
+  set(params, data) {
+    const key = this.generateKey(params);
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+}
 
 class BinanceProvider {
   constructor(logger, statsCollector) {
     this.logger = logger;
     this.stats = statsCollector;
-    this.binanceProvider = Provider.Binance;
+    this.cacheManager = new CacheManager();
     this.supportedTimeframes = SUPPORTED_TIMEFRAMES.BINANCE;
-    this.timezone = 'UTC'; // Binance uses UTC for all symbols
+    this.timezone = 'UTC';
+  }
+
+  clearCache() {
+    this.cacheManager.clear();
   }
 
   async getMarketData(symbol, timeframe, limit = 100, sDate, eDate) {
     try {
-      /* Convert timeframe to Binance format */
       const convertedTimeframe = TimeframeParser.toBinanceTimeframe(timeframe);
 
-      /* Binance API hard limit: 1000 candles per request - use pagination for more */
       if (limit > 1000) {
         return await this.getPaginatedData(symbol, convertedTimeframe, limit);
       }
 
-      this.stats.recordRequest('Binance', timeframe);
-      const result = await this.binanceProvider.getMarketData(
-        symbol,
-        convertedTimeframe,
-        limit,
-        sDate,
-        eDate,
-      );
+      const cacheParams = { symbol, timeframe: convertedTimeframe, limit, sDate, eDate };
+      const cachedData = this.cacheManager.get(cacheParams);
+      if (cachedData) {
+        return cachedData;
+      }
 
-      /* Symbol not found or no data - return [] to allow next provider to try */
+      this.stats.recordRequest('Binance', timeframe);
+
+      let url = `${BINANCE_API_URL}/klines?symbol=${symbol}&interval=${convertedTimeframe}`;
+      if (limit) url += `&limit=${limit}`;
+      if (sDate) url += `&startTime=${sDate}`;
+      if (eDate) url += `&endTime=${eDate}`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (errorText.includes('Invalid symbol')) {
+          this.logger.debug(`Binance: Invalid symbol ${symbol}`);
+          return [];
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       if (!result || result.length === 0) {
         this.logger.debug(`No data from Binance for: ${symbol}`);
         return [];
       }
 
-      return result;
+      const data = result.map((item) => ({
+        openTime: parseInt(item[0]),
+        open: parseFloat(item[1]),
+        high: parseFloat(item[2]),
+        low: parseFloat(item[3]),
+        close: parseFloat(item[4]),
+        volume: parseFloat(item[5]),
+        closeTime: parseInt(item[6]),
+        quoteAssetVolume: parseFloat(item[7]),
+        numberOfTrades: parseInt(item[8]),
+        takerBuyBaseAssetVolume: parseFloat(item[9]),
+        takerBuyQuoteAssetVolume: parseFloat(item[10]),
+        ignore: item[11],
+      }));
+
+      this.cacheManager.set(cacheParams, data);
+      return data;
     } catch (error) {
-      /* Parse Binance API error messages */
       const errorMsg = error.message || '';
 
-      /* Invalid symbol - return [] to continue chain */
       if (errorMsg.includes('Invalid symbol')) {
         this.logger.debug(`Binance: Invalid symbol ${symbol}`);
         return [];
       }
 
-      /* Invalid interval - throw TimeframeError to stop chain */
       if (errorMsg.includes('Invalid interval') || error instanceof TimeframeError) {
         throw new TimeframeError(timeframe, symbol, 'Binance', this.supportedTimeframes);
       }
 
-      /* Other errors - return [] to allow next provider to try */
       this.logger.debug(`Binance Provider error: ${error.message}`);
       return [];
     }
@@ -66,15 +135,29 @@ class BinanceProvider {
       const batchSize = Math.min(1000, limit - allData.length);
       this.stats.recordRequest('Binance', convertedTimeframe);
 
-      const batch = await this.binanceProvider.getMarketData(
-        symbol,
-        convertedTimeframe,
-        batchSize,
-        null,
-        oldestTime ? oldestTime - 1 : null,
-      );
+      let url = `${BINANCE_API_URL}/klines?symbol=${symbol}&interval=${convertedTimeframe}&limit=${batchSize}`;
+      if (oldestTime) url += `&endTime=${oldestTime - 1}`;
 
-      if (!batch || batch.length === 0) break;
+      const response = await fetch(url);
+      if (!response.ok) break;
+
+      const result = await response.json();
+      if (!result || result.length === 0) break;
+
+      const batch = result.map((item) => ({
+        openTime: parseInt(item[0]),
+        open: parseFloat(item[1]),
+        high: parseFloat(item[2]),
+        low: parseFloat(item[3]),
+        close: parseFloat(item[4]),
+        volume: parseFloat(item[5]),
+        closeTime: parseInt(item[6]),
+        quoteAssetVolume: parseFloat(item[7]),
+        numberOfTrades: parseInt(item[8]),
+        takerBuyBaseAssetVolume: parseFloat(item[9]),
+        takerBuyQuoteAssetVolume: parseFloat(item[10]),
+        ignore: item[11],
+      }));
 
       allData.unshift(...batch);
       oldestTime = batch[0].openTime;

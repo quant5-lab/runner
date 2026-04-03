@@ -1,0 +1,11 @@
+//@version=5
+indicator("Switch 2-Tab Indent", overlay=false)
+val = 1
+result = switch val
+		1 =>
+				10.0
+		2 =>
+				20.0
+		=>
+				0.0
+plot(result, "Result")

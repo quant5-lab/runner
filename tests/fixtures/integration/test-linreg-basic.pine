@@ -1,0 +1,11 @@
+//@version=5
+indicator("Linreg Basic Test", overlay=true)
+
+linreg14 = ta.linreg(close, 14, 0)
+linreg20 = ta.linreg(close, 20, 0)
+linreg50 = ta.linreg(close, 50, 0)
+
+plot(close, "Close", color=color.gray, linewidth=1)
+plot(linreg14, "Linreg 14", color=color.blue, linewidth=2)
+plot(linreg20, "Linreg 20", color=color.green, linewidth=2)
+plot(linreg50, "Linreg 50", color=color.orange, linewidth=2)

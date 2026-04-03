@@ -1,0 +1,55 @@
+//@version=5
+strategy("Momentum Cascade Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Multi-timeframe momentum using nested for loops
+fastLen = input.int(5, "Fast Length", minval=1)
+slowLen = input.int(20, "Slow Length", minval=1)
+cascadeLevels = input.int(3, "Cascade Levels", minval=1, maxval=5)
+
+// Calculate momentum across multiple timeframes
+calculateCascadeMomentum(src, fast, slow, levels) =>
+    totalMomentum = 0.0
+    
+    // Outer loop: iterate through cascade levels
+    for level = 1 to levels
+        levelWeight = levels - level + 1
+        fastSum = 0.0
+        slowSum = 0.0
+        
+        // Inner loops: calculate averages at each level
+        lookback = level * 5
+        for i = 0 to fast - 1
+            fastSum := fastSum + src[i + lookback]
+        
+        for j = 0 to slow - 1
+            slowSum := slowSum + src[j + lookback]
+        
+        fastAvg = fastSum / fast
+        slowAvg = slowSum / slow
+        momentum = (fastAvg - slowAvg) / slowAvg * 100
+        
+        totalMomentum := totalMomentum + momentum * levelWeight
+    
+    totalMomentum / levels
+
+momentum = calculateCascadeMomentum(close, fastLen, slowLen, cascadeLevels)
+
+// Entry conditions
+longCondition = momentum > 1.0 and momentum > momentum[1]
+shortCondition = momentum < -1.0 and momentum < momentum[1]
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+// Exit conditions
+if strategy.position_size > 0 and momentum < 0
+    strategy.close("Long")
+
+if strategy.position_size < 0 and momentum > 0
+    strategy.close("Short")
+
+plot(momentum, "Cascade Momentum", color=momentum > 0 ? color.green : color.red, linewidth=2)
+hline(0, "Zero Line", color=color.gray)

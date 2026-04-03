@@ -1,0 +1,9 @@
+//@version=3
+
+variant_geoMean(price, per)=>
+    gmean = pow(price, 1.0/per)
+    gx = for i = 1 to per-1
+        gmean := gmean * pow(price[i], 1.0/per)
+        gmean
+    ggx = gx
+    ggx

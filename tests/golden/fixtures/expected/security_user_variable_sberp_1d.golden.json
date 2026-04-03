@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "strategy": "Security User Variable Test",
+  "dataSource": "SBERP_1D.json",
+  "generatedAt": "2026-02-12T21:10:41Z",
+  "result": {
+    "trades": [],
+    "openTrades": [],
+    "equity": 10000,
+    "netProfit": 0,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

@@ -1,0 +1,12 @@
+//@version=5
+strategy("Bar Timing Test", overlay=true)
+
+// Simple condition that should trigger on specific bar
+testCondition = close > 90 and close < 95
+
+if testCondition
+    strategy.entry("Long", strategy.long)
+    label.new(bar_index, low, "ENTRY", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+
+if strategy.position_size > 0 and close < 85
+    strategy.close("Long")

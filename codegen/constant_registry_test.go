@@ -164,14 +164,24 @@ func TestConstantRegistry_ExtractFromGeneratedCode_String(t *testing.T) {
 		expected interface{}
 	}{
 		{
-			name:     "string literal attempts bool parse (returns false for strings)",
-			code:     `const symbol = "BTCUSDT"` + "\n",
-			expected: false, // Sscanf tries %t first, parses "BTCUSDT" as false
+			name:     "extract simple string",
+			code:     `const maType = "EMA"` + "\n",
+			expected: "EMA",
 		},
 		{
-			name:     "empty string attempts bool parse",
+			name:     "extract string with spaces",
+			code:     `const title = "Moving Average"` + "\n",
+			expected: "Moving Average",
+		},
+		{
+			name:     "extract empty string",
 			code:     `const empty = ""` + "\n",
-			expected: false,
+			expected: "",
+		},
+		{
+			name:     "extract session string",
+			code:     `const session = "0950-1345"` + "\n",
+			expected: "0950-1345",
 		},
 	}
 
@@ -181,7 +191,7 @@ func TestConstantRegistry_ExtractFromGeneratedCode_String(t *testing.T) {
 			result := registry.ExtractFromGeneratedCode(tt.code)
 
 			if result != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, result)
+				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
 	}

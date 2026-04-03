@@ -1,0 +1,6 @@
+//@version=5
+indicator("KCW Warmup", overlay=false)
+
+width = ta.kcw(close, 20)
+
+plot(width, "KCW Width")

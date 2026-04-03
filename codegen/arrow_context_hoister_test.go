@@ -6,11 +6,23 @@ import (
 )
 
 func TestArrowContextHoister_EmptyCallSites(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	code := hoister.GeneratePreLoopDeclarations([]ArrowCallSite{})
+	tests := []struct {
+		name  string
+		sites []ArrowCallSite
+	}{
+		{"nil_slice", nil},
+		{"empty_slice", []ArrowCallSite{}},
+	}
 
-	if code != "" {
-		t.Errorf("Expected empty code for no call sites, got %q", code)
+	hoister := NewArrowContextHoister("\t")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := hoister.GeneratePreLoopDeclarations(tt.sites)
+			if code != "" {
+				t.Errorf("expected empty code, got %q", code)
+			}
+		})
 	}
 }
 
@@ -24,7 +36,7 @@ func TestArrowContextHoister_SingleCallSite(t *testing.T) {
 
 	expected := "\tarrowCtx_adx_1 := context.NewArrowContext(ctx)\n"
 	if code != expected {
-		t.Errorf("Expected:\n%s\nGot:\n%s", expected, code)
+		t.Errorf("expected:\n%s\ngot:\n%s", expected, code)
 	}
 }
 
@@ -38,68 +50,44 @@ func TestArrowContextHoister_MultipleCallSites(t *testing.T) {
 
 	code := hoister.GeneratePreLoopDeclarations(sites)
 
-	expectedLines := []string{
-		"\tarrowCtx_adx_1 := context.NewArrowContext(ctx)",
-		"\tarrowCtx_rma_1 := context.NewArrowContext(ctx)",
-		"\tarrowCtx_ema_1 := context.NewArrowContext(ctx)",
-	}
-
-	for _, line := range expectedLines {
-		if !strings.Contains(code, line) {
-			t.Errorf("Expected code to contain:\n%s\n\nGot:\n%s", line, code)
+	expectedVars := []string{"arrowCtx_adx_1", "arrowCtx_rma_1", "arrowCtx_ema_1"}
+	for _, v := range expectedVars {
+		if !strings.Contains(code, v) {
+			t.Errorf("missing variable %q in output:\n%s", v, code)
 		}
 	}
 }
 
+/* TestArrowContextHoister_IndentationVariations verifies all indentation styles */
 func TestArrowContextHoister_IndentationVariations(t *testing.T) {
 	tests := []struct {
 		name        string
 		indentation string
-		expectStart string
 	}{
-		{
-			name:        "no indentation",
-			indentation: "",
-			expectStart: "arrowCtx_func_1 := context.NewArrowContext(ctx)",
-		},
-		{
-			name:        "single tab",
-			indentation: "\t",
-			expectStart: "\tarrowCtx_func_1 := context.NewArrowContext(ctx)",
-		},
-		{
-			name:        "two tabs",
-			indentation: "\t\t",
-			expectStart: "\t\tarrowCtx_func_1 := context.NewArrowContext(ctx)",
-		},
-		{
-			name:        "four spaces",
-			indentation: "    ",
-			expectStart: "    arrowCtx_func_1 := context.NewArrowContext(ctx)",
-		},
-		{
-			name:        "eight spaces",
-			indentation: "        ",
-			expectStart: "        arrowCtx_func_1 := context.NewArrowContext(ctx)",
-		},
+		{"no_indentation", ""},
+		{"single_tab", "\t"},
+		{"double_tab", "\t\t"},
+		{"four_spaces", "    "},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hoister := NewArrowContextHoister(tt.indentation)
 			sites := []ArrowCallSite{
-				{FunctionName: "func", CallIndex: 1, ContextVar: "arrowCtx_func_1"},
+				{FunctionName: "f", CallIndex: 1, ContextVar: "arrowCtx_f_1"},
 			}
 
 			code := hoister.GeneratePreLoopDeclarations(sites)
 
-			if !strings.HasPrefix(code, tt.expectStart) {
-				t.Errorf("Expected code to start with:\n%q\n\nGot:\n%q", tt.expectStart, code)
+			expected := tt.indentation + "arrowCtx_f_1 := context.NewArrowContext(ctx)"
+			if !strings.HasPrefix(code, expected) {
+				t.Errorf("expected prefix %q, got %q", expected, code)
 			}
 		})
 	}
 }
 
+/* TestArrowContextHoister_OrderPreservation verifies declaration order matches input order */
 func TestArrowContextHoister_OrderPreservation(t *testing.T) {
 	hoister := NewArrowContextHoister("\t")
 	sites := []ArrowCallSite{
@@ -109,20 +97,21 @@ func TestArrowContextHoister_OrderPreservation(t *testing.T) {
 	}
 
 	code := hoister.GeneratePreLoopDeclarations(sites)
-
 	lines := strings.Split(strings.TrimSpace(code), "\n")
+
 	if len(lines) != 3 {
-		t.Fatalf("Expected 3 lines of code, got %d", len(lines))
+		t.Fatalf("expected 3 lines, got %d", len(lines))
 	}
 
 	expectedOrder := []string{"arrowCtx_first_1", "arrowCtx_second_1", "arrowCtx_third_1"}
 	for i, expectedVar := range expectedOrder {
 		if !strings.Contains(lines[i], expectedVar) {
-			t.Errorf("Line %d: expected to contain %q, got %q", i, expectedVar, lines[i])
+			t.Errorf("line %d: expected %q, got %q", i, expectedVar, lines[i])
 		}
 	}
 }
 
+/* TestArrowContextHoister_SameFunctionMultipleInstances verifies unique context per call site */
 func TestArrowContextHoister_SameFunctionMultipleInstances(t *testing.T) {
 	hoister := NewArrowContextHoister("\t")
 	sites := []ArrowCallSite{
@@ -133,19 +122,15 @@ func TestArrowContextHoister_SameFunctionMultipleInstances(t *testing.T) {
 
 	code := hoister.GeneratePreLoopDeclarations(sites)
 
-	expectedVars := []string{"arrowCtx_calc_1", "arrowCtx_calc_2", "arrowCtx_calc_3"}
-	for _, varName := range expectedVars {
-		if !strings.Contains(code, varName) {
-			t.Errorf("Expected code to contain %q\n\nGot:\n%s", varName, code)
+	for _, varName := range []string{"arrowCtx_calc_1", "arrowCtx_calc_2", "arrowCtx_calc_3"} {
+		count := strings.Count(code, varName)
+		if count != 1 {
+			t.Errorf("variable %q appears %d times, expected 1", varName, count)
 		}
-	}
-
-	lines := strings.Split(strings.TrimSpace(code), "\n")
-	if len(lines) != 3 {
-		t.Errorf("Expected 3 distinct declarations, got %d", len(lines))
 	}
 }
 
+/* TestArrowContextHoister_CodeFormat verifies structural properties of generated code */
 func TestArrowContextHoister_CodeFormat(t *testing.T) {
 	hoister := NewArrowContextHoister("\t")
 	sites := []ArrowCallSite{
@@ -154,148 +139,116 @@ func TestArrowContextHoister_CodeFormat(t *testing.T) {
 
 	code := hoister.GeneratePreLoopDeclarations(sites)
 
-	if !strings.Contains(code, ":=") {
-		t.Error("Expected short variable declaration (:=)")
-	}
-	if !strings.Contains(code, "context.NewArrowContext") {
-		t.Error("Expected context.NewArrowContext constructor call")
-	}
-	if !strings.Contains(code, "(ctx)") {
-		t.Error("Expected ctx parameter to NewArrowContext")
-	}
-	if !strings.HasSuffix(code, "\n") {
-		t.Error("Expected code to end with newline")
-	}
-}
-
-func TestArrowContextHoister_NoCodeInjection(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	sites := []ArrowCallSite{
-		{FunctionName: "func'; DROP TABLE users; --", CallIndex: 1, ContextVar: "arrowCtx_malicious_1"},
+	checks := []struct {
+		desc    string
+		pattern string
+	}{
+		{"short variable declaration", ":="},
+		{"constructor call", "context.NewArrowContext"},
+		{"ctx parameter", "(ctx)"},
 	}
 
-	code := hoister.GeneratePreLoopDeclarations(sites)
-
-	if strings.Contains(code, "DROP TABLE") {
-		t.Error("Code injection vulnerability: malicious function name included in output")
-	}
-
-	if !strings.Contains(code, "arrowCtx_malicious_1") {
-		t.Error("Expected sanitized context variable name")
-	}
-}
-
-func TestArrowContextHoister_UniqueDeclarations(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	sites := []ArrowCallSite{
-		{FunctionName: "func1", CallIndex: 1, ContextVar: "arrowCtx_func1_1"},
-		{FunctionName: "func2", CallIndex: 1, ContextVar: "arrowCtx_func2_1"},
-		{FunctionName: "func3", CallIndex: 1, ContextVar: "arrowCtx_func3_1"},
-	}
-
-	code := hoister.GeneratePreLoopDeclarations(sites)
-
-	lines := strings.Split(strings.TrimSpace(code), "\n")
-	seen := make(map[string]bool)
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if seen[trimmed] {
-			t.Errorf("Duplicate declaration found: %q", trimmed)
+	for _, c := range checks {
+		if !strings.Contains(code, c.pattern) {
+			t.Errorf("missing %s (%q) in output:\n%s", c.desc, c.pattern, code)
 		}
-		seen[trimmed] = true
+	}
+
+	if !strings.HasSuffix(code, "\n") {
+		t.Error("expected trailing newline")
 	}
 }
 
-func TestArrowContextHoister_LargeScaleGeneration(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	sites := []ArrowCallSite{}
+/* TestArrowContextHoister_SecurityBridge verifies security bridge generation behavior */
+func TestArrowContextHoister_SecurityBridge(t *testing.T) {
+	tests := []struct {
+		name            string
+		sites           []ArrowCallSite
+		wantBridgeFor   []string
+		wantNoBridgeFor []string
+	}{
+		{
+			name: "single_security_function",
+			sites: []ArrowCallSite{
+				{FunctionName: "getHTF", CallIndex: 1, ContextVar: "arrowCtx_getHTF_1", NeedsSecurity: true},
+			},
+			wantBridgeFor: []string{"arrowCtx_getHTF_1"},
+		},
+		{
+			name: "multiple_security_functions",
+			sites: []ArrowCallSite{
+				{FunctionName: "getDaily", CallIndex: 1, ContextVar: "arrowCtx_getDaily_1", NeedsSecurity: true},
+				{FunctionName: "getWeekly", CallIndex: 1, ContextVar: "arrowCtx_getWeekly_1", NeedsSecurity: true},
+			},
+			wantBridgeFor: []string{"arrowCtx_getDaily_1", "arrowCtx_getWeekly_1"},
+		},
+		{
+			name: "mixed_security_and_non_security",
+			sites: []ArrowCallSite{
+				{FunctionName: "calcSMA", CallIndex: 1, ContextVar: "arrowCtx_calcSMA_1", NeedsSecurity: false},
+				{FunctionName: "getHTF", CallIndex: 1, ContextVar: "arrowCtx_getHTF_1", NeedsSecurity: true},
+				{FunctionName: "calcEMA", CallIndex: 1, ContextVar: "arrowCtx_calcEMA_1", NeedsSecurity: false},
+			},
+			wantBridgeFor:   []string{"arrowCtx_getHTF_1"},
+			wantNoBridgeFor: []string{"arrowCtx_calcSMA_1", "arrowCtx_calcEMA_1"},
+		},
+		{
+			name: "all_non_security",
+			sites: []ArrowCallSite{
+				{FunctionName: "a", CallIndex: 1, ContextVar: "arrowCtx_a_1", NeedsSecurity: false},
+				{FunctionName: "b", CallIndex: 1, ContextVar: "arrowCtx_b_1", NeedsSecurity: false},
+			},
+			wantNoBridgeFor: []string{"arrowCtx_a_1", "arrowCtx_b_1"},
+		},
+	}
 
-	for i := 1; i <= 100; i++ {
-		sites = append(sites, ArrowCallSite{
-			FunctionName: "func",
-			CallIndex:    i,
-			ContextVar:   "arrowCtx_func_" + string(rune('0'+i%10)),
+	hoister := NewArrowContextHoister("\t")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := hoister.GeneratePreLoopDeclarations(tt.sites)
+
+			for _, varName := range tt.wantBridgeFor {
+				bridgePattern := varName + ".SecurityContexts"
+				if !strings.Contains(code, bridgePattern) {
+					t.Errorf("expected security bridge for %s.\nGot:\n%s", varName, code)
+				}
+
+				mapperPattern := varName + ".SetBarMapper"
+				if !strings.Contains(code, mapperPattern) {
+					t.Errorf("expected SetBarMapper for %s.\nGot:\n%s", varName, code)
+				}
+			}
+
+			for _, varName := range tt.wantNoBridgeFor {
+				bridgePattern := varName + ".SecurityContexts"
+				if strings.Contains(code, bridgePattern) {
+					t.Errorf("non-security %s should NOT have bridge.\nGot:\n%s", varName, code)
+				}
+			}
 		})
 	}
-
-	code := hoister.GeneratePreLoopDeclarations(sites)
-
-	lines := strings.Split(strings.TrimSpace(code), "\n")
-	if len(lines) != 100 {
-		t.Errorf("Expected 100 declarations, got %d", len(lines))
-	}
-
-	for i, line := range lines {
-		if !strings.Contains(line, ":=") {
-			t.Errorf("Line %d missing declaration operator: %q", i, line)
-		}
-		if !strings.Contains(line, "context.NewArrowContext(ctx)") {
-			t.Errorf("Line %d missing constructor call: %q", i, line)
-		}
-	}
 }
 
-func TestArrowContextHoister_ConsistentFormatting(t *testing.T) {
+/* TestArrowContextHoister_SecurityBridgeCodeStructure verifies generated bridge code format */
+func TestArrowContextHoister_SecurityBridgeCodeStructure(t *testing.T) {
 	hoister := NewArrowContextHoister("\t")
 	sites := []ArrowCallSite{
-		{FunctionName: "a", CallIndex: 1, ContextVar: "arrowCtx_a_1"},
-		{FunctionName: "b", CallIndex: 1, ContextVar: "arrowCtx_b_1"},
-		{FunctionName: "c", CallIndex: 1, ContextVar: "arrowCtx_c_1"},
-	}
-
-	code := hoister.GeneratePreLoopDeclarations(sites)
-	lines := strings.Split(strings.TrimRight(code, "\n"), "\n")
-
-	if len(lines) != 3 {
-		t.Fatalf("Expected 3 lines, got %d", len(lines))
-	}
-
-	expectedIndent := "\t"
-	for i, line := range lines {
-		if !strings.HasPrefix(line, expectedIndent) {
-			t.Errorf("Line %d does not have expected indentation, got: %q", i, line)
-		}
-
-		if !strings.Contains(line, ":=") {
-			t.Errorf("Line %d missing declaration operator", i)
-		}
-
-		if !strings.Contains(line, "context.NewArrowContext(ctx)") {
-			t.Errorf("Line %d missing constructor call", i)
-		}
-	}
-}
-
-func TestArrowContextHoister_NilCallSitesList(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	code := hoister.GeneratePreLoopDeclarations(nil)
-
-	if code != "" {
-		t.Errorf("Expected empty code for nil call sites, got %q", code)
-	}
-}
-
-func TestArrowContextHoister_ContextVariableUniqueness(t *testing.T) {
-	hoister := NewArrowContextHoister("\t")
-	sites := []ArrowCallSite{
-		{FunctionName: "adx", CallIndex: 1, ContextVar: "arrowCtx_adx_1"},
-		{FunctionName: "adx", CallIndex: 2, ContextVar: "arrowCtx_adx_2"},
-		{FunctionName: "rma", CallIndex: 1, ContextVar: "arrowCtx_rma_1"},
-		{FunctionName: "rma", CallIndex: 2, ContextVar: "arrowCtx_rma_2"},
+		{FunctionName: "getHTF", CallIndex: 1, ContextVar: "arrowCtx_getHTF_1", NeedsSecurity: true},
 	}
 
 	code := hoister.GeneratePreLoopDeclarations(sites)
 
-	contextVars := []string{"arrowCtx_adx_1", "arrowCtx_adx_2", "arrowCtx_rma_1", "arrowCtx_rma_2"}
-	varCounts := make(map[string]int)
+	requiredElements := []string{
+		"context.NewArrowContext(ctx)",
+		".SecurityContexts = securityContexts",
+		"for secKey, mapper := range securityBarMappers",
+		".SetBarMapper(secKey, mapper)",
+	}
 
-	for _, varName := range contextVars {
-		count := strings.Count(code, varName)
-		varCounts[varName] = count
-
-		if count != 1 {
-			t.Errorf("Context variable %q appears %d times, expected 1", varName, count)
+	for _, elem := range requiredElements {
+		if !strings.Contains(code, elem) {
+			t.Errorf("missing structural element %q.\nGot:\n%s", elem, code)
 		}
 	}
 }

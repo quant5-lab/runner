@@ -35,13 +35,13 @@ calc(len) =>
 plot(calc(20))
 `,
 			expectedScalar: []string{
-				"result := (bar.Close * len)",
+				"result := (ctx.Data[ctx.BarIndex].Close * len)",
 			},
 			expectedSeriesSet: []string{
 				"resultSeries.Set(result)",
 			},
 			forbiddenPattern: []string{
-				"resultSeries.Set((bar.Close * len))", // Should use scalar, not inline expr
+				"resultSeries.Set((ctx.Data[ctx.BarIndex].Close * len))", // Should use scalar, not inline expr
 			},
 			description: "single variable uses scalar declaration then Series.Set()",
 		},
@@ -58,9 +58,9 @@ compute(factor) =>
 plot(compute(2))
 `,
 			expectedScalar: []string{
-				"a := (bar.Close * factor)",
-				"b := (bar.Open * factor)",
-				"c := (bar.High * factor)",
+				"a := (ctx.Data[ctx.BarIndex].Close * factor)",
+				"b := (ctx.Data[ctx.BarIndex].Open * factor)",
+				"c := (ctx.Data[ctx.BarIndex].High * factor)",
 			},
 			expectedSeriesSet: []string{
 				"aSeries.Set(a)",
@@ -82,8 +82,8 @@ pair(multiplier) =>
 [x, y] = pair(1.5)
 `,
 			expectedScalar: []string{
-				"first := (bar.Close * multiplier)",
-				"second := (bar.Open * multiplier)",
+				"first := (ctx.Data[ctx.BarIndex].Close * multiplier)",
+				"second := (ctx.Data[ctx.BarIndex].Open * multiplier)",
 			},
 			expectedSeriesSet: []string{
 				"firstSeries.Set(first)",
@@ -103,7 +103,7 @@ average(period) =>
 plot(average(10))
 `,
 			expectedScalar: []string{
-				"avg := ((bar.Close + (bar.Open + (bar.High + bar.Low))) / 4)",
+				"avg := ((((ctx.Data[ctx.BarIndex].Close + ctx.Data[ctx.BarIndex].Open) + ctx.Data[ctx.BarIndex].High) + ctx.Data[ctx.BarIndex].Low) / 4)",
 			},
 			expectedSeriesSet: []string{
 				"avgSeries.Set(avg)",
@@ -122,7 +122,7 @@ select(threshold) =>
 plot(select(100))
 `,
 			expectedScalar: []string{
-				"value := func() float64 { if (bar.Close > threshold)",
+				"value := func() float64 { if (ctx.Data[ctx.BarIndex].Close > threshold)",
 			},
 			expectedSeriesSet: []string{
 				"valueSeries.Set(value)",
@@ -203,7 +203,7 @@ calc(multiplier) =>
 plot(calc(5))
 `,
 			expectedScalar: []string{
-				"base := (bar.Close * 2)",
+				"base := (ctx.Data[ctx.BarIndex].Close * 2)",
 				"result := (base + multiplier)",
 			},
 			forbiddenPattern: []string{
@@ -223,7 +223,7 @@ check(threshold) =>
 plot(check(100))
 `,
 			expectedScalar: []string{
-				"value := (bar.Close + bar.Open)",
+				"value := (ctx.Data[ctx.BarIndex].Close + ctx.Data[ctx.BarIndex].Open)",
 				"if (value > threshold)",
 			},
 			forbiddenPattern: []string{
@@ -244,8 +244,8 @@ select(threshold) =>
 plot(select(100))
 `,
 			expectedScalar: []string{
-				"high_val := (bar.High * 1.1)",
-				"low_val := (bar.Low * 0.9)",
+				"high_val := (ctx.Data[ctx.BarIndex].High * 1.1)",
+				"low_val := (ctx.Data[ctx.BarIndex].Low * 0.9)",
 				"return high_val",
 				"return low_val",
 			},
@@ -268,8 +268,8 @@ combine(factor) =>
 plot(combine(2))
 `,
 			expectedScalar: []string{
-				"a := (bar.Close * factor)",
-				"b := (bar.Open * factor)",
+				"a := (ctx.Data[ctx.BarIndex].Close * factor)",
+				"b := (ctx.Data[ctx.BarIndex].Open * factor)",
 				"sum := (a + b)",
 			},
 			forbiddenPattern: []string{
@@ -290,7 +290,7 @@ nested(threshold) =>
 plot(nested(100))
 `,
 			expectedScalar: []string{
-				"base := (bar.Close + bar.Open)",
+				"base := (ctx.Data[ctx.BarIndex].Close + ctx.Data[ctx.BarIndex].Open)",
 				"adjusted := ((base * 2) / threshold)",
 			},
 			forbiddenPattern: []string{
@@ -310,7 +310,7 @@ invert(multiplier) =>
 plot(invert(2))
 `,
 			expectedScalar: []string{
-				"value := (bar.Close * multiplier)",
+				"value := (ctx.Data[ctx.BarIndex].Close * multiplier)",
 				"inverted := -value",
 			},
 			forbiddenPattern: []string{
@@ -423,7 +423,7 @@ direct(val) =>
 plot(direct(2))
 `,
 			expectedReturn: []string{
-				"return (bar.Close * val)",
+				"return (ctx.Data[ctx.BarIndex].Close * val)",
 			},
 			forbiddenPattern: nil,
 			description:      "immediate expression return is scalar",
@@ -474,7 +474,7 @@ calc(multiplier) =>
 plot(calc(2))
 `,
 			expectedParam: []string{
-				"(bar.Close * multiplier)",
+				"(ctx.Data[ctx.BarIndex].Close * multiplier)",
 			},
 			forbiddenPattern: []string{
 				"multiplierSeries",
@@ -492,7 +492,7 @@ check(threshold) =>
 plot(check(100))
 `,
 			expectedParam: []string{
-				"(bar.Close > threshold)",
+				"(ctx.Data[ctx.BarIndex].Close > threshold)",
 			},
 			forbiddenPattern: []string{
 				"thresholdSeries",
@@ -510,8 +510,8 @@ combine(factor1, factor2) =>
 plot(combine(2, 3))
 `,
 			expectedParam: []string{
-				"(bar.Close * factor1)",
-				"(bar.Open * factor2)",
+				"(ctx.Data[ctx.BarIndex].Close * factor1)",
+				"(ctx.Data[ctx.BarIndex].Open * factor2)",
 			},
 			forbiddenPattern: []string{
 				"factor1Series",
@@ -565,7 +565,7 @@ plot(calc(10))
 `,
 			mustPrecede: []struct{ before, after string }{
 				{
-					before: "result := (bar.Close * len)",
+					before: "result := (ctx.Data[ctx.BarIndex].Close * len)",
 					after:  "resultSeries.Set(result)",
 				},
 			},
@@ -584,12 +584,12 @@ plot(multi(2))
 `,
 			mustPrecede: []struct{ before, after string }{
 				{
-					before: "a := (bar.Close * factor)",
+					before: "a := (ctx.Data[ctx.BarIndex].Close * factor)",
 					after:  "aSeries.Set(a)",
 				},
 				{
 					before: "aSeries.Set(a)",
-					after:  "b := (a + bar.Open)",
+					after:  "b := (a + ctx.Data[ctx.BarIndex].Open)",
 				},
 			},
 			description: "dependent variables maintain temporal order",
@@ -607,11 +607,11 @@ pair(multiplier) =>
 `,
 			mustPrecede: []struct{ before, after string }{
 				{
-					before: "first := (bar.Close * multiplier)",
+					before: "first := (ctx.Data[ctx.BarIndex].Close * multiplier)",
 					after:  "firstSeries.Set(first)",
 				},
 				{
-					before: "second := (bar.Open * multiplier)",
+					before: "second := (ctx.Data[ctx.BarIndex].Open * multiplier)",
 					after:  "secondSeries.Set(second)",
 				},
 			},
@@ -669,9 +669,9 @@ calc(f) =>
 plot(calc(2))
 `,
 			expectedPattern: []string{
-				"x := (bar.Close * f)",
+				"x := (ctx.Data[ctx.BarIndex].Close * f)",
 				"xSeries.Set(x)",
-				"y := (bar.Open * f)",
+				"y := (ctx.Data[ctx.BarIndex].Open * f)",
 				"ySeries.Set(y)",
 			},
 			description: "single-letter variables work correctly",
@@ -687,7 +687,7 @@ calc(len) =>
 plot(calc(10))
 `,
 			expectedPattern: []string{
-				"my_value := (bar.Close * len)",
+				"my_value := (ctx.Data[ctx.BarIndex].Close * len)",
 				"my_valueSeries.Set(my_value)",
 			},
 			description: "underscore variable names work correctly",
@@ -720,7 +720,7 @@ plot(update(10))
 			expectedPattern: []string{
 				"value := initial",
 				"valueSeries.Set(value)",
-				"value := (value * 2)",
+				"value = (value * 2)",
 				"valueSeries.Set(value)",
 			},
 			description: "variable reassignment maintains dual-access pattern",

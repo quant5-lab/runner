@@ -1,0 +1,42 @@
+//@version=5
+indicator("Custom Volatility Bands", overlay=true)
+
+// Calculate volatility bands using for loops
+length = input.int(20, "Length", minval=2)
+multiplier = input.float(2.0, "Multiplier", step=0.1)
+
+// Custom standard deviation using for loop
+customStdev(src, len) =>
+    // Calculate mean
+    sum = 0.0
+    for i = 0 to len - 1
+        sum := sum + src[i]
+    mean = sum / len
+    
+    // Calculate variance
+    variance = 0.0
+    for i = 0 to len - 1
+        diff = src[i] - mean
+        variance := variance + diff * diff
+    variance := variance / len
+    
+    // Return standard deviation
+    stdev = math.sqrt(variance)
+    stdev
+
+// Calculate bands
+basis = ta.sma(close, length)
+stdev = customStdev(close, length)
+upperBand = basis + multiplier * stdev
+lowerBand = basis - multiplier * stdev
+
+// Plot bands
+plot(basis, "Basis", color=color.blue, linewidth=2)
+p1 = plot(upperBand, "Upper Band", color=color.red, linewidth=1)
+p2 = plot(lowerBand, "Lower Band", color=color.green, linewidth=1)
+fill(p1, p2, color=color.new(color.blue, 95), title="Band Fill")
+
+// Comparison with built-in
+[bbMiddle, bbUpper, bbLower] = ta.bb(close, length, multiplier)
+plot(bbUpper, "Built-in Upper", color=color.new(color.red, 70), linewidth=1, style=plot.style_circles)
+plot(bbLower, "Built-in Lower", color=color.new(color.green, 70), linewidth=1, style=plot.style_circles)

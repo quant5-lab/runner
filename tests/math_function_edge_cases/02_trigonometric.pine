@@ -1,0 +1,10 @@
+//@version=5
+strategy("Trigonometric Functions", overlay=true)
+// Trigonometric functions
+a = math.sin(3.14159)
+b = math.cos(3.14159)
+c = math.tan(0.5)
+d = math.asin(0.5)
+e = math.acos(0.5)
+f = math.atan(1)
+strategy.entry("test", strategy.long)

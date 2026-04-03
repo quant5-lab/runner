@@ -1,0 +1,8 @@
+ZigZag PA Strategy V4.1 (v4) — harmonic pattern recognition
+
+Parse: ✅ (v4→v5 preprocessing)
+Generate: ✅ (heikenashi→ticker.heikinashi, bare tickerid→syminfo.tickerid, UDF scope isolation)
+Compile: ✅
+Execute: ⏳ (needs 60-min secondary data fixture for request.security)
+
+Blocker: #4 RESOLVED

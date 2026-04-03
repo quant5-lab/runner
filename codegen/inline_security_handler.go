@@ -15,7 +15,7 @@ func NewSecurityInlineHandler() *SecurityInlineHandler {
 }
 
 func (h *SecurityInlineHandler) CanHandle(funcName string) bool {
-	return funcName == "request.security" || funcName == "security"
+	return IsSecurityFunction(funcName)
 }
 
 func (h *SecurityInlineHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
@@ -23,101 +23,38 @@ func (h *SecurityInlineHandler) GenerateInline(expr *ast.CallExpression, g *gene
 		return "(func() float64 { return math.NaN() }())", nil
 	}
 
-	symbolExpr := expr.Arguments[0]
-	timeframeExpr := expr.Arguments[1]
-	expressionArg := expr.Arguments[2]
+	argExtractor := NewSecurityArgumentExtractor(g)
 
-	symbolCode := h.extractSymbol(symbolExpr)
-	timeframe := h.extractTimeframe(timeframeExpr)
-	lookahead := h.extractLookahead(expr.Arguments)
-
-	if symbolCode == "" || timeframe == "" {
+	symbolResult, err := argExtractor.ExtractSymbol(expr.Arguments[0])
+	if err != nil {
 		return "(func() float64 { return math.NaN() }())", nil
 	}
 
+	timeframeResult, err := argExtractor.ExtractTimeframe(expr.Arguments[1])
+	if err != nil {
+		return "(func() float64 { return math.NaN() }())", nil
+	}
+
+	expressionArg := expr.Arguments[2]
+	lookahead := resolveSecurityLookahead(expr, g.pineVersion)
+
 	g.hasSecurityCalls = true
 
-	return h.generateIIFE(symbolCode, timeframe, expressionArg, lookahead, g)
+	return h.generateIIFE(symbolResult, timeframeResult, expressionArg, lookahead, g)
 }
 
-func (h *SecurityInlineHandler) extractSymbol(symbolExpr ast.Expression) string {
-	switch expr := symbolExpr.(type) {
-	case *ast.Identifier:
-		if expr.Name == "tickerid" {
-			return "ctx.Symbol"
-		}
-		return fmt.Sprintf("%q", expr.Name)
-	case *ast.MemberExpression:
-		return "ctx.Symbol"
-	case *ast.Literal:
-		if s, ok := expr.Value.(string); ok {
-			return fmt.Sprintf("%q", s)
-		}
-	}
-	return ""
-}
-
-func (h *SecurityInlineHandler) extractTimeframe(timeframeExpr ast.Expression) string {
-	lit, ok := timeframeExpr.(*ast.Literal)
-	if !ok {
-		return ""
-	}
-
-	s, ok := lit.Value.(string)
-	if !ok {
-		return ""
-	}
-
-	tf := strings.Trim(s, "'\"")
-	return h.normalizeTimeframe(tf)
-}
-
-func (h *SecurityInlineHandler) normalizeTimeframe(tf string) string {
-	switch tf {
-	case "D":
-		return "1D"
-	case "W":
-		return "1W"
-	case "M":
-		return "1M"
-	default:
-		return tf
-	}
-}
-
-func (h *SecurityInlineHandler) extractLookahead(args []ast.Expression) bool {
-	if len(args) < 4 {
-		return false
-	}
-
-	resolver := NewConstantResolver()
-	fourthArg := args[3]
-
-	if objExpr, ok := fourthArg.(*ast.ObjectExpression); ok {
-		for _, prop := range objExpr.Properties {
-			if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "lookahead" {
-				if resolved, ok := resolver.ResolveToBool(prop.Value); ok {
-					return resolved
-				}
-				break
-			}
-		}
-	} else {
-		if resolved, ok := resolver.ResolveToBool(fourthArg); ok {
-			return resolved
-		}
-	}
-
-	return false
-}
-
-func (h *SecurityInlineHandler) generateIIFE(symbolCode, timeframe string, exprArg ast.Expression, lookahead bool, g *generator) (string, error) {
-	cacheKeyPattern := h.buildCacheKeyPattern(symbolCode, timeframe)
+func (h *SecurityInlineHandler) generateIIFE(symbolResult, timeframeResult *ExtractionResult, exprArg ast.Expression, lookahead bool, g *generator) (string, error) {
+	keyBuilder := NewSecurityCacheKeyBuilder()
+	keyComponents := keyBuilder.Build(symbolResult, timeframeResult)
 
 	var iife strings.Builder
 	iife.WriteString("(func() float64 {\n")
 
-	iife.WriteString(fmt.Sprintf("\t\tsecKey := fmt.Sprintf(%q, %s)\n", cacheKeyPattern, symbolCode))
+	if keyComponents.FormatArgs == "" {
+		iife.WriteString(fmt.Sprintf("\t\tsecKey := %q\n", keyComponents.KeyPattern))
+	} else {
+		iife.WriteString(fmt.Sprintf("\t\tsecKey := fmt.Sprintf(%q, %s)\n", keyComponents.KeyPattern, keyComponents.FormatArgs))
+	}
 	iife.WriteString("\t\tsecCtx, secFound := securityContexts[secKey]\n")
 	iife.WriteString("\t\tif !secFound { return math.NaN() }\n\n")
 
@@ -125,7 +62,7 @@ func (h *SecurityInlineHandler) generateIIFE(symbolCode, timeframe string, exprA
 	iife.WriteString("\t\tif !mapperFound { return math.NaN() }\n\n")
 
 	iife.WriteString(fmt.Sprintf("\t\tsecLookahead := %v\n", lookahead))
-	iife.WriteString(fmt.Sprintf("\t\tif %q == ctx.Timeframe { secLookahead = true }\n", timeframe))
+	iife.WriteString(fmt.Sprintf("\t\tif %s == ctx.Timeframe { secLookahead = true }\n", timeframeResult.Code))
 	iife.WriteString("\t\tsecBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)\n")
 	iife.WriteString("\t\tif secBarIdx < 0 { return math.NaN() }\n\n")
 
@@ -140,38 +77,17 @@ func (h *SecurityInlineHandler) generateIIFE(symbolCode, timeframe string, exprA
 	return iife.String(), nil
 }
 
-func (h *SecurityInlineHandler) buildCacheKeyPattern(symbolCode, timeframe string) string {
-	if symbolCode == "ctx.Symbol" {
-		return fmt.Sprintf("%%s:%s", timeframe)
-	}
-	return fmt.Sprintf("%s:%s", strings.Trim(symbolCode, `"`), timeframe)
-}
-
 func (h *SecurityInlineHandler) generateExpressionEvaluation(exprArg ast.Expression, g *generator) (string, error) {
 	switch expr := exprArg.(type) {
 	case *ast.Identifier:
-		return h.generateOHLCVAccess(expr.Name), nil
+		if fieldExpr, ok := SecurityBarFieldExpression(expr.Name, "secCtx.Data[secBarIdx]"); ok {
+			return "\t\treturn " + fieldExpr + "\n", nil
+		}
+		return "\t\treturn math.NaN()\n", nil
 	case *ast.CallExpression, *ast.BinaryExpression, *ast.ConditionalExpression:
 		return h.generateStreamingEvaluation(exprArg, g)
 	default:
 		return "\t\treturn math.NaN()\n", nil
-	}
-}
-
-func (h *SecurityInlineHandler) generateOHLCVAccess(fieldName string) string {
-	switch fieldName {
-	case "close":
-		return "\t\treturn secCtx.Data[secBarIdx].Close\n"
-	case "open":
-		return "\t\treturn secCtx.Data[secBarIdx].Open\n"
-	case "high":
-		return "\t\treturn secCtx.Data[secBarIdx].High\n"
-	case "low":
-		return "\t\treturn secCtx.Data[secBarIdx].Low\n"
-	case "volume":
-		return "\t\treturn secCtx.Data[secBarIdx].Volume\n"
-	default:
-		return "\t\treturn math.NaN()\n"
 	}
 }
 
@@ -184,9 +100,18 @@ func (h *SecurityInlineHandler) generateStreamingEvaluation(exprArg ast.Expressi
 	}
 
 	var code strings.Builder
-	code.WriteString("\t\tif secBarEvaluator == nil {\n")
-	code.WriteString("\t\t\tsecBarEvaluator = security.NewSeriesCachingEvaluator(security.NewStreamingBarEvaluator())\n")
-	code.WriteString("\t\t}\n")
+
+	initializer := NewSecurityEvaluatorInitializer(g.symbolTable, g)
+	indentLevel := 0
+	indentFunc := func() string {
+		return strings.Repeat("\t", 2+indentLevel)
+	}
+	incrementIndent := func() { indentLevel++ }
+	decrementIndent := func() { indentLevel-- }
+
+	initCode := initializer.EmitInitialization(indentFunc, incrementIndent, decrementIndent)
+	code.WriteString(initCode)
+
 	code.WriteString(fmt.Sprintf("\t\tsecValue, err := secBarEvaluator.EvaluateAtBar(%s, secCtx, secBarIdx)\n", exprJSON))
 	code.WriteString("\t\tif err != nil { return math.NaN() }\n")
 	code.WriteString("\t\treturn secValue\n")

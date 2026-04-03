@@ -40,8 +40,11 @@ func (p *Pipeline) Run(script *parser.Script) (*parser.Script, error) {
 // NewV4ToV5Pipeline creates a configured pipeline for Pine v4→v5 migration
 func NewV4ToV5Pipeline() *Pipeline {
 	return NewPipeline().
+		Add(NewIffToTernaryTransformer()).
 		Add(NewTANamespaceTransformer()).
 		Add(NewMathNamespaceTransformer()).
 		Add(NewRequestNamespaceTransformer()).
+		Add(NewTickerNamespaceTransformer()).
+		Add(NewV4BuiltinIdentifierTransformer()).
 		Add(NewStudyToIndicatorTransformer())
 }

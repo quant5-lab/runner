@@ -1,0 +1,6 @@
+//@version=5
+indicator("Reassignment Trailing Comma")
+
+var cumulative = 0.0
+cumulative := cumulative + close,
+plot(cumulative),

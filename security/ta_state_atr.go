@@ -1,61 +1,64 @@
 package security
 
 import (
+	"math"
+
 	"github.com/quant5-lab/runner/ast"
 	"github.com/quant5-lab/runner/runtime/context"
 )
 
 type ATRStateManager struct {
-	cacheKey        string
-	period          int
-	trCalculator    *TrueRangeCalculator
-	rmaStateManager *RMAStateManager
-	prevClose       float64
-	computed        int
-	hasHistory      bool
+	cacheKey     string
+	period       int
+	trCalculator *TrueRangeCalculator
+	prevClose    float64
+	hasHistory   bool
+	buf          forwardBufferE
 }
 
-func NewATRStateManager(cacheKey string, period int) *ATRStateManager {
+func NewATRStateManager(cacheKey string, period int, capacity int) *ATRStateManager {
 	return &ATRStateManager{
 		cacheKey:     cacheKey,
 		period:       period,
 		trCalculator: NewTrueRangeCalculator(),
-		rmaStateManager: &RMAStateManager{
-			cacheKey: cacheKey + "_rma_tr",
-			period:   period,
-			computed: 0,
-		},
-		computed:   0,
-		hasHistory: false,
+		buf:          newForwardBufferE(capacity),
 	}
 }
 
-func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, sourceID *ast.Identifier, barIdx int) (float64, error) {
-	for s.computed <= barIdx {
-		if s.computed >= len(secCtx.Data) {
-			break
-		}
-
-		isFirstBar := s.computed == 0 || !s.hasHistory
-		trueRange := s.trCalculator.CalculateAtBar(secCtx.Data, s.computed, s.prevClose, isFirstBar)
-
-		if s.computed == 0 {
-			s.rmaStateManager.prevRMA = trueRange
-		} else if s.computed < s.period {
-			s.rmaStateManager.prevRMA = (s.rmaStateManager.prevRMA*float64(s.computed) + trueRange) / float64(s.computed+1)
-		} else {
-			alpha := 1.0 / float64(s.period)
-			s.rmaStateManager.prevRMA = alpha*trueRange + (1-alpha)*s.rmaStateManager.prevRMA
-		}
-
-		s.prevClose = secCtx.Data[s.computed].Close
-		s.hasHistory = true
-		s.computed++
+func (s *ATRStateManager) ComputeAtBar(secCtx *context.Context, _ ast.Expression, barIdx int) (float64, error) {
+	if s.buf.growsFor(len(secCtx.Data)) {
+		s.buf.reallocate(len(secCtx.Data))
+		s.prevClose = 0
+		s.hasHistory = false
 	}
-
+	if err := s.buf.advanceTo(barIdx, func(bar int) (float64, error) {
+		if bar >= len(secCtx.Data) {
+			return math.NaN(), nil
+		}
+		return s.atrAtBar(secCtx, bar), nil
+	}); err != nil {
+		return math.NaN(), err
+	}
 	if barIdx < s.period-1 {
-		return 0.0, nil
+		return math.NaN(), nil
 	}
+	return s.buf.at(barIdx), nil
+}
 
-	return s.rmaStateManager.prevRMA, nil
+func (s *ATRStateManager) atrAtBar(secCtx *context.Context, bar int) float64 {
+	isFirstBar := bar == 0 || !s.hasHistory
+	tr := s.trCalculator.CalculateAtBar(secCtx.Data, bar, s.prevClose, isFirstBar, true)
+	var atr float64
+	switch {
+	case bar == 0:
+		atr = tr
+	case bar < s.period:
+		atr = (s.buf.prev()*float64(bar) + tr) / float64(bar+1)
+	default:
+		alpha := 1.0 / float64(s.period)
+		atr = alpha*tr + (1-alpha)*s.buf.prev()
+	}
+	s.prevClose = secCtx.Data[bar].Close
+	s.hasHistory = true
+	return atr
 }

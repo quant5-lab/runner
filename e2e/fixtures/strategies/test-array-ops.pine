@@ -1,0 +1,56 @@
+//@version=5
+strategy("Array Operations Test", overlay=false)
+
+// Test constructors
+prices = array.new_float(5, 100.0)
+volumes = array.from(100, 200, 300, 400, 500)
+
+// Test mutators
+array.push(prices, close)
+lastRemoved = array.pop(prices)
+firstRemoved = array.shift(prices)
+array.unshift(prices, open)
+array.set(prices, 0, high)
+array.insert(prices, 1, low)
+array.remove(prices, 2)
+array.clear(prices)
+array.fill(prices, close, 0, 3)
+array.reverse(prices)
+array.sort(prices, order.ascending)
+
+// Test accessors
+firstPrice = array.first(prices)
+lastPrice = array.last(prices)
+hasValue = array.includes(prices, close)
+indexPos = array.indexof(prices, close)
+lastIndexPos = array.lastindexof(prices, close)
+
+// Test statistics
+sumVal = array.sum(prices)
+avgVal = array.avg(prices)
+minVal = array.min(prices)
+maxVal = array.max(prices)
+medianVal = array.median(prices)
+modeVal = array.mode(prices)
+stdevVal = array.stdev(prices)
+varianceVal = array.variance(prices)
+rangeVal = array.range(prices)
+percentile50 = array.percentile_linear_interpolation(prices, 50)
+percentile75 = array.percentile_nearest_rank(prices, 75)
+rankVal = array.percentrank(prices, close)
+covVal = array.covariance(prices, volumes)
+
+// Plot key metrics
+sizeVal = array.size(prices)
+plot(avgVal, "Average", color=color.blue)
+plot(stdevVal, "StdDev", color=color.red)
+plot(sizeVal, "Size", color=color.green)
+
+// Strategy logic using array stats
+longCondition = close > avgVal + stdevVal
+shortCondition = close < avgVal - stdevVal
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)

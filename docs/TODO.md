@@ -159,9 +159,8 @@
 - Type: string variables (standalone assignment)
 - Runtime: multi-symbol security (data files only)
 - Parser: while loops, for loops (execution only), map generics
-- Codegen: RSI inline
 - Parser: varip (not implemented)
-- Note: arrow functions ✅, syminfo.tickerid ✅ (security context), strategy.exit ✅
+- Note: arrow functions ✅, syminfo.tickerid ✅ (security context), strategy.exit ⚠️ (triggers but misaligned), keltner-squeeze ✅ (crossover/crossunder threshold fix)
 
 ### BB7 Dissected Components Testing
 - [x] `bb7-dissect-session.pine` - manual validation PASSED

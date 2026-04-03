@@ -1,0 +1,5 @@
+//@version=5
+indicator("Trailing Comma - Assignment")
+
+adaptiveMa = ta.sma(close, 20),
+plot(adaptiveMa),

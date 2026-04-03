@@ -1,0 +1,19 @@
+//@version=5
+strategy("Test ta.cum basic", overlay=false)
+
+gain = close > open ? close - open : 0
+loss = close < open ? open - close : 0
+
+cumGain = ta.cum(gain)
+cumLoss = ta.cum(loss)
+
+netCum = ta.cum(close - open)
+
+plot(cumGain, title="cum_gain", color=color.green)
+plot(cumLoss, title="cum_loss", color=color.red)
+plot(netCum, title="net_cum", color=color.blue)
+
+if cumGain > cumLoss * 1.5
+    strategy.entry("Long", strategy.long)
+if cumLoss > cumGain * 1.5
+    strategy.entry("Short", strategy.short)

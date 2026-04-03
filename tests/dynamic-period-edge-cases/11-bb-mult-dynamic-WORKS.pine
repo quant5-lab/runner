@@ -1,0 +1,7 @@
+//@version=5
+// TEST: BB with dynamic multiplier - WORKS
+// Note: BB multiplier accepts dynamic values
+indicator("Dynamic BB mult: ta.bb(close, 20, getMult())")
+getMult() => 2.0
+[middle, upper, lower] = ta.bb(close, 20, getMult())
+plot(middle)

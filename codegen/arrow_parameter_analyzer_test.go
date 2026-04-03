@@ -223,6 +223,83 @@ func TestParameterUsageAnalyzer_AnalyzeArrowFunction(t *testing.T) {
 			expectedUsages: map[string]ParameterUsageType{},
 		},
 		{
+			name: "for-loop with subscript access marks parameter as series",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{
+					{Name: "src"},
+					{Name: "len"},
+				},
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID:   &ast.Identifier{Name: "sum"},
+								Init: &ast.Literal{Value: 0.0},
+							},
+						},
+					},
+					&ast.ForStatement{
+						Counter: "i",
+						From:    &ast.Literal{Value: 0.0},
+						To:      &ast.Identifier{Name: "len"},
+						Body: []ast.Node{
+							&ast.VariableDeclaration{
+								Kind: "var",
+								Declarations: []ast.VariableDeclarator{
+									{
+										ID: &ast.Identifier{Name: "sum"},
+										Init: &ast.BinaryExpression{
+											Left:     &ast.Identifier{Name: "sum"},
+											Operator: "+",
+											Right: &ast.MemberExpression{
+												Object:   &ast.Identifier{Name: "src"},
+												Property: &ast.Identifier{Name: "i"},
+												Computed: true,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"src": ParameterUsageSeries,
+				"len": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "for-in loop with TA call inside body",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{
+					{Name: "src"},
+					{Name: "len"},
+				},
+				Body: []ast.Node{
+					&ast.ForInStatement{
+						ElementVar: "val",
+						Collection: &ast.Identifier{Name: "src"},
+						Body: []ast.Node{
+							&ast.ExpressionStatement{
+								Expression: &ast.CallExpression{
+									Callee: &ast.Identifier{Name: "sma"},
+									Arguments: []ast.Expression{
+										&ast.Identifier{Name: "src"},
+										&ast.Identifier{Name: "len"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"src": ParameterUsageSeries,
+				"len": ParameterUsageScalar,
+			},
+		},
+		{
 			name: "parameter unused in body",
 			arrowFunc: &ast.ArrowFunctionExpression{
 				Params: []ast.Identifier{
@@ -263,7 +340,7 @@ func TestParameterUsageAnalyzer_AnalyzeArrowFunction(t *testing.T) {
 	}
 }
 
-/* TestParameterUsageAnalyzer_TAFunctionRecognition validates TA function detection */
+/* TestParameterUsageAnalyzer_TAFunctionRecognition validates TA function detection via registry */
 func TestParameterUsageAnalyzer_TAFunctionRecognition(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -292,9 +369,9 @@ func TestParameterUsageAnalyzer_TAFunctionRecognition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isTAIndicatorFunction(tt.funcName)
+			result := sharedTASignatures.Contains(tt.funcName)
 			if result != tt.isTAFunc {
-				t.Errorf("isTAIndicatorFunction(%q) = %v, want %v", tt.funcName, result, tt.isTAFunc)
+				t.Errorf("sharedTASignatures.Contains(%q) = %v, want %v", tt.funcName, result, tt.isTAFunc)
 			}
 		})
 	}

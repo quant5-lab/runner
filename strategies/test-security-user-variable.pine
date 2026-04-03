@@ -1,0 +1,9 @@
+//@version=5
+strategy("Security User Variable Test", overlay=true)
+
+mySymbol = "SBERP"
+myTimeframe = "1W"
+
+weeklyClose = request.security(mySymbol, myTimeframe, close)
+
+plot(weeklyClose, title="Weekly Close", color=color.blue)

@@ -1,0 +1,14 @@
+//@version=5
+indicator("Test math vs TA dispatch in plot", overlay=false)
+
+// math.max/min take priority over ta.max/min when bare names used in plot()
+// Verifies PlotExpressionHandler routes max/min to math handler, not IIFE TA handler
+plot(max(high, low), "math max")
+plot(min(high, low), "math min")
+plot(abs(close - open), "math abs")
+
+// ta.max/min with two series args still route correctly to IIFE TA handler
+taMax = ta.max(close, 10)
+taMin = ta.min(close, 10)
+plot(taMax, "ta max")
+plot(taMin, "ta min")

@@ -276,6 +276,14 @@ func (m *mockWindowAccessor) GenerateLoopValueAccess(loopVar string) string {
 	return m.loopAccess
 }
 
+func (m *mockWindowAccessor) GenerateCurrentValueAccess() string {
+	return "closeSeries.GetCurrent()"
+}
+
+func (m *mockWindowAccessor) GetBaseOffset() int {
+	return 0
+}
+
 func intToString(n int) string {
 	if n == 0 {
 		return "0"

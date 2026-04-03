@@ -1,0 +1,15 @@
+//@version=5
+strategy("Test ta.vwma basic", overlay=true)
+
+vwma14 = ta.vwma(close, 14)
+vwma20 = ta.vwma(close, 20)
+vwma50 = ta.vwma(close, 50)
+
+plot(vwma14, title="VWMA 14", color=color.blue)
+plot(vwma20, title="VWMA 20", color=color.orange)
+plot(vwma50, title="VWMA 50", color=color.red)
+
+if close > vwma20
+    strategy.entry("Long", strategy.long)
+if close < vwma20
+    strategy.close("Long")

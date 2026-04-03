@@ -1,9 +1,0 @@
-Runtime limitation: Requires float64 modulo operator support in Go codegen
-Parse: ✅ Success
-Generate: ✅ Success
-Compile: ❌ Fails
-Execute: ❌ Not reached
-Error: "invalid operation: operator % not defined on float64(i)"
-Blocker: Go codegen produces bar_index as float64, but Go % operator requires integers
-Note: Need int(bar_index) % N pattern or Series.Get modulo support in codegen
-Related: bb9 uses (bar_index % 20) pattern for periodic conditions

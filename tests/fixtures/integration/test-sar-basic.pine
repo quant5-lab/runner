@@ -1,0 +1,6 @@
+//@version=5
+indicator("SAR Basic", overlay=true)
+
+s = ta.sar(0.02, 0.02, 0.2)
+
+plot(s, "SAR")

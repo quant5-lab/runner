@@ -10,7 +10,7 @@ import (
 
 func TestGenerateSeriesStrategyFullPipeline(t *testing.T) {
 	// Read strategy file
-	content, err := os.ReadFile("../testdata/fixtures/strategy-sma-crossover-series.pine")
+	content, err := os.ReadFile("../tests/fixtures/basic/strategy-sma-crossover-series.pine")
 	if err != nil {
 		t.Fatalf("Failed to read strategy file: %v", err)
 	}
@@ -117,9 +117,9 @@ func TestGenerateSeriesStrategyFullPipeline(t *testing.T) {
 func TestSeriesCodegenPerformanceCheck(t *testing.T) {
 	// This test verifies the generated code will have good performance characteristics
 
-	content, err := os.ReadFile("../testdata/fixtures/strategy-sma-crossover-series.pine")
+	content, err := os.ReadFile("../tests/fixtures/basic/strategy-sma-crossover-series.pine")
 	if err != nil {
-		t.Skip("Strategy file not available")
+		t.Fatalf("Failed to read strategy file: %v", err)
 	}
 
 	p, err := parser.NewParser()

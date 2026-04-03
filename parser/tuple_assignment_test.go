@@ -54,17 +54,17 @@ func TestTupleAssignment_ElementCounts(t *testing.T) {
 			}
 
 			stmt := script.Statements[0]
-			if stmt.TupleAssignment == nil {
+			if stmt.Core.TupleAssignment == nil {
 				t.Fatal("Expected TupleAssignment, got nil")
 			}
 
-			if len(stmt.TupleAssignment.Names) != len(tt.expectedNames) {
-				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.TupleAssignment.Names))
+			if len(stmt.Core.TupleAssignment.Names) != len(tt.expectedNames) {
+				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.Core.TupleAssignment.Names))
 			}
 
 			for i, expected := range tt.expectedNames {
-				if stmt.TupleAssignment.Names[i] != expected {
-					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.TupleAssignment.Names[i])
+				if stmt.Core.TupleAssignment.Names[i] != expected {
+					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.Core.TupleAssignment.Names[i])
 				}
 			}
 		})
@@ -113,17 +113,17 @@ func TestTupleAssignment_WhitespaceVariations(t *testing.T) {
 			}
 
 			stmt := script.Statements[0]
-			if stmt.TupleAssignment == nil {
+			if stmt.Core.TupleAssignment == nil {
 				t.Fatal("Expected TupleAssignment, got nil")
 			}
 
-			if len(stmt.TupleAssignment.Names) != len(tt.expectedNames) {
-				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.TupleAssignment.Names))
+			if len(stmt.Core.TupleAssignment.Names) != len(tt.expectedNames) {
+				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.Core.TupleAssignment.Names))
 			}
 
 			for i, expected := range tt.expectedNames {
-				if stmt.TupleAssignment.Names[i] != expected {
-					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.TupleAssignment.Names[i])
+				if stmt.Core.TupleAssignment.Names[i] != expected {
+					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.Core.TupleAssignment.Names[i])
 				}
 			}
 		})
@@ -257,11 +257,11 @@ func TestTupleAssignment_BackwardCompatibility(t *testing.T) {
 			}
 
 			stmt := script.Statements[0]
-			if stmt.Assignment == nil {
+			if stmt.Core.Assignment == nil {
 				t.Fatal("Expected Assignment (not TupleAssignment), got nil")
 			}
 
-			if stmt.TupleAssignment != nil {
+			if stmt.Core.TupleAssignment != nil {
 				t.Fatal("Expected nil TupleAssignment, but got non-nil")
 			}
 
@@ -458,17 +458,17 @@ func TestTupleAssignment_IdentifierNamingPatterns(t *testing.T) {
 			}
 
 			stmt := script.Statements[0]
-			if stmt.TupleAssignment == nil {
+			if stmt.Core.TupleAssignment == nil {
 				t.Fatal("Expected TupleAssignment, got nil")
 			}
 
-			if len(stmt.TupleAssignment.Names) != len(tt.expectedNames) {
-				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.TupleAssignment.Names))
+			if len(stmt.Core.TupleAssignment.Names) != len(tt.expectedNames) {
+				t.Fatalf("Expected %d names, got %d", len(tt.expectedNames), len(stmt.Core.TupleAssignment.Names))
 			}
 
 			for i, expected := range tt.expectedNames {
-				if stmt.TupleAssignment.Names[i] != expected {
-					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.TupleAssignment.Names[i])
+				if stmt.Core.TupleAssignment.Names[i] != expected {
+					t.Errorf("Expected name[%d] '%s', got '%s'", i, expected, stmt.Core.TupleAssignment.Names[i])
 				}
 			}
 		})

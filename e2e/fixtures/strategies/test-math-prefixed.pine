@@ -1,0 +1,30 @@
+//@version=5
+indicator("Math Prefixed Functions", overlay=false)
+
+// Variable assignments - prefixed unary
+a = math.abs(close - open)
+b = math.sqrt(close)
+c = math.floor(close)
+d = math.ceil(close)
+e = math.round(close)
+f = math.log(close)
+g = math.log10(close)
+h = math.exp(close)
+i = math.sign(close)
+
+// Variable assignments - prefixed binary
+j = math.pow(close, 2.0)
+k = math.max(high, low)
+l = math.min(high, low)
+
+// Variable assignments - prefixed trig
+m = math.sin(close)
+n = math.cos(close)
+o = math.tan(close)
+p = math.asin(close)
+q = math.acos(close)
+r = math.atan(close)
+
+plot(a, "abs")
+plot(j, "pow")
+plot(k, "max")

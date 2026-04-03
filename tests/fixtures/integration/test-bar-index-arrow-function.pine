@@ -1,0 +1,22 @@
+//@version=5
+indicator("bar_index in Arrow Functions", overlay=false)
+
+// Tests bar_index historical access inside arrow function contexts
+// Arrow functions are used in ta.* callbacks (ta.sma, ta.ema, ta.highest, etc.)
+
+// Test 1: bar_index[N] inside ta.highest callback
+highestBarPrev = ta.highest(bar_index[1], 5)
+
+// Test 2: bar_index[N] inside ta.lowest callback
+lowestBarPrev = ta.lowest(bar_index[2], 5)
+
+// Test 3: Current bar_index in arrow function (baseline)
+highestBarCurrent = ta.highest(bar_index, 5)
+
+// Test 4: bar_index[N] difference in arrow context
+barDiffInArrow = ta.sma(bar_index - nz(bar_index[1]), 5)
+
+plot(highestBarPrev, "Highest bar_index[1]", color=color.blue)
+plot(lowestBarPrev, "Lowest bar_index[2]", color=color.green)
+plot(highestBarCurrent, "Highest bar_index", color=color.orange)
+plot(barDiffInArrow, "SMA of bar diff", color=color.red)

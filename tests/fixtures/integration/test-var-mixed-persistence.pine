@@ -1,0 +1,9 @@
+//@version=5
+indicator("Var Mixed Persistence", overlay=false)
+
+var cumVol = 0.0
+delta = close - open
+cumVol := cumVol + volume
+
+plot(cumVol, "Cumulative Volume")
+plot(delta, "Delta")

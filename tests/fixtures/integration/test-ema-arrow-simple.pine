@@ -1,0 +1,7 @@
+//@version=5
+indicator("Test EMA Arrow", overlay=false)
+
+calcEMA(src) => ta.ema(src, 14)
+ema14 = calcEMA(close)
+
+plot(ema14, "EMA 14")

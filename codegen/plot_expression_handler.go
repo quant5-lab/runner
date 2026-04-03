@@ -86,22 +86,33 @@ func (h *PlotExpressionHandler) handleConditional(expr *ast.ConditionalExpressio
 }
 
 func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (string, error) {
+	/* Check if call was hoisted by InlineExpressionScanner */
+	if hoistedVarName := h.generator.tempVarMgr.GetVarNameForCall(call); hoistedVarName != "" {
+		return fmt.Sprintf("%sSeries.Get(0)", hoistedVarName), nil
+	}
+
 	funcName := h.generator.extractFunctionName(call.Callee)
+
+	/* User-defined functions take precedence over built-in TA names */
+	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {
+		return h.generator.callRouter.RouteCall(h.generator, call)
+	}
 
 	if funcName == "ta.atr" || funcName == "atr" {
 		return h.HandleATRFunction(call, funcName)
+	}
+
+	if h.mathHandler.CanHandle(funcName) {
+		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
 	}
 
 	if h.taRegistry.IsSupported(funcName) {
 		return h.HandleTAFunction(call, funcName)
 	}
 
-	if h.isMathFunction(funcName) {
-		return h.mathHandler.GenerateMathCall(funcName, call.Arguments, h.generator)
-	}
-
-	if varType, exists := h.generator.variables[funcName]; exists && varType == "function" {
-		return h.generator.callRouter.RouteCall(h.generator, call)
+	/* Check ValueHandler for nz, fixnan, etc. */
+	if h.generator.valueHandler.CanHandle(funcName) {
+		return h.generator.valueHandler.GenerateInlineCall(funcName, call.Arguments, h.generator)
 	}
 
 	return "", fmt.Errorf("unsupported inline function in plot: %s", funcName)
@@ -112,27 +123,27 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 		return "", fmt.Errorf("%s requires at least 2 arguments (source, period)", funcName)
 	}
 
-	sourceExpr := h.generator.extractSeriesExpression(call.Arguments[0])
-	classifier := NewSeriesSourceClassifier()
-	sourceInfo := classifier.Classify(sourceExpr)
-	accessor := CreateAccessGenerator(sourceInfo)
-
-	periodArg, ok := call.Arguments[1].(*ast.Literal)
-	if !ok {
-		return "", fmt.Errorf("%s period must be literal", funcName)
-	}
-
-	period, err := h.extractPeriod(periodArg)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", funcName, err)
-	}
-
 	if !strings.HasPrefix(funcName, "ta.") {
 		funcName = "ta." + funcName
 	}
 
+	sourceExpr, periodResult := extractTAArgumentsWithDynamic(h.generator, call, funcName)
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("%s: %s", funcName, periodResult.FailureReason)
+	}
+
+	if periodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("inline plot() with runtime dynamic period not supported for %s", funcName)
+	}
+
+	period := periodResult.StaticValue
+	sourceExprStr := h.generator.extractSeriesExpression(sourceExpr)
+	classifier := NewSeriesSourceClassifier()
+	sourceInfo := classifier.Classify(sourceExprStr)
+	accessor := CreateAccessGenerator(sourceInfo)
+
 	hasher := &ExpressionHasher{}
-	sourceHash := hasher.Hash(call.Arguments[0])
+	sourceHash := hasher.Hash(sourceExpr)
 
 	code, ok := h.taRegistry.Generate(funcName, accessor, NewConstantPeriod(period), sourceHash)
 	if !ok {
@@ -143,22 +154,16 @@ func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcN
 }
 
 func (h *PlotExpressionHandler) HandleATRFunction(call *ast.CallExpression, funcName string) (string, error) {
-	if len(call.Arguments) < 1 {
-		return "", fmt.Errorf("%s requires 1 argument (period)", funcName)
+	periodResult := extractSinglePeriodWithDynamic(h.generator, call, "ta.atr")
+	if periodResult.IsFailed() {
+		return "", fmt.Errorf("ta.atr: %s", periodResult.FailureReason)
 	}
 
-	periodArg, ok := call.Arguments[0].(*ast.Literal)
-	if !ok {
-		return "", fmt.Errorf("%s period must be literal", funcName)
-	}
-
-	_, err := h.extractPeriod(periodArg)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", funcName, err)
+	if periodResult.IsRuntimeDynamic() {
+		return "", fmt.Errorf("inline plot() with runtime dynamic period not supported for ta.atr")
 	}
 
 	argHash := h.generator.exprAnalyzer.ComputeArgHash(call)
-
 	callInfo := CallInfo{
 		Call:     call,
 		FuncName: "ta.atr",
@@ -178,8 +183,4 @@ func (h *PlotExpressionHandler) extractPeriod(arg *ast.Literal) (int, error) {
 	default:
 		return 0, fmt.Errorf("period must be numeric")
 	}
-}
-
-func (h *PlotExpressionHandler) isMathFunction(funcName string) bool {
-	return funcName == "math.abs" || funcName == "math.max" || funcName == "math.min"
 }

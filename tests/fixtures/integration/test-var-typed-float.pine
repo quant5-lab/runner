@@ -1,0 +1,7 @@
+//@version=5
+indicator("Var Typed Float", overlay=false)
+
+var float runSum = 0.0
+runSum := runSum + close
+
+plot(runSum, "Running Sum")

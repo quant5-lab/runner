@@ -1,0 +1,28 @@
+//@version=5
+strategy("Unprefixed Math Functions Test", overlay=false)
+
+// Test commonly used unprefixed variants
+abs_unprefixed = abs(close - open)
+max_unprefixed = max(close, open)
+min_unprefixed = min(close, open)
+
+// Mix prefixed and unprefixed in same expression
+mixed_expr = abs(close - open) + math.max(high, low)
+nested_mixed = math.sqrt(math.pow(abs(close - open), 2) + math.pow(high - low, 2))
+
+// Trading logic with unprefixed
+range_val = abs(high - low)
+mid_point = (max(close, open) + min(close, open)) / 2
+is_bullish = close > mid_point
+
+longCondition = is_bullish and range_val > ta.sma(range_val, 20)
+shortCondition = not is_bullish and range_val > ta.sma(range_val, 20)
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+plot(abs_unprefixed, "Abs", color.blue)
+plot(max_unprefixed, "Max", color.green)
+plot(min_unprefixed, "Min", color.red)

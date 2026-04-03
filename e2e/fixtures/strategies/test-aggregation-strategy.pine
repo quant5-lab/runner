@@ -1,0 +1,32 @@
+//@version=5
+strategy("Aggregation Functions Strategy", overlay=true)
+
+// Use aggregation functions to create trading signals
+period = 20
+
+// Calculate statistical measures
+median_price = ta.median(close, period)
+max_price = ta.max(close, period)
+min_price = ta.min(close, period)
+range_price = ta.range(close, period)
+variance_price = ta.variance(close, period)
+
+// Volatility indicator from variance
+volatility = math.sqrt(variance_price)
+
+// Signal: Buy when close near min and volatility is low
+buy_signal = close < (min_price + range_price * 0.2) and volatility < ta.sma(volatility, 50)
+
+// Signal: Sell when close near max
+sell_signal = close > (max_price - range_price * 0.2)
+
+if buy_signal
+    strategy.entry("Long", strategy.long)
+
+if sell_signal
+    strategy.close("Long")
+
+plot(median_price, "Median", color=color.blue)
+plot(max_price, "Max", color=color.red)
+plot(min_price, "Min", color=color.green)
+plot(volatility, "Volatility", color=color.orange)

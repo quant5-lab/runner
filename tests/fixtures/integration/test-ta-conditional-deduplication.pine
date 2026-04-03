@@ -1,0 +1,8 @@
+//@version=5
+indicator("TA in Conditional - Deduplication Test", overlay=false)
+
+// Test stateful TA functions in ternary branches emit once
+condition = close > open
+result = condition ? ta.rsi(close, 14) : ta.rsi(close, 14) + 10
+
+plot(result, "RSI Result", color=color.blue)

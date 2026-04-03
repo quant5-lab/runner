@@ -1,0 +1,6 @@
+//@version=5
+indicator("HMA Basic", overlay=false)
+
+h = ta.hma(close, 16)
+
+plot(h, "HMA")

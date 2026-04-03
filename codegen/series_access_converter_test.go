@@ -64,9 +64,13 @@ func TestSeriesAccessConverter(t *testing.T) {
 			field string
 			want  string
 		}{
-			{"close", "ctx.Data[i-0].Close"},
-			{"high", "ctx.Data[i-0].High"},
-			{"volume", "ctx.Data[i-0].Volume"},
+			{"close", "closeSeries.Get(0)"},
+			{"high", "highSeries.Get(0)"},
+			{"volume", "volumeSeries.Get(0)"},
+			{"hl2", "(highSeries.Get(0) + lowSeries.Get(0)) / 2"},
+			{"hlc3", "(highSeries.Get(0) + lowSeries.Get(0) + closeSeries.Get(0)) / 3"},
+			{"ohlc4", "(openSeries.Get(0) + highSeries.Get(0) + lowSeries.Get(0) + closeSeries.Get(0)) / 4"},
+			{"hlcc4", "(highSeries.Get(0) + lowSeries.Get(0) + closeSeries.Get(0) + closeSeries.Get(0)) / 4"},
 		}
 
 		for _, tt := range tests {

@@ -1,0 +1,24 @@
+//@version=5
+indicator("bar_index Modulo Test", overlay=false)
+
+// Pattern: Test modulo operations with bar_index
+// These patterns are common in strategies for periodic actions
+
+// Modulo 5 - cycles 0,1,2,3,4,0,1...
+mod5 = bar_index % 5
+
+// Modulo 10 - useful for every-10-bars logic
+mod10 = bar_index % 10
+
+// Modulo 20 - bb9 pattern: security(syminfo.tickerid, "1D", (bar_index % 20) == 0)
+mod20 = bar_index % 20
+
+// Boolean conditions based on modulo
+every5th = (bar_index % 5) == 0 ? 1 : 0
+every20th = (bar_index % 20) == 0 ? 1 : 0
+
+plot(mod5, "Mod 5", color=color.blue)
+plot(mod10, "Mod 10", color=color.green)
+plot(mod20, "Mod 20", color=color.orange)
+plot(every5th, "Every 5th Bar", color=color.red)
+plot(every20th, "Every 20th Bar", color=color.purple)

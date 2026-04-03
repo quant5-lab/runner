@@ -1,0 +1,29 @@
+//@version=5
+indicator("Test ta.max ta.min", overlay=false)
+
+// Test max over different periods
+max5 = ta.max(close, 5)
+max10 = ta.max(close, 10)
+max20 = ta.max(close, 20)
+
+// Test min over different periods
+min5 = ta.min(close, 5)
+min10 = ta.min(close, 10)
+min20 = ta.min(close, 20)
+
+// Test with high/low sources
+maxHigh = ta.max(high, 10)
+minLow = ta.min(low, 10)
+
+// Test range calculation
+range10 = ta.range(close, 10)
+
+// Verify max >= value >= min
+above_min = close >= min10
+below_max = close <= max10
+
+plot(max5, "Max 5", color=color.red)
+plot(min5, "Min 5", color=color.green)
+plot(max10, "Max 10", color=color.orange)
+plot(min10, "Min 10", color=color.blue)
+plot(range10, "Range 10", color=color.purple)

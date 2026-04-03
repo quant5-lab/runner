@@ -1,0 +1,72 @@
+{
+  "version": "1.0",
+  "strategy": "Moon Phases Strategy [LuxAlgo]",
+  "dataSource": "AAPL-M.json",
+  "generatedAt": "2026-03-26T18:41:21Z",
+  "result": {
+    "trades": [
+      {
+        "entryId": "Long",
+        "entryBar": 2,
+        "entryTime": 1614956400,
+        "entryPrice": 100.68297822842358,
+        "entryComment": "",
+        "exitBar": 33,
+        "exitTime": 1695308400,
+        "exitPrice": 101.37483373741931,
+        "exitComment": "",
+        "size": 1,
+        "profit": 0.6918555089957295,
+        "direction": "long"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 33,
+        "entryTime": 1695308400,
+        "entryPrice": 101.37483373741931,
+        "entryComment": "",
+        "exitBar": 65,
+        "exitTime": 1778252400,
+        "exitPrice": 101.10262505231192,
+        "exitComment": "",
+        "size": 1,
+        "profit": 0.2722086851073868,
+        "direction": "short"
+      },
+      {
+        "entryId": "Long",
+        "entryBar": 65,
+        "entryTime": 1778252400,
+        "entryPrice": 101.10262505231192,
+        "entryComment": "",
+        "exitBar": 96,
+        "exitTime": 1858604400,
+        "exitPrice": 101.81820464543694,
+        "exitComment": "",
+        "size": 1,
+        "profit": 0.715579593125014,
+        "direction": "long"
+      }
+    ],
+    "openTrades": [
+      {
+        "entryId": "Short",
+        "entryBar": 96,
+        "entryTime": 1858604400,
+        "entryPrice": 101.81820464543694,
+        "entryComment": "",
+        "exitBar": 0,
+        "exitTime": 0,
+        "exitPrice": 0,
+        "exitComment": "",
+        "size": 1,
+        "profit": 0,
+        "direction": "short"
+      }
+    ],
+    "equity": 10002.203169318836,
+    "netProfit": 1.6796437872281302,
+    "totalTrades": 0,
+    "plots": {}
+  }
+}

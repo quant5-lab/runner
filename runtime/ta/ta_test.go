@@ -193,3 +193,175 @@ func TestStoch(t *testing.T) {
 		}
 	}
 }
+
+func TestCum(t *testing.T) {
+	source := []float64{1, 2, 3, 4, 5}
+	result := Cum(source)
+
+	if len(result) != len(source) {
+		t.Fatalf("Cum length = %d, want %d", len(result), len(source))
+	}
+
+	expected := []float64{1, 3, 6, 10, 15}
+	if !floatSliceEqual(result, expected, 0.0001) {
+		t.Errorf("Cum = %v, want %v", result, expected)
+	}
+
+	if math.Abs(result[0]-1.0) > 0.0001 {
+		t.Errorf("Cum[0] = %f, want 1.0", result[0])
+	}
+
+	if math.Abs(result[4]-15.0) > 0.0001 {
+		t.Errorf("Cum[4] = %f, want 15.0", result[4])
+	}
+}
+
+func TestCum_NaNHandling(t *testing.T) {
+	source := []float64{1, math.NaN(), 3, 4}
+	result := Cum(source)
+
+	if len(result) != len(source) {
+		t.Fatalf("Cum length = %d, want %d", len(result), len(source))
+	}
+
+	if !math.IsNaN(result[1]) {
+		t.Errorf("Cum[1] should be NaN when source[1] is NaN, got %f", result[1])
+	}
+
+	if math.Abs(result[0]-1.0) > 0.0001 {
+		t.Errorf("Cum[0] = %f, want 1.0", result[0])
+	}
+
+	if math.Abs(result[2]-4.0) > 0.0001 {
+		t.Errorf("Cum[2] = %f, want 4.0 (cumsum continues after NaN)", result[2])
+	}
+
+	if math.Abs(result[3]-8.0) > 0.0001 {
+		t.Errorf("Cum[3] = %f, want 8.0", result[3])
+	}
+}
+
+func TestCum_EdgeCases(t *testing.T) {
+	t.Run("empty_slice", func(t *testing.T) {
+		source := []float64{}
+		result := Cum(source)
+
+		if len(result) != 0 {
+			t.Errorf("Cum of empty slice should be empty, got length %d", len(result))
+		}
+	})
+
+	t.Run("single_value", func(t *testing.T) {
+		source := []float64{5.5}
+		result := Cum(source)
+
+		if len(result) != 1 {
+			t.Fatalf("Cum length = %d, want 1", len(result))
+		}
+
+		if math.Abs(result[0]-5.5) > 0.0001 {
+			t.Errorf("Cum[0] = %f, want 5.5", result[0])
+		}
+	})
+
+	t.Run("all_nan", func(t *testing.T) {
+		source := []float64{math.NaN(), math.NaN(), math.NaN()}
+		result := Cum(source)
+
+		for i := range result {
+			if !math.IsNaN(result[i]) {
+				t.Errorf("Cum[%d] should be NaN, got %f", i, result[i])
+			}
+		}
+	})
+
+	t.Run("leading_nan", func(t *testing.T) {
+		source := []float64{math.NaN(), math.NaN(), 1, 2}
+		result := Cum(source)
+
+		if !math.IsNaN(result[0]) || !math.IsNaN(result[1]) {
+			t.Error("Leading NaN values should remain NaN")
+		}
+
+		if math.Abs(result[2]-1.0) > 0.0001 {
+			t.Errorf("Cum[2] = %f, want 1.0 (first non-NaN starts accumulation)", result[2])
+		}
+
+		if math.Abs(result[3]-3.0) > 0.0001 {
+			t.Errorf("Cum[3] = %f, want 3.0", result[3])
+		}
+	})
+
+	t.Run("trailing_nan", func(t *testing.T) {
+		source := []float64{1, 2, math.NaN(), math.NaN()}
+		result := Cum(source)
+
+		if math.Abs(result[0]-1.0) > 0.0001 || math.Abs(result[1]-3.0) > 0.0001 {
+			t.Error("Non-NaN values should accumulate correctly")
+		}
+
+		if !math.IsNaN(result[2]) || !math.IsNaN(result[3]) {
+			t.Error("Trailing NaN values should remain NaN")
+		}
+	})
+}
+
+func TestCum_SignedValues(t *testing.T) {
+	t.Run("mixed_signs", func(t *testing.T) {
+		source := []float64{10, -5, 3, -2, 7}
+		result := Cum(source)
+
+		expected := []float64{10, 5, 8, 6, 13}
+		if !floatSliceEqual(result, expected, 0.0001) {
+			t.Errorf("Cum = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("all_negative", func(t *testing.T) {
+		source := []float64{-1, -2, -3}
+		result := Cum(source)
+
+		expected := []float64{-1, -3, -6}
+		if !floatSliceEqual(result, expected, 0.0001) {
+			t.Errorf("Cum = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("zeros", func(t *testing.T) {
+		source := []float64{0, 0, 5, 0}
+		result := Cum(source)
+
+		expected := []float64{0, 0, 5, 5}
+		if !floatSliceEqual(result, expected, 0.0001) {
+			t.Errorf("Cum = %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestCum_LargeDataset(t *testing.T) {
+	source := make([]float64, 1000)
+	for i := range source {
+		source[i] = 1.0
+	}
+
+	result := Cum(source)
+
+	if len(result) != len(source) {
+		t.Fatalf("Cum length = %d, want %d", len(result), len(source))
+	}
+
+	if math.Abs(result[0]-1.0) > 0.0001 {
+		t.Errorf("Cum[0] = %f, want 1.0", result[0])
+	}
+
+	if math.Abs(result[999]-1000.0) > 0.01 {
+		t.Errorf("Cum[999] = %f, want 1000.0", result[999])
+	}
+
+	for i := 1; i < len(result); i++ {
+		if result[i] < result[i-1] {
+			t.Errorf("Cum should be monotonic increasing, but result[%d]=%f < result[%d]=%f", i, result[i], i-1, result[i-1])
+			break
+		}
+	}
+}
