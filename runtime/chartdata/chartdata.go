@@ -51,6 +51,7 @@ type UIConfig struct {
 /* Trade represents a closed trade in chart data */
 type Trade struct {
 	EntryID      string  `json:"entryId"`
+	ExitID       string  `json:"exitId,omitempty"`
 	EntryPrice   float64 `json:"entryPrice"`
 	EntryBar     int     `json:"entryBar"`
 	EntryTime    int64   `json:"entryTime"`
@@ -96,7 +97,7 @@ func (p PlotPoint) MarshalJSON() ([]byte, error) {
 	type Alias PlotPoint
 	var value interface{}
 	if math.IsNaN(p.Value) || math.IsInf(p.Value, 0) {
-		value = nil // Encode as JSON null
+		value = nil
 	} else {
 		value = p.Value
 	}
@@ -147,8 +148,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 		Indicators:  make(map[string]IndicatorSeries),
 		UI: UIConfig{
 			Panes: map[string]PaneConfig{
-				"main":      {Height: 400, Fixed: true},
-				"indicator": {Height: 200, Fixed: false},
+				"main": {Height: 400, Fixed: true},
 			},
 		},
 	}
@@ -247,6 +247,7 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	for i, t := range closedTrades {
 		trades[i] = Trade{
 			EntryID:      t.EntryID,
+			ExitID:       t.ExitID,
 			EntryPrice:   t.EntryPrice,
 			EntryBar:     t.EntryBar,
 			EntryTime:    t.EntryTime,
@@ -283,8 +284,6 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	}
 }
 
-/* ToJSON converts chart data to JSON bytes, with NaN as null */
 func (cd *ChartData) ToJSON() ([]byte, error) {
-	// PlotPoint.MarshalJSON automatically converts NaN to null
 	return json.MarshalIndent(cd, "", "  ")
 }

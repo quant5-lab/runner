@@ -649,3 +649,203 @@ func TestTradeCommentOmitEmpty(t *testing.T) {
 		t.Error("Trade should not have exitComment field (omitempty)")
 	}
 }
+
+/* TestNewChartData_UIConfigInitialPanes verifies that only the main pane is pre-declared — dynamic panes are resolved from indicator data at render time */
+func TestNewChartData_UIConfigInitialPanes(t *testing.T) {
+	ctx := context.New("TEST", "1h", 1)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	mainPane, hasMain := cd.UI.Panes["main"]
+	if !hasMain {
+		t.Fatal("UIConfig.Panes must contain 'main'")
+	}
+	if mainPane.Height != 400 {
+		t.Errorf("main pane height: want 400, got %d", mainPane.Height)
+	}
+	if !mainPane.Fixed {
+		t.Error("main pane must have Fixed=true")
+	}
+	if len(cd.UI.Panes) != 1 {
+		t.Errorf("NewChartData should pre-declare exactly 1 pane, got %d: %v", len(cd.UI.Panes), cd.UI.Panes)
+	}
+}
+
+/* TestNewChartData_UIConfigInitialPanesPreservedAfterAddPlots verifies that AddPlots does not mutate UIConfig.Panes — pane layout is the caller's responsibility */
+func TestNewChartData_UIConfigInitialPanesPreservedAfterAddPlots(t *testing.T) {
+	ctx := context.New("TEST", "1h", 1)
+	cd := NewChartData(ctx, "TEST", "1h", "")
+
+	collector := output.NewCollector()
+	now := clock.Now().Unix()
+	collector.Add("RSI", now, 50.0, map[string]interface{}{"pane": "indicator"})
+	collector.Add("MACD", now, 1.5, map[string]interface{}{"pane": "oscillator"})
+	cd.AddPlots(collector)
+
+	if len(cd.UI.Panes) != 1 {
+		t.Errorf("AddPlots must not add entries to UIConfig.Panes, got %d panes: %v", len(cd.UI.Panes), cd.UI.Panes)
+	}
+	if _, ok := cd.UI.Panes["main"]; !ok {
+		t.Error("'main' pane must still be present after AddPlots")
+	}
+}
+
+/* TestTrade_ExitIDSerializationContract verifies omitempty behaviour: non-empty ExitID appears in JSON; empty string is absent */
+func TestTrade_ExitIDSerializationContract(t *testing.T) {
+	tests := []struct {
+		name       string
+		exitID     string
+		wantInJSON bool
+	}{
+		{"non-empty exitId emitted", "take_profit", true},
+		{"single-char exitId emitted", "x", true},
+		{"numeric-style exitId emitted", "exit_123", true},
+		{"empty exitId omitted", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			trade := Trade{
+				EntryID:   "entry_sig",
+				ExitID:    tt.exitID,
+				Direction: "long",
+				Size:      1.0,
+			}
+
+			b, err := json.Marshal(trade)
+			if err != nil {
+				t.Fatalf("json.Marshal failed: %v", err)
+			}
+
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(b, &parsed); err != nil {
+				t.Fatalf("json.Unmarshal failed: %v", err)
+			}
+
+			_, present := parsed["exitId"]
+			if present != tt.wantInJSON {
+				if tt.wantInJSON {
+					t.Errorf("exitId=%q should appear in JSON but was absent", tt.exitID)
+				} else {
+					t.Errorf("exitId=%q should be omitted from JSON but was present", tt.exitID)
+				}
+			}
+
+			if tt.wantInJSON {
+				if parsed["exitId"] != tt.exitID {
+					t.Errorf("exitId: want %q, got %v", tt.exitID, parsed["exitId"])
+				}
+			}
+		})
+	}
+}
+
+/* TestAddStrategy_ClosedTradeIdentifierPropagation verifies that EntryID, ExitID, Direction, and comment fields are faithfully propagated through AddStrategy into JSON */
+func TestAddStrategy_ClosedTradeIdentifierPropagation(t *testing.T) {
+	tests := []struct {
+		name         string
+		entryID      string
+		exitID       string
+		direction    string
+		entryComment string
+		exitComment  string
+		useCloseAll  bool
+	}{
+		{
+			name:         "long trade with both IDs and comments",
+			entryID:      "long_entry",
+			exitID:       "take_profit",
+			direction:    strategy.Long,
+			entryComment: "breakout signal",
+			exitComment:  "target reached",
+		},
+		{
+			name:         "short trade with IDs, no comments",
+			entryID:      "short_entry",
+			exitID:       "stop_loss",
+			direction:    strategy.Short,
+			entryComment: "",
+			exitComment:  "",
+		},
+		{
+			name:        "trade closed via CloseAll has no exit ID in JSON",
+			entryID:     "signal_a",
+			exitID:      "",
+			direction:   strategy.Long,
+			useCloseAll: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.New("TEST", "1h", 5)
+			cd := NewChartData(ctx, "TEST", "1h", "")
+
+			strat := strategy.NewStrategy()
+			strat.CallWithPyramiding("test", 10000, 0)
+
+			strat.Entry(tt.entryID, tt.direction, 10, tt.entryComment)
+			strat.OnBarUpdate(1, 100, 1000)
+
+			switch {
+			case tt.useCloseAll:
+				strat.CloseAll(110, 2000, tt.exitComment)
+			case tt.exitID != "":
+				strat.Exit(tt.exitID, tt.entryID, 110, 2000, tt.exitComment)
+			default:
+				strat.Close(tt.entryID, 110, 2000, tt.exitComment)
+			}
+			strat.OnBarUpdate(2, 110, 2000)
+
+			cd.AddStrategy(strat, 110)
+
+			if cd.Strategy == nil || len(cd.Strategy.Trades) != 1 {
+				t.Fatalf("expected 1 closed trade")
+			}
+
+			trade := cd.Strategy.Trades[0]
+
+			if trade.EntryID != tt.entryID {
+				t.Errorf("EntryID: want %q, got %q", tt.entryID, trade.EntryID)
+			}
+			if trade.Direction != tt.direction {
+				t.Errorf("Direction: want %q, got %q", tt.direction, trade.Direction)
+			}
+			if trade.EntryComment != tt.entryComment {
+				t.Errorf("EntryComment: want %q, got %q", tt.entryComment, trade.EntryComment)
+			}
+			if trade.ExitComment != tt.exitComment {
+				t.Errorf("ExitComment: want %q, got %q", tt.exitComment, trade.ExitComment)
+			}
+
+			if tt.exitID != "" && trade.ExitID != tt.exitID {
+				t.Errorf("ExitID: want %q, got %q", tt.exitID, trade.ExitID)
+			}
+
+			b, err := json.Marshal(cd.Strategy.Trades)
+			if err != nil {
+				t.Fatalf("json.Marshal failed: %v", err)
+			}
+			var parsed []map[string]interface{}
+			if err := json.Unmarshal(b, &parsed); err != nil {
+				t.Fatalf("json.Unmarshal failed: %v", err)
+			}
+			j := parsed[0]
+
+			if j["entryId"] != tt.entryID {
+				t.Errorf("JSON entryId: want %q, got %v", tt.entryID, j["entryId"])
+			}
+			if j["direction"] != tt.direction {
+				t.Errorf("JSON direction: want %q, got %v", tt.direction, j["direction"])
+			}
+			if tt.exitID != "" {
+				if j["exitId"] != tt.exitID {
+					t.Errorf("JSON exitId: want %q, got %v", tt.exitID, j["exitId"])
+				}
+			} else {
+				if _, present := j["exitId"]; present {
+					t.Errorf("JSON exitId should be absent when empty, but was present")
+				}
+			}
+		})
+	}
+}

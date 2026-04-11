@@ -230,3 +230,5 @@ testdata/*-output.json
 # Contribot
 contribot.*.json
 transcripts/
+
+.playwright-cli
