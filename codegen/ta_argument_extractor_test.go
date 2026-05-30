@@ -770,8 +770,8 @@ func TestTAArgumentExtractor_ExtractWithDynamic_BuiltinHandling(t *testing.T) {
 			if result.AccessGen == nil {
 				t.Fatal("AccessGen should not be nil")
 			}
-			if _, ok := result.AccessGen.(*TrueRangeAccessGenerator); !ok {
-				t.Errorf("AccessGen = %T, want *TrueRangeAccessGenerator", result.AccessGen)
+			if _, ok := result.AccessGen.(*BuiltinTrueRangeAccessor); !ok {
+				t.Errorf("AccessGen = %T, want *BuiltinTrueRangeAccessor", result.AccessGen)
 			}
 			if !result.NeedsNaNCheck {
 				t.Error("NeedsNaNCheck = false, want true: ta.tr needs NaN check")

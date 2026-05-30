@@ -398,3 +398,49 @@ plot(close, color=color.new(color.blue, 50))
 		}
 	}
 }
+
+func TestColorConstants_NamespaceGuard(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+	}{
+		{
+			name: "color.* in simple conditional assignment",
+			script: `//@version=5
+indicator("Color Guard")
+bclr = close > open ? color.lime : color.red
+barcolor(bclr)
+`,
+		},
+		{
+			name: "color.* in nested conditional (else-if)",
+			script: `//@version=5
+indicator("Color Guard Nested")
+bclr = close > close[1] ? color.lime : (close < close[1] ? color.red : color.gray)
+barcolor(bclr)
+`,
+		},
+		{
+			name: "color.* assigned to variable then used in barcolor",
+			script: `//@version=5
+indicator("Color Var")
+upColor = color.green
+downColor = color.red
+bclr = close >= open ? upColor : downColor
+barcolor(bclr)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, err := compilePineScript(tt.script)
+			if err != nil {
+				t.Fatalf("compile failed: %v", err)
+			}
+			if strings.Contains(code, "colorSeries") {
+				t.Errorf("generated code contains undefined 'colorSeries':\n%s", code)
+			}
+		})
+	}
+}

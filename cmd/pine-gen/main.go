@@ -118,6 +118,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	reportFeatureGaps(strategyCode.FeatureGaps)
+
 	temporaryDirectory := os.TempDir()
 
 	/* Create unique temp file to avoid conflicts when running tests in parallel */
@@ -139,6 +141,16 @@ func main() {
 	fmt.Printf("Generated: %s\n", temporaryGoFile)
 	fmt.Printf("AST size: %d bytes\n", len(astJSON))
 	fmt.Printf("Next: Compile with: go build -o %s %s\n", *outputFlag, temporaryGoFile)
+}
+
+func reportFeatureGaps(gaps []string) {
+	if len(gaps) == 0 {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "WARNING: %d unimplemented Pine function(s) — binary runs with stubs:\n", len(gaps))
+	for _, name := range gaps {
+		fmt.Fprintf(os.Stderr, "  - %s()\n", name)
+	}
 }
 
 func deriveStrategyNameFromSourceFile(inputPath string) string {

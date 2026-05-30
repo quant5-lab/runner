@@ -28,8 +28,12 @@ const standardData = barsArray.map(bar => ({
 // If metadata file is provided, add timezone to the output
 if (metadataFile && fs.existsSync(metadataFile)) {
     const metadata = JSON.parse(fs.readFileSync(metadataFile, 'utf8'));
+    const symbol = String(metadata.symbol || '').toUpperCase();
+    const provider = String(metadata.provider || '').toLowerCase();
+    const isMoex = provider.includes('moex') || ['SBERP', 'SBER', 'GAZP', 'LKOH', 'YNDX', 'CNRU'].includes(symbol);
     const outputWithMetadata = {
         timezone: metadata.timezone || 'UTC',
+        referenceSession: isMoex ? 'regular' : 'always-open',
         bars: standardData
     };
     fs.writeFileSync(outputFile, JSON.stringify(outputWithMetadata, null, 2));
@@ -38,4 +42,3 @@ if (metadataFile && fs.existsSync(metadataFile)) {
     fs.writeFileSync(outputFile, JSON.stringify(standardData, null, 2));
     console.log(`Converted ${standardData.length} bars: ${inputFile} → ${outputFile}`);
 }
-

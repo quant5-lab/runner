@@ -34,11 +34,13 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				Right:    &ast.Identifier{Name: "fullmoon"},
 			},
 			mustHave: []string{
+				"func() float64",
 				"value.IsTrue(newmoonSeries.GetCurrent())",
 				"||",
 				"value.IsTrue(fullmoonSeries.GetCurrent())",
+				"return 1.0",
 			},
-			mustNot: []string{"or", "0.0"},
+			mustNot: []string{"or"},
 		},
 		{
 			name: "simple and expression",
@@ -48,11 +50,13 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				Right:    &ast.Identifier{Name: "signal"},
 			},
 			mustHave: []string{
+				"func() float64",
 				"value.IsTrue(conditionSeries.GetCurrent())",
 				"&&",
 				"value.IsTrue(signalSeries.GetCurrent())",
+				"return 1.0",
 			},
-			mustNot: []string{"and", "0.0"},
+			mustNot: []string{"and"},
 		},
 		{
 			name: "nested or within and",
@@ -66,13 +70,14 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				Right: &ast.Identifier{Name: "condition"},
 			},
 			mustHave: []string{
+				"func() float64",
 				"value.IsTrue(newmoonSeries.GetCurrent())",
 				"||",
 				"value.IsTrue(fullmoonSeries.GetCurrent())",
 				"&&",
 				"value.IsTrue(conditionSeries.GetCurrent())",
 			},
-			mustNot: []string{"or", "and", "0.0"},
+			mustNot: []string{"or", "and"},
 		},
 		{
 			name: "nested and within or",
@@ -86,13 +91,14 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				},
 			},
 			mustHave: []string{
+				"func() float64",
 				"value.IsTrue(signalSeries.GetCurrent())",
 				"||",
 				"value.IsTrue(newmoonSeries.GetCurrent())",
 				"&&",
 				"value.IsTrue(fullmoonSeries.GetCurrent())",
 			},
-			mustNot: []string{"or", "and", "0.0"},
+			mustNot: []string{"or", "and"},
 		},
 		{
 			name: "logical with literal true",
@@ -158,6 +164,7 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				},
 			},
 			mustHave: []string{
+				"func() float64",
 				"value.IsTrue(newmoonSeries.GetCurrent())",
 				"&&",
 				"value.IsTrue(fullmoonSeries.GetCurrent())",
@@ -166,7 +173,7 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				"&&",
 				"value.IsTrue(signalSeries.GetCurrent())",
 			},
-			mustNot: []string{"or", "and", "0.0"},
+			mustNot: []string{"or", "and"},
 		},
 	}
 

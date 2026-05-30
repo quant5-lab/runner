@@ -133,6 +133,7 @@ dist/
 .pnp.*
 
 # Generated files
+chart-data.json
 out/chart-data.json
 out/chart-config.json
 out/e2e-*-output.json
@@ -232,3 +233,5 @@ contribot.*.json
 transcripts/
 
 .playwright-cli
+# Editor and tool artifacts
+*.backup

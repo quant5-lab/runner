@@ -101,6 +101,12 @@ func (g *generator) extractDefaultSeries(call *ast.CallExpression) string {
 		return "Series.GetCurrent()"
 	}
 	funcName := g.extractFunctionName(call.Callee)
+	isKnownTA := sharedTASignatures.Contains(funcName)
+	isMath := g.mathHandler.CanHandle(funcName)
+	if !isKnownTA && !isMath {
+		g.featureGaps = append(g.featureGaps, funcName)
+		return "math.NaN()"
+	}
 	varName := strings.ReplaceAll(funcName, ".", "_")
 	return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 }

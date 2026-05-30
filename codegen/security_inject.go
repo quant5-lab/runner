@@ -126,9 +126,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 	var codeBuilder strings.Builder
 
-	codeBuilder.WriteString("\n\t// request.security() Prefetch\n")
 	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
-	codeBuilder.WriteString("\t// Fetch and cache multi-timeframe data\n")
 
 	dedupMap := make(map[string][]resolvedSecurityCall)
 	for _, r := range resolved {
@@ -218,11 +216,25 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString("\t\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = baseSecurityBars + requiredWarmup\n", varName))
 		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %s, %s_limit)\n",
-			varName, varName, symbolCode, timeframeCode, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_marketData, %s_err := fetcher.FetchWithMetadata(%s, %s, 0)\n",
+			varName, varName, symbolCode, timeframeCode))
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_err != nil {\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %s, %s_err)\n", symbolCode, timeframeCode, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%v\\n\", %s, %s, %s_err)\n", symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString("\t\tos.Exit(1)\n")
+		codeBuilder.WriteString("\t}\n")
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_metadata := %s_marketData.SourceMetadata\n", varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\tif %s_metadata.ReferenceSession == \"\" {\n", varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_metadata.ReferenceSession = ctx.ReferenceSession\n", varName))
+		codeBuilder.WriteString("\t}\n")
+		codeBuilder.WriteString(fmt.Sprintf("\tif %s_metadata.Timezone == \"\" {\n", varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_metadata.Timezone = ctx.Timezone\n", varName))
+		codeBuilder.WriteString("\t}\n")
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_profile := market.NormalizeBarsWithMetadata(%s, %s, %s_metadata, %s_marketData.Bars)\n",
+			varName, varName, symbolCode, timeframeCode, varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\tif %s_limit > 0 && %s_limit < len(%s_data) {\n",
+			varName, varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_data = %s_data[len(%s_data)-%s_limit:]\n",
+			varName, varName, varName, varName))
 		codeBuilder.WriteString("\t}\n")
 
 		hasModifier := firstCall.modifierPrefix != ""
@@ -237,6 +249,8 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
 			varName, symbolCode, timeframeCode, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.Timezone = %s_profile.Timezone\n", varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.ReferenceSession = string(%s_profile.ReferenceSession)\n", varName, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")

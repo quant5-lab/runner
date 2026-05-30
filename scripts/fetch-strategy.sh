@@ -61,7 +61,7 @@ import('./fetchers/src/container.js').then(({ createContainer }) => {
       .then(result => {
         const fs = require('fs');
         fs.writeFileSync('$BINANCE_FILE', JSON.stringify(result.data, null, 2));
-        fs.writeFileSync('$METADATA_FILE', JSON.stringify({ timezone: result.timezone, provider: result.provider }, null, 2));
+        fs.writeFileSync('$METADATA_FILE', JSON.stringify({ symbol: '$SYMBOL', timezone: result.timezone, provider: result.provider }, null, 2));
         console.log('✓ Fetched ' + result.data.length + ' bars from ' + result.provider + ' (timezone: ' + result.timezone + ')');
       })
       .catch(err => {

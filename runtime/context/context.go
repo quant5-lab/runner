@@ -16,16 +16,17 @@ type OHLCV struct {
 }
 
 type Context struct {
-	Symbol     string
-	Timeframe  string
-	Timezone   string // Exchange timezone: "UTC" (Binance), "America/New_York" (NYSE/Yahoo), "Europe/Moscow" (MOEX)
-	Bars       int
-	Data       []OHLCV
-	BarIndex   int
-	IsMonthly  bool
-	IsDaily    bool
-	IsWeekly   bool
-	IsIntraday bool
+	Symbol           string
+	Timeframe        string
+	Timezone         string // Exchange timezone: "UTC" (Binance), "America/New_York" (NYSE/Yahoo), "Europe/Moscow" (MOEX)
+	ReferenceSession string
+	Bars             int
+	Data             []OHLCV
+	BarIndex         int
+	IsMonthly        bool
+	IsDaily          bool
+	IsWeekly         bool
+	IsIntraday       bool
 
 	parent           *Context
 	variableResolver VariableResolver
@@ -34,16 +35,17 @@ type Context struct {
 
 func New(symbol, timeframe string, bars int) *Context {
 	return &Context{
-		Symbol:     symbol,
-		Timeframe:  timeframe,
-		Timezone:   "UTC", // Default to UTC, should be set by provider
-		Bars:       bars,
-		Data:       make([]OHLCV, 0, bars),
-		BarIndex:   0,
-		IsMonthly:  IsMonthlyTimeframe(timeframe),
-		IsDaily:    IsDailyTimeframe(timeframe),
-		IsWeekly:   IsWeeklyTimeframe(timeframe),
-		IsIntraday: IsIntradayTimeframe(timeframe),
+		Symbol:           symbol,
+		Timeframe:        timeframe,
+		Timezone:         "UTC", // Default to UTC, should be set by provider
+		ReferenceSession: "always-open",
+		Bars:             bars,
+		Data:             make([]OHLCV, 0, bars),
+		BarIndex:         0,
+		IsMonthly:        IsMonthlyTimeframe(timeframe),
+		IsDaily:          IsDailyTimeframe(timeframe),
+		IsWeekly:         IsWeeklyTimeframe(timeframe),
+		IsIntraday:       IsIntradayTimeframe(timeframe),
 	}
 }
 

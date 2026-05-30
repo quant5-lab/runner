@@ -1,0 +1,12 @@
+//@version=4
+strategy("Security Daily SMA Comparison", overlay=true)
+
+sma_1d_20  = security(syminfo.tickerid, 'D', sma(close, 20))
+sma_1d_50  = security(syminfo.tickerid, 'D', sma(close, 50))
+sma_1d_200 = security(syminfo.tickerid, 'D', sma(close, 200))
+
+plot(sma_1d_20,  "SMA20_1D")
+plot(sma_1d_50,  "SMA50_1D")
+plot(sma_1d_200, "SMA200_1D")
+plot(sma_1d_20  > sma_1d_50  ? 1.0 : 0.0, "Bull20_50_1D")
+plot(sma_1d_50  > sma_1d_200 ? 1.0 : 0.0, "Bull50_200_1D")

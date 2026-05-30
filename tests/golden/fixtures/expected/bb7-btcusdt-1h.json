@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB7",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-01-21T07:51:45Z",
+  "generatedAt": "2026-05-29T20:55:08Z",
   "result": {
     "trades": [
       {
@@ -17,20 +17,6 @@
         "exitComment": "",
         "size": 8.47574132647725,
         "profit": -15943.462736996496,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 2181,
-        "entryTime": 1756551600,
-        "entryPrice": 108425.98,
-        "entryComment": "",
-        "exitBar": 2186,
-        "exitTime": 1756569600,
-        "exitPrice": 108869.98,
-        "exitComment": "",
-        "size": 9.222880971619443,
-        "profit": 4094.9591513990326,
         "direction": "long"
       },
       {
@@ -58,36 +44,8 @@
         "exitPrice": 85430.64,
         "exitComment": "",
         "size": 11.5409832433002,
-        "profit": -14046.4152955882,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 4557,
-        "entryTime": 1765105200,
-        "entryPrice": 89240.18,
-        "entryComment": "",
-        "exitBar": 4561,
-        "exitTime": 1765119600,
-        "exitPrice": 88220.53,
-        "exitComment": "",
-        "size": 11.205714735223529,
-        "profit": -11425.907029770606,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 4701,
-        "entryTime": 1765623600,
-        "entryPrice": 90595.14,
-        "entryComment": "",
-        "exitBar": 4731,
-        "exitTime": 1765731600,
-        "exitPrice": 88836.99,
-        "exitComment": "",
-        "size": 11.038120923277,
-        "profit": -19406.672301259394,
-        "direction": "long"
+        "profit": 14046.4152955882,
+        "direction": "short"
       },
       {
         "entryId": "BB entry",
@@ -100,8 +58,8 @@
         "exitPrice": 88003.63,
         "exitComment": "",
         "size": 11.41344958616544,
-        "profit": 4425.108539052276,
-        "direction": "long"
+        "profit": -4425.108539052276,
+        "direction": "short"
       }
     ],
     "openTrades": [
@@ -120,8 +78,8 @@
         "direction": "long"
       }
     ],
-    "equity": 1054042.0587338442,
-    "netProfit": 38408.946502762024,
+    "equity": 1100022.2924265468,
+    "netProfit": 84389.18019546484,
     "totalTrades": 0,
     "plots": {}
   }

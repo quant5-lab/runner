@@ -8,7 +8,16 @@ import (
 )
 
 type SecurityArgumentExtractor struct {
-	gen *generator
+	gen        *generator
+	arrowScope map[string]string
+}
+
+// WithArrowScope wires the arrow function parameter/local registry into the extractor
+// so that symbol identifiers that are arrow parameters resolve to the variable name
+// rather than being treated as string literals.
+func (e *SecurityArgumentExtractor) WithArrowScope(scope map[string]string) *SecurityArgumentExtractor {
+	e.arrowScope = scope
+	return e
 }
 
 type ExtractionResult struct {
@@ -40,6 +49,10 @@ func (e *SecurityArgumentExtractor) ExtractSymbol(expr ast.Expression) (*Extract
 			if varType, exists := e.gen.variables[exp.Name]; exists && varType == "string" {
 				return &ExtractionResult{Code: exp.Name, IsRuntime: true}, nil
 			}
+		}
+
+		if _, exists := e.arrowScope[exp.Name]; exists {
+			return &ExtractionResult{Code: exp.Name, IsRuntime: true}, nil
 		}
 
 		return &ExtractionResult{Code: fmt.Sprintf("%q", exp.Name), IsRuntime: false}, nil

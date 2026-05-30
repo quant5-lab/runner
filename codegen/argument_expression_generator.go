@@ -95,17 +95,20 @@ func (g *ArgumentExpressionGenerator) ensureFloat64(expr ast.Expression, code st
 }
 
 func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
-	if constVal, isConstant := g.generator.constants[id.Name]; isConstant {
-		if constVal == "input.source" {
-			return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
-		}
-		return id.Name, nil
-	}
-
 	expectsSeries := false
 	if g.signatureRegistry != nil {
 		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
 		expectsSeries = hasSignature && paramType == ParamTypeSeries
+	}
+
+	if constVal, isConstant := g.generator.constants[id.Name]; isConstant {
+		if constVal == "input.source" {
+			if expectsSeries {
+				return fmt.Sprintf("%sSeries", id.Name), nil
+			}
+			return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
+		}
+		return id.Name, nil
 	}
 
 	// Arrow resolver checked before builtins; bypassed when passing to a series-typed parameter

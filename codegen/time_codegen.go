@@ -4,12 +4,25 @@ import (
 	"fmt"
 )
 
+/*
+TimeCodeGenerator emits Go source for Pine's time(timeframe, session)
+function. The Pine version is captured at construction so the emitted call
+binds the correct default-DAYS semantics (v4 → Mon-Fri, v5 → all 7 days).
+*/
 type TimeCodeGenerator struct {
 	indentation string
+	pineVersion int
 }
 
 func NewTimeCodeGenerator(indentation string) *TimeCodeGenerator {
-	return &TimeCodeGenerator{indentation: indentation}
+	// pineVersion defaults to 5 for back-compat with handlers constructed
+	// outside the generator (e.g. tests). The version-aware constructor is
+	// NewTimeCodeGeneratorWithVersion.
+	return &TimeCodeGenerator{indentation: indentation, pineVersion: 5}
+}
+
+func NewTimeCodeGeneratorWithVersion(indentation string, pineVersion int) *TimeCodeGenerator {
+	return &TimeCodeGenerator{indentation: indentation, pineVersion: pineVersion}
 }
 
 func (g *TimeCodeGenerator) GenerateNoArguments(varName string) string {
@@ -38,14 +51,18 @@ func (g *TimeCodeGenerator) generateInvalidSession(varName string) string {
 
 func (g *TimeCodeGenerator) generateLiteralSession(varName, sessionValue string) string {
 	code := g.indentation + fmt.Sprintf("/* time(timeframe.period, %q) */\n", sessionValue)
-	code += g.indentation + fmt.Sprintf("%s_result := session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %q, ctx.Timezone)\n", varName, sessionValue)
+	code += g.indentation + fmt.Sprintf(
+		"%s_result := session.TimeFuncWithVersion(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %q, ctx.Timezone, %d)\n",
+		varName, sessionValue, g.pineVersion)
 	code += g.indentation + fmt.Sprintf("%sSeries.Set(%s_result)\n", varName, varName)
 	return code
 }
 
 func (g *TimeCodeGenerator) generateVariableSession(varName, sessionValue string) string {
 	code := g.indentation + fmt.Sprintf("/* time(timeframe.period, %s) */\n", sessionValue)
-	code += g.indentation + fmt.Sprintf("%s_result := session.TimeFunc(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %s, ctx.Timezone)\n", varName, sessionValue)
+	code += g.indentation + fmt.Sprintf(
+		"%s_result := session.TimeFuncWithVersion(ctx.Data[ctx.BarIndex].Time*1000, ctx.Timeframe, %s, ctx.Timezone, %d)\n",
+		varName, sessionValue, g.pineVersion)
 	code += g.indentation + fmt.Sprintf("%sSeries.Set(%s_result)\n", varName, varName)
 	return code
 }

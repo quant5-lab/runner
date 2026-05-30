@@ -6,6 +6,10 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+func isGoBoolLiteral(code string) bool {
+	return code == "true" || code == "false"
+}
+
 type BooleanConverter struct {
 	typeSystem            *TypeInferenceEngine
 	skipComparisonRule    ConversionRule
@@ -31,6 +35,10 @@ func NewBooleanConverter(typeSystem *TypeInferenceEngine) *BooleanConverter {
 
 func (bc *BooleanConverter) EnsureBooleanOperand(expr ast.Expression, generatedCode string) string {
 	if expr == nil {
+		return generatedCode
+	}
+
+	if isGoBoolLiteral(generatedCode) {
 		return generatedCode
 	}
 
@@ -112,6 +120,10 @@ func (bc *BooleanConverter) IsFloat64SeriesAccess(code string) bool {
 
 func (bc *BooleanConverter) ConvertBoolSeriesForIfStatement(expr ast.Expression, generatedCode string) string {
 	// UnaryExpression with 'not' is already boolean
+	if isGoBoolLiteral(generatedCode) {
+		return generatedCode
+	}
+
 	if unary, ok := expr.(*ast.UnaryExpression); ok {
 		if unary.Operator == "not" || unary.Operator == "!" {
 			return generatedCode

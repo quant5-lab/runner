@@ -3,6 +3,7 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,7 +79,6 @@ func (r *StrategyRunner) compileStrategy(t *testing.T, goSourcePath, binaryPath 
 func (r *StrategyRunner) runStrategy(t *testing.T, binaryPath, dataPath, outputPath, symbol, timeframe string) {
 	t.Helper()
 
-	/* Security() data directory: same directory as main data file */
 	dataDir := filepath.Dir(dataPath)
 
 	cmd := exec.Command(binaryPath,
@@ -90,7 +90,6 @@ func (r *StrategyRunner) runStrategy(t *testing.T, binaryPath, dataPath, outputP
 	)
 
 	output, err := cmd.CombinedOutput()
-	t.Logf("Strategy execution output:\n%s", output)
 	if err != nil {
 		t.Fatalf("Execute strategy: %v\nOutput: %s", err, output)
 	}
@@ -121,7 +120,24 @@ func (r *StrategyRunner) parseOutput(t *testing.T, outputPath string) *StrategyR
 		chartOutput.Strategy.Plots[plot.Title] = plot.Values
 	}
 
+	chartOutput.Strategy.Indicators = make(map[string][]float64, len(chartOutput.Indicators))
+	for name, ind := range chartOutput.Indicators {
+		chartOutput.Strategy.Indicators[name] = indicatorToFloats(ind)
+	}
+
 	return chartOutput.Strategy
+}
+
+func indicatorToFloats(ind IndicatorSeries) []float64 {
+	out := make([]float64, len(ind.Data))
+	for i, bar := range ind.Data {
+		if bar.Value != nil {
+			out[i] = *bar.Value
+		} else {
+			out[i] = math.NaN()
+		}
+	}
+	return out
 }
 
 func extractGeneratedFilePath(output string) string {

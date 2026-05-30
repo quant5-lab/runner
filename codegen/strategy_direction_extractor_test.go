@@ -470,3 +470,51 @@ func TestChainDirectionExtractor_NilSafety(t *testing.T) {
 		t.Errorf("Nil expression should default to Long, got %q", result)
 	}
 }
+
+// TestContextAwareDirectionExtractor_ConditionalExpression verifies that
+// entry_type = sma_bullish ? strategy.long : strategy.short resolves correctly
+// for both branches through the full generated code path.
+func TestContextAwareDirectionExtractor_ConditionalExpression(t *testing.T) {
+	const pine = `
+//@version=5
+strategy("Direction Test")
+sma_bullish = close > ta.sma(close, 20)
+entry_type = sma_bullish ? strategy.long : strategy.short
+if barstate.isconfirmed
+    strategy.entry("E", entry_type)
+`
+	code, err := compilePineScript(pine)
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+
+	// Ternary entry direction must produce an IIFE resolving strategy.Long or strategy.Short.
+	if !contains(code, "strategy.Long") && !contains(code, "strategy.Short") {
+		t.Errorf("generated code must reference strategy.Long or strategy.Short:\n%s", code)
+	}
+	if contains(code, `"strategy.long"`) || contains(code, `"strategy.short"`) {
+		t.Errorf("direction must not be emitted as a string literal:\n%s", code)
+	}
+}
+
+// TestContextAwareDirectionExtractor_MemberExpressionDirect verifies the simple
+// strategy.entry("id", strategy.long) form produces strategy.Long in generated code.
+func TestContextAwareDirectionExtractor_MemberExpressionDirect(t *testing.T) {
+	const pine = `
+//@version=5
+strategy("Long Only")
+if close > ta.sma(close, 20)
+    strategy.entry("Long", strategy.long)
+`
+	code, err := compilePineScript(pine)
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+
+	if !contains(code, "strategy.Long") {
+		t.Errorf("expected strategy.Long in generated code:\n%s", code)
+	}
+	if contains(code, "strategy.Short") {
+		t.Errorf("unexpected strategy.Short in long-only strategy:\n%s", code)
+	}
+}

@@ -57,7 +57,6 @@ func (m *GoldenManager) LoadExpected(t *testing.T, filename string) *StrategyRes
 
 func (m *GoldenManager) SaveGolden(t *testing.T, filename, strategyName, dataSource string, result *StrategyResult) {
 	t.Helper()
-
 	if existing := m.loadExistingResult(filename); existing != nil && ResultsEqual(existing, result) {
 		t.Logf("Golden file unchanged, skipping write: %s", filename)
 		return

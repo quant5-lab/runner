@@ -33,6 +33,7 @@ func newTestGenerator() *generator {
 		callRouter:                 NewCallExpressionRouter(),
 		funcSigRegistry:            NewFunctionSignatureRegistry(),
 		arrowContextLifecycle:      NewArrowContextLifecycleManager(),
+		nestedChildContextAlloc:    NewNestedChildContextAllocator(),
 		mathHandler:                NewMathHandler(),
 		colorHandler:               NewColorHandler(),
 	}
@@ -53,7 +54,7 @@ func newTestGenerator() *generator {
 	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
 	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
-	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.directionExtractor = NewContextAwareDirectionExtractor(gen)
 	gen.builtinSeriesLifecycle = NewCompositeSeriesLifecycle()
 
 	return gen

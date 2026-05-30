@@ -125,11 +125,11 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 		}
 	})
 
-	t.Run("RecursivePhase_PrevNaNRecoversWithCurrentSource", func(t *testing.T) {
+	t.Run("RecursivePhase_PrevNaNReseededViaSMA", func(t *testing.T) {
+		// Pine RMA: na(sum[1]) ? ta.sma(src, length) — re-seeds with full SMA, not currentSource
 		if !strings.Contains(code, "else if math.IsNaN(previousValue)") {
 			t.Error("Missing previous-NaN branch in recursive phase")
 		}
-		// Both EMA and RMA now recover from NaN previous by using currentSource
 		prevNaNIdx := strings.Index(code, "else if math.IsNaN(previousValue)")
 		if prevNaNIdx == -1 {
 			t.Fatal("Missing else if math.IsNaN(previousValue)")
@@ -140,40 +140,66 @@ func TestStatefulIndicatorBuilder_RMA_WithNaNCheck(t *testing.T) {
 			t.Fatal("Cannot find closing } else { of prev-NaN branch")
 		}
 		branchBody = branchBody[:nextElse]
-		if !strings.Contains(branchBody, "currentSource") {
-			t.Error("RMA prev-NaN branch must recover using currentSource")
-		}
-		if strings.Contains(branchBody, "math.NaN()") {
-			t.Error("RMA prev-NaN branch must NOT propagate NaN — recovers with currentSource")
+		if !strings.Contains(branchBody, "_sma_accumulator") {
+			t.Error("RMA prev-NaN branch must re-seed via SMA accumulation (Pine: na(sum[1]) ? ta.sma)")
 		}
 	})
 }
 
-func TestStatefulIndicatorBuilder_isEMAVariant(t *testing.T) {
-	tests := []struct {
-		indicatorName string
-		want          bool
-	}{
-		{"ta.ema", true},
-		{"ema", true},
-		{"ta.rma", false},
-		{"rma", false},
-		{"ta.atr", false},
-		{"atr", false},
-		{"ta.sma", false},
-		{"sma", false},
-		{"", false},
-		{"ema_trend", false},
+// TestStatefulIndicatorBuilder_EMA_PrevNaNRecovery verifies that EMA and RMA use
+// different prev-NaN recovery strategies matching Pine Script semantics:
+//   - EMA: na(sum[1]) ? src — restarts from current source value
+//   - RMA: na(sum[1]) ? ta.sma(src, length) — re-seeds with full SMA
+func TestStatefulIndicatorBuilder_EMA_PrevNaNRecovery(t *testing.T) {
+	mockAccessor := &MockAccessGenerator{
+		loopAccessFn: func(loopVar string) string {
+			return "sourceSeries.Get(" + loopVar + ")"
+		},
+		initialAccessFn: func(period int) string {
+			return fmt.Sprintf("sourceSeries.Get(%d)", period-1)
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.indicatorName, func(t *testing.T) {
-			got := isEMAVariant(tt.indicatorName)
-			if got != tt.want {
-				t.Errorf("isEMAVariant(%q) = %v, want %v", tt.indicatorName, got, tt.want)
-			}
-		})
+	extractPrevNaNBranch := func(src string) string {
+		idx := strings.Index(src, "else if math.IsNaN(previousValue)")
+		if idx == -1 {
+			return ""
+		}
+		body := src[idx:]
+		end := strings.Index(body, "} else {")
+		if end == -1 {
+			return ""
+		}
+		return body[:end]
 	}
+
+	builder := NewStatefulIndicatorBuilder("ta.ema", "ema10", P(10), mockAccessor, true, NewTopLevelIndicatorContext())
+	code := builder.BuildEMA()
+
+	t.Run("EMA prev-NaN branch restarts from currentSource", func(t *testing.T) {
+		prevNaNIdx := strings.Index(code, "else if math.IsNaN(previousValue)")
+		if prevNaNIdx == -1 {
+			t.Fatal("Missing 'else if math.IsNaN(previousValue)' branch")
+		}
+		branchBody := extractPrevNaNBranch(code)
+
+		if !strings.Contains(branchBody, "currentSource") {
+			t.Error("EMA prev-NaN branch must restart from currentSource")
+		}
+		if strings.Contains(branchBody, "math.NaN()") {
+			t.Error("EMA prev-NaN branch must NOT propagate NaN — it recovers from currentSource")
+		}
+	})
+
+	t.Run("RMA prev-NaN branch re-seeds via SMA not currentSource", func(t *testing.T) {
+		rmaBuilder := NewStatefulIndicatorBuilder("ta.rma", "rma10", P(10), mockAccessor, true, NewTopLevelIndicatorContext())
+		rmaCode := rmaBuilder.BuildRMA()
+		rmaBranch := extractPrevNaNBranch(rmaCode)
+
+		if !strings.Contains(rmaBranch, "_sma_accumulator") {
+			t.Error("RMA prev-NaN branch must re-seed via SMA accumulation (Pine: na(sum[1]) ? ta.sma)")
+		}
+	})
 }
 
 func TestStatefulIndicatorBuilder_DifferentPeriods(t *testing.T) {

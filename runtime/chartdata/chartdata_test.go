@@ -558,7 +558,7 @@ func TestOpenTradeCommentSerialization(t *testing.T) {
 	cd := NewChartData(ctx, "TEST", "1h", "Test Strategy")
 
 	strat := strategy.NewStrategy()
-	strat.CallWithPyramiding("Test Strategy", 10000, 1) // pyramiding=1 allows 2 trades
+	strat.CallWithPyramiding("Test Strategy", 10000, 2) // pyramiding=2 allows 2 simultaneous same-direction trades (TV semantic, post pyramiding off-by-one fix)
 
 	/* Open trade with entry comment */
 	strat.Entry("long1", strategy.Long, 10, "Trend entry")

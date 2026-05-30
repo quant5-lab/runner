@@ -13,6 +13,7 @@ type ArrowFunctionCodegen struct {
 	localStorage     *ArrowLocalVariableStorage
 	statementGen     *ArrowStatementGenerator
 	loopModifiedVars map[string]bool
+	lastReturnType   string
 }
 
 func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
@@ -23,8 +24,12 @@ func NewArrowFunctionCodegen(gen *generator) *ArrowFunctionCodegen {
 	}
 }
 
+func (a *ArrowFunctionCodegen) LastReturnType() string {
+	return a.lastReturnType
+}
+
 func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFunctionExpression) (string, error) {
-	analyzer := NewParameterUsageAnalyzer()
+	analyzer := NewParameterUsageAnalyzerWithRegistry(a.gen.funcSigRegistry)
 	paramUsage := analyzer.AnalyzeArrowFunction(arrowFunc)
 
 	loopAnalyzer := NewArrowLoopModificationAnalyzer()
@@ -65,11 +70,15 @@ func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFun
 	if err != nil {
 		return "", err
 	}
+	a.lastReturnType = returnType
 
 	a.localStorage = NewArrowLocalVariableStorage(a.gen.ind())
 	exprGen := NewArrowExpressionGeneratorImpl(a.gen, a.accessResolver)
 	arrowSymbolTable := cloneSymbolTable(a.gen.symbolTable)
-	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen, arrowSymbolTable)
+	arrowScope := a.accessResolver.BuildArrowScope()
+	tupleSecGen := NewArrowTupleSecurityGenerator(a.gen, a.localStorage, arrowScope)
+	a.statementGen = NewArrowStatementGenerator(a.gen, a.localStorage, exprGen, arrowSymbolTable).
+		WithTupleSecurityGenerator(tupleSecGen)
 
 	body, err := a.generateFunctionBody(arrowFunc)
 	if err != nil {
@@ -167,6 +176,9 @@ func (a *ArrowFunctionCodegen) inferReturnType(arrowFunc *ast.ArrowFunctionExpre
 			if elemSlice, ok := literal.Value.([]ast.Expression); ok {
 				return a.buildTupleReturnType(len(elemSlice)), nil
 			}
+		}
+		if inferredType := a.gen.typeSystem.InferType(stmt.Expression); inferredType == "string" {
+			return "string", nil
 		}
 		return "float64", nil
 
@@ -314,6 +326,7 @@ func (a *ArrowFunctionCodegen) generateFunctionBody(arrowFunc *ast.ArrowFunction
 
 	wasInArrowFunction := a.gen.inArrowFunctionBody
 	a.gen.inArrowFunctionBody = true
+	a.gen.nestedChildContextAlloc.Reset()
 
 	// Expose the access resolver globally so all sub-generators (e.g. ControlFlowExpressionGenerator
 	// processing IIFE for-loops) can resolve parameters and local variables correctly.
@@ -440,6 +453,12 @@ func (a *ArrowFunctionCodegen) generateTupleReturn(arrayPattern *ast.ArrayPatter
 }
 
 func (a *ArrowFunctionCodegen) generateTupleInitExpression(expr ast.Expression, varNames []string) (string, error) {
+	if call, ok := expr.(*ast.CallExpression); ok && isSecurityCallExpression(call) {
+		arrowScope := a.accessResolver.BuildArrowScope()
+		secGen := NewArrowTupleSecurityGenerator(a.gen, a.localStorage, arrowScope)
+		return secGen.Generate(varNames, call)
+	}
+
 	exprCode, err := a.generateExpression(expr)
 	if err != nil {
 		return "", err

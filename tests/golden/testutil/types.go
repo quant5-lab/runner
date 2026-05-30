@@ -38,16 +38,31 @@ type StrategyResult struct {
 	NetProfit   float64              `json:"netProfit"`
 	TotalTrades int                  `json:"totalTrades"`
 	Plots       map[string][]float64 `json:"plots"`
+	// Excluded from golden comparison — populated at test runtime from indicator output.
+	Indicators map[string][]float64 `json:"-"`
 }
 
 type ChartOutput struct {
-	Strategy *StrategyResult `json:"strategy"`
-	Plots    []PlotSeries    `json:"plots"`
+	Strategy   *StrategyResult            `json:"strategy"`
+	Plots      []PlotSeries               `json:"plots"`
+	Indicators map[string]IndicatorSeries `json:"indicators"`
 }
 
 type PlotSeries struct {
 	Title  string    `json:"title"`
 	Values []float64 `json:"values"`
+}
+
+// Runner binary outputs these under the "indicators" JSON key, separate from "plots".
+type IndicatorSeries struct {
+	Title string         `json:"title"`
+	Data  []IndicatorBar `json:"data"`
+}
+
+// Value is a pointer so that JSON null (Pine na) unmarshals as nil rather than 0.
+type IndicatorBar struct {
+	Time  int64    `json:"time"`
+	Value *float64 `json:"value"`
 }
 
 type GoldenFile struct {

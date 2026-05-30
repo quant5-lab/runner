@@ -179,6 +179,24 @@ func (c *ControlFlowExpressionGenerator) generateLoopBodyWithResult(builder *str
 	return nil
 }
 
+// GenerateIfExpressionAsTypedIIFE is like GenerateIfExpressionAsIIFE but allows
+// specifying the return type (e.g. "string") for non-float64 branch results.
+func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsTypedIIFE(ifStmt *ast.IfStatement, returnType string) (string, error) {
+	if returnType == "" || returnType == "float64" {
+		return c.GenerateIfExpressionAsIIFE(ifStmt)
+	}
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("(func() %s {\n", returnType))
+	c.baseGenerator.indent++
+	if err := c.generateIfBranchWithReturnTyped(&builder, ifStmt, c.baseGenerator.ind(), returnType); err != nil {
+		return "", err
+	}
+	c.baseGenerator.indent--
+	builder.WriteString(c.baseGenerator.ind())
+	builder.WriteString("}())")
+	return builder.String(), nil
+}
+
 func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsIIFE(ifStmt *ast.IfStatement) (string, error) {
 	var builder strings.Builder
 
@@ -196,11 +214,12 @@ func (c *ControlFlowExpressionGenerator) GenerateIfExpressionAsIIFE(ifStmt *ast.
 	return builder.String(), nil
 }
 
-func (c *ControlFlowExpressionGenerator) generateIfBranchWithReturn(builder *strings.Builder, ifStmt *ast.IfStatement, prefix string) error {
+func (c *ControlFlowExpressionGenerator) generateIfBranchWithReturnTyped(builder *strings.Builder, ifStmt *ast.IfStatement, prefix string, returnType string) error {
 	condCode, err := c.baseGenerator.generateConditionExpression(ifStmt.Test)
 	if err != nil {
 		return fmt.Errorf("generating if-expression condition: %w", err)
 	}
+	condCode = c.baseGenerator.addBoolConversionIfNeeded(ifStmt.Test, condCode)
 
 	builder.WriteString(prefix)
 	builder.WriteString(fmt.Sprintf("if %s {\n", condCode))
@@ -212,21 +231,32 @@ func (c *ControlFlowExpressionGenerator) generateIfBranchWithReturn(builder *str
 
 	c.baseGenerator.indent--
 
-	return c.generateIIFEAlternate(builder, ifStmt.Alternate)
+	return c.generateIIFEAlternateTyped(builder, ifStmt.Alternate, returnType)
 }
 
-func (c *ControlFlowExpressionGenerator) generateIIFEAlternate(builder *strings.Builder, alternate []ast.Node) error {
+func (c *ControlFlowExpressionGenerator) generateIfBranchWithReturn(builder *strings.Builder, ifStmt *ast.IfStatement, prefix string) error {
+	return c.generateIfBranchWithReturnTyped(builder, ifStmt, prefix, "float64")
+}
+
+func (c *ControlFlowExpressionGenerator) iifeFallback(returnType string) string {
+	if returnType == "string" {
+		return `""`
+	}
+	return pineNaExpression
+}
+
+func (c *ControlFlowExpressionGenerator) generateIIFEAlternateTyped(builder *strings.Builder, alternate []ast.Node, returnType string) error {
 	if len(alternate) == 0 {
 		builder.WriteString(c.baseGenerator.ind())
 		builder.WriteString("}\n")
 		builder.WriteString(c.baseGenerator.ind())
-		builder.WriteString("return " + pineNaExpression + "\n")
+		builder.WriteString("return " + c.iifeFallback(returnType) + "\n")
 		return nil
 	}
 
 	if nestedIf, isChain := extractElseIfChain(alternate); isChain {
 		prefix := c.baseGenerator.ind() + "} else "
-		return c.generateIfBranchWithReturn(builder, nestedIf, prefix)
+		return c.generateIfBranchWithReturnTyped(builder, nestedIf, prefix, returnType)
 	}
 
 	builder.WriteString(c.baseGenerator.ind())
@@ -243,11 +273,34 @@ func (c *ControlFlowExpressionGenerator) generateIIFEAlternate(builder *strings.
 	return nil
 }
 
+func (c *ControlFlowExpressionGenerator) generateIIFEAlternate(builder *strings.Builder, alternate []ast.Node) error {
+	return c.generateIIFEAlternateTyped(builder, alternate, "float64")
+}
+
 func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings.Builder, body []ast.Node) error {
 	/* IIFE bodies need arrow-function-style expression handling (e.g. binary expressions as values) */
 	wasInArrow := c.baseGenerator.inArrowFunctionBody
 	c.baseGenerator.inArrowFunctionBody = true
 	defer func() { c.baseGenerator.inArrowFunctionBody = wasInArrow }()
+
+	/* Snapshot outer scope to detect IIFE-local variables */
+	outerVars := make(map[string]bool, len(c.baseGenerator.variables))
+	for k := range c.baseGenerator.variables {
+		outerVars[k] = true
+	}
+
+	/* Activate IIFE-local var tracking, nested IIFEs get a fresh scope */
+	prevIifeLocalVars := c.baseGenerator.blockLocalVars
+	c.baseGenerator.blockLocalVars = make(map[string]bool)
+	defer func() {
+		/* Remove IIFE-local vars from g.variables so they don't pollute outer scope */
+		for k := range c.baseGenerator.blockLocalVars {
+			if !outerVars[k] {
+				delete(c.baseGenerator.variables, k)
+			}
+		}
+		c.baseGenerator.blockLocalVars = prevIifeLocalVars
+	}()
 
 	/* Last ExpressionStatement = return value; all preceding nodes emit normally */
 	lastIdx := len(body) - 1
@@ -257,6 +310,13 @@ func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings
 				break
 			}
 		}
+
+		/* Variable declarations for vars not in outer scope become Go locals */
+		if code, ok := c.tryGenerateIIFELocalDeclaration(node, outerVars); ok {
+			builder.WriteString(code)
+			continue
+		}
+
 		code, err := c.baseGenerator.generateStatement(node)
 		if err != nil {
 			return fmt.Errorf("generating expression body node: %w", err)
@@ -272,6 +332,30 @@ func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings
 	builder.WriteString(c.baseGenerator.ind())
 	builder.WriteString(fmt.Sprintf("return %s\n", lastExprCode))
 	return nil
+}
+
+/* tryGenerateIIFELocalDeclaration emits a Go-local `:=` declaration for variables first
+ * introduced inside an IIFE body. Returns ("", false) if the node is not an IIFE-local decl. */
+func (c *ControlFlowExpressionGenerator) tryGenerateIIFELocalDeclaration(node ast.Node, outerVars map[string]bool) (string, bool) {
+	varDecl, ok := node.(*ast.VariableDeclaration)
+	if !ok || len(varDecl.Declarations) == 0 {
+		return "", false
+	}
+	decl := varDecl.Declarations[0]
+	ident, ok := decl.ID.(*ast.Identifier)
+	if !ok || outerVars[ident.Name] {
+		return "", false
+	}
+	if decl.Init == nil {
+		return "", false
+	}
+
+	exprCode := c.baseGenerator.extractSeriesExpression(decl.Init)
+	c.baseGenerator.blockLocalVars[ident.Name] = true
+	/* Register with special type so identifier resolvers return plain name */
+	c.baseGenerator.variables[ident.Name] = "iife_local"
+
+	return c.baseGenerator.ind() + fmt.Sprintf("%s := %s\n", ident.Name, exprCode), true
 }
 
 func (c *ControlFlowExpressionGenerator) extractLastExpressionFromBlock(body []ast.Node) (string, error) {

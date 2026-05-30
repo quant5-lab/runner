@@ -128,6 +128,15 @@ func (d *BuiltinUsageDetector) scanExpression(expr ast.Expression, found map[str
 		d.scanExpression(e.Alternate, found)
 	case *ast.UnaryExpression:
 		d.scanExpression(e.Argument, found)
+	case *ast.IfStatement:
+		// Pine `if` used as rvalue: VariableDeclarator.Init can be *ast.IfStatement.
+		d.scanExpression(e.Test, found)
+		for _, stmt := range e.Consequent {
+			d.scanNode(stmt, found)
+		}
+		for _, stmt := range e.Alternate {
+			d.scanNode(stmt, found)
+		}
 	case *ast.ArrowFunctionExpression:
 		for _, bodyNode := range e.Body {
 			d.scanNode(bodyNode, found)

@@ -24,6 +24,14 @@ func NewBuiltinNamespaceResolver() *BuiltinNamespaceResolver {
 		"earnings":  r.resolveEarnings,
 		"math":      r.resolveMath,
 		"strategy":  r.resolveStrategy,
+		"extend":    r.resolveExtend,
+		"line":      r.resolveLineStyle,
+		"label":     r.resolveLabelStyle,
+		"xloc":      r.resolveXloc,
+		"size":      r.resolveSize,
+		"shape":     r.resolveShape,
+		"location":  r.resolveLocation,
+		"hline":     r.resolveHlineStyle,
 	}
 	return r
 }
@@ -290,6 +298,152 @@ func (r *BuiltinNamespaceResolver) resolveStrategy(prop string) (NamespaceResolu
 		return NamespaceResolution{Code: `"USD"`, GoType: GoString}, true
 	case "margin_liquidation_price":
 		return NamespaceResolution{Code: "math.NaN()"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveExtend(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "none":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "right":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "left":
+		return NamespaceResolution{Code: "2.0"}, true
+	case "both":
+		return NamespaceResolution{Code: "3.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveLineStyle(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "style_solid":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "style_dashed":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "style_dotted":
+		return NamespaceResolution{Code: "2.0"}, true
+	case "style_arrow_left":
+		return NamespaceResolution{Code: "3.0"}, true
+	case "style_arrow_right":
+		return NamespaceResolution{Code: "4.0"}, true
+	case "style_arrow_both":
+		return NamespaceResolution{Code: "5.0"}, true
+	case "style_cross":
+		return NamespaceResolution{Code: "6.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveLabelStyle(prop string) (NamespaceResolution, bool) {
+	styles := map[string]float64{
+		"style_none":              0,
+		"style_xcross":            1,
+		"style_cross":             2,
+		"style_triangleup":        3,
+		"style_triangledown":      4,
+		"style_flag":              5,
+		"style_circle":            6,
+		"style_arrowup":           7,
+		"style_arrowdown":         8,
+		"style_label_up":          9,
+		"style_label_down":        10,
+		"style_label_left":        11,
+		"style_label_right":       12,
+		"style_label_lower_left":  13,
+		"style_label_lower_right": 14,
+		"style_label_upper_left":  15,
+		"style_label_upper_right": 16,
+		"style_label_center":      17,
+		"style_square":            18,
+		"style_diamond":           19,
+	}
+	if v, ok := styles[prop]; ok {
+		return NamespaceResolution{Code: fmt.Sprintf("%.1f", v)}, true
+	}
+	return NamespaceResolution{}, false
+}
+
+func (r *BuiltinNamespaceResolver) resolveXloc(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "bar_time":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "bar_index":
+		return NamespaceResolution{Code: "1.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveSize(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "auto":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "tiny":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "small":
+		return NamespaceResolution{Code: "2.0"}, true
+	case "normal":
+		return NamespaceResolution{Code: "3.0"}, true
+	case "large":
+		return NamespaceResolution{Code: "4.0"}, true
+	case "huge":
+		return NamespaceResolution{Code: "5.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveShape(prop string) (NamespaceResolution, bool) {
+	shapes := map[string]float64{
+		"xcross":       0,
+		"cross":        1,
+		"circle":       2,
+		"triangleup":   3,
+		"triangledown": 4,
+		"flag":         5,
+		"labelup":      6,
+		"labeldown":    7,
+		"arrowup":      8,
+		"arrowdown":    9,
+		"diamond":      10,
+		"square":       11,
+	}
+	if v, ok := shapes[prop]; ok {
+		return NamespaceResolution{Code: fmt.Sprintf("%.1f", v)}, true
+	}
+	return NamespaceResolution{}, false
+}
+
+func (r *BuiltinNamespaceResolver) resolveLocation(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "abovebar":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "belowbar":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "top":
+		return NamespaceResolution{Code: "2.0"}, true
+	case "bottom":
+		return NamespaceResolution{Code: "3.0"}, true
+	case "absolute":
+		return NamespaceResolution{Code: "4.0"}, true
+	default:
+		return NamespaceResolution{}, false
+	}
+}
+
+func (r *BuiltinNamespaceResolver) resolveHlineStyle(prop string) (NamespaceResolution, bool) {
+	switch prop {
+	case "style_solid":
+		return NamespaceResolution{Code: "0.0"}, true
+	case "style_dashed":
+		return NamespaceResolution{Code: "1.0"}, true
+	case "style_dotted":
+		return NamespaceResolution{Code: "2.0"}, true
 	default:
 		return NamespaceResolution{}, false
 	}

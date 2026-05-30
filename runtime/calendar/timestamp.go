@@ -34,7 +34,7 @@ func Timestamp(year, month, day, hour, minute, second float64, timezone string) 
 
 	loc := loadLocation(timezone)
 	t := time.Date(int(year), time.Month(int(month)), int(day), h, m, s, 0, loc)
-	return float64(t.Unix())
+	return float64(t.UnixMilli())
 }
 
 func TimestampFromString(dateStr string, timezone string) float64 {
@@ -42,7 +42,7 @@ func TimestampFromString(dateStr string, timezone string) float64 {
 
 	for _, layout := range dateFormats {
 		if t, err := time.ParseInLocation(layout, dateStr, loc); err == nil {
-			return float64(t.Unix())
+			return float64(t.UnixMilli())
 		}
 	}
 

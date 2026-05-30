@@ -10,6 +10,7 @@ import (
 type tupleSecurityArguments struct {
 	varNames        []string
 	elements        []ast.Expression
+	udfCall         *ast.CallExpression
 	symbolResult    *ExtractionResult
 	timeframeResult *ExtractionResult
 	cacheKey        CacheKeyComponents
@@ -54,6 +55,54 @@ func parseTupleSecurityArguments(g *generator, varNames []string, call *ast.Call
 	return &tupleSecurityArguments{
 		varNames:        varNames,
 		elements:        elements,
+		symbolResult:    symbolResult,
+		timeframeResult: timeframeResult,
+		cacheKey:        NewSecurityCacheKeyBuilder().Build(symbolResult, timeframeResult),
+		lookahead:       resolveSecurityLookahead(call, g.pineVersion),
+	}, nil
+}
+
+// parseTupleSecurityArgumentsWithScope is like parseTupleSecurityArguments but
+// passes an arrow-scope map to SecurityArgumentExtractor so parameter identifiers
+// in the symbol/timeframe positions resolve to the variable name, not a string literal.
+func parseTupleSecurityArgumentsWithScope(g *generator, varNames []string, call *ast.CallExpression, arrowScope map[string]string) (*tupleSecurityArguments, error) {
+	if len(call.Arguments) < 3 {
+		return nil, fmt.Errorf("security() requires at least 3 arguments, got %d", len(call.Arguments))
+	}
+
+	var elements []ast.Expression
+	var udfCall *ast.CallExpression
+
+	if callArg, ok := call.Arguments[2].(*ast.CallExpression); ok &&
+		NewUserDefinedFunctionDetector(g.variables).IsUserDefinedFunction(extractCallFunctionName(callArg)) {
+		udfCall = callArg
+	} else {
+		var err error
+		elements, err = extractTupleExpressionElements(call.Arguments[2])
+		if err != nil {
+			return nil, fmt.Errorf("security() tuple: %w", err)
+		}
+		if len(elements) != len(varNames) {
+			return nil, fmt.Errorf("security() tuple: cardinality mismatch: %d variables vs %d expressions", len(varNames), len(elements))
+		}
+	}
+
+	extractor := NewSecurityArgumentExtractor(g).WithArrowScope(arrowScope)
+
+	symbolResult, err := extractor.ExtractSymbol(call.Arguments[0])
+	if err != nil {
+		return nil, fmt.Errorf("security symbol: %w", err)
+	}
+
+	timeframeResult, err := extractor.ExtractTimeframe(call.Arguments[1])
+	if err != nil {
+		return nil, fmt.Errorf("security timeframe: %w", err)
+	}
+
+	return &tupleSecurityArguments{
+		varNames:        varNames,
+		elements:        elements,
+		udfCall:         udfCall,
 		symbolResult:    symbolResult,
 		timeframeResult: timeframeResult,
 		cacheKey:        NewSecurityCacheKeyBuilder().Build(symbolResult, timeframeResult),

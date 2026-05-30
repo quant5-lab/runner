@@ -1,6 +1,10 @@
 package codegen
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"fmt"
+
+	"github.com/quant5-lab/runner/ast"
+)
 
 // OuterScopeCaptureKind classifies how an outer-scope identifier is stored in Go,
 // which drives its parameter type, call-site expression, and access resolver role.
@@ -49,6 +53,20 @@ func (c OuterScopeCapture) GoParamType() string {
 	default:
 		return "float64"
 	}
+}
+
+// GoCallSiteExpression returns the Go expression used at a call site for this capture.
+// Bool scalar constants must be bridged to float64 via an IIFE; all other captures
+// use GoParamName() directly.
+func (c OuterScopeCapture) GoCallSiteExpression(constants map[string]interface{}) string {
+	if c.Kind == OuterScopeCaptureScalar {
+		if val, ok := constants[c.Name]; ok {
+			if _, isBool := val.(bool); isBool {
+				return fmt.Sprintf("func() float64 { if %s { return 1.0 } else { return 0.0 } }()", c.Name)
+			}
+		}
+	}
+	return c.GoParamName()
 }
 
 // NeedsSeriesAccessRegistration reports whether the access resolver must track
@@ -133,6 +151,9 @@ func (a *OuterScopeCaptureAnalyzer) Analyze(body []ast.Node) []OuterScopeCapture
 			}
 		case *ast.MemberExpression:
 			scanExpr(e.Object)
+			if e.Computed {
+				scanExpr(e.Property)
+			}
 		case *ast.ForStatement:
 			scanExpr(e.From)
 			scanExpr(e.To)

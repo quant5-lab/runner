@@ -50,7 +50,7 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 
 	if g.arrowCaptureRegistry != nil {
 		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
-			argStrings = append(argStrings, cap.GoParamName())
+			argStrings = append(argStrings, cap.GoCallSiteExpression(g.constants))
 		}
 	}
 

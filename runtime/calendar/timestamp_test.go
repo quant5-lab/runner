@@ -12,9 +12,9 @@ func TestTimestamp_BasicBehavior(t *testing.T) {
 		tz                 string
 		want               float64
 	}{
-		{"date_only", 2024, 1, 15, 0, 0, 0, "UTC", 1705276800},
-		{"with_time", 2024, 1, 15, 14, 30, 0, "UTC", 1705329000},
-		{"with_seconds", 2024, 1, 15, 14, 30, 45, "UTC", 1705329045},
+		{"date_only", 2024, 1, 15, 0, 0, 0, "UTC", 1705276800000},
+		{"with_time", 2024, 1, 15, 14, 30, 0, "UTC", 1705329000000},
+		{"with_seconds", 2024, 1, 15, 14, 30, 45, "UTC", 1705329045000},
 		{"epoch", 1970, 1, 1, 0, 0, 0, "UTC", 0},
 	}
 
@@ -33,10 +33,10 @@ func TestTimestamp_TimezoneConversion(t *testing.T) {
 		h    float64
 		want float64
 	}{
-		{"UTC", 12, 1705320000},
-		{"Europe/Moscow", 15, 1705320000},
-		{"America/New_York", 7, 1705320000},
-		{"", 12, 1705320000},
+		{"UTC", 12, 1705320000000},
+		{"Europe/Moscow", 15, 1705320000000},
+		{"America/New_York", 7, 1705320000000},
+		{"", 12, 1705320000000},
 	}
 
 	for _, tt := range tests {
@@ -129,16 +129,16 @@ func TestTimestampFromString_AllFormats(t *testing.T) {
 		input  string
 		want   float64
 	}{
-		{"ISO8601_date", "2024-01-15", 1705276800},
-		{"ISO8601_datetime_T", "2024-01-15T14:30:00", 1705329000},
-		{"ISO8601_datetime_space", "2024-01-15 14:30:00", 1705329000},
-		{"RFC3339_Z", "2024-01-15T14:30:00Z", 1705329000},
-		{"RFC3339_offset", "2024-01-15T14:30:00+00:00", 1705329000},
-		{"RFC1123Z", "Mon, 15 Jan 2024 14:30:00 +0000", 1705329000},
-		{"RFC2822_no_day", "15 Jan 2024 14:30:00 +0000", 1705329000},
-		{"RFC2822_date_only", "20 Feb 2020", 1582156800},
-		{"Pine_doc_example_1", "20 Feb 2020", 1582156800},
-		{"Pine_doc_example_2", "2011-10-10T14:48:00", 1318258080},
+		{"ISO8601_date", "2024-01-15", 1705276800000},
+		{"ISO8601_datetime_T", "2024-01-15T14:30:00", 1705329000000},
+		{"ISO8601_datetime_space", "2024-01-15 14:30:00", 1705329000000},
+		{"RFC3339_Z", "2024-01-15T14:30:00Z", 1705329000000},
+		{"RFC3339_offset", "2024-01-15T14:30:00+00:00", 1705329000000},
+		{"RFC1123Z", "Mon, 15 Jan 2024 14:30:00 +0000", 1705329000000},
+		{"RFC2822_no_day", "15 Jan 2024 14:30:00 +0000", 1705329000000},
+		{"RFC2822_date_only", "20 Feb 2020", 1582156800000},
+		{"Pine_doc_example_1", "20 Feb 2020", 1582156800000},
+		{"Pine_doc_example_2", "2011-10-10T14:48:00", 1318258080000},
 	}
 
 	for _, tt := range tests {
@@ -157,10 +157,10 @@ func TestTimestampFromString_TimezoneHandling(t *testing.T) {
 		tzParam string
 		want    float64
 	}{
-		{"RFC3339_Z_ignores_param", "2024-01-15T12:00:00Z", "America/New_York", 1705320000},
-		{"RFC3339_offset_overrides", "2024-01-15T12:00:00+05:00", "UTC", 1705302000},
-		{"ISO8601_uses_param", "2024-01-15 12:00:00", "America/New_York", 1705338000},
-		{"date_only_uses_param", "2024-01-15", "Europe/Moscow", 1705266000},
+		{"RFC3339_Z_ignores_param", "2024-01-15T12:00:00Z", "America/New_York", 1705320000000},
+		{"RFC3339_offset_overrides", "2024-01-15T12:00:00+05:00", "UTC", 1705302000000},
+		{"ISO8601_uses_param", "2024-01-15 12:00:00", "America/New_York", 1705338000000},
+		{"date_only_uses_param", "2024-01-15", "Europe/Moscow", 1705266000000},
 	}
 
 	for _, tt := range tests {
@@ -200,8 +200,8 @@ func TestTimestampFromString_BoundaryDates(t *testing.T) {
 		want  float64
 	}{
 		{"epoch", "1970-01-01", 0},
-		{"leap_day", "2020-02-29", 1582934400},
-		{"year_2038", "2038-01-19 03:14:07", 2147483647},
+		{"leap_day", "2020-02-29", 1582934400000},
+		{"year_2038", "2038-01-19 03:14:07", 2147483647000},
 	}
 
 	for _, tt := range tests {

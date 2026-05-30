@@ -359,7 +359,7 @@ func TestEquityUnrealizedProfitCalculation(t *testing.T) {
 /* TestEquityMultiplePositions verifies equity with multiple open trades */
 func TestEquityMultiplePositions(t *testing.T) {
 	s := NewStrategy()
-	s.CallWithPyramiding("Test", 10000, 1) // pyramiding=1 allows 2 positions
+	s.CallWithPyramiding("Test", 10000, 2) // pyramiding=2 allows 2 simultaneous same-direction entries
 
 	/* Open first long position */
 	s.Entry("long1", Long, 10, "")
@@ -623,7 +623,7 @@ func TestExit_ClosesAllMatchingEntriesById(t *testing.T) {
 /* TestStrategyMixedComments verifies behavior with mixed comment/no-comment trades */
 func TestStrategyMixedComments(t *testing.T) {
 	s := NewStrategy()
-	s.CallWithPyramiding("Test Strategy", 10000, 1) // pyramiding=1 allows 2 positions
+	s.CallWithPyramiding("Test Strategy", 10000, 2) // pyramiding=2 allows 2 simultaneous same-direction entries
 
 	/* Entry with comment */
 	s.Entry("long1", Long, 10, "Signal A")
@@ -688,7 +688,7 @@ func TestStrategyShort(t *testing.T) {
 
 func TestStrategyCloseAll(t *testing.T) {
 	s := NewStrategy()
-	s.CallWithPyramiding("Test Strategy", 10000, 1)
+	s.CallWithPyramiding("Test Strategy", 10000, 2)
 
 	s.Entry("long1", Long, 10, "")
 	s.Entry("long2", Long, 5, "")

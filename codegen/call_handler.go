@@ -33,6 +33,7 @@ func NewCallExpressionRouter() *CallExpressionRouter {
 	router.RegisterHandler(&UserDefinedFunctionHandler{})
 	router.RegisterHandler(NewArrayMethodCallHandler())
 	router.RegisterHandler(NewStringNamespaceHandler())
+	router.RegisterHandler(NewVoidBuiltinHandler())
 	router.RegisterHandler(&UnknownFunctionHandler{})
 
 	return router

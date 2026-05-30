@@ -124,7 +124,7 @@ func (om *OrderManager) CreateCloseAllOrder(createdBar int, comment string) Orde
 	return order
 }
 
-/* CreateOrder creates or replaces an order - legacy compatibility */
+/* legacy compatibility */
 func (om *OrderManager) CreateOrder(id, direction string, qty float64, createdBar int, comment string) Order {
 	return om.CreateEntryOrder(id, direction, qty, createdBar, comment)
 }
@@ -278,11 +278,7 @@ func (th *TradeHistory) CloseTrade(entryID, exitID string, exitPrice float64, ex
 	return nil
 }
 
-/*
-	PartialCloseTrades closes up to qty units from open trades in direction (FIFO).
-
-Returns (actual qty closed, newly closed trades). totalExitCommission is allocated proportionally.
-*/
+/* totalExitCommission is allocated proportionally across closed lots. */
 func (th *TradeHistory) PartialCloseTrades(direction, exitID string, qty, exitPrice float64, exitBar int, exitTime int64, exitComment string, totalExitCommission float64) (float64, []Trade) {
 	remaining := qty
 	var newlyClosed []Trade
@@ -393,23 +389,25 @@ func (ec *EquityCalculator) GetNetProfit() float64 {
 }
 
 type Strategy struct {
-	context           interface{} // Context with OHLCV data
-	orderManager      *OrderManager
-	positionTracker   *PositionTracker
-	tradeHistory      *TradeHistory
-	equityCalculator  *EquityCalculator
-	reversalHandler   *PositionReversalHandler
-	defaultQtyCalc    *DefaultQtyCalculator
-	currencyConverter *CurrencyConverter
-	initialized       bool
-	currentBar        int
-	currentPrice      float64
-	pyramiding        int
-	commissionValue   float64
-	commissionType    string
-	defaultQtyValue   float64
-	defaultQtyType    string
-	allowedDirection  string
+	context            interface{} // Context with OHLCV data
+	orderManager       *OrderManager
+	positionTracker    *PositionTracker
+	tradeHistory       *TradeHistory
+	equityCalculator   *EquityCalculator
+	reversalHandler    *PositionReversalHandler
+	defaultQtyCalc     *DefaultQtyCalculator
+	currencyConverter  *CurrencyConverter
+	pendingExitManager *PendingExitManager
+	initialized        bool
+	currentBar         int
+	currentPrice       float64
+	currentBarTime     int64
+	pyramiding         int
+	commissionValue    float64
+	commissionType     string
+	defaultQtyValue    float64
+	defaultQtyType     string
+	allowedDirection   string
 }
 
 func NewStrategy() *Strategy {
@@ -420,15 +418,16 @@ func NewStrategy() *Strategy {
 	rh := NewPositionReversalHandler(th, pt, ec)
 
 	return &Strategy{
-		orderManager:      om,
-		positionTracker:   pt,
-		tradeHistory:      th,
-		equityCalculator:  ec,
-		reversalHandler:   rh,
-		defaultQtyCalc:    NewDefaultQtyCalculator(),
-		currencyConverter: NewCurrencyConverter(),
-		initialized:       false,
-		pyramiding:        -1,
+		orderManager:       om,
+		positionTracker:    pt,
+		tradeHistory:       th,
+		equityCalculator:   ec,
+		reversalHandler:    rh,
+		defaultQtyCalc:     NewDefaultQtyCalculator(),
+		currencyConverter:  NewCurrencyConverter(),
+		pendingExitManager: NewPendingExitManager(),
+		initialized:        false,
+		pyramiding:         -1,
 	}
 }
 
@@ -468,7 +467,6 @@ func (s *Strategy) ConvertToSymbol(value float64) float64 {
 	return s.currencyConverter.ToSymbol(value)
 }
 
-/* SetAllowedDirection restricts entry direction; DirectionAll permits both */
 func (s *Strategy) SetAllowedDirection(direction string) {
 	s.allowedDirection = direction
 }
@@ -489,7 +487,6 @@ func (s *Strategy) GetPositionEntryName() string {
 	return openTrades[len(openTrades)-1].EntryID
 }
 
-/* calcCommission computes commission for one side of a trade (entry or exit) */
 func (s *Strategy) calcCommission(qty, price float64) float64 {
 	switch s.commissionType {
 	case CommissionPercent:
@@ -509,6 +506,10 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 
 	if s.allowedDirection != "" && s.allowedDirection != DirectionAll {
 		if direction != s.allowedDirection {
+			// TV semantics: a blocked entry still closes any open opposite-direction
+			// positions — the reversal "close" half of `strategy.entry` runs even
+			// when the "open" half is disabled by `strategy.risk.allow_entry_in`.
+			s.scheduleDirectionCloseForBlockedEntry(id, direction, comment)
 			return nil
 		}
 	}
@@ -529,7 +530,15 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 			}
 		}
 
-		if sameDirectionCount > s.pyramiding {
+		// TV semantics: pyramiding=N caps simultaneous same-direction entries at N
+		// (the count must be strictly less than the cap for a new entry to land).
+		// Pine treats pyramiding=0 as the default that still permits one entry, so
+		// the effective limit is max(1, pyramiding).
+		limit := s.pyramiding
+		if limit < 1 {
+			limit = 1
+		}
+		if sameDirectionCount >= limit {
 			return nil
 		}
 	}
@@ -538,11 +547,7 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 	return nil
 }
 
-/*
-	Order places a net-position order: ignores pyramiding, nets arithmetically against current position.
-
-Long adds to position; Short reduces it (and may cross zero into a short position).
-*/
+/* ignores pyramiding; may cross zero from long to short or vice-versa */
 func (s *Strategy) Order(id, direction string, qty float64, comment string) error {
 	if !s.initialized {
 		return fmt.Errorf("strategy not initialized")
@@ -550,6 +555,7 @@ func (s *Strategy) Order(id, direction string, qty float64, comment string) erro
 
 	if s.allowedDirection != "" && s.allowedDirection != DirectionAll {
 		if direction != s.allowedDirection {
+			s.scheduleDirectionCloseForBlockedEntry(id, direction, comment)
 			return nil
 		}
 	}
@@ -558,7 +564,23 @@ func (s *Strategy) Order(id, direction string, qty float64, comment string) erro
 	return nil
 }
 
-/* executeNetOrder fills a strategy.order at fillPrice by netting the position arithmetically (FIFO). */
+// scheduleDirectionCloseForBlockedEntry schedules a close order against every
+// currently-open trade in the direction OPPOSITE to the blocked entry. Mirrors
+// the "close existing opposite + open new same" reversal flow of strategy.entry
+// but skips the open half when the configured allowedDirection blocks it.
+// Idempotent per-bar — CreateCloseOrder dedupes by id.
+func (s *Strategy) scheduleDirectionCloseForBlockedEntry(blockedEntryID, blockedDirection, comment string) {
+	opposite := Long
+	if blockedDirection == Long {
+		opposite = Short
+	}
+	for _, trade := range s.tradeHistory.GetOpenTrades() {
+		if trade.Direction == opposite {
+			s.orderManager.CreateCloseOrder(blockedEntryID, trade.EntryID, s.currentBar, comment)
+		}
+	}
+}
+
 func (s *Strategy) executeNetOrder(id, direction string, qty, fillPrice float64, fillBar int, fillTime int64, comment string) {
 	currentSize := s.positionTracker.GetPositionSize()
 
@@ -614,7 +636,7 @@ func (s *Strategy) openNetTrade(id, direction string, qty, fillPrice float64, fi
 	})
 }
 
-/* Close creates a pending close order - fills at next bar open per TradingView model */
+/* fills at next bar open — TV pending-order model */
 func (s *Strategy) Close(id string, currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
@@ -647,24 +669,35 @@ func (s *Strategy) closeTrades(trades []Trade, exitID string, fillPrice float64,
 
 func (s *Strategy) executeCloseOrder(exitID, entryID string, fillPrice float64, fillBar int, fillTime int64, comment string) {
 	s.closeTrades(s.tradeHistory.MatchingOpenTrades(entryID), exitID, fillPrice, fillBar, fillTime, comment)
+	s.pendingExitManager.RemoveAllExitsForEntry(entryID)
 }
 
-/* CloseAll creates a pending close-all order - fills at next bar open per TradingView model */
+/*
+	TV broker emulator: pending exits are cancelled immediately so OnBarMetrics cannot fill them
+
+on the same bar as a close_all call. Fills at next bar open.
+*/
 func (s *Strategy) CloseAll(currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
 
-	if len(s.tradeHistory.GetOpenTrades()) > 0 {
+	openTrades := s.tradeHistory.GetOpenTrades()
+	if len(openTrades) > 0 {
+		for _, trade := range openTrades {
+			s.pendingExitManager.RemoveAllExitsForEntry(trade.EntryID)
+		}
 		s.orderManager.CreateCloseAllOrder(s.currentBar, comment)
 	}
 }
 
 func (s *Strategy) executeCloseAllOrder(fillPrice float64, fillBar int, fillTime int64, comment string) {
+	for _, trade := range s.tradeHistory.AllOpenTradesSnapshot() {
+		s.pendingExitManager.RemoveAllExitsForEntry(trade.EntryID)
+	}
 	s.closeTrades(s.tradeHistory.AllOpenTradesSnapshot(), "", fillPrice, fillBar, fillTime, comment)
 }
 
-/* Exit exits with stop/limit orders (simplified - just closes) */
 func (s *Strategy) Exit(id, fromEntry string, currentPrice float64, currentTime int64, comment string) {
 	if !s.initialized {
 		return
@@ -679,51 +712,14 @@ func (s *Strategy) Exit(id, fromEntry string, currentPrice float64, currentTime 
 	}
 }
 
-/* ExitWithLevels checks stop/limit levels and closes if triggered */
+/* declarative per Pine: re-calls update levels but do not reset the eligibility gate */
 func (s *Strategy) ExitWithLevels(exitID, fromEntry string, stopLevel, limitLevel, barHigh, barLow, barClose float64, barTime int64, comment string) {
 	if !s.initialized {
 		return
 	}
-
-	openTrades := s.tradeHistory.GetOpenTrades()
-	var trade *Trade
-	for i := range openTrades {
-		if openTrades[i].EntryID == fromEntry {
-			trade = &openTrades[i]
-			break
-		}
-	}
-
-	if trade == nil {
-		return
-	}
-
-	// Check stop loss (long: low <= stop, short: high >= stop)
-	if !math.IsNaN(stopLevel) {
-		if trade.Direction == Long && barLow <= stopLevel {
-			s.executeCloseOrder(exitID, fromEntry, stopLevel, s.currentBar, barTime, comment)
-			return
-		}
-		if trade.Direction == Short && barHigh >= stopLevel {
-			s.executeCloseOrder(exitID, fromEntry, stopLevel, s.currentBar, barTime, comment)
-			return
-		}
-	}
-
-	// Check take profit (long: high >= limit, short: low <= limit)
-	if !math.IsNaN(limitLevel) {
-		if trade.Direction == Long && barHigh >= limitLevel {
-			s.executeCloseOrder(exitID, fromEntry, limitLevel, s.currentBar, barTime, comment)
-			return
-		}
-		if trade.Direction == Short && barLow <= limitLevel {
-			s.executeCloseOrder(exitID, fromEntry, limitLevel, s.currentBar, barTime, comment)
-			return
-		}
-	}
+	s.pendingExitManager.RegisterExit(exitID, fromEntry, stopLevel, limitLevel, s.currentBar, comment)
 }
 
-/* OnBarUpdate processes pending orders at bar open */
 func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64) {
 	if !s.initialized {
 		return
@@ -766,11 +762,26 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	}
 }
 
-func (s *Strategy) OnBarMetrics(barHigh, barLow float64) {
+func (s *Strategy) OnBarMetrics(barOpen, barHigh, barLow float64, barTime int64) {
 	if !s.initialized {
 		return
 	}
+	s.currentBarTime = barTime
 	s.tradeHistory.UpdateOpenTradeMetrics(barHigh, barLow)
+	s.checkAndFillPendingExits(barOpen, barHigh, barLow, barTime)
+}
+
+func (s *Strategy) checkAndFillPendingExits(barOpen, barHigh, barLow float64, barTime int64) {
+	for _, trade := range s.tradeHistory.GetOpenTrades() {
+		for _, exit := range s.pendingExitManager.GetExitsForEntry(trade.EntryID) {
+			triggered, fillPrice, _ := s.pendingExitManager.CheckExitTriggered(exit, trade, s.currentBar, barOpen, barHigh, barLow)
+			if triggered {
+				s.executeCloseOrder(exit.ExitID, trade.EntryID, fillPrice, s.currentBar, barTime, exit.Comment)
+				s.pendingExitManager.RemoveAllExitsForEntry(trade.EntryID)
+				break
+			}
+		}
+	}
 }
 
 func (s *Strategy) GetPositionSize() float64 {

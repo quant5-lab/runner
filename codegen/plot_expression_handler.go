@@ -115,7 +115,9 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 		return h.generator.valueHandler.GenerateInlineCall(funcName, call.Arguments, h.generator)
 	}
 
-	return "", fmt.Errorf("unsupported inline function in plot: %s", funcName)
+	/* Unknown function in plot position: degrade to NaN and record gap */
+	h.generator.featureGaps = append(h.generator.featureGaps, funcName)
+	return "math.NaN()", nil
 }
 
 func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcName string) (string, error) {

@@ -18,5 +18,6 @@ func (h *UnknownFunctionHandler) CanHandle(funcName string) bool {
 
 func (h *UnknownFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
+	g.featureGaps = append(g.featureGaps, funcName)
 	return g.ind() + fmt.Sprintf("// %s() - TODO: implement\n", funcName), nil
 }

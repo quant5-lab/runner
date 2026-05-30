@@ -18,6 +18,7 @@ type StrategyCode struct {
 	FunctionBody         string   // executeStrategy() function body
 	StrategyName         string   // Pine Script strategy name
 	AdditionalImports    []string // Additional imports needed for security() streaming evaluation
+	FeatureGaps          []string // Deduplicated list of unimplemented function names encountered
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -87,11 +88,12 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 	gen.arrowCaptureRegistry = NewArrowCaptureRegistry()
 	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
+	gen.nestedChildContextAlloc = NewNestedChildContextAllocator()
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 	gen.symbolTable = NewSymbolTable()
 	gen.literalFormatter = NewLiteralFormatter()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
-	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.directionExtractor = NewContextAwareDirectionExtractor(gen)
 
 	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)
@@ -163,6 +165,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		FunctionBody:         body,
 		StrategyName:         gen.strategyConfig.Name,
 		AdditionalImports:    additionalImports,
+		FeatureGaps:          deduplicateFeatureGaps(gen.featureGaps),
 	}
 
 	return code, nil
@@ -182,6 +185,8 @@ type generator struct {
 	tupleTAFunctions          []tupleTAFunctionCall
 	inSecurityContext         bool
 	inArrowFunctionBody       bool
+	nestedChildContextAlloc   *NestedChildContextAllocator
+	blockLocalVars            map[string]bool
 	loopContextStack          *LoopContextStack
 	hasSecurityCalls          bool
 	hasSecurityExprEvals      bool
@@ -233,6 +238,7 @@ type generator struct {
 	arrowAccessResolver        *ArrowSeriesAccessResolver
 	arrowCaptureRegistry       *ArrowCaptureRegistry
 	symbolTable                SymbolTable
+	arrowSymbolTable           SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
 	directionExtractor         *ChainDirectionExtractor
@@ -244,6 +250,7 @@ type generator struct {
 	statementAnalyzer      *StatementConditionalAnalyzer
 	builtinSeriesLifecycle *CompositeSeriesLifecycle
 	seriesInitCoercer      *SeriesInitCoercer
+	featureGaps            []string
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -549,6 +556,34 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 					g.userDefinedFunctions += funcCode
 					g.indent = savedIndent
+
+					if retType := arrowCodegen.LastReturnType(); retType == "string" {
+						g.typeSystem.RegisterUDFReturnType(id.Name, retType)
+					}
+				}
+			}
+		}
+	}
+
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				id, ok := declarator.ID.(*ast.Identifier)
+				if !ok || declarator.Init == nil {
+					continue
+				}
+				varName := id.Name
+				if g.variables[varName] != "float64" {
+					continue
+				}
+				callExpr, ok := declarator.Init.(*ast.CallExpression)
+				if !ok {
+					continue
+				}
+				funcName := g.extractFunctionName(callExpr.Callee)
+				if retType, ok2 := g.typeSystem.GetUDFReturnType(funcName); ok2 && retType == "string" {
+					g.variables[varName] = "string"
+					g.typeSystem.RegisterVariable(varName, "string")
 				}
 			}
 		}
@@ -903,7 +938,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 
 	if g.hasStrategyRuntimeAccess {
-		code += g.ind() + "strat.OnBarMetrics(bar.High, bar.Low)\n"
+		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
 	}
 
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
@@ -1311,6 +1346,10 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			}
 		}
 
+		if g.blockLocalVars != nil && g.blockLocalVars[e.Name] {
+			return e.Name, nil
+		}
+
 		// User variables and parameters shadow builtins (PineScript semantics)
 		if varType, exists := g.variables[e.Name]; exists {
 			if varType == "float" || varType == "float64" || varType == "bool" {
@@ -1620,6 +1659,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			if access, resolved := g.arrowAccessResolver.ResolveAccess(varName); resolved {
 				return access, nil
 			}
+		}
+
+		if g.blockLocalVars != nil && g.blockLocalVars[varName] {
+			return varName, nil
 		}
 
 		/* User-declared variables shadow builtins (PineScript semantics) */
@@ -2159,6 +2202,11 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				}
 			}
 		}
+
+		if dir, ok := resolveStrategyDirectionMember(expr); ok {
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, dir), nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", expr)
 
 	case *ast.CallExpression:
@@ -2177,6 +2225,15 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				return "", err
 			}
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, joinCode), nil
+		}
+		detector := NewUserDefinedFunctionDetector(g.variables)
+		if detector.IsUserDefinedFunction(funcName) {
+			ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
+			callCode, err := g.generateUserDefinedFunctionCallWithContext(expr, ctxVarName)
+			if err != nil {
+				return "", fmt.Errorf("UDF string call %s: %w", funcName, err)
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, callCode), nil
 		}
 		return "", fmt.Errorf("unsupported call expression for string variable: %s", funcName)
 
@@ -2236,6 +2293,11 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 				}
 			}
 		}
+
+		if dir, ok := resolveStrategyDirectionMember(e); ok {
+			return dir, nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", e)
 
 	case *ast.CallExpression:
@@ -2479,7 +2541,12 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code := ""
 
 		if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
-			code = g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+			if g.inArrowFunctionBody {
+				childCtxExpr := g.nestedChildContextAlloc.AllocateChildContextExpr(funcName)
+				code = g.ind() + fmt.Sprintf("%s := %s\n", ctxVarName, childCtxExpr)
+			} else {
+				code = g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+			}
 		}
 
 		callCode, err := g.generateUserDefinedFunctionCallWithContext(call, ctxVarName)
@@ -2688,7 +2755,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		 * Usage: entry_time = time(timeframe.period, "0950-1345")
 		 * Check: is_entry_time = na(entry_time) ? false : true
 		 */
-		handler := NewTimeHandler(g.ind())
+		handler := NewTimeHandlerWithVersion(g.ind(), g.pineVersion)
 		return handler.HandleVariableInit(varName, call), nil
 
 	case "nz":
@@ -2961,7 +3028,12 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 	ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
 
 	if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
-		code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+		if g.inArrowFunctionBody {
+			childCtxExpr := g.nestedChildContextAlloc.AllocateChildContextExpr(funcName)
+			code += g.ind() + fmt.Sprintf("%s := %s\n", ctxVarName, childCtxExpr)
+		} else {
+			code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+		}
 	}
 
 	args := []string{ctxVarName}
@@ -3024,7 +3096,7 @@ func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
 
 func (g *generator) extractDirectionConstant(expr ast.Expression) string {
 	if g.directionExtractor == nil {
-		g.directionExtractor = NewDefaultDirectionExtractor()
+		g.directionExtractor = NewContextAwareDirectionExtractor(g)
 	}
 	return g.directionExtractor.Extract(expr)
 }
@@ -3098,6 +3170,12 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				}
 			}
 
+			// color.* namespace: color values can't be stored as float64 series;
+			// callers that produce colors (barcolor etc.) are no-op stubs.
+			if varName == "color" {
+				return "0.0"
+			}
+
 			// Check if it's an input constant with subscript
 			if funcName, isConstant := g.constants[varName]; isConstant {
 				if funcName == "input.source" {
@@ -3150,6 +3228,10 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return e.Name
 		}
 
+		if g.blockLocalVars != nil && g.blockLocalVars[e.Name] {
+			return e.Name
+		}
+
 		// Arrow resolver checked before builtins: parameters shadow builtins (PineScript semantics)
 		if g.arrowAccessResolver != nil {
 			if access, resolved := g.arrowAccessResolver.ResolveAccess(e.Name); resolved {
@@ -3191,7 +3273,8 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		left := g.extractSeriesExpression(e.Left)
 		right := g.extractSeriesExpression(e.Right)
 		op := NormalizeLogicalOperator(e.Operator)
-		return fmt.Sprintf("(value.IsTrue(%s) %s value.IsTrue(%s))", left, op, right)
+		boolExpr := fmt.Sprintf("(value.IsTrue(%s) %s value.IsTrue(%s))", left, op, right)
+		return fmt.Sprintf("func() float64 { if %s { return 1.0 }; return 0.0 }()", boolExpr)
 	case *ast.UnaryExpression:
 		operand := g.extractSeriesExpression(e.Argument)
 		op := NormalizeLogicalOperator(e.Operator)
@@ -3383,7 +3466,7 @@ func (g *generator) generatePlaceholder() string {
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)\n"
-	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].High, ctx.Data[i].Low)\n"
+	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].Open, ctx.Data[i].High, ctx.Data[i].Low, ctx.Data[i].Time)\n"
 	g.indent--
 	code += g.ind() + "}\n"
 	return code
@@ -3478,11 +3561,13 @@ func (g *generator) generateSTDEV(varName string, period int, accessor AccessGen
 
 	code.WriteString(g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period))
 
-	// Pass 2: Calculate variance
+	// Pass 2: Calculate variance with TV epsilon-rounding compensation
+	// (Pine ta.stdev reference: |diff|<=1e-10 → 0; |diff|<=1e-4 → 1e-5).
 	code.WriteString(g.ind() + "variance := 0.0\n")
 	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
 	g.indent++
 	code.WriteString(g.ind() + fmt.Sprintf("diff := %s - mean\n", accessor.GenerateLoopValueAccess("j")))
+	code.WriteString(g.ind() + "if d := math.Abs(diff); d <= 1e-10 { diff = 0 } else if d <= 1e-4 { diff = 1e-5 }\n")
 	code.WriteString(g.ind() + "variance += diff * diff\n")
 	g.indent--
 	code.WriteString(g.ind() + "}\n")
@@ -3610,8 +3695,9 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
 	isDirectSeriesAccess := strings.Contains(conditionAccess, ".Get(") &&
 		!strings.ContainsAny(conditionAccess, "><!=&|")
+	isFloat64Expression := isDirectSeriesAccess || strings.Contains(conditionAccess, "func() float64")
 
-	if isDirectSeriesAccess {
+	if isFloat64Expression {
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(%s) {\n", conditionAccess)
 	} else {
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(func() float64 { if %s { return 1.0 } else { return 0.0 } }()) {\n", conditionAccess)

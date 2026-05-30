@@ -67,7 +67,9 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"timeframe.in_seconds", 11, "TimeframeFuncCallHandler"},
 		{"timeframe.from_seconds", 11, "TimeframeFuncCallHandler"},
 		{"timeframe.change", 11, "TimeframeFuncCallHandler"},
-		{"unknown_function", 15, "UnknownFunctionHandler"},
+		{"alert", 15, "VoidBuiltinHandler"},
+		{"alertcondition", 15, "VoidBuiltinHandler"},
+		{"unknown_function", 16, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +174,24 @@ func TestCallExpressionRouter_RouteCall(t *testing.T) {
 				},
 			},
 			wantCode: "strat.CloseAll(",
+			wantErr:  false,
+		},
+		{
+			name: "alert void builtin produces no code",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "alert"},
+				Arguments: []ast.Expression{&ast.Literal{Value: "signal"}},
+			},
+			wantCode: "",
+			wantErr:  false,
+		},
+		{
+			name: "alertcondition void builtin produces no code",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "alertcondition"},
+				Arguments: []ast.Expression{&ast.Literal{Value: true}},
+			},
+			wantCode: "",
 			wantErr:  false,
 		},
 		{

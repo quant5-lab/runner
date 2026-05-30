@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/quant5-lab/runner/ast"
 )
@@ -133,12 +134,14 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 		if routeErr != nil {
 			return "", routeErr
 		}
-		if routedCode != "" {
+		if routedCode != "" && !strings.HasPrefix(strings.TrimSpace(routedCode), "//") {
 			return routedCode, nil
 		}
 	}
 
-	return "", fmt.Errorf("unhandled call expression: %s", funcName)
+	/* Unknown function in arrow expression position: degrade to NaN rather than error */
+	e.gen.featureGaps = append(e.gen.featureGaps, funcName)
+	return "math.NaN()", nil
 }
 
 func isTAFunction(funcName string) bool {

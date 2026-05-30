@@ -14,14 +14,17 @@ func (h *ValuewhenHandler) CanHandle(funcName string) bool {
 }
 
 func (h *ValuewhenHandler) GenerateCode(g *generator, varName string, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 3 {
+	resolver := newNamedArgResolver("condition", "source", "occurrence")
+	args := resolver.resolve(call.Arguments)
+
+	if len(args) < 3 {
 		return "", fmt.Errorf("valuewhen requires 3 arguments (condition, source, occurrence)")
 	}
 
-	conditionExpr := g.extractSeriesExpression(call.Arguments[0])
-	sourceExpr := g.extractSeriesExpression(call.Arguments[1])
+	conditionExpr := g.extractSeriesExpression(args[0])
+	sourceExpr := g.extractSeriesExpression(args[1])
 
-	occurrenceArg, ok := call.Arguments[2].(*ast.Literal)
+	occurrenceArg, ok := args[2].(*ast.Literal)
 	if !ok {
 		return "", fmt.Errorf("valuewhen occurrence must be literal")
 	}

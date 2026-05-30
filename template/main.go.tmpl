@@ -8,14 +8,16 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
-	"github.com/quant5-lab/runner/runtime/clock"
-	"encoding/json"
 
+	"github.com/quant5-lab/runner/datafetcher"
 	"github.com/quant5-lab/runner/runtime/arrayops"
-	"github.com/quant5-lab/runner/runtime/chartdata"
-	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/runtime/calendar"
+	"github.com/quant5-lab/runner/runtime/chartdata"
+	"github.com/quant5-lab/runner/runtime/clock"
+	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/market"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/request"
 	"github.com/quant5-lab/runner/runtime/series"
@@ -24,10 +26,8 @@ import (
 	"github.com/quant5-lab/runner/runtime/ta"
 	"github.com/quant5-lab/runner/runtime/value"
 	"github.com/quant5-lab/runner/runtime/visual"
-	"github.com/quant5-lab/runner/datafetcher"
 )
 
-/* Prevent unused import errors */
 var (
 	_ = math.IsNaN
 	_ = rand.Float64
@@ -40,9 +40,9 @@ var (
 	_ = value.Nz
 	_ = visual.PineColorNew
 	_ = calendar.Year
+	_ = strings.Contains
 )
 
-/* CLI flags */
 var (
 	symbolFlag    = flag.String("symbol", "", "Trading symbol (e.g., BTCUSDT)")
 	timeframeFlag = flag.String("timeframe", "1h", "Timeframe (e.g., 1m, 5m, 1h, 1D)")
@@ -51,10 +51,16 @@ var (
 	outputFlag    = flag.String("output", "chart-data.json", "Output file path")
 )
 
-/* Strategy execution function - INJECTED BY CODEGEN */
 {{STRATEGY_FUNC}}
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Runtime error: %v\n", r)
+			os.Exit(2)
+		}
+	}()
+
 	flag.Parse()
 
 	if *symbolFlag == "" || *dataFlag == "" {
@@ -62,79 +68,53 @@ func main() {
 		os.Exit(1)
 	}
 
-	/* Load OHLCV data from standard JSON format */
 	dataBytes, err := os.ReadFile(*dataFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read data file: %v\n", err)
 		os.Exit(1)
 	}
 
-	/* Parse JSON - support both array format and object with timezone */
-	var bars []context.OHLCV
-	var timezone string = "UTC" // default
-	
-	/* Try parsing as object with timezone metadata first */
-	var dataWithMetadata struct {
-		Timezone string           `json:"timezone"`
-		Bars     []context.OHLCV `json:"bars"`
-	}
-	if err := json.Unmarshal(dataBytes, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
-		bars = dataWithMetadata.Bars
-		timezone = dataWithMetadata.Timezone
-	} else {
-		/* Fallback: parse as plain array */
-		if err := json.Unmarshal(dataBytes, &bars); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	if len(bars) == 0 {
-		fmt.Fprintf(os.Stderr, "No bars in data file\n")
+	marketData, err := datafetcher.ParseMarketDataJSON(dataBytes)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
 		os.Exit(1)
 	}
 
-	/* Infer timezone for MOEX symbols if not specified */
-	if timezone == "" || timezone == "UTC" {
-		symbol := *symbolFlag
-		if len(symbol) >= 2 && (symbol[len(symbol)-2:] == "RU" || 
-			symbol == "CNRU" || symbol == "SBER" || symbol == "GAZP" || 
-			symbol == "LKOH" || symbol == "YNDX") {
-			timezone = "Europe/Moscow"
-		}
+	bars, profile := market.NormalizeBarsWithMetadata(*symbolFlag, *timeframeFlag, marketData.SourceMetadata, marketData.Bars)
+	if len(marketData.Bars) == 0 {
+		fmt.Fprintf(os.Stderr, "No bars in data file\n")
+		os.Exit(1)
+	}
+	if len(bars) == 0 {
+		fmt.Fprintf(os.Stderr, "No bars remain after market normalization\n")
+		os.Exit(1)
 	}
 
-	/* Create runtime context with timezone from data source */
 	ctx := context.New(*symbolFlag, *timeframeFlag, len(bars))
-	ctx.Timezone = timezone
+	ctx.Timezone = profile.Timezone
+	ctx.ReferenceSession = string(profile.ReferenceSession)
 	for _, bar := range bars {
 		ctx.AddBar(bar)
 	}
 
-	/* Determine data directory for security() calls */
 	dataDir := *dataDirFlag
 	if dataDir == "" {
-		/* Default: same directory as main data file */
 		dataDir = filepath.Dir(*dataFlag)
 	}
 
-	/* Built-in variables */
-	var syminfo_tickerid string = *symbolFlag  // syminfo.tickerid
-	_ = syminfo_tickerid // Suppress unused warning if not referenced
+	var syminfo_tickerid string = *symbolFlag
+	_ = syminfo_tickerid
 
-	/* Execute strategy (securityContexts filled by prefetch in executeStrategy) */
 	startTime := clock.Now()
 	securityContexts := make(map[string]*context.Context)
 	securityBarMappers := make(map[string]*request.SecurityBarMapper)
 	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts, securityBarMappers)
 	executionTime := time.Since(startTime)
 
-	/* Generate chart data with metadata */
 	cd := chartdata.NewChartData(ctx, *symbolFlag, *timeframeFlag, "{{STRATEGY_NAME}}")
 	cd.AddPlots(plotCollector)
 	cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
 
-	/* Write output */
 	jsonBytes, err := cd.ToJSON()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to generate JSON: %v\n", err)
@@ -147,10 +127,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	/* Print summary */
 	fmt.Printf("Symbol: %s\n", *symbolFlag)
 	fmt.Printf("Timeframe: %s\n", *timeframeFlag)
-	fmt.Printf("Timezone: %s\n", timezone)
+	fmt.Printf("Timezone: %s\n", profile.Timezone)
 	fmt.Printf("Bars: %d\n", len(bars))
 	fmt.Printf("Execution time: %v\n", executionTime)
 	fmt.Printf("Output: %s (%d bytes)\n", *outputFlag, len(jsonBytes))
