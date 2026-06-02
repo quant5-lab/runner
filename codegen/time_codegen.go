@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+// bar.Time stores seconds; Pine's time contract and calendar.* both require milliseconds.
+const barTimestampMsExpr = "float64(ctx.Data[ctx.BarIndex].Time * 1000)"
+
 /*
 TimeCodeGenerator emits Go source for Pine's time(timeframe, session)
 function. The Pine version is captured at construction so the emitted call
@@ -26,11 +29,11 @@ func NewTimeCodeGeneratorWithVersion(indentation string, pineVersion int) *TimeC
 }
 
 func (g *TimeCodeGenerator) GenerateNoArguments(varName string) string {
-	return g.indentation + fmt.Sprintf("%sSeries.Set(float64(ctx.Data[ctx.BarIndex].Time))\n", varName)
+	return g.indentation + fmt.Sprintf("%sSeries.Set(%s)\n", varName, barTimestampMsExpr)
 }
 
 func (g *TimeCodeGenerator) GenerateSingleArgument(varName string) string {
-	return g.indentation + fmt.Sprintf("%sSeries.Set(float64(ctx.Data[ctx.BarIndex].Time))\n", varName)
+	return g.indentation + fmt.Sprintf("%sSeries.Set(%s)\n", varName, barTimestampMsExpr)
 }
 
 func (g *TimeCodeGenerator) GenerateWithSession(varName string, session SessionArgument) string {

@@ -117,21 +117,38 @@ func TestCalendarFuncs_MsCanonicalization(t *testing.T) {
 		t.Fatalf("read result: %v", err)
 	}
 
-	// Result schema: parse generic and locate "year" plot series.
 	var result map[string]any
 	if err := json.Unmarshal(resultBytes, &result); err != nil {
 		t.Fatalf("unmarshal result: %v", err)
 	}
 
-	yearValues := extractPlotValues(t, result, "year")
-	if len(yearValues) == 0 {
-		t.Fatalf("plot 'year' missing or empty in result\nraw: %s", truncate(string(resultBytes), 2000))
+	// All three call forms of Pine's time() must yield ms-unit timestamps.
+	// Fixture epoch: 1640000000 sec = 2021-12-20 UTC; 30 daily bars stays inside 2022.
+	// If any path stores seconds instead of ms, year() returns ~55000 (1970 + 55000/365 ≈ year 2120+).
+	calendarPlots := []struct {
+		plotName string
+		desc     string
+	}{
+		{"year", "year(time) — built-in time variable"},
+		{"year_via_t", "year(t) where t = time() — no-arg variable-init path"},
+		{"year_via_t1d", "year(t) where t = time(\"D\") — single-arg variable-init path"},
 	}
+	for _, cp := range calendarPlots {
+		assertYearPlotInRange(t, result, resultBytes, cp.plotName, cp.desc)
+	}
+}
 
-	for _, y := range yearValues {
-		// 1640000000s = 2021-12-20 UTC; 30 daily bars stays within 2022.
+func assertYearPlotInRange(t *testing.T, result map[string]any, raw []byte, plotName, desc string) {
+	t.Helper()
+	values := extractPlotValues(t, result, plotName)
+	if len(values) == 0 {
+		t.Errorf("plot %q (%s) missing or empty in result\nraw: %s",
+			plotName, desc, truncate(string(raw), 2000))
+		return
+	}
+	for _, y := range values {
 		if y < 2020 || y > 2030 {
-			t.Errorf("year(time) = %v, want value in [2020, 2030] — calendar ms canonicalization broken (year would be ~55000+ if pkg still expected seconds)", y)
+			t.Errorf("%s (%s): year = %v, want value in [2020, 2030]", plotName, desc, y)
 			break
 		}
 	}

@@ -248,197 +248,246 @@ func TestSessionArgument_IsValid(t *testing.T) {
 	}
 }
 
-func TestTimeCodeGenerator_GenerateNoArguments(t *testing.T) {
-	gen := NewTimeCodeGenerator("\t")
-	result := gen.GenerateNoArguments("myVar")
+func TestTimeCodeGenerator_BareTimestampPaths(t *testing.T) {
+	type genFunc func(varName string) string
 
-	expected := "\tmyVarSeries.Set(float64(ctx.Data[ctx.BarIndex].Time))\n"
-	if result != expected {
-		t.Errorf("expected:\n%s\ngot:\n%s", expected, result)
+	tests := []struct {
+		name    string
+		indent  string
+		varName string
+		method  func(g *TimeCodeGenerator) genFunc
+	}{
+		{"no_args_tab_indent", "\t", "myVar", func(g *TimeCodeGenerator) genFunc { return g.GenerateNoArguments }},
+		{"no_args_double_indent", "\t\t", "tSeries", func(g *TimeCodeGenerator) genFunc { return g.GenerateNoArguments }},
+		{"single_arg_tab_indent", "\t", "myVar", func(g *TimeCodeGenerator) genFunc { return g.GenerateSingleArgument }},
+		{"single_arg_double_indent", "\t\t", "tSeries", func(g *TimeCodeGenerator) genFunc { return g.GenerateSingleArgument }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := NewTimeCodeGenerator(tt.indent)
+			result := tt.method(gen)(tt.varName)
+			if !strings.Contains(result, barTimestampMsExpr) {
+				t.Errorf("want ms timestamp %q in output, got:\n%s", barTimestampMsExpr, result)
+			}
+			if !strings.Contains(result, tt.varName+"Series.Set(") {
+				t.Errorf("want %sSeries.Set(...) in output, got:\n%s", tt.varName, result)
+			}
+			if !strings.HasPrefix(result, tt.indent) {
+				t.Errorf("want indentation %q prefix, got:\n%s", tt.indent, result)
+			}
+		})
 	}
 }
 
-func TestTimeCodeGenerator_GenerateWithSession_Literal(t *testing.T) {
-	gen := NewTimeCodeGenerator("\t")
-	session := SessionArgument{
-		Type:  ArgumentTypeLiteral,
-		Value: "0950-1645",
-	}
-
-	result := gen.GenerateWithSession("myVar", session)
-
-	if !strings.Contains(result, `"0950-1645"`) {
-		t.Errorf("expected literal session string in quotes, got:\n%s", result)
-	}
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got:\n%s", result)
-	}
-	if !strings.Contains(result, "ctx.Timezone") {
-		t.Errorf("expected ctx.Timezone parameter, got:\n%s", result)
-	}
-}
-
-func TestTimeCodeGenerator_GenerateWithSession_Variable(t *testing.T) {
-	gen := NewTimeCodeGenerator("\t")
-	session := SessionArgument{
-		Type:  ArgumentTypeIdentifier,
-		Value: "entry_time_input",
-	}
-
-	result := gen.GenerateWithSession("myVar", session)
-
-	if !strings.Contains(result, "entry_time_input") {
-		t.Errorf("expected variable name without quotes, got:\n%s", result)
-	}
-	if strings.Contains(result, `"entry_time_input"`) {
-		t.Errorf("variable should not be quoted, got:\n%s", result)
-	}
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got:\n%s", result)
-	}
-}
-
-func TestTimeCodeGenerator_GenerateWithSession_Invalid(t *testing.T) {
-	gen := NewTimeCodeGenerator("\t")
-	session := SessionArgument{
-		Type: ArgumentTypeUnknown,
-	}
-
-	result := gen.GenerateWithSession("myVar", session)
-
-	if !strings.Contains(result, "math.NaN()") {
-		t.Errorf("expected NaN for invalid session, got:\n%s", result)
-	}
-}
-
-func TestTimeHandler_HandleVariableInit_NoArguments(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{},
-	}
-
-	result := handler.HandleVariableInit("testVar", call)
-
-	if !strings.Contains(result, "float64(ctx.Data[ctx.BarIndex].Time)") {
-		t.Errorf("expected timestamp without session filtering, got:\n%s", result)
-	}
-}
-
-func TestTimeHandler_HandleVariableInit_SingleArgument(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "timeframe.period"},
+func TestTimeCodeGenerator_SessionPaths(t *testing.T) {
+	tests := []struct {
+		name           string
+		session        SessionArgument
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:         "literal_session_quoted",
+			session:      SessionArgument{Type: ArgumentTypeLiteral, Value: "0950-1645"},
+			wantContains: []string{`"0950-1645"`, "session.TimeFunc", "ctx.Timezone"},
+		},
+		{
+			name:           "identifier_session_unquoted",
+			session:        SessionArgument{Type: ArgumentTypeIdentifier, Value: "entry_time_input"},
+			wantContains:   []string{"entry_time_input", "session.TimeFunc"},
+			wantNotContain: []string{`"entry_time_input"`},
+		},
+		{
+			name:         "invalid_session_emits_nan",
+			session:      SessionArgument{Type: ArgumentTypeUnknown},
+			wantContains: []string{"math.NaN()"},
 		},
 	}
 
-	result := handler.HandleVariableInit("testVar", call)
-
-	if !strings.Contains(result, "float64(ctx.Data[ctx.BarIndex].Time)") {
-		t.Errorf("expected timestamp without session filtering, got:\n%s", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := NewTimeCodeGenerator("\t")
+			result := gen.GenerateWithSession("myVar", tt.session)
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("want %q in output, got:\n%s", want, result)
+				}
+			}
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(result, notWant) {
+					t.Errorf("must not contain %q in output, got:\n%s", notWant, result)
+				}
+			}
+		})
 	}
 }
 
-func TestTimeHandler_HandleVariableInit_TwoArguments_Literal(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "timeframe.period"},
-			&ast.Literal{Value: `"0950-1645"`},
+func TestTimeHandler_HandleVariableInit(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []ast.Expression
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:         "zero_args_emits_ms_timestamp",
+			args:         []ast.Expression{},
+			wantContains: []string{barTimestampMsExpr},
+		},
+		{
+			name:         "single_arg_timeframe_emits_ms_timestamp",
+			args:         []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
+			wantContains: []string{barTimestampMsExpr},
+		},
+		{
+			name: "two_args_literal_session_emits_session_filter",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Literal{Value: `"0950-1645"`},
+			},
+			wantContains:   []string{"session.TimeFunc", `"0950-1645"`},
+			wantNotContain: []string{"math.NaN()"},
+		},
+		{
+			name: "two_args_variable_session_unquoted",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Identifier{Name: "my_session_var"},
+			},
+			wantContains:   []string{"session.TimeFunc", "my_session_var"},
+			wantNotContain: []string{`"my_session_var"`},
+		},
+		{
+			name: "two_args_invalid_session_emits_nan",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Literal{Value: 123},
+			},
+			wantContains: []string{"math.NaN()"},
 		},
 	}
 
-	result := handler.HandleVariableInit("testVar", call)
-
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got:\n%s", result)
-	}
-	if !strings.Contains(result, `"0950-1645"`) {
-		t.Errorf("expected quoted session string, got:\n%s", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewTimeHandler("\t")
+			result := handler.HandleVariableInit("testVar", &ast.CallExpression{Arguments: tt.args})
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("want %q in output, got:\n%s", want, result)
+				}
+			}
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(result, notWant) {
+					t.Errorf("must not contain %q in output, got:\n%s", notWant, result)
+				}
+			}
+		})
 	}
 }
 
-func TestTimeHandler_HandleVariableInit_TwoArguments_Variable(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Identifier{Name: "timeframe.period"},
-			&ast.Identifier{Name: "my_session_var"},
+func TestTimeHandler_HandleInlineExpression(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []ast.Expression
+		wantContains   []string
+		wantExact      string
+		wantNotContain []string
+	}{
+		{
+			name:      "zero_args_returns_ms_timestamp",
+			args:      []ast.Expression{},
+			wantExact: barTimestampMsExpr,
+		},
+		{
+			name:      "single_arg_timeframe_only_returns_ms_timestamp",
+			args:      []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
+			wantExact: barTimestampMsExpr,
+		},
+		{
+			name: "two_args_literal_session_emits_session_filter",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Literal{Value: `"0950-1645"`},
+			},
+			wantContains:   []string{"session.TimeFunc", `"0950-1645"`},
+			wantNotContain: []string{"math.NaN()"},
+		},
+		{
+			name: "two_args_variable_session_unquoted",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Identifier{Name: "entry_time"},
+			},
+			wantContains:   []string{"session.TimeFunc", "entry_time"},
+			wantNotContain: []string{`"entry_time"`},
+		},
+		{
+			name: "two_args_invalid_session_returns_nan",
+			args: []ast.Expression{
+				&ast.Identifier{Name: "timeframe.period"},
+				&ast.Literal{Value: 123},
+			},
+			wantExact: "math.NaN()",
 		},
 	}
 
-	result := handler.HandleVariableInit("testVar", call)
-
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got:\n%s", result)
-	}
-	if !strings.Contains(result, "my_session_var") {
-		t.Errorf("expected variable name, got:\n%s", result)
-	}
-	if strings.Contains(result, `"my_session_var"`) {
-		t.Errorf("variable should not be quoted, got:\n%s", result)
-	}
-}
-
-func TestTimeHandler_HandleInlineExpression_NoSession(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	args := []ast.Expression{
-		&ast.Identifier{Name: "timeframe.period"},
-	}
-
-	result := handler.HandleInlineExpression(args)
-
-	expected := "float64(ctx.Data[ctx.BarIndex].Time)"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewTimeHandler("\t")
+			result := handler.HandleInlineExpression(tt.args)
+			if tt.wantExact != "" && result != tt.wantExact {
+				t.Errorf("want exact %q, got %q", tt.wantExact, result)
+			}
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("want %q in output, got: %s", want, result)
+				}
+			}
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(result, notWant) {
+					t.Errorf("must not contain %q in output, got: %s", notWant, result)
+				}
+			}
+		})
 	}
 }
 
-func TestTimeHandler_HandleInlineExpression_WithLiteralSession(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	args := []ast.Expression{
+// The registry constructs TimeHandlers at setup time with a v5 default; strategies may be v4.
+func TestTimeHandler_GenerateInline_PineVersionBinding(t *testing.T) {
+	sessionArgs := []ast.Expression{
 		&ast.Identifier{Name: "timeframe.period"},
-		&ast.Literal{Value: `"0950-1645"`},
+		&ast.Literal{Value: `"0930-1600"`},
+	}
+	expr := &ast.CallExpression{Arguments: sessionArgs}
+
+	tests := []struct {
+		name         string
+		handlerVer   int
+		generatorVer int
+		wantVersion  string
+	}{
+		{"handler_v4_no_generator", 4, 0, ", 4)"},
+		{"handler_v5_no_generator", 5, 0, ", 5)"},
+		{"generator_v4_overrides_handler_v5", 5, 4, ", 4)"},
+		{"generator_v5_overrides_handler_v4", 4, 5, ", 5)"},
 	}
 
-	result := handler.HandleInlineExpression(args)
-
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got: %s", result)
-	}
-	if !strings.Contains(result, `"0950-1645"`) {
-		t.Errorf("expected quoted session string, got: %s", result)
-	}
-}
-
-func TestTimeHandler_HandleInlineExpression_WithVariableSession(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	args := []ast.Expression{
-		&ast.Identifier{Name: "timeframe.period"},
-		&ast.Identifier{Name: "entry_time"},
-	}
-
-	result := handler.HandleInlineExpression(args)
-
-	if !strings.Contains(result, "session.TimeFunc") {
-		t.Errorf("expected session.TimeFunc call, got: %s", result)
-	}
-	if !strings.Contains(result, "entry_time") {
-		t.Errorf("expected variable name, got: %s", result)
-	}
-}
-
-func TestTimeHandler_HandleInlineExpression_InvalidSession(t *testing.T) {
-	handler := NewTimeHandler("\t")
-	args := []ast.Expression{
-		&ast.Identifier{Name: "timeframe.period"},
-		&ast.Literal{Value: 123}, // Invalid: not a string
-	}
-
-	result := handler.HandleInlineExpression(args)
-
-	expected := "math.NaN()"
-	if result != expected {
-		t.Errorf("expected %q for invalid session, got %q", expected, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewTimeHandlerWithVersion("", tt.handlerVer)
+			var g *generator
+			if tt.generatorVer != 0 {
+				g = newTestGenerator()
+				g.pineVersion = tt.generatorVer
+			}
+			result, err := handler.GenerateInline(expr, g)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, tt.wantVersion) {
+				t.Errorf("want version suffix %q in output, got: %s", tt.wantVersion, result)
+			}
+		})
 	}
 }

@@ -77,7 +77,7 @@ func (h *TimeHandler) HandleInlineExpression(args []ast.Expression) string {
 
 func (h *TimeHandler) handleInlineExpressionWithVersion(args []ast.Expression, pineVersion int) string {
 	if len(args) < 2 {
-		return "float64(ctx.Data[ctx.BarIndex].Time)"
+		return barTimestampMsExpr
 	}
 
 	sessionArg := args[1]
