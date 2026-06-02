@@ -141,7 +141,7 @@ func (e *ArrowExpressionGeneratorImpl) generateCallExpression(call *ast.CallExpr
 
 	/* Unknown function in arrow expression position: degrade to NaN rather than error */
 	e.gen.featureGaps = append(e.gen.featureGaps, funcName)
-	return "math.NaN()", nil
+	return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", funcName, "arrow_expression"), nil
 }
 
 func isTAFunction(funcName string) bool {

@@ -2563,8 +2563,10 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	}
 
 	if sharedTASignatures.Contains(funcName) {
-		log.Printf("WARNING: TA function %s has no handler — producing NaN stub", funcName)
-		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
+		log.Printf("WARNING: TA function %s has no handler — producing featuregap stub", funcName)
+		g.featureGaps = append(g.featureGaps, funcName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(featuregap.Record(%q, %q, ctx.BarIndex))\n",
+			varName, funcName, "generator.ta_no_handler"), nil
 	}
 
 	// Handle math functions that need Series storage (have TA dependencies)
@@ -2805,7 +2807,9 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, routedCode), nil
 		}
 
-		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
+		g.featureGaps = append(g.featureGaps, funcName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(featuregap.Record(%q, %q, ctx.BarIndex))\n",
+			varName, funcName, "generator.variable_init_unknown"), nil
 	}
 }
 

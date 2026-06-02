@@ -235,3 +235,6 @@ transcripts/
 .playwright-cli
 # Editor and tool artifacts
 *.backup
+
+# Claude Code agent artifacts
+.claude/scheduled_tasks.lock

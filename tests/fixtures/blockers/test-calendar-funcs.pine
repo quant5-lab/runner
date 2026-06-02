@@ -1,0 +1,22 @@
+//@version=5
+indicator("Test Calendar Functions", overlay=false)
+
+// Exercise the function-call form of every calendar builtin against the
+// Pine `time` identifier. With the ms convention fix, these must produce
+// values that match the current year/month/etc. of the test fixture epoch
+// (1640000000 sec = 2021-12-20 UTC).
+y  = year(time)
+mo = month(time)
+dw = dayofweek(time)
+dm = dayofmonth(time)
+hr = hour(time)
+mn = minute(time)
+sc = second(time)
+wk = weekofyear(time)
+
+// Plot one of them to keep pine-gen happy; the others must compile and run.
+plot(y, "year")
+plot(mo, "month")
+plot(dw, "dayofweek")
+plot(dm, "dayofmonth")
+plot(hr, "hour")

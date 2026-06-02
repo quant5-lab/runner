@@ -6,9 +6,11 @@ import (
 )
 
 // TestArrowExpressionPosition_UnknownCall_DegradesToNaN verifies that an unknown
-// function call in arrow expression position produces math.NaN() — a valid Go
-// expression — rather than a comment stub or an error.  The contract covers all
-// syntactic positions in which the call can appear as an expression value.
+// function call in arrow expression position produces a NaN-returning expression
+// — specifically `featuregap.Record(...)`, which returns NaN at runtime while
+// also recording the gap for diagnostics — rather than a comment stub or an
+// error. The contract covers all syntactic positions in which the call can
+// appear as an expression value.
 func TestArrowExpressionPosition_UnknownCall_DegradesToNaN(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -57,8 +59,8 @@ plot(f(close), "f")
 			if strings.Contains(code, "// TODO") {
 				t.Errorf("generated code must not embed TODO comment as expression value:\n%s", code)
 			}
-			if !strings.Contains(code, "math.NaN()") {
-				t.Errorf("generated code must contain math.NaN() stub for unknown function:\n%s", code)
+			if !strings.Contains(code, "featuregap.Record(") {
+				t.Errorf("generated code must contain featuregap.Record stub for unknown function:\n%s", code)
 			}
 		})
 	}

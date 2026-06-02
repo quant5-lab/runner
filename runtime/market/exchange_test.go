@@ -1,6 +1,11 @@
 package market
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/quant5-lab/runner/runtime/context"
+)
 
 func TestResolveExchange_KnownSymbolFamilies(t *testing.T) {
 	tests := []struct {
@@ -134,6 +139,86 @@ func TestCalendarFor_MetadataUniversePrecedence(t *testing.T) {
 			case AlwaysOpenCalendar:
 				if _, ok := profile.Calendar.(AlwaysOpenCalendar); !ok {
 					t.Fatalf("calendar = %T, want AlwaysOpenCalendar", profile.Calendar)
+				}
+			}
+		})
+	}
+}
+
+// TestRegularCalendarForExchange_WeekdayBehavior verifies the exact weekday
+// accept/reject pattern produced by RegularCalendarForExchange for each known
+// exchange. This is the behavioral contract that session-filter correctness
+// relies on: MOEX must reject Sat/Sun, Binance must accept all days.
+//
+// The test uses synthetic weekday bars at a fixed midday UTC instant so the
+// assertions are timezone-independent (UTC weekday == exchange weekday for
+// these specific dates).
+func TestRegularCalendarForExchange_WeekdayBehavior(t *testing.T) {
+	// 2025-09-01 Mon through 2025-09-07 Sun at 12:00 UTC.
+	type weekRow struct {
+		weekday time.Weekday
+		bar     context.OHLCV
+	}
+	base := time.Date(2025, time.September, 1, 12, 0, 0, 0, time.UTC) // Monday
+	weekBars := make([]weekRow, 7)
+	for i := range weekBars {
+		instant := base.AddDate(0, 0, i)
+		weekBars[i] = weekRow{weekday: instant.Weekday(), bar: context.OHLCV{Time: instant.Unix()}}
+	}
+
+	cases := []struct {
+		name           string
+		exchange       Exchange
+		acceptWeekdays map[time.Weekday]bool
+	}{
+		{
+			name:     "MOEX_rejects_sat_sun_accepts_weekdays",
+			exchange: ExchangeMOEX,
+			acceptWeekdays: map[time.Weekday]bool{
+				time.Monday:    true,
+				time.Tuesday:   true,
+				time.Wednesday: true,
+				time.Thursday:  true,
+				time.Friday:    true,
+				time.Saturday:  false,
+				time.Sunday:    false,
+			},
+		},
+		{
+			name:     "Binance_accepts_all_seven_days",
+			exchange: ExchangeBinance,
+			acceptWeekdays: map[time.Weekday]bool{
+				time.Monday:    true,
+				time.Tuesday:   true,
+				time.Wednesday: true,
+				time.Thursday:  true,
+				time.Friday:    true,
+				time.Saturday:  true,
+				time.Sunday:    true,
+			},
+		},
+		{
+			name:     "Unknown_accepts_all_seven_days",
+			exchange: ExchangeUnknown,
+			acceptWeekdays: map[time.Weekday]bool{
+				time.Monday:    true,
+				time.Tuesday:   true,
+				time.Wednesday: true,
+				time.Thursday:  true,
+				time.Friday:    true,
+				time.Saturday:  true,
+				time.Sunday:    true,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cal := RegularCalendarForExchange(tc.exchange, SourceMetadata{})
+			for _, row := range weekBars {
+				want := tc.acceptWeekdays[row.weekday]
+				if got := cal.Accepts(row.bar, "1h", "UTC"); got != want {
+					t.Errorf("%s: Accepts(%s) = %v, want %v", tc.name, row.weekday, got, want)
 				}
 			}
 		})

@@ -6,7 +6,13 @@ import (
 	"testing"
 )
 
-var bb7DisputedBars = []int{1798, 3327, 3766}
+// bb7SBERPDisputedBars are SBERP 1h bar indices that fall on Sundays in
+// Europe/Moscow time, verified by TestBB7_DisputedBars_AreWeekendDays.
+var bb7SBERPDisputedBars = []int{1798, 3327, 3766}
+
+// bb7BTCUSDTDisputedBars are BTCUSDT 1h bar indices that fall on weekends in UTC:
+// two Saturdays (2181, 4701) and one Sunday (4557), verified by TestBB7_DisputedBars_AreWeekendDays.
+var bb7BTCUSDTDisputedBars = []int{2181, 4557, 4701}
 
 type directionProbe struct {
 	HourlyBarIdx int
@@ -20,6 +26,8 @@ type directionProbe struct {
 	EntryType    string
 }
 
+// TestBB7_SBERP_DirectionTrace asserts that at each weekend bar the daily
+// SMA direction is internally consistent: SMA20 < SMA50 → entry_type=Short.
 func TestBB7_SBERP_DirectionTrace(t *testing.T) {
 	root := projectRootFromCwd()
 	dataDir := filepath.Join(root, "tests", "golden", "fixtures", "data")
@@ -27,7 +35,22 @@ func TestBB7_SBERP_DirectionTrace(t *testing.T) {
 	hourly := loadOHLCVBars(t, filepath.Join(dataDir, "SBERP-1h.json"))
 	daily := loadOHLCVBars(t, filepath.Join(dataDir, "SBERP_1D.json"))
 
-	for _, barIdx := range bb7DisputedBars {
+	for _, barIdx := range bb7SBERPDisputedBars {
+		probe := buildDirectionProbe(t, hourly, daily, barIdx)
+		assertProbeConsistency(t, probe)
+	}
+}
+
+// TestBB7_BTCUSDT_DirectionTrace asserts that at each weekend BTCUSDT bar the
+// daily SMA direction is internally consistent: SMA20 < SMA50 → entry_type=Short.
+func TestBB7_BTCUSDT_DirectionTrace(t *testing.T) {
+	root := projectRootFromCwd()
+	dataDir := filepath.Join(root, "tests", "golden", "fixtures", "data")
+
+	hourly := loadOHLCVBars(t, filepath.Join(dataDir, "BTCUSDT-1h.json"))
+	daily := loadOHLCVBars(t, filepath.Join(dataDir, "BTCUSDT_1D.json"))
+
+	for _, barIdx := range bb7BTCUSDTDisputedBars {
 		probe := buildDirectionProbe(t, hourly, daily, barIdx)
 		assertProbeConsistency(t, probe)
 	}

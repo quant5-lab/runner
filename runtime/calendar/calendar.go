@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-/* Calendar extraction for Pine Script date/time builtins (timestamps in Unix seconds) */
+// Calendar extraction for Pine Script date/time builtins.
+// All public functions accept timestamps as Unix milliseconds (Pine convention).
 
 func loadLocation(timezone string) *time.Location {
 	if timezone == "" {
@@ -18,65 +19,65 @@ func loadLocation(timezone string) *time.Location {
 	return loc
 }
 
-func toTime(timestampSec float64, timezone string) (time.Time, bool) {
-	if math.IsNaN(timestampSec) {
+func toTime(timestampMs float64, timezone string) (time.Time, bool) {
+	if math.IsNaN(timestampMs) {
 		return time.Time{}, false
 	}
-	return time.Unix(int64(timestampSec), 0).In(loadLocation(timezone)), true
+	return time.UnixMilli(int64(timestampMs)).In(loadLocation(timezone)), true
 }
 
-func Year(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func Year(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Year())
 	}
 	return math.NaN()
 }
 
-func Month(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func Month(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Month())
 	}
 	return math.NaN()
 }
 
-/* Pine convention: 1=Sunday, 2=Monday...7=Saturday */
-func DayOfWeek(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+// Pine convention: 1=Sunday, 2=Monday...7=Saturday
+func DayOfWeek(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Weekday() + 1)
 	}
 	return math.NaN()
 }
 
-func DayOfMonth(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func DayOfMonth(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Day())
 	}
 	return math.NaN()
 }
 
-func Hour(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func Hour(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Hour())
 	}
 	return math.NaN()
 }
 
-func Minute(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func Minute(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Minute())
 	}
 	return math.NaN()
 }
 
-func Second(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func Second(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		return float64(t.Second())
 	}
 	return math.NaN()
 }
 
-func WeekOfYear(timestampSec float64, timezone string) float64 {
-	if t, ok := toTime(timestampSec, timezone); ok {
+func WeekOfYear(timestampMs float64, timezone string) float64 {
+	if t, ok := toTime(timestampMs, timezone); ok {
 		_, week := t.ISOWeek()
 		return float64(week)
 	}
