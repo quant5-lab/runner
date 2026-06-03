@@ -117,3 +117,102 @@ func TestExplicitUniverseCalendars(t *testing.T) {
 		t.Fatal("date whitelist calendar must accept only listed local dates")
 	}
 }
+
+func TestRegularSessionCalendar_NonIntradayTimeframesPassThroughWindow(t *testing.T) {
+	window := NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50))
+	calWithWindow := NewRegularSessionCalendarWithWindow(
+		NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window,
+	)
+	calMOEXStyle := NewRegularSessionCalendarWithWindow(
+		WeekdaySet{}, nil, nil, window,
+	)
+	calNoWindow := NewRegularWeekdayCalendar(
+		NewWeekdaySet(time.Saturday, time.Sunday), nil, nil,
+	)
+
+	preSession := context.OHLCV{Time: unixInMoscow(t, "2025-08-15 06:00")}
+	inSession := context.OHLCV{Time: unixInMoscow(t, "2025-08-15 13:00")}
+	satPreSession := context.OHLCV{Time: unixInMoscow(t, "2025-08-16 06:00")}
+	midnight := context.OHLCV{Time: unixInMoscow(t, "2025-08-15 00:00")}
+
+	cases := []struct {
+		name      string
+		calendar  RegularSessionCalendar
+		bar       context.OHLCV
+		timeframe string
+		want      bool
+	}{
+		{name: "intraday-1h/before window start rejected", calendar: calWithWindow, bar: preSession, timeframe: "1h", want: false},
+		{name: "intraday-1h/within window accepted", calendar: calWithWindow, bar: inSession, timeframe: "1h", want: true},
+		{name: "intraday-30/before start rejected", calendar: calWithWindow, bar: preSession, timeframe: "30", want: false},
+		{name: "intraday-15/within window accepted", calendar: calWithWindow, bar: inSession, timeframe: "15", want: true},
+
+		// calWithWindow has Sat/Sun closed; preSession/midnight are Friday → weekday open.
+		{name: "daily-1D/pre-session weekday accepted", calendar: calWithWindow, bar: preSession, timeframe: "1D", want: true},
+		{name: "daily-1D/midnight weekday accepted", calendar: calWithWindow, bar: midnight, timeframe: "1D", want: true},
+		{name: "daily-D/pre-session accepted", calendar: calMOEXStyle, bar: preSession, timeframe: "D", want: true},
+
+		{name: "weekly-1W/pre-session accepted", calendar: calMOEXStyle, bar: preSession, timeframe: "1W", want: true},
+		{name: "weekly-1W/midnight accepted", calendar: calMOEXStyle, bar: midnight, timeframe: "1W", want: true},
+		{name: "monthly-1M/pre-session accepted", calendar: calMOEXStyle, bar: preSession, timeframe: "1M", want: true},
+		{name: "monthly-1mo/midnight accepted", calendar: calMOEXStyle, bar: midnight, timeframe: "1mo", want: true},
+
+		// Weekday rejection is NOT timeframe-gated — closed weekdays apply to all timeframes.
+		{name: "daily/closed-weekday still rejected", calendar: calWithWindow, bar: satPreSession, timeframe: "1D", want: false},
+		{name: "weekly/closed-weekday still rejected", calendar: calWithWindow, bar: satPreSession, timeframe: "1W", want: false},
+		{name: "intraday/closed-weekday rejected", calendar: calWithWindow, bar: satPreSession, timeframe: "1h", want: false},
+
+		{name: "no-window/intraday pre-session accepted", calendar: calNoWindow, bar: preSession, timeframe: "1h", want: true},
+		{name: "no-window/daily midnight accepted", calendar: calNoWindow, bar: midnight, timeframe: "1D", want: true},
+		{name: "no-window/closed-weekday rejected regardless", calendar: calNoWindow, bar: satPreSession, timeframe: "1D", want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.calendar.Accepts(tc.bar, tc.timeframe, "Europe/Moscow"); got != tc.want {
+				t.Fatalf("Accepts(timeframe=%q) = %v, want %v", tc.timeframe, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRegularSessionCalendar_SessionWindowContract(t *testing.T) {
+	window := NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50))
+	noWindow := SessionWindow{}
+
+	cases := []struct {
+		name     string
+		calendar RegularSessionCalendar
+		time     string
+		want     bool
+	}{
+		{name: "unbounded/pre-dawn weekday accepted", calendar: NewRegularWeekdayCalendar(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil), time: "2025-08-15 06:00", want: true},
+		{name: "unbounded/midnight weekday accepted", calendar: NewRegularWeekdayCalendar(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil), time: "2025-08-15 00:00", want: true},
+
+		{name: "window/bar before start rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window), time: "2025-08-15 06:00", want: false},
+		{name: "window/bar at start accepted", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window), time: "2025-08-15 07:00", want: true},
+		{name: "window/midday bar accepted", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window), time: "2025-08-15 13:00", want: true},
+		{name: "window/bar at end rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window), time: "2025-08-15 23:50", want: false},
+
+		{name: "window/closed weekday outside window rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil, window), time: "2025-08-16 13:00", want: false},
+		{name: "no-window/closed weekday still rejected", calendar: NewRegularWeekdayCalendar(NewWeekdaySet(time.Saturday, time.Sunday), nil, nil), time: "2025-08-16 13:00", want: false},
+
+		{name: "special-closed/inside window rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), nil, NewDateSet("2025-08-15"), window), time: "2025-08-15 13:00", want: false},
+		{name: "special-closed/no-window rejected", calendar: NewRegularWeekdayCalendar(NewWeekdaySet(time.Saturday, time.Sunday), nil, NewDateSet("2025-08-15")), time: "2025-08-15 13:00", want: false},
+
+		{name: "special-open/inside window accepted", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), NewDateSet("2025-08-16"), nil, window), time: "2025-08-16 13:00", want: true},
+		{name: "special-open/before window rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), NewDateSet("2025-08-16"), nil, window), time: "2025-08-16 06:00", want: false},
+		{name: "special-open/no-window any hour accepted", calendar: NewRegularWeekdayCalendar(NewWeekdaySet(time.Saturday, time.Sunday), NewDateSet("2025-08-16"), nil), time: "2025-08-16 06:00", want: true},
+
+		{name: "closed-beats-open/inside window rejected", calendar: NewRegularSessionCalendarWithWindow(NewWeekdaySet(time.Saturday, time.Sunday), NewDateSet("2025-08-18"), NewDateSet("2025-08-18"), noWindow), time: "2025-08-18 13:00", want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bar := context.OHLCV{Time: unixInMoscow(t, tc.time)}
+			if got := tc.calendar.Accepts(bar, "1h", "Europe/Moscow"); got != tc.want {
+				t.Fatalf("Accepts() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -2,7 +2,6 @@ package market
 
 import (
 	"strings"
-	"time"
 )
 
 type Exchange string
@@ -26,6 +25,7 @@ type SourceMetadata struct {
 	ReferenceSession   string   `json:"referenceSession,omitempty"`
 	SessionSource      string   `json:"sessionSource,omitempty"`
 	CalendarID         string   `json:"calendarId,omitempty"`
+	SessionWindow      string   `json:"sessionWindow,omitempty"`
 	ClosedWeekdays     []string `json:"closedWeekdays,omitempty"`
 	OpenDates          []string `json:"openDates,omitempty"`
 	ClosedDates        []string `json:"closedDates,omitempty"`
@@ -56,7 +56,7 @@ func ResolveProfileWithMetadata(symbol string, metadata SourceMetadata) Profile 
 	if timezone == "" {
 		timezone = DefaultTimezone(exchange)
 	}
-	session := ParseReferenceSession(metadata.ReferenceSession)
+	session := resolveReferenceSession(metadata, exchange)
 
 	return Profile{
 		Exchange:         exchange,
@@ -122,6 +122,22 @@ func ParseReferenceSession(value string) ReferenceSession {
 	}
 }
 
+func DefaultReferenceSession(exchange Exchange) ReferenceSession {
+	switch exchange {
+	case ExchangeMOEX:
+		return ReferenceSessionRegular
+	default:
+		return ReferenceSessionAlwaysOpen
+	}
+}
+
+func resolveReferenceSession(metadata SourceMetadata, exchange Exchange) ReferenceSession {
+	if metadata.ReferenceSession != "" {
+		return ParseReferenceSession(metadata.ReferenceSession)
+	}
+	return DefaultReferenceSession(exchange)
+}
+
 func CalendarFor(exchange Exchange, referenceSession ReferenceSession, metadata SourceMetadata) Calendar {
 	if exact := NewTimestampSet(metadata.IncludedTimestamps...); !exact.Empty() {
 		return ExactTimestampCalendar{Allowed: exact}
@@ -142,17 +158,34 @@ func RegularCalendarForExchange(exchange Exchange, metadata SourceMetadata) Cale
 	}
 	openDates := NewDateSet(metadata.OpenDates...)
 	closedDates := NewDateSet(metadata.ClosedDates...)
-	if closed.Empty() && openDates.Empty() && closedDates.Empty() {
+	window := resolveSessionWindow(exchange, metadata)
+	if closed.Empty() && openDates.Empty() && closedDates.Empty() && window.IsUnbounded() {
 		return AlwaysOpenCalendar{}
 	}
-	return NewRegularWeekdayCalendar(closed, openDates, closedDates)
+	return NewRegularSessionCalendarWithWindow(closed, openDates, closedDates, window)
 }
 
 func regularClosedWeekdays(exchange Exchange) WeekdaySet {
 	switch exchange {
-	case ExchangeMOEX:
-		return NewWeekdaySet(time.Saturday, time.Sunday)
 	default:
 		return WeekdaySet{}
 	}
+}
+
+func regularSessionWindow(exchange Exchange) SessionWindow {
+	switch exchange {
+	case ExchangeMOEX:
+		return NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50))
+	default:
+		return SessionWindow{}
+	}
+}
+
+func resolveSessionWindow(exchange Exchange, metadata SourceMetadata) SessionWindow {
+	if metadata.SessionWindow != "" {
+		if parsed, err := ParseSessionWindow(metadata.SessionWindow); err == nil {
+			return parsed
+		}
+	}
+	return regularSessionWindow(exchange)
 }

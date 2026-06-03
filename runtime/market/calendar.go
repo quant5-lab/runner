@@ -99,20 +99,28 @@ type RegularSessionCalendar struct {
 	ClosedWeekdays WeekdaySet
 	SpecialOpen    DateSet
 	SpecialClosed  DateSet
+	SessionWindow  SessionWindow
 }
 
 func (c RegularSessionCalendar) Accepts(bar context.OHLCV, timeframe string, timezone string) bool {
-	date := localDate(bar, timezone)
+	instant := barInstant(bar).In(locationOrUTC(timezone))
+	date := instant.Format("2006-01-02")
+
 	if c.SpecialClosed.Contains(date) {
 		return false
 	}
-	if c.SpecialOpen.Contains(date) {
-		return true
+	if c.ClosedWeekdays.Contains(instant.Weekday()) && !c.SpecialOpen.Contains(date) {
+		return false
 	}
-	return !c.ClosedWeekdays.Contains(barInstant(bar).In(locationOrUTC(timezone)).Weekday())
+	// Session window is an intraday concept; daily/weekly/monthly bars carry end-of-day
+	// timestamps that fall outside any intraday window and must not be filtered by it.
+	if context.IsIntradayTimeframe(timeframe) && !c.SessionWindow.Contains(instant) {
+		return false
+	}
+	return true
 }
 
-func NewRegularWeekdayCalendar(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet) RegularSessionCalendar {
+func NewRegularSessionCalendarWithWindow(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, window SessionWindow) RegularSessionCalendar {
 	if closed == nil {
 		closed = WeekdaySet{}
 	}
@@ -126,7 +134,12 @@ func NewRegularWeekdayCalendar(closed WeekdaySet, specialOpen DateSet, specialCl
 		ClosedWeekdays: closed,
 		SpecialOpen:    specialOpen,
 		SpecialClosed:  specialClosed,
+		SessionWindow:  window,
 	}
+}
+
+func NewRegularWeekdayCalendar(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet) RegularSessionCalendar {
+	return NewRegularSessionCalendarWithWindow(closed, specialOpen, specialClosed, SessionWindow{})
 }
 
 func localDate(bar context.OHLCV, timezone string) string {

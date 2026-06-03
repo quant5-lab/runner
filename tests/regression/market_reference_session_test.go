@@ -25,7 +25,7 @@ type referenceSessionPoint struct {
 	Value *float64 `json:"value"`
 }
 
-func TestReferenceSession_RegularExchangeFixtureHasNoClosedWeekdayBarsAfterNormalization(t *testing.T) {
+func TestReferenceSession_RegularExchangeFixtureFiltersPreSessionAuctionBarsAfterNormalization(t *testing.T) {
 	root := projectRootFromCwd()
 	fixtureBars := loadOHLCVBars(t, filepath.Join(root, "tests", "golden", "fixtures", "data", "SBERP-1h.json"))
 
@@ -40,11 +40,14 @@ func TestReferenceSession_RegularExchangeFixtureHasNoClosedWeekdayBarsAfterNorma
 	if len(normalized) >= len(fixtureBars) {
 		t.Fatalf("regular exchange normalization removed no bars: before=%d after=%d", len(fixtureBars), len(normalized))
 	}
+	// MOEX trades 7 days/week; regular session filters by time window (07:00–23:50 MSK) only.
+	// Weekend bars within the window are preserved; pre-session auction bars (< 07:00) are removed.
+	loc := mustLocation(t, timezone)
 	for _, bar := range normalized {
-		instant := runtimeBarInstant(bar)
-		weekday := instant.In(mustLocation(t, timezone)).Weekday()
-		if weekday == time.Saturday || weekday == time.Sunday {
-			t.Fatalf("closed-weekday bar survived normalization: %s", instant)
+		instant := runtimeBarInstant(bar).In(loc)
+		h, m := instant.Hour(), instant.Minute()
+		if h*60+m < 7*60 {
+			t.Fatalf("pre-session bar survived normalization: %s", instant)
 		}
 	}
 }
@@ -66,21 +69,16 @@ func TestReferenceSession_AlwaysOpenFixturePreservesWeekendBars(t *testing.T) {
 	}
 }
 
-func TestReferenceSession_GeneratedRunnerNormalizesChartBarsFromMetadata(t *testing.T) {
+func TestReferenceSession_GeneratedRunnerPreservesMidDayBarsFromMetadata(t *testing.T) {
 	root := projectRootFromCwd()
 	tmpDir := t.TempDir()
-	dataPath := writeReferenceSessionBars(t, tmpDir, "SBERP_1h.json", "Europe/Moscow", "regular", moscowRuntimeWeekdayWeekendBars(t))
+	bars := moscowRuntimeWeekdayWeekendBars(t)
+	dataPath := writeReferenceSessionBars(t, tmpDir, "SBERP_1h.json", "Europe/Moscow", "regular", bars)
 	outputPath := runReferenceSessionProbe(t, root, tmpDir, dataPath, "SBERP", "1h")
 	output := readReferenceSessionChartOutput(t, outputPath)
 
-	if len(output.Candlestick) == 0 {
-		t.Fatal("generated runner emitted no chart bars")
-	}
-	for _, bar := range output.Candlestick {
-		weekday := runtimeBarInstant(bar).In(mustLocation(t, "Europe/Moscow")).Weekday()
-		if weekday == time.Saturday || weekday == time.Sunday {
-			t.Fatalf("generated runner kept closed-weekday bar: %+v", bar)
-		}
+	if len(output.Candlestick) != len(bars) {
+		t.Fatalf("candlestick bars = %d, want %d (MOEX regular session must keep all mid-day bars including weekends)", len(output.Candlestick), len(bars))
 	}
 }
 
@@ -130,7 +128,7 @@ func TestReferenceSession_GeneratedRunnerNormalizesSecurityBarsFromMetadata(t *t
 	outputPath := runSecurityReferenceSessionProbe(t, root, tmpDir, filepath.Join(tmpDir, "SBERP_1h.json"), "SBERP", "1h")
 	output := readReferenceSessionChartOutput(t, outputPath)
 
-	assertIndicatorValues(t, output, "Security close", []float64{1, 1, 1, 1, 4})
+	assertIndicatorValues(t, output, "Security close", []float64{1, 1, 2, 3, 4})
 }
 
 func TestReferenceSession_GeneratedRunnerPreservesAlwaysOpenSecurityBars(t *testing.T) {
@@ -162,8 +160,8 @@ func TestReferenceSession_GeneratedRunnerInheritsRegularSessionForUnannotatedSec
 	outputPath := runSecurityReferenceSessionProbe(t, root, tmpDir, filepath.Join(tmpDir, "SBERP_1h.json"), "SBERP", "1h")
 	output := readReferenceSessionChartOutput(t, outputPath)
 
-	assertRuntimeCloseSequence(t, output.Candlestick, []float64{1, 4, 5})
-	assertIndicatorValues(t, output, "Security close", []float64{1, 1, 4})
+	assertRuntimeCloseSequence(t, output.Candlestick, []float64{1, 2, 3, 4, 5})
+	assertIndicatorValues(t, output, "Security close", []float64{1, 1, 2, 3, 4})
 }
 
 func TestReferenceSession_GeneratedRunnerInheritsAlwaysOpenSessionForUnannotatedSecurityBars(t *testing.T) {
