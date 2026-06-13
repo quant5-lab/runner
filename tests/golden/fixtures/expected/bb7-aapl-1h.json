@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB7",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-01-21T07:51:44Z",
+  "generatedAt": "2026-06-11T18:39:50Z",
   "result": {
     "trades": [
       {
@@ -15,14 +15,14 @@
         "exitTime": 1765467000,
         "exitPrice": 276.114990234375,
         "exitComment": "",
-        "size": 3563.941801422053,
-        "profit": -15948.987602555231,
+        "size": 3562,
+        "profit": -16535.192898046877,
         "direction": "long"
       }
     ],
     "openTrades": [],
-    "equity": 984051.0123974448,
-    "netProfit": -15948.987602555231,
+    "equity": 983464.8071019531,
+    "netProfit": -16535.192898046877,
     "totalTrades": 0,
     "plots": {}
   }

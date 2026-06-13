@@ -229,8 +229,12 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_metadata.Timezone == \"\" {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_metadata.Timezone = ctx.Timezone\n", varName))
 		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_profile := market.NormalizeBarsWithMetadata(%s, %s, %s_metadata, %s_marketData.Bars)\n",
-			varName, varName, symbolCode, timeframeCode, varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_profile, %s_normErr := market.NormalizeBarsWithMetadataE(%s, %s, %s_metadata, %s_marketData.Bars)\n",
+			varName, varName, varName, symbolCode, timeframeCode, varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\tif %s_normErr != nil {\n", varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Invalid market metadata for %%s:%%s: %%v\\n\", %s, %s, %s_normErr)\n", symbolCode, timeframeCode, varName))
+		codeBuilder.WriteString("\t\tos.Exit(1)\n")
+		codeBuilder.WriteString("\t}\n")
 		codeBuilder.WriteString(fmt.Sprintf("\tif %s_limit > 0 && %s_limit < len(%s_data) {\n",
 			varName, varName, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_data = %s_data[len(%s_data)-%s_limit:]\n",

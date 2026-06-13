@@ -453,37 +453,37 @@ func TestStrategyFunctionQuantityCalculation(t *testing.T) {
 	}
 
 	type qtyCase struct {
-		name           string
-		defaultQtyType string
-		defaultQtyVal  float64
-		dynamicExpr    string // non-empty for cash/percent_of_equity types; uses %s for qtyVarName
-		wantLiteralQty string // non-empty for fixed types; e.g. "100,"
-		wantWarning    bool
+		name                string
+		defaultQtyType      string
+		defaultQtyVal       float64
+		wantDefaultQtyLogic bool   // entry emits EntryWithDefaultQty; order emits DefaultEntryQty block
+		wantLiteralQty      string // for fixed types
+		wantWarning         bool
 	}
 	qtyCases := []qtyCase{
 		{
-			name:           "strategy.cash generates runtime division",
-			defaultQtyType: "strategy.cash",
-			defaultQtyVal:  600000.0,
-			dynamicExpr:    "%s := 600000 / closeSeries.GetCurrent()",
+			name:                "strategy.cash defers qty computation to fill time",
+			defaultQtyType:      "strategy.cash",
+			defaultQtyVal:       600000.0,
+			wantDefaultQtyLogic: true,
 		},
 		{
-			name:           "cash unprefixed generates runtime division",
-			defaultQtyType: "cash",
-			defaultQtyVal:  50000.0,
-			dynamicExpr:    "%s := 50000 / closeSeries.GetCurrent()",
+			name:                "cash unprefixed defers qty computation to fill time",
+			defaultQtyType:      "cash",
+			defaultQtyVal:       50000.0,
+			wantDefaultQtyLogic: true,
 		},
 		{
-			name:           "strategy.percent_of_equity generates equity percentage",
-			defaultQtyType: "strategy.percent_of_equity",
-			defaultQtyVal:  10.0,
-			dynamicExpr:    "%s := (strat.Equity() * 10.00 / 100) / closeSeries.GetCurrent()",
+			name:                "strategy.percent_of_equity defers qty computation to fill time",
+			defaultQtyType:      "strategy.percent_of_equity",
+			defaultQtyVal:       10.0,
+			wantDefaultQtyLogic: true,
 		},
 		{
-			name:           "percent_of_equity unprefixed generates equity percentage",
-			defaultQtyType: "percent_of_equity",
-			defaultQtyVal:  25.5,
-			dynamicExpr:    "%s := (strat.Equity() * 25.50 / 100) / closeSeries.GetCurrent()",
+			name:                "percent_of_equity unprefixed defers qty computation to fill time",
+			defaultQtyType:      "percent_of_equity",
+			defaultQtyVal:       25.5,
+			wantDefaultQtyLogic: true,
 		},
 		{
 			name:           "strategy.fixed uses qty directly",
@@ -547,15 +547,20 @@ func TestStrategyFunctionQuantityCalculation(t *testing.T) {
 					t.Errorf("Must NOT contain %q in output, got:\n%s", fn.otherMethod, code)
 				}
 
-				if qc.dynamicExpr != "" {
-					want := fmt.Sprintf(qc.dynamicExpr, fn.qtyVarName)
+				switch {
+				case qc.wantDefaultQtyLogic && fn.funcName == "entry":
+					if !strings.Contains(code, "strat.EntryWithDefaultQty") {
+						t.Errorf("Expected strat.EntryWithDefaultQty in output, got:\n%s", code)
+					}
+					if strings.Contains(code, fn.qtyVarName+" :=") {
+						t.Errorf("Must NOT emit qty variable for entry+default, got:\n%s", code)
+					}
+				case qc.wantDefaultQtyLogic && fn.funcName == "order":
+					want := fn.qtyVarName + " := strat.DefaultEntryQty(closeSeries.GetCurrent())"
 					if !strings.Contains(code, want) {
-						t.Errorf("Expected dynamic expr %q, got:\n%s", want, code)
+						t.Errorf("Expected %q in output, got:\n%s", want, code)
 					}
-					if strings.Contains(code, fn.qtyVarName+" :=") && !strings.Contains(code, want) {
-						t.Errorf("Unexpected assignment form, got:\n%s", code)
-					}
-				} else {
+				default:
 					if strings.Contains(code, fn.qtyVarName+" :=") {
 						t.Errorf("Must NOT emit qty variable assignment for fixed type, got:\n%s", code)
 					}

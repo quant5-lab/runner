@@ -488,6 +488,9 @@ func TestTimeHandler_GenerateInline_PineVersionBinding(t *testing.T) {
 			if !strings.Contains(result, tt.wantVersion) {
 				t.Errorf("want version suffix %q in output, got: %s", tt.wantVersion, result)
 			}
+			if strings.Contains(result, "session.TimeFunc(") {
+				t.Errorf("unversioned session.TimeFunc( found — must use session.TimeFuncWithVersion: %s", result)
+			}
 		})
 	}
 }

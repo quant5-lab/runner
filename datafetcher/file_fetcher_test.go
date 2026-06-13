@@ -70,9 +70,10 @@ func TestFileFetcher_FetchWithMetadata_PreservesSourceMetadataAndLimit(t *testin
 
 	testData := `{
 		"timezone": "Europe/Moscow",
-		"exchange": "MOEX",
-		"referenceSession": "regular",
-		"openDates": ["2025-08-16"],
+			"exchange": "MOEX",
+			"referenceSession": "regular",
+			"qtyStep": 0.00001,
+			"openDates": ["2025-08-16"],
 		"bars": [
 			{"time": 1700000000, "open": 100, "high": 105, "low": 95, "close": 102, "volume": 1000},
 			{"time": 1700003600, "open": 102, "high": 107, "low": 97, "close": 104, "volume": 1100},
@@ -97,6 +98,9 @@ func TestFileFetcher_FetchWithMetadata_PreservesSourceMetadataAndLimit(t *testin
 	}
 	if marketData.Exchange != "MOEX" {
 		t.Fatalf("exchange = %q, want MOEX", marketData.Exchange)
+	}
+	if marketData.QtyStep != 0.00001 {
+		t.Fatalf("qty step = %.8f, want 0.00001000", marketData.QtyStep)
 	}
 	if len(marketData.OpenDates) != 1 || marketData.OpenDates[0] != "2025-08-16" {
 		t.Fatalf("open dates = %#v, want [2025-08-16]", marketData.OpenDates)

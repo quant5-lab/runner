@@ -153,6 +153,8 @@ func extractGeneratedFilePath(output string) string {
 	return ""
 }
 
+func FindWorkspaceRoot() (string, error) { return findWorkspaceRoot() }
+
 func findWorkspaceRoot() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {

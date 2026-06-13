@@ -183,14 +183,13 @@ func (h *StrategyActionHandler) generateQtyBlock(g *generator, method, qtyVar, i
 	fixedCall := g.ind() + fmt.Sprintf("strat.%s(%q, %s, %.0f, %s)\n", method, id, direction, qty, comment)
 
 	switch g.strategyConfig.DefaultQtyType {
-	case "strategy.cash", "cash":
+	case "strategy.cash", "cash",
+		"strategy.percent_of_equity", "percent_of_equity":
+		if method == "Entry" {
+			return g.ind() + fmt.Sprintf("strat.EntryWithDefaultQty(%q, %s, %s)\n", id, direction, comment)
+		}
 		return g.ind() + "{\n" +
-			g.ind() + "\t" + fmt.Sprintf("%s := %.0f / closeSeries.GetCurrent()\n", qtyVar, qty) +
-			dynamicCall +
-			g.ind() + "}\n"
-	case "strategy.percent_of_equity", "percent_of_equity":
-		return g.ind() + "{\n" +
-			g.ind() + "\t" + fmt.Sprintf("%s := (strat.Equity() * %.2f / 100) / closeSeries.GetCurrent()\n", qtyVar, qty) +
+			g.ind() + "\t" + fmt.Sprintf("%s := strat.DefaultEntryQty(closeSeries.GetCurrent())\n", qtyVar) +
 			dynamicCall +
 			g.ind() + "}\n"
 	case "strategy.fixed", "fixed", "":

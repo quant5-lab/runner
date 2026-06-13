@@ -1265,6 +1265,22 @@ func TestCommission_FullClose(t *testing.T) {
 					t.Errorf("commission: got %.4f, want %.4f", closed[0].Commission, tt.wantCommission)
 				}
 			})
+			t.Run("reversal_path", func(t *testing.T) {
+				s := NewStrategy()
+				s.CallWithPyramiding("Test", 10000, 10)
+				s.SetCommission(tt.commRate, tt.commType)
+				s.Entry("e", Long, tt.qty, "")
+				s.OnBarUpdate(1, tt.entryPrice, 1000)
+				s.Entry("rev", Short, tt.qty, "")
+				s.OnBarUpdate(2, tt.exitPrice, 2000)
+				closed := s.GetTradeHistory().GetClosedTrades()
+				if len(closed) != 1 {
+					t.Fatalf("expected 1 closed trade, got %d", len(closed))
+				}
+				if closed[0].Commission != tt.wantCommission {
+					t.Errorf("commission: got %.4f, want %.4f", closed[0].Commission, tt.wantCommission)
+				}
+			})
 		})
 	}
 }
@@ -1913,7 +1929,7 @@ func TestBuildClosedTrade(t *testing.T) {
 	tests := []struct {
 		name         string
 		closeSize    float64
-		profit       float64
+		grossProfit  float64
 		commission   float64
 		metricsScale float64
 		wantMaxDD    float64
@@ -1925,7 +1941,7 @@ func TestBuildClosedTrade(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			closed := buildClosedTrade(open, tt.closeSize, tt.profit, tt.commission, tt.metricsScale, exitID, exitPrice, exitBar, exitTime, exitComment)
+			closed := buildClosedTrade(open, tt.closeSize, tt.grossProfit, tt.commission, tt.metricsScale, exitID, exitPrice, exitBar, exitTime, exitComment)
 
 			if closed.EntryID != open.EntryID {
 				t.Errorf("EntryID: got %q, want %q", closed.EntryID, open.EntryID)
@@ -1963,8 +1979,10 @@ func TestBuildClosedTrade(t *testing.T) {
 			if closed.Size != tt.closeSize {
 				t.Errorf("Size: got %.2f, want %.2f", closed.Size, tt.closeSize)
 			}
-			if closed.Profit != tt.profit {
-				t.Errorf("Profit: got %.4f, want %.4f", closed.Profit, tt.profit)
+			wantProfit := tt.grossProfit - tt.commission
+			if closed.Profit != wantProfit {
+				t.Errorf("Profit: got %.4f, want %.4f (gross=%.4f - commission=%.4f)",
+					closed.Profit, wantProfit, tt.grossProfit, tt.commission)
 			}
 			if closed.Commission != tt.commission {
 				t.Errorf("Commission: got %.4f, want %.4f", closed.Commission, tt.commission)
@@ -2160,14 +2178,14 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 20}},
 			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 15,
 			wantQtyClosed: 10, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{10, 35, 100}},
+			wantClosed: []closedWant{{10, 35, 65}}, // net = gross(100) - commission(35)
 		},
 		{
 			name:      "partial_close_single_long_1_of_10",
 			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 10}},
 			direction: Long, qty: 1, exitPrice: 110, totalExitCommission: 1,
 			wantQtyClosed: 1, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{1, 2, 10}},
+			wantClosed: []closedWant{{1, 2, 8}}, // net = gross(10) - commission(2)
 			wantOpen:   []openWant{{9, 9}},
 		},
 		{
@@ -2175,7 +2193,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 20}},
 			direction: Long, qty: 4, exitPrice: 110, totalExitCommission: 8,
 			wantQtyClosed: 4, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{4, 16, 40}},
+			wantClosed: []closedWant{{4, 16, 24}}, // net = gross(40) - commission(16)
 			wantOpen:   []openWant{{6, 12}},
 		},
 		{
@@ -2183,7 +2201,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 10, EntryPrice: 100, Commission: 10}},
 			direction: Long, qty: 9, exitPrice: 110, totalExitCommission: 9,
 			wantQtyClosed: 9, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{9, 18, 90}},
+			wantClosed: []closedWant{{9, 18, 72}}, // net = gross(90) - commission(18)
 			wantOpen:   []openWant{{1, 1}},
 		},
 		{
@@ -2191,14 +2209,14 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			setup:     []Trade{{EntryID: "s1", Direction: Short, Size: 8, EntryPrice: 100, Commission: 16}},
 			direction: Short, qty: 8, exitPrice: 90, totalExitCommission: 16,
 			wantQtyClosed: 8, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{8, 32, 80}},
+			wantClosed: []closedWant{{8, 32, 48}}, // net = gross(80) - commission(32)
 		},
 		{
 			name:      "partial_close_single_short_6_of_10",
 			setup:     []Trade{{EntryID: "s1", Direction: Short, Size: 10, EntryPrice: 100, Commission: 20}},
 			direction: Short, qty: 6, exitPrice: 90, totalExitCommission: 12,
 			wantQtyClosed: 6, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{6, 24, 60}},
+			wantClosed: []closedWant{{6, 24, 36}}, // net = gross(60) - commission(24)
 			wantOpen:   []openWant{{4, 8}},
 		},
 		{
@@ -2209,7 +2227,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			},
 			direction: Long, qty: 10, exitPrice: 115, totalExitCommission: 20,
 			wantQtyClosed: 10, wantNewlyClosedLen: 2,
-			wantClosed: []closedWant{{5, 20, 75}, {5, 20, 50}},
+			wantClosed: []closedWant{{5, 20, 55}, {5, 20, 30}}, // net = gross-commission per lot
 		},
 		{
 			name: "fifo_first_full_second_partial",
@@ -2219,7 +2237,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			},
 			direction: Long, qty: 8, exitPrice: 110, totalExitCommission: 8,
 			wantQtyClosed: 8, wantNewlyClosedLen: 2,
-			wantClosed: []closedWant{{6, 18, 60}, {2, 6, 10}},
+			wantClosed: []closedWant{{6, 18, 42}, {2, 6, 4}}, // net = gross-commission per lot
 			wantOpen:   []openWant{{2, 4}},
 		},
 		{
@@ -2231,7 +2249,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			},
 			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 10,
 			wantQtyClosed: 10, wantNewlyClosedLen: 3,
-			wantClosed: []closedWant{{3, 9, 30}, {3, 9, 24}, {4, 12, 24}},
+			wantClosed: []closedWant{{3, 9, 21}, {3, 9, 15}, {4, 12, 12}}, // net = gross-commission per lot
 		},
 		{
 			name:      "no_matching_direction",
@@ -2245,7 +2263,7 @@ func TestTradeHistory_PartialCloseTrades(t *testing.T) {
 			setup:     []Trade{{EntryID: "t1", Direction: Long, Size: 5, EntryPrice: 100, Commission: 10}},
 			direction: Long, qty: 10, exitPrice: 110, totalExitCommission: 10,
 			wantQtyClosed: 5, wantNewlyClosedLen: 1,
-			wantClosed: []closedWant{{5, 15, 50}},
+			wantClosed: []closedWant{{5, 15, 35}}, // net = gross(50) - commission(15)
 		},
 	}
 
@@ -2692,6 +2710,48 @@ func TestStrategy_DefaultEntryQty_DynamicEquity(t *testing.T) {
 	}
 }
 
+func TestStrategy_DefaultEntryQty_CommissionExcludedFromSizing(t *testing.T) {
+	// Commission applies to profit only — qty is sized on raw fill price regardless of commission type or rate.
+	calc := NewDefaultQtyCalculator()
+
+	cases := []struct {
+		name       string
+		qtyType    string
+		qtyValue   float64
+		fillPrice  float64
+		initialCap float64
+		commType   string
+		commRate   float64
+	}{
+		{"cash / percent commission / typical rate", QtyTypeCash, 1000, 50, 10000, CommissionPercent, 0.03},
+		{"cash / percent commission / high rate", QtyTypeCash, 1000, 50, 10000, CommissionPercent, 50.0},
+		{"percent-of-equity / percent commission", QtyTypePercentOfEquity, 10, 50, 10000, CommissionPercent, 0.03},
+		{"cash / cash-per-contract commission", QtyTypeCash, 1000, 50, 10000, CommissionCashPerContract, 2.0},
+		{"percent-of-equity / cash-per-contract commission", QtyTypePercentOfEquity, 10, 50, 10000, CommissionCashPerContract, 2.0},
+		{"cash / cash-per-order commission", QtyTypeCash, 1000, 50, 10000, CommissionCashPerOrder, 5.0},
+		{"percent-of-equity / cash-per-order commission", QtyTypePercentOfEquity, 10, 50, 10000, CommissionCashPerOrder, 5.0},
+		{"fixed / percent commission", QtyTypeFixed, 7, 50, 10000, CommissionPercent, 10.0},
+		{"cash / zero commission", QtyTypeCash, 1000, 50, 10000, CommissionPercent, 0.0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tc.initialCap)
+			s.SetDefaultQty(tc.qtyValue, tc.qtyType)
+			s.SetCommission(tc.commRate, tc.commType)
+
+			want := calc.CalculateQty(tc.qtyType, tc.qtyValue, tc.fillPrice, tc.initialCap)
+			got := s.DefaultEntryQty(tc.fillPrice)
+
+			if got != want {
+				t.Errorf("got %v, want %v — commission (type=%s rate=%.4f) must not enter qty denominator",
+					got, want, tc.commType, tc.commRate)
+			}
+		})
+	}
+}
+
 func TestStrategy_ConvertToAccount(t *testing.T) {
 	s := NewStrategy()
 
@@ -2735,6 +2795,306 @@ func TestStrategy_ConvertToSymbol(t *testing.T) {
 			result := s.ConvertToSymbol(tt.input)
 			if result != tt.input {
 				t.Errorf("ConvertToSymbol(%v) = %v, want %v", tt.input, result, tt.input)
+			}
+		})
+	}
+}
+
+func TestOrderManager_CreateEntryOrderWithDefaultQty(t *testing.T) {
+	om := NewOrderManager()
+	order := om.CreateEntryOrderWithDefaultQty("buy", Long, 3, "signal comment")
+
+	if order.ID != "buy" {
+		t.Errorf("ID: got %q, want %q", order.ID, "buy")
+	}
+	if order.Action != OrderActionEntry {
+		t.Errorf("Action: got %q, want %q", order.Action, OrderActionEntry)
+	}
+	if order.Direction != Long {
+		t.Errorf("Direction: got %q, want %q", order.Direction, Long)
+	}
+	if !order.UseDefaultQty {
+		t.Errorf("UseDefaultQty: expected true")
+	}
+	if order.Qty != 0 {
+		t.Errorf("Qty: expected 0 for deferred sizing, got %v", order.Qty)
+	}
+	if order.EntryComment != "signal comment" {
+		t.Errorf("EntryComment: got %q, want %q", order.EntryComment, "signal comment")
+	}
+	if order.CreatedBar != 3 {
+		t.Errorf("CreatedBar: got %d, want 3", order.CreatedBar)
+	}
+
+	// Same-ID create replaces the existing pending order (idempotent scheduling)
+	om.CreateEntryOrderWithDefaultQty("buy", Short, 7, "updated")
+	count := 0
+	for _, o := range om.GetPendingOrders(10) {
+		if o.ID == "buy" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("deduplication: expected 1 pending order for 'buy', got %d", count)
+	}
+}
+
+func TestEntryWithDefaultQty_GuardBehavior(t *testing.T) {
+	t.Run("not_initialized_returns_error", func(t *testing.T) {
+		s := NewStrategy()
+		if err := s.EntryWithDefaultQty("Buy", Long, ""); err == nil {
+			t.Errorf("expected error when not initialized")
+		}
+	})
+
+	t.Run("blocked_direction_skips_entry", func(t *testing.T) {
+		s := NewStrategy()
+		s.Call("Test", 10000)
+		s.SetAllowedDirection(DirectionLong)
+
+		if err := s.EntryWithDefaultQty("Short", Short, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for _, o := range s.orderManager.GetPendingOrders(s.currentBar + 1) {
+			if o.ID == "Short" && o.Action == OrderActionEntry {
+				t.Errorf("blocked direction should not create an entry order")
+			}
+		}
+	})
+
+	t.Run("allowed_direction_creates_deferred_order", func(t *testing.T) {
+		s := NewStrategy()
+		s.Call("Test", 10000)
+		s.SetAllowedDirection(DirectionLong)
+
+		if err := s.EntryWithDefaultQty("Buy", Long, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		var found *Order
+		for _, o := range s.orderManager.GetPendingOrders(s.currentBar + 1) {
+			if o.ID == "Buy" && o.Action == OrderActionEntry {
+				o := o
+				found = &o
+			}
+		}
+		if found == nil {
+			t.Fatalf("expected pending entry order for 'Buy'")
+		}
+		if !found.UseDefaultQty {
+			t.Errorf("UseDefaultQty: expected true")
+		}
+	})
+
+	t.Run("pyramiding_cap_blocks_excess_same_direction", func(t *testing.T) {
+		s := NewStrategy()
+		s.CallWithPyramiding("Test", 10000, 1)
+		s.SetDefaultQty(1, QtyTypeFixed)
+		s.Entry("Buy1", Long, 1, "")
+		s.OnBarUpdate(1, 100, 1000)
+
+		if err := s.EntryWithDefaultQty("Buy2", Long, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for _, o := range s.orderManager.GetPendingOrders(s.currentBar + 1) {
+			if o.ID == "Buy2" {
+				t.Errorf("pyramiding cap=1 should block a second same-direction entry")
+			}
+		}
+	})
+
+	t.Run("pyramiding_cap_allows_within_limit", func(t *testing.T) {
+		s := NewStrategy()
+		s.CallWithPyramiding("Test", 10000, 2)
+		s.SetDefaultQty(1, QtyTypeFixed)
+		s.Entry("Buy1", Long, 1, "")
+		s.OnBarUpdate(1, 100, 1000)
+
+		if err := s.EntryWithDefaultQty("Buy2", Long, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		var found bool
+		for _, o := range s.orderManager.GetPendingOrders(s.currentBar + 1) {
+			if o.ID == "Buy2" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("pyramiding cap=2 should allow a second same-direction entry")
+		}
+	})
+
+	t.Run("blocked_direction_still_schedules_opposite_close", func(t *testing.T) {
+		// TV semantics: even a blocked entry must close any open opposite position
+		s := NewStrategy()
+		s.CallWithPyramiding("Test", 10000, 5)
+		s.SetAllowedDirection(DirectionLong)
+		s.Entry("Long", Long, 1, "")
+		s.OnBarUpdate(1, 100, 1000)
+
+		if err := s.EntryWithDefaultQty("Short", Short, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		s.OnBarUpdate(2, 110, 2000)
+
+		if len(s.GetTradeHistory().GetClosedTrades()) != 1 {
+			t.Errorf("blocked entry should still close the opposite open trade")
+		}
+		if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+			t.Errorf("no new short should have opened (direction blocked)")
+		}
+	})
+}
+
+func TestEntryWithDefaultQty_DeferredQtyAtFillPrice(t *testing.T) {
+	tests := []struct {
+		name       string
+		qtyType    string
+		qtyValue   float64
+		initialCap float64
+		openPrice  float64
+		wantQty    float64
+	}{
+		{
+			name:       "percent_of_equity_100pct",
+			qtyType:    QtyTypePercentOfEquity,
+			qtyValue:   100,
+			initialCap: 10000,
+			openPrice:  200,
+			wantQty:    50,
+		},
+		{
+			name:       "percent_of_equity_50pct",
+			qtyType:    QtyTypePercentOfEquity,
+			qtyValue:   50,
+			initialCap: 10000,
+			openPrice:  100,
+			wantQty:    50,
+		},
+		{
+			name:       "cash_type",
+			qtyType:    QtyTypeCash,
+			qtyValue:   5000,
+			initialCap: 10000,
+			openPrice:  250,
+			wantQty:    20,
+		},
+		{
+			name:       "higher_open_price_yields_smaller_qty",
+			qtyType:    QtyTypePercentOfEquity,
+			qtyValue:   100,
+			initialCap: 10000,
+			openPrice:  500,
+			wantQty:    20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCap)
+			s.SetDefaultQty(tt.qtyValue, tt.qtyType)
+
+			if err := s.EntryWithDefaultQty("Buy", Long, ""); err != nil {
+				t.Fatalf("EntryWithDefaultQty: %v", err)
+			}
+			s.OnBarUpdate(1, tt.openPrice, 1000)
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != 1 {
+				t.Fatalf("open trades: want 1, got %d", len(open))
+			}
+			if open[0].Size != tt.wantQty {
+				t.Errorf("size: got %v, want %v", open[0].Size, tt.wantQty)
+			}
+			if open[0].EntryPrice != tt.openPrice {
+				t.Errorf("entry price: got %v, want %v", open[0].EntryPrice, tt.openPrice)
+			}
+		})
+	}
+}
+
+func TestEntryWithDefaultQty_PostReversalEquity(t *testing.T) {
+	// Deferred qty for percent_of_equity uses the equity AFTER the reversal close
+	// executes — not the pre-reversal equity that includes unrealized PnL of the
+	// position being reversed. The fill price is deliberately different from the
+	// signal-bar price so pre- and post-reversal equity values diverge.
+	tests := []struct {
+		name        string
+		initialCap  float64
+		initDir     string
+		reversalDir string
+		openQty     float64
+		entryPrice  float64
+		signalPrice float64 // currentPrice at signal bar (drives unrealized PnL)
+		fillPrice   float64 // bar open at fill; reversal executes at this price
+		wantQty     float64 // postReversalEquity / fillPrice
+	}{
+		{
+			name:        "profitable_long_reversal",
+			initialCap:  10000,
+			initDir:     Long,
+			reversalDir: Short,
+			openQty:     1.0,
+			entryPrice:  100.0,
+			signalPrice: 150.0,
+			fillPrice:   160.0,
+			wantQty:     62.875,
+		},
+		{
+			name:        "losing_long_reversal",
+			initialCap:  10000,
+			initDir:     Long,
+			reversalDir: Short,
+			openQty:     1.0,
+			entryPrice:  100.0,
+			signalPrice: 80.0,
+			fillPrice:   70.0,
+			wantQty:     9970.0 / 70.0,
+		},
+		{
+			name:        "profitable_short_reversal",
+			initialCap:  10000,
+			initDir:     Short,
+			reversalDir: Long,
+			openQty:     1.0,
+			entryPrice:  200.0,
+			signalPrice: 180.0,
+			fillPrice:   170.0,
+			wantQty:     10030.0 / 170.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.Call("Test", tt.initialCap)
+			s.SetDefaultQty(100, QtyTypePercentOfEquity)
+
+			s.Entry("Init", tt.initDir, tt.openQty, "")
+			s.OnBarUpdate(1, tt.entryPrice, 1000)
+
+			// Signal bar: advance currentPrice to reflect unrealized PnL
+			s.OnBarUpdate(2, tt.signalPrice, 2000)
+			if err := s.EntryWithDefaultQty("Rev", tt.reversalDir, ""); err != nil {
+				t.Fatalf("EntryWithDefaultQty: %v", err)
+			}
+
+			// Fill bar: HandleReversal closes Init position, then opens Rev with deferred qty
+			s.OnBarUpdate(3, tt.fillPrice, 3000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("closed trades: want 1, got %d", len(closed))
+			}
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != 1 {
+				t.Fatalf("open trades: want 1, got %d", len(open))
+			}
+			if open[0].Direction != tt.reversalDir {
+				t.Errorf("direction: got %s, want %s", open[0].Direction, tt.reversalDir)
+			}
+			if open[0].Size != tt.wantQty {
+				t.Errorf("size: got %.6f, want %.6f", open[0].Size, tt.wantQty)
 			}
 		})
 	}

@@ -82,7 +82,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	bars, profile := market.NormalizeBarsWithMetadata(*symbolFlag, *timeframeFlag, marketData.SourceMetadata, marketData.Bars)
+	bars, profile, err := market.NormalizeBarsWithMetadataE(*symbolFlag, *timeframeFlag, marketData.SourceMetadata, marketData.Bars)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid market metadata: %v\n", err)
+		os.Exit(1)
+	}
 	if len(marketData.Bars) == 0 {
 		fmt.Fprintf(os.Stderr, "No bars in data file\n")
 		os.Exit(1)
@@ -110,7 +114,7 @@ func main() {
 	startTime := clock.Now()
 	securityContexts := make(map[string]*context.Context)
 	securityBarMappers := make(map[string]*request.SecurityBarMapper)
-	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts, securityBarMappers)
+	plotCollector, strat := executeStrategy(ctx, dataDir, securityContexts, securityBarMappers, profile.QtyStep)
 	executionTime := time.Since(startTime)
 
 	cd := chartdata.NewChartData(ctx, *symbolFlag, *timeframeFlag, "{{STRATEGY_NAME}}")

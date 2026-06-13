@@ -216,3 +216,47 @@ func TestRegularSessionCalendar_SessionWindowContract(t *testing.T) {
 		})
 	}
 }
+
+func TestRegularSessionCalendar_DateSessionWindowPrecedence(t *testing.T) {
+	baseSchedule := WeekSchedule{
+		Weekday: NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50)),
+		Weekend: NewSessionWindow(ClockTimeAt(10, 0), ClockTimeAt(19, 0)),
+	}
+	dateWindows := DateSessionWindows{
+		"2025-08-16": NewSessionWindow(ClockTimeAt(12, 0), ClockTimeAt(15, 0)),
+	}
+	calendar := NewRegularSessionCalendar(nil, NewDateSet("2025-08-16"), nil, baseSchedule, dateWindows)
+	closedCalendar := NewRegularSessionCalendar(nil, NewDateSet("2025-08-16"), NewDateSet("2025-08-16"), baseSchedule, dateWindows)
+	weekdayClosedCalendar := NewRegularSessionCalendar(NewWeekdaySet(time.Saturday), nil, nil, baseSchedule, dateWindows)
+
+	cases := []struct {
+		name      string
+		calendar  RegularSessionCalendar
+		timeframe string
+		datetime  string
+		want      bool
+	}{
+		{name: "intraday before override start", calendar: calendar, timeframe: "1h", datetime: "2025-08-16 11:59", want: false},
+		{name: "intraday at override start", calendar: calendar, timeframe: "1h", datetime: "2025-08-16 12:00", want: true},
+		{name: "intraday before override end", calendar: calendar, timeframe: "1h", datetime: "2025-08-16 14:59", want: true},
+		{name: "intraday at override end", calendar: calendar, timeframe: "1h", datetime: "2025-08-16 15:00", want: false},
+		{name: "adjacent date uses regular weekend schedule", calendar: calendar, timeframe: "1h", datetime: "2025-08-17 10:00", want: true},
+		{name: "daily bypasses date window", calendar: calendar, timeframe: "1D", datetime: "2025-08-16 20:00", want: true},
+		{name: "special closed wins", calendar: closedCalendar, timeframe: "1h", datetime: "2025-08-16 12:00", want: false},
+		{name: "closed weekday wins without special open", calendar: weekdayClosedCalendar, timeframe: "1h", datetime: "2025-08-16 12:00", want: false},
+	}
+
+	seen := map[string]bool{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if seen[tc.name] {
+				t.Fatalf("duplicate case name %q", tc.name)
+			}
+			seen[tc.name] = true
+			bar := context.OHLCV{Time: unixInMoscow(t, tc.datetime)}
+			if got := tc.calendar.Accepts(bar, tc.timeframe, "Europe/Moscow"); got != tc.want {
+				t.Fatalf("Accepts(%s, %s) = %v, want %v", tc.datetime, tc.timeframe, got, tc.want)
+			}
+		})
+	}
+}

@@ -641,6 +641,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	if g.strategyConfig.DefaultQtyType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
+	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
 	code += "\n"
 
 	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
@@ -3466,6 +3467,7 @@ func (g *generator) generatePlaceholder() string {
 	if g.strategyConfig.DefaultQtyType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
+	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"

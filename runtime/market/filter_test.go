@@ -258,7 +258,31 @@ func TestNormalizeBarsWithMetadata_SessionWindowOverridesExchangeDefault(t *test
 	assertCloseSequence(t, got, []float64{1, 2, 3})
 }
 
-func TestNormalizeBarsWithMetadata_InvalidSessionWindowFallsBackToExchangeDefault(t *testing.T) {
+func TestNormalizeBarsWithMetadata_SplitSessionWindows(t *testing.T) {
+	bars := []context.OHLCV{
+		{Time: unixInMoscow(t, "2025-08-15 05:59"), Close: 1},
+		{Time: unixInMoscow(t, "2025-08-15 06:00"), Close: 2},
+		{Time: unixInMoscow(t, "2025-08-15 22:59"), Close: 3},
+		{Time: unixInMoscow(t, "2025-08-15 23:00"), Close: 4},
+		{Time: unixInMoscow(t, "2025-08-16 10:59"), Close: 5},
+		{Time: unixInMoscow(t, "2025-08-16 11:00"), Close: 6},
+		{Time: unixInMoscow(t, "2025-08-16 16:59"), Close: 7},
+		{Time: unixInMoscow(t, "2025-08-16 17:00"), Close: 8},
+	}
+	metadata := SourceMetadata{
+		Exchange:             "MOEX",
+		Timezone:             "Europe/Moscow",
+		ReferenceSession:     "regular",
+		WeekdaySessionWindow: "0600-2300",
+		WeekendSessionWindow: "1100-1700",
+	}
+
+	got, _ := NormalizeBarsWithMetadata("SBERP", "1h", metadata, bars)
+
+	assertCloseSequence(t, got, []float64{2, 3, 6, 7})
+}
+
+func TestNormalizeBarsWithMetadata_LegacyInvalidSessionWindowFallsBackToExchangeDefault(t *testing.T) {
 	bars := []context.OHLCV{
 		{Time: unixInMoscow(t, "2025-08-15 06:00"), Close: 1},
 		{Time: unixInMoscow(t, "2025-08-15 07:00"), Close: 2},
@@ -274,6 +298,144 @@ func TestNormalizeBarsWithMetadata_InvalidSessionWindowFallsBackToExchangeDefaul
 	got, _ := NormalizeBarsWithMetadata("SBERP", "1h", metadata, bars)
 
 	assertCloseSequence(t, got, []float64{2, 3})
+}
+
+func TestNormalizeBarsWithMetadataE_InvalidSessionMetadataFails(t *testing.T) {
+	bars := []context.OHLCV{{Time: unixInMoscow(t, "2025-08-15 07:00"), Close: 1}}
+
+	cases := []struct {
+		name     string
+		metadata SourceMetadata
+	}{
+		{
+			name: "uniform window",
+			metadata: SourceMetadata{
+				Exchange:         "MOEX",
+				Timezone:         "Europe/Moscow",
+				ReferenceSession: "regular",
+				SessionWindow:    "not-a-window",
+			},
+		},
+		{
+			name: "weekday window",
+			metadata: SourceMetadata{
+				Exchange:             "MOEX",
+				Timezone:             "Europe/Moscow",
+				ReferenceSession:     "regular",
+				WeekdaySessionWindow: "not-a-window",
+			},
+		},
+		{
+			name: "weekend window",
+			metadata: SourceMetadata{
+				Exchange:             "MOEX",
+				Timezone:             "Europe/Moscow",
+				ReferenceSession:     "regular",
+				WeekendSessionWindow: "not-a-window",
+			},
+		},
+		{
+			name: "date window date",
+			metadata: SourceMetadata{
+				Exchange:           "MOEX",
+				Timezone:           "Europe/Moscow",
+				ReferenceSession:   "regular",
+				DateSessionWindows: map[string]string{"2025/08/15": "0700-1900"},
+			},
+		},
+		{
+			name: "date window value",
+			metadata: SourceMetadata{
+				Exchange:           "MOEX",
+				Timezone:           "Europe/Moscow",
+				ReferenceSession:   "regular",
+				DateSessionWindows: map[string]string{"2025-08-15": "not-a-window"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := NormalizeBarsWithMetadataE("SBERP", "1h", tc.metadata, bars)
+			if err == nil {
+				t.Fatal("expected metadata validation error")
+			}
+		})
+	}
+}
+
+func TestNormalizeBarsWithMetadata_ExplicitUniversePrecedence(t *testing.T) {
+	bars := []context.OHLCV{
+		{Time: unixInMoscow(t, "2025-08-15 06:00"), Close: 1},
+		{Time: unixInMoscow(t, "2025-08-15 07:00"), Close: 2},
+		{Time: unixInMoscow(t, "2025-08-16 09:00"), Close: 3},
+		{Time: unixInMoscow(t, "2025-08-16 10:00"), Close: 4},
+	}
+
+	cases := []struct {
+		name       string
+		metadata   SourceMetadata
+		wantCloses []float64
+	}{
+		{
+			name: "timestamps ignore invalid session metadata",
+			metadata: SourceMetadata{
+				Exchange:             "MOEX",
+				Timezone:             "Europe/Moscow",
+				ReferenceSession:     "regular",
+				SessionWindow:        "not-a-window",
+				WeekdaySessionWindow: "also-bad",
+				DateSessionWindows:   map[string]string{"not-a-date": "bad"},
+				IncludedTimestamps:   []int64{bars[0].Time, bars[2].Time * 1000},
+			},
+			wantCloses: []float64{1, 3},
+		},
+		{
+			name: "dates ignore invalid session metadata",
+			metadata: SourceMetadata{
+				Exchange:             "MOEX",
+				Timezone:             "Europe/Moscow",
+				ReferenceSession:     "regular",
+				WeekendSessionWindow: "not-a-window",
+				DateSessionWindows:   map[string]string{"not-a-date": "bad"},
+				IncludedDates:        []string{"2025-08-16"},
+			},
+			wantCloses: []float64{3, 4},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _, err := NormalizeBarsWithMetadataE("SBERP", "1h", tc.metadata, bars)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertCloseSequence(t, got, tc.wantCloses)
+		})
+	}
+}
+
+func TestNormalizeBarsWithMetadata_DateSessionWindowOverridesSingleDate(t *testing.T) {
+	bars := []context.OHLCV{
+		{Time: unixInMoscow(t, "2025-08-16 11:59"), Close: 1},
+		{Time: unixInMoscow(t, "2025-08-16 12:00"), Close: 2},
+		{Time: unixInMoscow(t, "2025-08-16 14:59"), Close: 3},
+		{Time: unixInMoscow(t, "2025-08-16 15:00"), Close: 4},
+		{Time: unixInMoscow(t, "2025-08-17 12:00"), Close: 5},
+	}
+	metadata := SourceMetadata{
+		Exchange:           "MOEX",
+		Timezone:           "Europe/Moscow",
+		ReferenceSession:   "regular",
+		DateSessionWindows: map[string]string{"2025-08-16": "1200-1500"},
+	}
+
+	got, _, err := NormalizeBarsWithMetadataE("SBERP", "1h", metadata, bars)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertCloseSequence(t, got, []float64{2, 3, 5})
 }
 
 func TestNormalizeBarsForProfile_NilCalendarPassesThroughBars(t *testing.T) {

@@ -118,7 +118,7 @@ func TestStrategyEntryWhenParameter_DirectHandlerIntegration(t *testing.T) {
 			qtyType:     "strategy.cash",
 			qtyValue:    1000.0,
 			expectIf:    true,
-			expectEntry: "entryQty :=",
+			expectEntry: "strat.EntryWithDefaultQty",
 			expectCond:  "if value.IsTrue(",
 		},
 	}

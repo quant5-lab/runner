@@ -99,7 +99,8 @@ type RegularSessionCalendar struct {
 	ClosedWeekdays WeekdaySet
 	SpecialOpen    DateSet
 	SpecialClosed  DateSet
-	SessionWindow  SessionWindow
+	Schedule       WeekSchedule
+	DateWindows    DateSessionWindows
 }
 
 func (c RegularSessionCalendar) Accepts(bar context.OHLCV, timeframe string, timezone string) bool {
@@ -112,15 +113,32 @@ func (c RegularSessionCalendar) Accepts(bar context.OHLCV, timeframe string, tim
 	if c.ClosedWeekdays.Contains(instant.Weekday()) && !c.SpecialOpen.Contains(date) {
 		return false
 	}
-	// Session window is an intraday concept; daily/weekly/monthly bars carry end-of-day
-	// timestamps that fall outside any intraday window and must not be filtered by it.
-	if context.IsIntradayTimeframe(timeframe) && !c.SessionWindow.Contains(instant) {
-		return false
+	// Session schedule is an intraday concept; daily/weekly/monthly bars carry
+	// end-of-day timestamps that fall outside any intraday window and must not
+	// be filtered by it.
+	// Special-open weekend dates (holiday compensations) run with a full weekday
+	// session, so the weekday window applies instead of the narrower weekend one.
+	if context.IsIntradayTimeframe(timeframe) {
+		if window, ok := c.DateWindows.Window(date); ok {
+			return window.Contains(instant)
+		}
+		treatAsWeekend := isWeekendDay(instant) && !c.SpecialOpen.Contains(date)
+		if !c.Schedule.ContainsFor(instant, treatAsWeekend) {
+			return false
+		}
 	}
 	return true
 }
 
 func NewRegularSessionCalendarWithWindow(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, window SessionWindow) RegularSessionCalendar {
+	return NewRegularSessionCalendarWithSchedule(closed, specialOpen, specialClosed, UniformWeekSchedule(window))
+}
+
+func NewRegularSessionCalendarWithSchedule(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, schedule WeekSchedule) RegularSessionCalendar {
+	return NewRegularSessionCalendar(closed, specialOpen, specialClosed, schedule, nil)
+}
+
+func NewRegularSessionCalendar(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, schedule WeekSchedule, dateWindows DateSessionWindows) RegularSessionCalendar {
 	if closed == nil {
 		closed = WeekdaySet{}
 	}
@@ -130,11 +148,15 @@ func NewRegularSessionCalendarWithWindow(closed WeekdaySet, specialOpen DateSet,
 	if specialClosed == nil {
 		specialClosed = DateSet{}
 	}
+	if dateWindows == nil {
+		dateWindows = DateSessionWindows{}
+	}
 	return RegularSessionCalendar{
 		ClosedWeekdays: closed,
 		SpecialOpen:    specialOpen,
 		SpecialClosed:  specialClosed,
-		SessionWindow:  window,
+		Schedule:       schedule,
+		DateWindows:    dateWindows,
 	}
 }
 

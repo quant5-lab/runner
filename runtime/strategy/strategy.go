@@ -52,16 +52,17 @@ type Trade struct {
 }
 
 type Order struct {
-	ID           string
-	ExitID       string // Semantic exit ID propagated to Trade.ExitID on fill
-	Action       string // OrderActionEntry, OrderActionClose, OrderActionCloseAll
-	Direction    string
-	Qty          float64
-	Type         string
-	CreatedBar   int
-	EntryComment string
-	FromEntry    string // Target entry ID for close orders
-	ExitComment  string // Comment for close orders
+	ID            string
+	ExitID        string // Semantic exit ID propagated to Trade.ExitID on fill
+	Action        string // OrderActionEntry, OrderActionClose, OrderActionCloseAll
+	Direction     string
+	Qty           float64
+	UseDefaultQty bool // qty deferred to fill time: computed after reversal close at fill price
+	Type          string
+	CreatedBar    int
+	EntryComment  string
+	FromEntry     string // Target entry ID for close orders
+	ExitComment   string // Comment for close orders
 }
 
 type OrderManager struct {
@@ -119,6 +120,21 @@ func (om *OrderManager) CreateCloseAllOrder(createdBar int, comment string) Orde
 		Type:        "market",
 		CreatedBar:  createdBar,
 		ExitComment: comment,
+	}
+	om.orders = append(om.orders, order)
+	return order
+}
+
+func (om *OrderManager) CreateEntryOrderWithDefaultQty(id, direction string, createdBar int, comment string) Order {
+	om.removeOrderByID(id)
+	order := Order{
+		ID:            id,
+		Action:        OrderActionEntry,
+		Direction:     direction,
+		UseDefaultQty: true,
+		Type:          "market",
+		CreatedBar:    createdBar,
+		EntryComment:  comment,
 	}
 	om.orders = append(om.orders, order)
 	return order
@@ -258,7 +274,7 @@ func buildClosedTrade(open Trade, closeSize, profit, commission, metricsScale fl
 		ExitBar:      exitBar,
 		ExitTime:     exitTime,
 		ExitComment:  exitComment,
-		Profit:       profit,
+		Profit:       profit - commission,
 		MaxDrawdown:  open.MaxDrawdown * metricsScale,
 		MaxRunup:     open.MaxRunup * metricsScale,
 		Commission:   commission,
@@ -407,6 +423,7 @@ type Strategy struct {
 	commissionType     string
 	defaultQtyValue    float64
 	defaultQtyType     string
+	qtyStep            float64
 	allowedDirection   string
 }
 
@@ -448,11 +465,20 @@ func (s *Strategy) CallWithPyramiding(strategyName string, initialCapital float6
 func (s *Strategy) SetCommission(value float64, commType string) {
 	s.commissionValue = value
 	s.commissionType = commType
+	s.reversalHandler.commissionCalc = s.calcCommission
 }
 
 func (s *Strategy) SetDefaultQty(value float64, qtyType string) {
 	s.defaultQtyValue = value
 	s.defaultQtyType = qtyType
+}
+
+func (s *Strategy) SetQtyStep(step float64) {
+	s.qtyStep = step
+}
+
+func (s *Strategy) applyQtyStep(qty float64) float64 {
+	return floorToStep(qty, s.qtyStep)
 }
 
 func (s *Strategy) DefaultEntryQty(fillPrice float64) float64 {
@@ -500,6 +526,14 @@ func (s *Strategy) calcCommission(qty, price float64) float64 {
 }
 
 func (s *Strategy) Entry(id, direction string, qty float64, comment string) error {
+	return s.scheduleEntry(id, direction, qty, false, comment)
+}
+
+func (s *Strategy) EntryWithDefaultQty(id, direction, comment string) error {
+	return s.scheduleEntry(id, direction, 0, true, comment)
+}
+
+func (s *Strategy) scheduleEntry(id, direction string, qty float64, useDefaultQty bool, comment string) error {
 	if !s.initialized {
 		return fmt.Errorf("strategy not initialized")
 	}
@@ -543,7 +577,11 @@ func (s *Strategy) Entry(id, direction string, qty float64, comment string) erro
 		}
 	}
 
-	s.orderManager.CreateOrder(id, direction, qty, s.currentBar, comment)
+	if useDefaultQty {
+		s.orderManager.CreateEntryOrderWithDefaultQty(id, direction, s.currentBar, comment)
+	} else {
+		s.orderManager.CreateOrder(id, direction, qty, s.currentBar, comment)
+	}
 	return nil
 }
 
@@ -734,13 +772,19 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 		case OrderActionEntry:
 			s.reversalHandler.HandleReversal(order.Direction, openPrice, currentBar, openTime)
 
-			s.positionTracker.UpdatePosition(order.Qty, openPrice, order.Direction)
+			qty := order.Qty
+			if order.UseDefaultQty {
+				qty = s.DefaultEntryQty(openPrice)
+			}
+			qty = s.applyQtyStep(qty)
 
-			entryCommission := s.calcCommission(order.Qty, openPrice)
+			s.positionTracker.UpdatePosition(qty, openPrice, order.Direction)
+
+			entryCommission := s.calcCommission(qty, openPrice)
 			s.tradeHistory.AddOpenTrade(Trade{
 				EntryID:      order.ID,
 				Direction:    order.Direction,
-				Size:         order.Qty,
+				Size:         qty,
 				EntryPrice:   openPrice,
 				EntryBar:     currentBar,
 				EntryTime:    openTime,
@@ -755,7 +799,7 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 			s.executeCloseAllOrder(openPrice, currentBar, openTime, order.ExitComment)
 
 		case OrderActionOrder:
-			s.executeNetOrder(order.ID, order.Direction, order.Qty, openPrice, currentBar, openTime, order.EntryComment)
+			s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), openPrice, currentBar, openTime, order.EntryComment)
 		}
 
 		s.orderManager.RemoveOrder(order.ID)

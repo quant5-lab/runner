@@ -128,11 +128,10 @@ func TestGoldenManager_SaveGolden_ToleranceBoundaryOnSkip(t *testing.T) {
 		StrategyResult: result,
 	})
 
-	// Profit differs by less than priceTolerance — still considered equal, must not rewrite.
-	nearlyIdentical := baselineResult()
-	nearlyIdentical.Trades[0].Profit += priceTolerance * 0.5
+	profitWithinFinancialTolerance := baselineResult()
+	profitWithinFinancialTolerance.Trades[0].Profit += 10.0 * financialRelEps * 0.5
 
-	mgr.SaveGolden(t, "tolerance.json", "TestStrategy", "data.json", nearlyIdentical)
+	mgr.SaveGolden(t, "tolerance.json", "TestStrategy", "data.json", profitWithinFinancialTolerance)
 
 	got := readGoldenFile(t, root, "tolerance.json")
 	if got.GeneratedAt != pastTimestamp {

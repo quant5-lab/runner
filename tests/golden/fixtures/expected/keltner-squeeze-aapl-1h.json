@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Keltner Squeeze",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-02-01T07:25:20Z",
+  "generatedAt": "2026-06-11T18:39:55Z",
   "result": {
     "trades": [
       {
@@ -11,12 +11,12 @@
         "entryTime": 1760459400,
         "entryPrice": 247.38999938964844,
         "entryComment": "",
-        "exitBar": 61,
-        "exitTime": 1760535000,
-        "exitPrice": 250.35867938232423,
-        "exitComment": "",
-        "size": 0.4042200583965251,
-        "profit": 1.2000000000000028,
+        "exitBar": 96,
+        "exitTime": 1761139800,
+        "exitPrice": 262.7900085449219,
+        "exitComment": "Position reversal",
+        "size": 0,
+        "profit": 0,
         "direction": "long"
       },
       {
@@ -25,26 +25,12 @@
         "entryTime": 1761139800,
         "entryPrice": 262.7900085449219,
         "entryComment": "",
-        "exitBar": 97,
-        "exitTime": 1761143400,
-        "exitPrice": 259.6365284423828,
-        "exitComment": "",
-        "size": 0.3809161520124662,
-        "profit": 1.201211506107052,
-        "direction": "short"
-      },
-      {
-        "entryId": "Short",
-        "entryBar": 133,
-        "entryTime": 1761751800,
-        "entryPrice": 267.6099853515625,
-        "entryComment": "",
-        "exitBar": 447,
-        "exitTime": 1767709800,
-        "exitPrice": 264.3986655273437,
-        "exitComment": "",
-        "size": 0.3745473949922131,
-        "profit": 1.2027914746479944,
+        "exitBar": 457,
+        "exitTime": 1767807000,
+        "exitPrice": 262.3699951171875,
+        "exitComment": "Position reversal",
+        "size": 0,
+        "profit": 0,
         "direction": "short"
       }
     ],
@@ -59,13 +45,13 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 0.3825293714801536,
+        "size": 0,
         "profit": 0,
         "direction": "long"
       }
     ],
-    "equity": 1002.7241900958986,
-    "netProfit": 3.604002980755049,
+    "equity": 1000,
+    "netProfit": 0,
     "totalTrades": 0,
     "plots": {}
   }

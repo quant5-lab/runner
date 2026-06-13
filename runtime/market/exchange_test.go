@@ -255,9 +255,38 @@ func TestRegularCalendarForExchange_SessionWindowContract(t *testing.T) {
 		{name: "MOEX/at window end rejected", exchange: ExchangeMOEX, datetime: "2025-08-15 23:50", timezone: "Europe/Moscow", want: false},
 		{name: "MOEX/after window end rejected", exchange: ExchangeMOEX, datetime: "2025-08-16 00:00", timezone: "Europe/Moscow", want: false},
 
+		{name: "MOEX/saturday pre-session auction rejected", exchange: ExchangeMOEX, datetime: "2025-08-16 09:00", timezone: "Europe/Moscow", want: false},
+		{name: "MOEX/saturday at weekend open accepted", exchange: ExchangeMOEX, datetime: "2025-08-16 10:00", timezone: "Europe/Moscow", want: true},
+		{name: "MOEX/saturday midday accepted", exchange: ExchangeMOEX, datetime: "2025-08-16 13:00", timezone: "Europe/Moscow", want: true},
+		{name: "MOEX/saturday one before weekend close accepted", exchange: ExchangeMOEX, datetime: "2025-08-16 18:59", timezone: "Europe/Moscow", want: true},
+		{name: "MOEX/saturday at weekend close rejected", exchange: ExchangeMOEX, datetime: "2025-08-16 19:00", timezone: "Europe/Moscow", want: false},
+		{name: "MOEX/saturday post-session rejected", exchange: ExchangeMOEX, datetime: "2025-08-16 20:00", timezone: "Europe/Moscow", want: false},
+		{name: "MOEX/sunday pre-session rejected", exchange: ExchangeMOEX, datetime: "2025-08-17 09:00", timezone: "Europe/Moscow", want: false},
+		{name: "MOEX/sunday at weekend open accepted", exchange: ExchangeMOEX, datetime: "2025-08-17 10:00", timezone: "Europe/Moscow", want: true},
+		{name: "MOEX/sunday in session accepted", exchange: ExchangeMOEX, datetime: "2025-08-17 14:00", timezone: "Europe/Moscow", want: true},
+		{name: "MOEX/sunday at weekend close rejected", exchange: ExchangeMOEX, datetime: "2025-08-17 19:00", timezone: "Europe/Moscow", want: false},
+
+		{name: "metadata-override/uniform overrides weekend default on saturday 09:00", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0700-2350"}, datetime: "2025-08-16 09:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/uniform override saturday before override-start rejected", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0900-1900"}, datetime: "2025-08-16 08:59", timezone: "Europe/Moscow", want: false},
+		{name: "metadata-override/uniform override saturday at override-start accepted", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0900-1900"}, datetime: "2025-08-16 09:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/split weekday start accepts friday", exchange: ExchangeMOEX, metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, datetime: "2025-08-15 06:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/split weekend rejects before weekend start", exchange: ExchangeMOEX, metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, datetime: "2025-08-16 10:59", timezone: "Europe/Moscow", want: false},
+		{name: "metadata-override/split weekend accepts weekend start", exchange: ExchangeMOEX, metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, datetime: "2025-08-16 11:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/split weekend rejects weekend end", exchange: ExchangeMOEX, metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, datetime: "2025-08-16 17:00", timezone: "Europe/Moscow", want: false},
+		{name: "metadata-override/sessionWindow wins over split windows", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0800-2000", WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, datetime: "2025-08-16 10:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/date window rejects before special start", exchange: ExchangeMOEX, metadata: SourceMetadata{DateSessionWindows: map[string]string{"2025-08-16": "1200-1500"}}, datetime: "2025-08-16 11:59", timezone: "Europe/Moscow", want: false},
+		{name: "metadata-override/date window accepts special start", exchange: ExchangeMOEX, metadata: SourceMetadata{DateSessionWindows: map[string]string{"2025-08-16": "1200-1500"}}, datetime: "2025-08-16 12:00", timezone: "Europe/Moscow", want: true},
+		{name: "metadata-override/date window rejects special end", exchange: ExchangeMOEX, metadata: SourceMetadata{DateSessionWindows: map[string]string{"2025-08-16": "1200-1500"}}, datetime: "2025-08-16 15:00", timezone: "Europe/Moscow", want: false},
+		{name: "metadata-override/date window does not affect next day", exchange: ExchangeMOEX, metadata: SourceMetadata{DateSessionWindows: map[string]string{"2025-08-16": "1200-1500"}}, datetime: "2025-08-17 12:00", timezone: "Europe/Moscow", want: true},
+
 		{name: "Binance/midnight accepted", exchange: ExchangeBinance, datetime: "2025-08-15 00:00", timezone: "Europe/Moscow", want: true},
 		{name: "Binance/early hour accepted", exchange: ExchangeBinance, datetime: "2025-08-15 06:00", timezone: "Europe/Moscow", want: true},
 		{name: "Unknown/early hour accepted", exchange: ExchangeUnknown, datetime: "2025-08-15 06:00", timezone: "Europe/Moscow", want: true},
+
+		{name: "Binance/saturday pre-MOEX-session accepted", exchange: ExchangeBinance, datetime: "2025-08-16 06:00", timezone: "Europe/Moscow", want: true},
+		{name: "Binance/sunday before-MOEX-weekend-open accepted", exchange: ExchangeBinance, datetime: "2025-08-17 09:00", timezone: "Europe/Moscow", want: true},
+		{name: "Unknown/saturday pre-MOEX-session accepted", exchange: ExchangeUnknown, datetime: "2025-08-16 06:00", timezone: "Europe/Moscow", want: true},
+		{name: "Unknown/sunday before-MOEX-weekend-open accepted", exchange: ExchangeUnknown, datetime: "2025-08-17 09:00", timezone: "Europe/Moscow", want: true},
 
 		{name: "metadata-override/0600 start accepts pre-default bar", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0600-2350"}, datetime: "2025-08-15 06:00", timezone: "Europe/Moscow", want: true},
 		{name: "metadata-override/0800 start rejects 07:00 bar", exchange: ExchangeMOEX, metadata: SourceMetadata{SessionWindow: "0800-2350"}, datetime: "2025-08-15 07:00", timezone: "Europe/Moscow", want: false},
@@ -272,6 +301,122 @@ func TestRegularCalendarForExchange_SessionWindowContract(t *testing.T) {
 			cal := RegularCalendarForExchange(tc.exchange, tc.metadata)
 			if got := cal.Accepts(bar, "1h", tc.timezone); got != tc.want {
 				t.Fatalf("Accepts(%s) = %v, want %v", tc.datetime, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWeekScheduleFromMetadata(t *testing.T) {
+	at := func(datetime string) time.Time {
+		ts, err := time.Parse("2006-01-02 15:04", datetime)
+		if err != nil {
+			t.Fatalf("parse %q: %v", datetime, err)
+		}
+		return ts
+	}
+	assertContains := func(t *testing.T, schedule WeekSchedule, datetime string, want bool) {
+		t.Helper()
+		if got := schedule.Contains(at(datetime)); got != want {
+			t.Fatalf("Contains(%s) = %v, want %v", datetime, got, want)
+		}
+	}
+
+	cases := []struct {
+		name       string
+		metadata   SourceMetadata
+		want       bool
+		wantErr    bool
+		assertions map[string]bool
+	}{
+		{
+			name:     "empty metadata",
+			metadata: SourceMetadata{},
+			want:     false,
+		},
+		{
+			name:     "invalid uniform window rejected",
+			metadata: SourceMetadata{SessionWindow: "bad"},
+			wantErr:  true,
+		},
+		{
+			name:     "uniform window",
+			metadata: SourceMetadata{SessionWindow: "0800-2000"},
+			want:     true,
+			assertions: map[string]bool{
+				"2025-08-15 07:59": false,
+				"2025-08-15 08:00": true,
+				"2025-08-16 08:00": true,
+				"2025-08-16 20:00": false,
+			},
+		},
+		{
+			name:     "split windows",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"},
+			want:     true,
+			assertions: map[string]bool{
+				"2025-08-15 06:00": true,
+				"2025-08-15 23:00": false,
+				"2025-08-16 10:59": false,
+				"2025-08-16 11:00": true,
+				"2025-08-16 17:00": false,
+			},
+		},
+		{
+			name:     "weekday-only split override inherits weekday on weekends",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300"},
+			want:     true,
+			assertions: map[string]bool{
+				"2025-08-15 06:00": true,
+				"2025-08-16 06:00": true,
+				"2025-08-16 23:00": false,
+			},
+		},
+		{
+			name:     "weekend-only split override leaves weekdays unbounded",
+			metadata: SourceMetadata{WeekendSessionWindow: "1100-1700"},
+			want:     true,
+			assertions: map[string]bool{
+				"2025-08-15 03:00": true,
+				"2025-08-16 10:59": false,
+				"2025-08-16 11:00": true,
+				"2025-08-16 17:00": false,
+			},
+		},
+		{
+			name:     "invalid split peer rejected",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "bad"},
+			wantErr:  true,
+		},
+		{
+			name:     "uniform window takes precedence over split windows",
+			metadata: SourceMetadata{SessionWindow: "0800-2000", WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"},
+			want:     true,
+			assertions: map[string]bool{
+				"2025-08-15 07:59": false,
+				"2025-08-15 08:00": true,
+				"2025-08-16 10:00": true,
+				"2025-08-16 20:00": false,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			schedule, ok, err := weekScheduleFromMetadata(tc.metadata)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if ok != tc.want {
+				t.Fatalf("ok = %v, want %v", ok, tc.want)
+			}
+			for datetime, want := range tc.assertions {
+				assertContains(t, schedule, datetime, want)
 			}
 		})
 	}
@@ -358,6 +503,82 @@ func TestResolveReferenceSession(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := resolveReferenceSession(tc.metadata, tc.exchange); got != tc.want {
 				t.Fatalf("resolveReferenceSession(%v) = %v, want %v", tc.exchange, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRegularCalendarForExchange_OpenDatesWeekendSessionWindow(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Moscow")
+	mosUnix := func(datetime string) int64 {
+		ts, _ := time.ParseInLocation("2006-01-02 15:04", datetime, loc)
+		return ts.Unix()
+	}
+
+	satOpenDates := SourceMetadata{OpenDates: []string{"2025-08-16"}}
+	sunOpenDates := SourceMetadata{OpenDates: []string{"2025-08-17"}}
+
+	cases := []struct {
+		name     string
+		metadata SourceMetadata
+		datetime string
+		want     bool
+	}{
+		{name: "saturday-open/pre-weekday-start-filtered", datetime: "2025-08-16 06:59", metadata: satOpenDates, want: false},
+		{name: "saturday-open/at-weekday-start-accepted", datetime: "2025-08-16 07:00", metadata: satOpenDates, want: true},
+		{name: "saturday-open/below-weekend-start-accepted", datetime: "2025-08-16 09:00", metadata: satOpenDates, want: true},
+		{name: "saturday-open/past-weekend-end-accepted", datetime: "2025-08-16 21:00", metadata: satOpenDates, want: true},
+		{name: "saturday-open/before-weekday-end-accepted", datetime: "2025-08-16 23:49", metadata: satOpenDates, want: true},
+		{name: "saturday-open/at-weekday-end-filtered", datetime: "2025-08-16 23:50", metadata: satOpenDates, want: false},
+		{name: "sunday-open/pre-weekday-start-filtered", datetime: "2025-08-17 06:59", metadata: sunOpenDates, want: false},
+		{name: "sunday-open/at-weekday-start-accepted", datetime: "2025-08-17 07:00", metadata: sunOpenDates, want: true},
+		{name: "sunday-open/below-weekend-start-accepted", datetime: "2025-08-17 09:00", metadata: sunOpenDates, want: true},
+		{name: "sunday-open/past-weekend-end-accepted", datetime: "2025-08-17 21:00", metadata: sunOpenDates, want: true},
+		{name: "sunday-open/at-weekday-end-filtered", datetime: "2025-08-17 23:50", metadata: sunOpenDates, want: false},
+		{name: "saturday-unlisted/below-weekend-start-filtered", datetime: "2025-08-23 09:00", metadata: satOpenDates, want: false},
+		{name: "saturday-unlisted/at-weekend-start-accepted", datetime: "2025-08-23 10:00", metadata: satOpenDates, want: true},
+		{name: "saturday-unlisted/past-weekend-end-filtered", datetime: "2025-08-23 21:00", metadata: satOpenDates, want: false},
+		{name: "weekday-in-openDates/no-effect-at-session-start", datetime: "2025-08-15 07:00",
+			metadata: SourceMetadata{OpenDates: []string{"2025-08-15"}}, want: true},
+		{name: "weekday-in-openDates/no-effect-before-session-start", datetime: "2025-08-15 06:59",
+			metadata: SourceMetadata{OpenDates: []string{"2025-08-15"}}, want: false},
+		{name: "open-and-closed-same-day/closed-wins", datetime: "2025-08-16 12:00",
+			metadata: SourceMetadata{OpenDates: []string{"2025-08-16"}, ClosedDates: []string{"2025-08-16"}}, want: false},
+		{name: "uniform-override/saturday-unlisted/override-start-accepted", datetime: "2025-08-16 08:00",
+			metadata: SourceMetadata{SessionWindow: "0800-2000"}, want: true},
+		{name: "uniform-override/saturday-listed/override-start-accepted", datetime: "2025-08-16 08:00",
+			metadata: SourceMetadata{SessionWindow: "0800-2000", OpenDates: []string{"2025-08-16"}}, want: true},
+		{name: "uniform-override/saturday-listed/before-override-start-filtered", datetime: "2025-08-16 07:59",
+			metadata: SourceMetadata{SessionWindow: "0800-2000", OpenDates: []string{"2025-08-16"}}, want: false},
+
+		{name: "split-override/saturday-unlisted/weekend-start-accepted", datetime: "2025-08-16 11:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, want: true},
+		{name: "split-override/saturday-unlisted/weekend-end-filtered", datetime: "2025-08-16 17:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700"}, want: false},
+		{name: "split-override/saturday-listed/weekday-start-accepted", datetime: "2025-08-16 06:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700", OpenDates: []string{"2025-08-16"}}, want: true},
+		{name: "split-override/saturday-listed/weekday-end-filtered", datetime: "2025-08-16 23:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300", WeekendSessionWindow: "1100-1700", OpenDates: []string{"2025-08-16"}}, want: false},
+		{name: "weekday-only-override/weekday-before-start-filtered", datetime: "2025-08-15 05:59",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300"}, want: false},
+		{name: "weekday-only-override/weekday-start-accepted", datetime: "2025-08-15 06:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300"}, want: true},
+		{name: "weekday-only-override/weekend-inherits-weekday-window", datetime: "2025-08-16 06:00",
+			metadata: SourceMetadata{WeekdaySessionWindow: "0600-2300"}, want: true},
+		{name: "weekend-only-override/weekday-unbounded", datetime: "2025-08-15 02:00",
+			metadata: SourceMetadata{WeekendSessionWindow: "1100-1700"}, want: true},
+		{name: "weekend-only-override/weekend-before-start-filtered", datetime: "2025-08-16 10:59",
+			metadata: SourceMetadata{WeekendSessionWindow: "1100-1700"}, want: false},
+		{name: "weekend-only-override/weekend-start-accepted", datetime: "2025-08-16 11:00",
+			metadata: SourceMetadata{WeekendSessionWindow: "1100-1700"}, want: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bar := context.OHLCV{Time: mosUnix(tc.datetime)}
+			cal := RegularCalendarForExchange(ExchangeMOEX, tc.metadata)
+			if got := cal.Accepts(bar, "1h", "Europe/Moscow"); got != tc.want {
+				t.Fatalf("Accepts(%s) = %v, want %v", tc.datetime, got, tc.want)
 			}
 		})
 	}

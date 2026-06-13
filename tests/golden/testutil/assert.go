@@ -73,17 +73,17 @@ func (a *Asserter) assertTrade(index int, expected, actual *Trade) {
 			index, expected.ExitBar, actual.ExitBar)
 	}
 
-	if !a.floatClose(expected.EntryPrice, actual.EntryPrice, 0.01) {
+	if !matchPrice(expected.EntryPrice, actual.EntryPrice) {
 		a.t.Errorf("Trade[%d]: entryPrice mismatch: expected %.2f, got %.2f",
 			index, expected.EntryPrice, actual.EntryPrice)
 	}
 
-	if !a.floatClose(expected.ExitPrice, actual.ExitPrice, 0.01) {
+	if !matchPrice(expected.ExitPrice, actual.ExitPrice) {
 		a.t.Errorf("Trade[%d]: exitPrice mismatch: expected %.2f, got %.2f",
 			index, expected.ExitPrice, actual.ExitPrice)
 	}
 
-	if !a.floatClose(expected.Profit, actual.Profit, 0.01) {
+	if !matchFinancial(expected.Profit, actual.Profit) {
 		a.t.Errorf("Trade[%d]: profit mismatch: expected %.2f, got %.2f",
 			index, expected.Profit, actual.Profit)
 	}
@@ -183,7 +183,7 @@ func AssertTradesMatch(t *testing.T, expected, actual []Trade) {
 			t.Errorf("Trade[%d].exitBar: expected %d, got %d", i, exp.ExitBar, act.ExitBar)
 		}
 
-		if !floatWithin(exp.Profit, act.Profit, 0.01) {
+		if !matchFinancial(exp.Profit, act.Profit) {
 			t.Errorf("Trade[%d].profit: expected %.2f, got %.2f", i, exp.Profit, act.Profit)
 		}
 	}
@@ -201,12 +201,8 @@ func AssertPlotSmokePoints(t *testing.T, plotName string, expectedValues, actual
 		exp := expectedValues[idx]
 		act := actualValues[idx]
 
-		if math.IsNaN(exp) && math.IsNaN(act) {
-			continue
-		}
-
-		if !floatWithin(exp, act, 0.01) {
-			t.Errorf("Plot %q[%d]: expected %.4f, got %.4f", plotName, idx, exp, act)
+		if !matchPlot(exp, act) {
+			t.Errorf("Plot %q[%d]: expected %.8f, got %.8f", plotName, idx, exp, act)
 		}
 	}
 }

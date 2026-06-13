@@ -1,6 +1,7 @@
 package market
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -20,17 +21,21 @@ const (
 )
 
 type SourceMetadata struct {
-	Exchange           string   `json:"exchange,omitempty"`
-	Timezone           string   `json:"timezone,omitempty"`
-	ReferenceSession   string   `json:"referenceSession,omitempty"`
-	SessionSource      string   `json:"sessionSource,omitempty"`
-	CalendarID         string   `json:"calendarId,omitempty"`
-	SessionWindow      string   `json:"sessionWindow,omitempty"`
-	ClosedWeekdays     []string `json:"closedWeekdays,omitempty"`
-	OpenDates          []string `json:"openDates,omitempty"`
-	ClosedDates        []string `json:"closedDates,omitempty"`
-	IncludedDates      []string `json:"includedDates,omitempty"`
-	IncludedTimestamps []int64  `json:"includedTimestamps,omitempty"`
+	Exchange             string            `json:"exchange,omitempty"`
+	Timezone             string            `json:"timezone,omitempty"`
+	ReferenceSession     string            `json:"referenceSession,omitempty"`
+	SessionSource        string            `json:"sessionSource,omitempty"`
+	CalendarID           string            `json:"calendarId,omitempty"`
+	SessionWindow        string            `json:"sessionWindow,omitempty"`
+	WeekdaySessionWindow string            `json:"weekdaySessionWindow,omitempty"`
+	WeekendSessionWindow string            `json:"weekendSessionWindow,omitempty"`
+	DateSessionWindows   map[string]string `json:"dateSessionWindows,omitempty"`
+	ClosedWeekdays       []string          `json:"closedWeekdays,omitempty"`
+	OpenDates            []string          `json:"openDates,omitempty"`
+	ClosedDates          []string          `json:"closedDates,omitempty"`
+	IncludedDates        []string          `json:"includedDates,omitempty"`
+	IncludedTimestamps   []int64           `json:"includedTimestamps,omitempty"`
+	QtyStep              float64           `json:"qtyStep,omitempty"`
 }
 
 type Profile struct {
@@ -40,6 +45,7 @@ type Profile struct {
 	ReferenceSession ReferenceSession
 	SessionSource    string
 	CalendarID       string
+	QtyStep          float64
 }
 
 func ResolveProfile(symbol, timezone string) Profile {
@@ -51,13 +57,16 @@ func ResolveProfileWithReferenceSession(symbol, timezone, referenceSession strin
 }
 
 func ResolveProfileWithMetadata(symbol string, metadata SourceMetadata) Profile {
+	profile, err := ResolveProfileWithMetadataE(symbol, metadata)
+	if err == nil {
+		return profile
+	}
 	exchange := ResolveExchangeWithMetadata(symbol, metadata.Exchange)
 	timezone := strings.TrimSpace(metadata.Timezone)
 	if timezone == "" {
 		timezone = DefaultTimezone(exchange)
 	}
 	session := resolveReferenceSession(metadata, exchange)
-
 	return Profile{
 		Exchange:         exchange,
 		Timezone:         timezone,
@@ -65,7 +74,32 @@ func ResolveProfileWithMetadata(symbol string, metadata SourceMetadata) Profile 
 		ReferenceSession: session,
 		SessionSource:    strings.TrimSpace(metadata.SessionSource),
 		CalendarID:       strings.TrimSpace(metadata.CalendarID),
+		QtyStep:          ResolveQtyStep(exchange, metadata),
 	}
+}
+
+func ResolveProfileWithMetadataE(symbol string, metadata SourceMetadata) (Profile, error) {
+	exchange := ResolveExchangeWithMetadata(symbol, metadata.Exchange)
+	timezone := strings.TrimSpace(metadata.Timezone)
+	if timezone == "" {
+		timezone = DefaultTimezone(exchange)
+	}
+	session := resolveReferenceSession(metadata, exchange)
+
+	calendar, err := CalendarForE(exchange, session, metadata)
+	if err != nil {
+		return Profile{}, err
+	}
+
+	return Profile{
+		Exchange:         exchange,
+		Timezone:         timezone,
+		Calendar:         calendar,
+		ReferenceSession: session,
+		SessionSource:    strings.TrimSpace(metadata.SessionSource),
+		CalendarID:       strings.TrimSpace(metadata.CalendarID),
+		QtyStep:          ResolveQtyStep(exchange, metadata),
+	}, nil
 }
 
 func ResolveExchange(symbol string) Exchange {
@@ -139,30 +173,57 @@ func resolveReferenceSession(metadata SourceMetadata, exchange Exchange) Referen
 }
 
 func CalendarFor(exchange Exchange, referenceSession ReferenceSession, metadata SourceMetadata) Calendar {
-	if exact := NewTimestampSet(metadata.IncludedTimestamps...); !exact.Empty() {
-		return ExactTimestampCalendar{Allowed: exact}
-	}
-	if dates := NewDateSet(metadata.IncludedDates...); !dates.Empty() {
-		return DateWhitelistCalendar{Allowed: dates}
-	}
-	if referenceSession != ReferenceSessionRegular {
-		return AlwaysOpenCalendar{}
+	calendar, err := CalendarForE(exchange, referenceSession, metadata)
+	if err == nil {
+		return calendar
 	}
 	return RegularCalendarForExchange(exchange, metadata)
 }
 
+func CalendarForE(exchange Exchange, referenceSession ReferenceSession, metadata SourceMetadata) (Calendar, error) {
+	if exact := NewTimestampSet(metadata.IncludedTimestamps...); !exact.Empty() {
+		return ExactTimestampCalendar{Allowed: exact}, nil
+	}
+	if dates := NewDateSet(metadata.IncludedDates...); !dates.Empty() {
+		return DateWhitelistCalendar{Allowed: dates}, nil
+	}
+	if referenceSession != ReferenceSessionRegular {
+		return AlwaysOpenCalendar{}, nil
+	}
+	return RegularCalendarForExchangeE(exchange, metadata)
+}
+
 func RegularCalendarForExchange(exchange Exchange, metadata SourceMetadata) Calendar {
+	calendar, err := RegularCalendarForExchangeE(exchange, metadata)
+	if err == nil {
+		return calendar
+	}
+	closed := regularClosedWeekdays(exchange)
+	if override := WeekdaySetFromNames(metadata.ClosedWeekdays...); !override.Empty() {
+		closed = override
+	}
+	return NewRegularSessionCalendarWithSchedule(closed, NewDateSet(metadata.OpenDates...), NewDateSet(metadata.ClosedDates...), regularWeekSchedule(exchange))
+}
+
+func RegularCalendarForExchangeE(exchange Exchange, metadata SourceMetadata) (Calendar, error) {
 	closed := regularClosedWeekdays(exchange)
 	if override := WeekdaySetFromNames(metadata.ClosedWeekdays...); !override.Empty() {
 		closed = override
 	}
 	openDates := NewDateSet(metadata.OpenDates...)
 	closedDates := NewDateSet(metadata.ClosedDates...)
-	window := resolveSessionWindow(exchange, metadata)
-	if closed.Empty() && openDates.Empty() && closedDates.Empty() && window.IsUnbounded() {
-		return AlwaysOpenCalendar{}
+	schedule, err := resolveWeekSchedule(exchange, metadata)
+	if err != nil {
+		return nil, err
 	}
-	return NewRegularSessionCalendarWithWindow(closed, openDates, closedDates, window)
+	dateWindows, err := NewDateSessionWindows(metadata.DateSessionWindows)
+	if err != nil {
+		return nil, err
+	}
+	if closed.Empty() && openDates.Empty() && closedDates.Empty() && schedule.IsUnbounded() && dateWindows.Empty() {
+		return AlwaysOpenCalendar{}, nil
+	}
+	return NewRegularSessionCalendar(closed, openDates, closedDates, schedule, dateWindows), nil
 }
 
 func regularClosedWeekdays(exchange Exchange) WeekdaySet {
@@ -172,20 +233,59 @@ func regularClosedWeekdays(exchange Exchange) WeekdaySet {
 	}
 }
 
-func regularSessionWindow(exchange Exchange) SessionWindow {
+// The MOEX regular profile follows the TradingView reference-session bar
+// universe observed by fixture/CSV alignment: weekday [07:00, 23:50) MSK and
+// weekend [10:00, 19:00) MSK. Treat this as a TV reference model unless
+// SourceMetadata supplies an official exchange-specific session override.
+func regularWeekSchedule(exchange Exchange) WeekSchedule {
 	switch exchange {
 	case ExchangeMOEX:
-		return NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50))
+		return WeekSchedule{
+			Weekday: NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50)),
+			Weekend: NewSessionWindow(ClockTimeAt(10, 0), ClockTimeAt(19, 0)),
+		}
 	default:
-		return SessionWindow{}
+		return WeekSchedule{}
 	}
 }
 
-func resolveSessionWindow(exchange Exchange, metadata SourceMetadata) SessionWindow {
-	if metadata.SessionWindow != "" {
-		if parsed, err := ParseSessionWindow(metadata.SessionWindow); err == nil {
-			return parsed
-		}
+func resolveWeekSchedule(exchange Exchange, metadata SourceMetadata) (WeekSchedule, error) {
+	schedule, ok, err := weekScheduleFromMetadata(metadata)
+	if err != nil {
+		return WeekSchedule{}, err
 	}
-	return regularSessionWindow(exchange)
+	if ok {
+		return schedule, nil
+	}
+	return regularWeekSchedule(exchange), nil
+}
+
+func weekScheduleFromMetadata(metadata SourceMetadata) (WeekSchedule, bool, error) {
+	if metadata.SessionWindow != "" {
+		parsed, err := ParseSessionWindow(metadata.SessionWindow)
+		if err != nil {
+			return WeekSchedule{}, false, fmt.Errorf("sessionWindow: %w", err)
+		}
+		return UniformWeekSchedule(parsed), true, nil
+	}
+
+	var schedule WeekSchedule
+	var hasOverride bool
+	if metadata.WeekdaySessionWindow != "" {
+		parsed, err := ParseSessionWindow(metadata.WeekdaySessionWindow)
+		if err != nil {
+			return WeekSchedule{}, false, fmt.Errorf("weekdaySessionWindow: %w", err)
+		}
+		schedule.Weekday = parsed
+		hasOverride = true
+	}
+	if metadata.WeekendSessionWindow != "" {
+		parsed, err := ParseSessionWindow(metadata.WeekendSessionWindow)
+		if err != nil {
+			return WeekSchedule{}, false, fmt.Errorf("weekendSessionWindow: %w", err)
+		}
+		schedule.Weekend = parsed
+		hasOverride = true
+	}
+	return schedule, hasOverride, nil
 }

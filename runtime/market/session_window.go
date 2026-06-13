@@ -2,6 +2,7 @@ package market
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -79,4 +80,75 @@ func (w SessionWindow) Contains(t time.Time) bool {
 		return barMinutes >= start && barMinutes < end
 	}
 	return barMinutes >= start || barMinutes < end
+}
+
+type WeekSchedule struct {
+	Weekday SessionWindow
+	Weekend SessionWindow
+}
+
+func UniformWeekSchedule(w SessionWindow) WeekSchedule {
+	return WeekSchedule{Weekday: w}
+}
+
+func (s WeekSchedule) IsUnbounded() bool {
+	return s.Weekday.IsUnbounded() && s.effectiveWeekend().IsUnbounded()
+}
+
+func (s WeekSchedule) Contains(t time.Time) bool {
+	return s.ContainsFor(t, isWeekendDay(t))
+}
+
+func (s WeekSchedule) ContainsFor(t time.Time, treatAsWeekend bool) bool {
+	if treatAsWeekend {
+		return s.effectiveWeekend().Contains(t)
+	}
+	return s.Weekday.Contains(t)
+}
+
+func (s WeekSchedule) effectiveWeekend() SessionWindow {
+	if s.Weekend.IsUnbounded() {
+		return s.Weekday
+	}
+	return s.Weekend
+}
+
+func isWeekendDay(t time.Time) bool {
+	return t.Weekday() == time.Saturday || t.Weekday() == time.Sunday
+}
+
+type DateSessionWindows map[string]SessionWindow
+
+func NewDateSessionWindows(values map[string]string) (DateSessionWindows, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	dates := make([]string, 0, len(values))
+	for date := range values {
+		dates = append(dates, date)
+	}
+	sort.Strings(dates)
+
+	windows := make(DateSessionWindows, len(values))
+	for _, date := range dates {
+		if _, err := time.Parse("2006-01-02", date); err != nil {
+			return nil, fmt.Errorf("date session window %q: date must be YYYY-MM-DD", date)
+		}
+		window, err := ParseSessionWindow(values[date])
+		if err != nil {
+			return nil, fmt.Errorf("date session window %s: %w", date, err)
+		}
+		windows[date] = window
+	}
+	return windows, nil
+}
+
+func (w DateSessionWindows) Empty() bool {
+	return len(w) == 0
+}
+
+func (w DateSessionWindows) Window(date string) (SessionWindow, bool) {
+	window, ok := w[date]
+	return window, ok
 }

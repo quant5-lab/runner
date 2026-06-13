@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB7",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-05-29T20:55:08Z",
+  "generatedAt": "2026-06-10T12:31:07Z",
   "result": {
     "trades": [
       {
@@ -16,7 +16,7 @@
         "exitPrice": 116102.71,
         "exitComment": "",
         "size": 8.47574132647725,
-        "profit": -15943.462736996496,
+        "profit": -16538.679698175398,
         "direction": "long"
       },
       {
@@ -30,7 +30,7 @@
         "exitPrice": 122258.04,
         "exitComment": "",
         "size": 8.921388118031393,
-        "profit": 90711.33617592542,
+        "profit": 90084.1227215443,
         "direction": "long"
       },
       {
@@ -44,7 +44,7 @@
         "exitPrice": 85430.64,
         "exitComment": "",
         "size": 11.5409832433002,
-        "profit": 14046.4152955882,
+        "profit": 13450.629220176877,
         "direction": "short"
       },
       {
@@ -58,7 +58,7 @@
         "exitPrice": 88003.63,
         "exitComment": "",
         "size": 11.41344958616544,
-        "profit": -4425.108539052276,
+        "profit": -5026.436003133294,
         "direction": "short"
       }
     ],
@@ -78,8 +78,8 @@
         "direction": "long"
       }
     ],
-    "equity": 1100022.2924265468,
-    "netProfit": 84389.18019546484,
+    "equity": 1097602.7484714945,
+    "netProfit": 81969.6362404125,
     "totalTrades": 0,
     "plots": {}
   }

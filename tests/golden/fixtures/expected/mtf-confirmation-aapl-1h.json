@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "MTF Confirmation",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-01-21T07:51:52Z",
+  "generatedAt": "2026-06-11T18:39:54Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1768318200,
         "exitPrice": 260.1400146484375,
         "exitComment": "Position reversal",
-        "size": 3.872966509382559,
-        "profit": 7.552331970719201,
+        "size": 3,
+        "profit": 5.85003662109375,
         "direction": "long"
       }
     ],
@@ -31,13 +31,13 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 3.845878885370632,
+        "size": 3,
         "profit": 0,
         "direction": "short"
       }
     ],
-    "equity": 10007.821571660754,
-    "netProfit": 7.552331970719201,
+    "equity": 10006.06005859375,
+    "netProfit": 5.85003662109375,
     "totalTrades": 0,
     "plots": {}
   }

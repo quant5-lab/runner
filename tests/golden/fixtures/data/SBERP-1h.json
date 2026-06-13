@@ -1,5 +1,9 @@
 {
   "timezone": "Europe/Moscow",
+  "openDates": [
+    "2024-12-28",
+    "2025-11-01"
+  ],
   "bars": [
     {
       "time": 1733986800,

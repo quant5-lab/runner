@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB+RSI",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-05-30T15:19:06Z",
+  "generatedAt": "2026-06-12T20:00:54Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1760538600,
         "exitPrice": 250.8699951171875,
         "exitComment": "",
-        "size": 393.9411826867371,
-        "profit": -1185.7668069689407,
+        "size": 393,
+        "profit": -1381.3005878906251,
         "direction": "long"
       },
       {
@@ -29,8 +29,8 @@
         "exitTime": 1762183800,
         "exitPrice": 267.6400146484375,
         "exitComment": "",
-        "size": 380.77968183177694,
-        "profit": -3103.363703307933,
+        "size": 380,
+        "profit": -3297.318679199219,
         "direction": "short"
       },
       {
@@ -43,8 +43,8 @@
         "exitTime": 1764876600,
         "exitPrice": 278.8599853515625,
         "exitComment": "",
-        "size": 337.81895741727794,
-        "profit": 1398.5754322274147,
+        "size": 336,
+        "profit": 1202.259966796875,
         "direction": "short"
       }
     ],
@@ -59,13 +59,13 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 363.74665497218365,
+        "size": 361,
         "profit": 0,
         "direction": "long"
       }
     ],
-    "equity": 94592.32428591653,
-    "netProfit": -2890.555078049459,
+    "equity": 94025.52686914062,
+    "netProfit": -3476.3593002929683,
     "totalTrades": 0,
     "plots": {}
   }

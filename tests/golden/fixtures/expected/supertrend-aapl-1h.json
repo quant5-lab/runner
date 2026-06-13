@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Supertrend",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-01-21T07:51:55Z",
+  "generatedAt": "2026-06-11T18:39:50Z",
   "result": {
     "trades": [
       {
@@ -11,12 +11,12 @@
         "entryTime": 1760725800,
         "entryPrice": 252.2823944091797,
         "entryComment": "",
-        "exitBar": 82,
-        "exitTime": 1760967000,
-        "exitPrice": 255.38251495361328,
+        "exitBar": 81,
+        "exitTime": 1760729400,
+        "exitPrice": 253.20001220703125,
         "exitComment": "",
-        "size": 0.3963535425700554,
-        "profit": 1.2287437601804636,
+        "size": 0,
+        "profit": 0,
         "direction": "long"
       },
       {
@@ -25,12 +25,12 @@
         "entryTime": 1761323400,
         "entryPrice": 263.5899963378906,
         "entryComment": "",
-        "exitBar": 123,
-        "exitTime": 1761593400,
-        "exitPrice": 267.76495361328125,
+        "exitBar": 113,
+        "exitTime": 1761323400,
+        "exitPrice": 262.8500061035156,
         "exitComment": "",
-        "size": 0.37985765034010804,
-        "profit": 1.585889460900222,
+        "size": 0,
+        "profit": -0,
         "direction": "long"
       },
       {
@@ -41,16 +41,16 @@
         "entryComment": "",
         "exitBar": 245,
         "exitTime": 1763656200,
-        "exitPrice": 268.1400146484375,
+        "exitPrice": 268.04998779296875,
         "exitComment": "",
-        "size": 0.3661176822950624,
-        "profit": -2.1124950045535202,
+        "size": 0,
+        "profit": -0,
         "direction": "long"
       }
     ],
     "openTrades": [],
-    "equity": 1000.7021382165271,
-    "netProfit": 0.7021382165271657,
+    "equity": 1000,
+    "netProfit": 0,
     "totalTrades": 0,
     "plots": {}
   }

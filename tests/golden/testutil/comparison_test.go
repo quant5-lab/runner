@@ -111,18 +111,18 @@ func TestCompareResults_TradeFieldMismatch(t *testing.T) {
 		{"entryId mismatch", func(tr *Trade) { tr.EntryID = "Short" }, "entryId"},
 		{"entryBar mismatch", func(tr *Trade) { tr.EntryBar = 99 }, "entryBar"},
 		{"entryTime mismatch", func(tr *Trade) { tr.EntryTime = 9_999_999 }, "entryTime"},
-		{"entryPrice within tolerance passes", func(tr *Trade) { tr.EntryPrice += priceTolerance * 0.5 }, ""},
-		{"entryPrice outside tolerance fails", func(tr *Trade) { tr.EntryPrice += priceTolerance + 0.001 }, "entryPrice"},
+		{"entryPrice within tolerance passes", func(tr *Trade) { tr.EntryPrice += 100.0 * priceRelEps * 0.5 }, ""},
+		{"entryPrice outside tolerance fails", func(tr *Trade) { tr.EntryPrice += 100.0 * priceRelEps * 2 }, "entryPrice"},
 		{"entryComment mismatch", func(tr *Trade) { tr.EntryComment = "other" }, "entryComment"},
 		{"exitBar mismatch", func(tr *Trade) { tr.ExitBar = 99 }, "exitBar"},
 		{"exitTime mismatch", func(tr *Trade) { tr.ExitTime = 9_999_999 }, "exitTime"},
-		{"exitPrice within tolerance passes", func(tr *Trade) { tr.ExitPrice += priceTolerance * 0.5 }, ""},
-		{"exitPrice outside tolerance fails", func(tr *Trade) { tr.ExitPrice += priceTolerance + 0.001 }, "exitPrice"},
+		{"exitPrice within tolerance passes", func(tr *Trade) { tr.ExitPrice += 110.0 * priceRelEps * 0.5 }, ""},
+		{"exitPrice outside tolerance fails", func(tr *Trade) { tr.ExitPrice += 110.0 * priceRelEps * 2 }, "exitPrice"},
 		{"exitComment mismatch", func(tr *Trade) { tr.ExitComment = "other" }, "exitComment"},
-		{"size within tolerance passes", func(tr *Trade) { tr.Size += priceTolerance * 0.5 }, ""},
-		{"size outside tolerance fails", func(tr *Trade) { tr.Size += priceTolerance + 0.001 }, "size"},
-		{"profit within tolerance passes", func(tr *Trade) { tr.Profit += priceTolerance * 0.5 }, ""},
-		{"profit outside tolerance fails", func(tr *Trade) { tr.Profit += priceTolerance + 0.001 }, "profit"},
+		{"size within tolerance passes", func(tr *Trade) { tr.Size += 1.0 * financialRelEps * 0.5 }, ""},
+		{"size outside tolerance fails", func(tr *Trade) { tr.Size += 1.0 * financialRelEps * 2 }, "size"},
+		{"profit within tolerance passes", func(tr *Trade) { tr.Profit += 10.0 * financialRelEps * 0.5 }, ""},
+		{"profit outside tolerance fails", func(tr *Trade) { tr.Profit += 10.0 * financialRelEps * 2 }, "profit"},
 		{"direction mismatch", func(tr *Trade) { tr.Direction = "short" }, "direction"},
 	}
 
@@ -186,10 +186,10 @@ func TestCompareResults_ScalarMismatch(t *testing.T) {
 		wantErr string
 	}{
 		{"totalTrades mismatch", func(r *StrategyResult) { r.TotalTrades = 99 }, "totalTrades"},
-		{"equity within tolerance passes", func(r *StrategyResult) { r.Equity += priceTolerance * 0.5 }, ""},
-		{"equity outside tolerance fails", func(r *StrategyResult) { r.Equity += priceTolerance + 0.001 }, "equity"},
-		{"netProfit within tolerance passes", func(r *StrategyResult) { r.NetProfit += priceTolerance * 0.5 }, ""},
-		{"netProfit outside tolerance fails", func(r *StrategyResult) { r.NetProfit += priceTolerance + 0.001 }, "netProfit"},
+		{"equity within tolerance passes", func(r *StrategyResult) { r.Equity += 10000.0 * financialRelEps * 0.5 }, ""},
+		{"equity outside tolerance fails", func(r *StrategyResult) { r.Equity += 10000.0 * financialRelEps * 2 }, "equity"},
+		{"netProfit within tolerance passes", func(r *StrategyResult) { r.NetProfit += 10.0 * financialRelEps * 0.5 }, ""},
+		{"netProfit outside tolerance fails", func(r *StrategyResult) { r.NetProfit += 10.0 * financialRelEps * 2 }, "netProfit"},
 	}
 
 	for _, tt := range tests {
@@ -249,13 +249,13 @@ func TestComparePlots(t *testing.T) {
 		{
 			"value within plot tolerance passes",
 			map[string][]float64{"rsi": {50.0}},
-			map[string][]float64{"rsi": {50.0 + plotTolerance*0.5}},
+			map[string][]float64{"rsi": {50.0 + plotAbsEps*0.5}},
 			"",
 		},
 		{
 			"value outside plot tolerance fails",
 			map[string][]float64{"rsi": {50.0}},
-			map[string][]float64{"rsi": {50.0 + plotTolerance + 1e-7}},
+			map[string][]float64{"rsi": {50.0 + plotAbsEps + 1e-7}},
 			`plots["rsi"][0]`,
 		},
 		{

@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB7",
   "dataSource": "SBERP-1h.json",
-  "generatedAt": "2026-06-03T16:51:34Z",
+  "generatedAt": "2026-06-10T13:26:53Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1739383200,
         "exitPrice": 303.46,
         "exitComment": "",
-        "size": 3623.8448994383043,
-        "profit": 99691.97318354771,
+        "size": 3622.7580720166993,
+        "profit": 99032.35588482721,
         "direction": "long"
       },
       {
@@ -29,56 +29,56 @@
         "exitTime": 1739509200,
         "exitPrice": 310.86,
         "exitComment": "",
-        "size": 3225.9105132423624,
-        "profit": 2903.3194619182364,
+        "size": 3225.2551618693,
+        "profit": 2302.0387728049704,
         "direction": "long"
       },
       {
         "entryId": "BB entry",
-        "entryBar": 909,
+        "entryBar": 908,
         "entryTime": 1741161600,
         "entryPrice": 312.2,
         "entryComment": "",
-        "exitBar": 950,
+        "exitBar": 949,
         "exitTime": 1741359600,
         "exitPrice": 310.2,
         "exitComment": "",
-        "size": 3202.767190852897,
-        "profit": -6405.534381705794,
+        "size": 3202.1143176585783,
+        "profit": -7002.127420710366,
         "direction": "long"
       },
       {
         "entryId": "BB entry",
-        "entryBar": 1065,
+        "entryBar": 1062,
         "entryTime": 1742198400,
         "entryPrice": 322.44,
         "entryComment": "",
-        "exitBar": 1161,
+        "exitBar": 1158,
         "exitTime": 1742842800,
         "exitPrice": 317.2,
         "exitComment": "",
-        "size": 3101.352189554646,
-        "profit": -16251.085473266374,
+        "size": 3100.4220629357656,
+        "profit": -16841.15780028431,
         "direction": "long"
       },
       {
         "entryId": "BB entry",
-        "entryBar": 4574,
+        "entryBar": 4519,
         "entryTime": 1763712000,
         "entryPrice": 302.73,
         "entryComment": "",
-        "exitBar": 4649,
+        "exitBar": 4594,
         "exitTime": 1764255600,
         "exitPrice": 295.75,
         "exitComment": "",
-        "size": 3304.255881575469,
-        "profit": -23063.706053396836,
+        "size": 3302.2828592244177,
+        "profit": -23642.839431063087,
         "direction": "long"
       }
     ],
     "openTrades": [],
-    "equity": 1056874.966737097,
-    "netProfit": 56874.966737096955,
+    "equity": 1053848.2700055744,
+    "netProfit": 53848.270005574406,
     "totalTrades": 0,
     "plots": {}
   }

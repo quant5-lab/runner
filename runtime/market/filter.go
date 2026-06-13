@@ -23,6 +23,15 @@ func NormalizeBarsWithMetadata(symbol, timeframe string, metadata SourceMetadata
 	return normalized, profile
 }
 
+func NormalizeBarsWithMetadataE(symbol, timeframe string, metadata SourceMetadata, bars []context.OHLCV) ([]context.OHLCV, Profile, error) {
+	profile, err := ResolveProfileWithMetadataE(symbol, metadata)
+	if err != nil {
+		return nil, Profile{}, err
+	}
+	normalized, _ := NormalizeBarsForProfile(profile, timeframe, bars)
+	return normalized, profile, nil
+}
+
 func NormalizeBarsForProfile(profile Profile, timeframe string, bars []context.OHLCV) ([]context.OHLCV, ReferenceSession) {
 	if profile.Calendar == nil || len(bars) == 0 {
 		return bars, profile.ReferenceSession

@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB8",
   "dataSource": "SBERP-1h.json",
-  "generatedAt": "2026-06-03T16:51:32Z",
+  "generatedAt": "2026-06-10T13:26:52Z",
   "result": {
     "trades": [
       {
@@ -11,32 +11,32 @@
         "entryTime": 1735891200,
         "entryPrice": 275.95,
         "entryComment": "",
-        "exitBar": 1252,
+        "exitBar": 1247,
         "exitTime": 1743397200,
         "exitPrice": 303.74,
         "exitComment": "",
-        "size": 2174.3069396629826,
-        "profit": 60423.98985323433,
+        "size": 2173.6548432100194,
+        "profit": 60027.85429998836,
         "direction": "long"
       },
       {
         "entryId": "BB entry",
-        "entryBar": 4574,
+        "entryBar": 4519,
         "entryTime": 1763712000,
         "entryPrice": 302.73,
         "entryComment": "",
-        "exitBar": 5178,
+        "exitBar": 5115,
         "exitTime": 1767934800,
         "exitPrice": 298.06,
         "exitComment": "",
-        "size": 1982.5535289452816,
-        "profit": -9258.524980174498,
+        "size": 1981.3697155346506,
+        "profit": -9610.112704965668,
         "direction": "long"
       }
     ],
     "openTrades": [],
-    "equity": 2051165.46487306,
-    "netProfit": 51165.46487305983,
+    "equity": 2050417.7415950226,
+    "netProfit": 50417.741595022686,
     "totalTrades": 0,
     "plots": {}
   }

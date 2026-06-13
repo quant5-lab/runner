@@ -4,6 +4,7 @@ type PositionReversalHandler struct {
 	tradeHistory     *TradeHistory
 	positionTracker  *PositionTracker
 	equityCalculator *EquityCalculator
+	commissionCalc   func(qty, price float64) float64
 }
 
 func NewPositionReversalHandler(
@@ -61,6 +62,10 @@ func (h *PositionReversalHandler) closeTrade(
 	exitBar int,
 	exitTime int64,
 ) {
+	exitCommission := 0.0
+	if h.commissionCalc != nil {
+		exitCommission = h.commissionCalc(trade.Size, exitPrice)
+	}
 	closedTrade := h.tradeHistory.CloseTrade(
 		trade.EntryID,
 		"",
@@ -68,7 +73,7 @@ func (h *PositionReversalHandler) closeTrade(
 		exitBar,
 		exitTime,
 		"Position reversal",
-		0.0,
+		exitCommission,
 	)
 
 	if closedTrade != nil {
