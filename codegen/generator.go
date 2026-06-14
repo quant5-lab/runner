@@ -250,6 +250,7 @@ type generator struct {
 	statementAnalyzer      *StatementConditionalAnalyzer
 	builtinSeriesLifecycle *CompositeSeriesLifecycle
 	seriesInitCoercer      *SeriesInitCoercer
+	chartOnlyUDFs          map[string]bool
 	featureGaps            []string
 }
 
@@ -533,6 +534,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		nestedScanner.ScanReassignments(stmt)
 	}
 
+	g.chartOnlyUDFs = NewChartOnlyUDFDetector().Detect(program)
 	// Generate user-defined functions at module level
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
@@ -848,6 +850,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	for i := range callSites {
 		callSites[i].NeedsSecurity = secDetector.FunctionContainsSecurityCall(callSites[i].FunctionName, program)
 	}
+	callSites = filterChartOnlyCallSites(callSites, g.chartOnlyUDFs)
 
 	g.hoistedArrowContexts = callSites
 
@@ -3050,6 +3053,9 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 		}
 		args = append(args, argCode)
 	}
+	if g.arrowCaptureRegistry != nil {
+		args = g.arrowCaptureRegistry.AppendCallArgs(args, funcName, g.constants)
+	}
 
 	callCode := fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
 	code += g.ind() + fmt.Sprintf("%s := %s\n", strings.Join(varNames, ", "), callCode)
@@ -3073,9 +3079,7 @@ func (g *generator) generateUserDefinedFunctionCallWithContext(callExpr *ast.Cal
 	}
 
 	if g.arrowCaptureRegistry != nil {
-		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
-			args = append(args, cap.GoParamName())
-		}
+		args = g.arrowCaptureRegistry.AppendCallArgs(args, funcName, g.constants)
 	}
 
 	return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", ")), nil

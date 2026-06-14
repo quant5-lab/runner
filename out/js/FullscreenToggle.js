@@ -31,9 +31,10 @@ export class FullscreenToggle {
 
   #createButton() {
     const btn = document.createElement('button');
-    btn.className   = 'fullscreen-toggle-btn';
-    btn.textContent = '⤢';
-    btn.title       = 'Toggle fullscreen';
+    btn.className        = 'fullscreen-toggle-btn';
+    btn.textContent      = '⤢';
+    btn.title            = 'Toggle fullscreen';
+    btn.setAttribute('aria-pressed', 'false');
     btn.addEventListener('click', () => this.#toggle());
     return btn;
   }
@@ -88,5 +89,6 @@ export class FullscreenToggle {
     const active = this.#isFullscreen();
     this.#button.textContent = active ? '✕' : '⤢';
     this.#button.title       = active ? 'Exit fullscreen' : 'Toggle fullscreen';
+    this.#button.setAttribute('aria-pressed', String(active));
   }
 }

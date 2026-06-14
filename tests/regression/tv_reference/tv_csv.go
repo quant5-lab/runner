@@ -155,6 +155,17 @@ func SizeResidual(runnerSize, tvSize float64) float64 {
 	return floatAbs(runnerSize-tvSize) / denominator
 }
 
+// HasSizeData reports whether any trade in the slice carries a nonzero Size,
+// indicating that the source CSV contained a size column.
+func HasSizeData(trades []TVTrade) bool {
+	for _, t := range trades {
+		if t.Size != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func pnlMatchRelative(a, b, relTol float64) bool {
 	if a == b {
 		return true

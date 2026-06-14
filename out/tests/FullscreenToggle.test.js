@@ -6,12 +6,15 @@ import { FullscreenToggle } from '../js/FullscreenToggle.js';
 
 function makeButtonStub() {
   const handlers = {};
+  const attrs    = {};
   return {
     className:   '',
     textContent: '',
     title:       '',
     addEventListener(event, fn) { (handlers[event] ??= []).push(fn); },
-    _fire:       (event) => (handlers[event] ?? []).forEach(fn => fn()),
+    setAttribute(name, value)   { attrs[name] = value; },
+    getAttribute(name)          { return attrs[name] ?? null; },
+    _fire: (event) => (handlers[event] ?? []).forEach(fn => fn()),
   };
 }
 
@@ -113,6 +116,34 @@ const ENTER_TITLE = 'Toggle fullscreen';
 const EXIT_TITLE  = 'Exit fullscreen';
 const BTN_CLASS   = 'fullscreen-toggle-btn';
 
+// ── Fullscreen detection sources ──────────────────────────────────────────────
+//
+// Each entry describes one independent mechanism for signalling that fullscreen
+// is active.  The same table drives both the button-state tests and the
+// aria-pressed tests so any new fullscreen source is covered in both aspects
+// by adding a single row here.
+
+const fullscreenSources = [
+  {
+    label:      'document.fullscreenElement (standard API)',
+    activate:   (doc, container) => { doc.fullscreenElement = container; },
+    deactivate: (doc)            => { doc.fullscreenElement = null; },
+    requiresEvent: true,
+  },
+  {
+    label:      'document.webkitFullscreenElement (webkit API)',
+    activate:   (doc, container) => { doc.webkitFullscreenElement = container; },
+    deactivate: (doc)            => { doc.webkitFullscreenElement = null; },
+    requiresEvent: true,
+  },
+  {
+    label:      'CSS class chart-fullscreen (fallback)',
+    activate:   (_, container) => container.classList.add('chart-fullscreen'),
+    deactivate: (_, container) => container.classList.remove('chart-fullscreen'),
+    requiresEvent: true,
+  },
+];
+
 // ── mount() — single-attachment guarantee ─────────────────────────────────────
 
 describe('mount() — button is appended exactly once regardless of call count', () => {
@@ -182,52 +213,39 @@ describe('button — initial state after first mount()', () => {
   });
 });
 
-// ── Button — state sync via fullscreenchange ──────────────────────────────────
+// ── Button state — all fullscreen sources ─────────────────────────────────────
 
-describe('button — shows exit state when fullscreen is active', () => {
-  it('document.fullscreenElement set → fullscreenchange → exit icon and title', () => {
-    const { button, doc, container } = makeToggle();
-    simulateApiFullscreenEntered(doc, container);
-    assert.equal(button().textContent, EXIT_ICON);
-    assert.equal(button().title,       EXIT_TITLE);
-  });
+describe('button — reflects active fullscreen state across all detection sources', () => {
+  for (const { label, activate, deactivate } of fullscreenSources) {
+    it(`${label} → active → exit icon and title`, () => {
+      const { button, doc, container } = makeToggle({ supportsRequestFullscreen: false });
+      activate(doc, container);
+      doc._fire('fullscreenchange');
+      assert.equal(button().textContent, EXIT_ICON,  `source: ${label}`);
+      assert.equal(button().title,       EXIT_TITLE, `source: ${label}`);
+    });
 
-  it('document.webkitFullscreenElement set → fullscreenchange → exit icon and title', () => {
-    const { button, doc } = makeToggle();
-    doc.webkitFullscreenElement = {};
-    doc._fire('fullscreenchange');
-    assert.equal(button().textContent, EXIT_ICON);
-    assert.equal(button().title,       EXIT_TITLE);
-  });
-
-  it('CSS class chart-fullscreen → fullscreenchange → exit icon and title', () => {
-    const { button, container, doc } = makeToggle({ supportsRequestFullscreen: false });
-    container.classList.add('chart-fullscreen');
-    doc._fire('fullscreenchange');
-    assert.equal(button().textContent, EXIT_ICON);
-    assert.equal(button().title,       EXIT_TITLE);
-  });
+    it(`${label} → deactivated → enter icon and title`, () => {
+      const { button, doc, container } = makeToggle({ supportsRequestFullscreen: false });
+      activate(doc, container);
+      doc._fire('fullscreenchange');
+      deactivate(doc, container);
+      doc._fire('fullscreenchange');
+      assert.equal(button().textContent, ENTER_ICON,  `source: ${label}`);
+      assert.equal(button().title,       ENTER_TITLE, `source: ${label}`);
+    });
+  }
 });
 
-describe('button — returns to enter state when fullscreen is no longer active', () => {
-  it('fullscreenElement cleared → fullscreenchange → enter icon and title', () => {
+describe('button — multiple sequential transitions stay consistent', () => {
+  it('enter → exit → enter cycle reflects correct state at each step', () => {
     const { button, doc, container } = makeToggle();
     simulateApiFullscreenEntered(doc, container);
     assert.equal(button().textContent, EXIT_ICON);
     simulateApiFullscreenExited(doc);
     assert.equal(button().textContent, ENTER_ICON);
-    assert.equal(button().title,       ENTER_TITLE);
-  });
-
-  it('CSS class removed → fullscreenchange → enter icon and title', () => {
-    const { button, container, doc } = makeToggle({ supportsRequestFullscreen: false });
-    container.classList.add('chart-fullscreen');
-    doc._fire('fullscreenchange');
+    simulateApiFullscreenEntered(doc, container);
     assert.equal(button().textContent, EXIT_ICON);
-    container.classList.remove('chart-fullscreen');
-    doc._fire('fullscreenchange');
-    assert.equal(button().textContent, ENTER_ICON);
-    assert.equal(button().title,       ENTER_TITLE);
   });
 });
 
@@ -408,42 +426,66 @@ describe('exit fullscreen — CSS fallback path', () => {
   });
 });
 
-// ── Fullscreen state detection — source independence ─────────────────────────
+// ── aria-pressed — assistive technology announcement ─────────────────────────
+//
+// Driven by the same fullscreenSources table as the button-state tests so that
+// every new detection source is covered in both concerns automatically.
 
-describe('fullscreen detection — source independence', () => {
-  const detectionCases = [
-    {
-      label: 'document.fullscreenElement',
-      activate:   (doc, container) => { doc.fullscreenElement = container; },
-      deactivate: (doc)            => { doc.fullscreenElement = null; },
-    },
-    {
-      label: 'document.webkitFullscreenElement',
-      activate:   (doc, container) => { doc.webkitFullscreenElement = container; },
-      deactivate: (doc)            => { doc.webkitFullscreenElement = null; },
-    },
-    {
-      label: 'CSS class chart-fullscreen',
-      activate:   (_, container) => container.classList.add('chart-fullscreen'),
-      deactivate: (_, container) => container.classList.remove('chart-fullscreen'),
-    },
-  ];
+describe('aria-pressed — initial state is not-pressed on load', () => {
+  it('button has aria-pressed="false" immediately after first mount', () => {
+    const { button } = makeToggle();
+    assert.equal(button().getAttribute('aria-pressed'), 'false');
+  });
 
-  for (const { label, activate, deactivate } of detectionCases) {
-    it(`${label} → active: button shows exit state`, () => {
+  it('aria-pressed="false" is stable across N idempotent mount() calls', () => {
+    const { button } = makeToggle({ mountCount: 5 });
+    assert.equal(button().getAttribute('aria-pressed'), 'false');
+  });
+});
+
+describe('aria-pressed — tracks active state across all fullscreen detection sources', () => {
+  for (const { label, activate, deactivate } of fullscreenSources) {
+    it(`${label} → active → aria-pressed="true"`, () => {
       const { button, doc, container } = makeToggle({ supportsRequestFullscreen: false });
       activate(doc, container);
       doc._fire('fullscreenchange');
-      assert.equal(button().textContent, EXIT_ICON, `source: ${label}`);
+      assert.equal(button().getAttribute('aria-pressed'), 'true', `source: ${label}`);
     });
 
-    it(`${label} → cleared: button shows enter state`, () => {
+    it(`${label} → deactivated → aria-pressed="false"`, () => {
       const { button, doc, container } = makeToggle({ supportsRequestFullscreen: false });
       activate(doc, container);
       doc._fire('fullscreenchange');
       deactivate(doc, container);
       doc._fire('fullscreenchange');
-      assert.equal(button().textContent, ENTER_ICON, `source: ${label}`);
+      assert.equal(button().getAttribute('aria-pressed'), 'false', `source: ${label}`);
     });
   }
+});
+
+describe('aria-pressed — CSS fallback path (synchronous, no fullscreenchange needed)', () => {
+  it('CSS enter → aria-pressed="true" immediately', () => {
+    const { button } = makeToggle({ supportsRequestFullscreen: false });
+    button()._fire('click');
+    assert.equal(button().getAttribute('aria-pressed'), 'true');
+  });
+
+  it('CSS exit → aria-pressed="false" immediately', () => {
+    const { button } = makeToggle({ supportsRequestFullscreen: false });
+    button()._fire('click');
+    button()._fire('click');
+    assert.equal(button().getAttribute('aria-pressed'), 'false');
+  });
+});
+
+describe('aria-pressed — multiple sequential transitions stay consistent', () => {
+  it('enter → exit → enter cycle produces correct aria-pressed at each step', () => {
+    const { button, doc, container } = makeToggle();
+    simulateApiFullscreenEntered(doc, container);
+    assert.equal(button().getAttribute('aria-pressed'), 'true');
+    simulateApiFullscreenExited(doc);
+    assert.equal(button().getAttribute('aria-pressed'), 'false');
+    simulateApiFullscreenEntered(doc, container);
+    assert.equal(button().getAttribute('aria-pressed'), 'true');
+  });
 });

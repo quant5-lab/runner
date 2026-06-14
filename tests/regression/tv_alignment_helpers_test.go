@@ -10,19 +10,20 @@ import (
 )
 
 type tvAlignmentCase struct {
-	Name                 string
-	Strategy             string
-	Data                 string
-	Symbol               string
-	Timeframe            string
-	Golden               string
-	CSV                  string
-	Timezone             tvref.TVTimezone
-	Tolerance            tvAlignmentTolerance
-	Discrepancy          tvAlignmentDiscrepancy
-	InitialCapital       float64
-	PnLDiscrepancy       int    // known PnL mismatches due to cold-start timing offset, not commission bugs
-	SkipPnLRatchetReason string // non-empty: excluded from TestPerTradePnL_TVAlignment; must state why equityRatio is inapplicable
+	Name                  string
+	Strategy              string
+	Data                  string
+	Symbol                string
+	Timeframe             string
+	Golden                string
+	CSV                   string
+	Timezone              tvref.TVTimezone
+	Tolerance             tvAlignmentTolerance
+	Discrepancy           tvAlignmentDiscrepancy
+	InitialCapital        float64
+	PnLDiscrepancy        int    // known PnL mismatches due to cold-start timing offset, not commission bugs
+	SkipPnLRatchetReason  string // non-empty: excluded from TestPerTradePnL_TVAlignment; must state why equityRatio is inapplicable
+	SkipSizeRatchetReason string // non-empty: excluded from size assertion in assertTVAlignment; must state why runner and TV sizes are not comparable
 }
 
 type tvAlignmentTolerance struct {
@@ -47,7 +48,8 @@ func tvAlignmentCases() []tvAlignmentCase {
 			Name: "Hull SBERP", Strategy: "top10/hull.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "hull-sberp-1h.json", CSV: "hull-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
 			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 1, TVOnly: 3},
-			InitialCapital: 100000,
+			InitialCapital:        100000,
+			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start is inflated by 316+ pre-window trades since 2021; runner starts fresh at 100,000 RUB — position sizes are not comparable.",
 		},
 		{
 			Name: "UtPlus SBERP", Strategy: "top10/ut+.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
@@ -59,20 +61,23 @@ func tvAlignmentCases() []tvAlignmentCase {
 			Name: "BB+RSI SBERP", Strategy: "bb-rsi-strategy.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "bb-rsi-sberp-1h.json", CSV: "bb-rsi-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
 			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 1, TVOnly: 1},
-			InitialCapital: 100000,
+			InitialCapital:        100000,
+			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
 		},
 		{
 			Name: "BB+RSI BTCUSDT", Strategy: "bb-rsi-strategy.pine", Data: "BTCUSDT-1h.json", Symbol: "BTCUSDT", Timeframe: "1h",
 			Golden: "bb-rsi-btcusdt-1h.json", CSV: "bb-rsi-btcusdt-1h-reference.csv", Timezone: tvref.TVTimezoneUTC,
 			Tolerance: oneHour, Discrepancy: exactTVAlignment(),
-			InitialCapital: 100000,
+			InitialCapital:        100000,
+			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
 		},
 		{
 			Name: "BB+RSI AAPL", Strategy: "bb-rsi-strategy.pine", Data: "AAPL-1h.json", Symbol: "AAPL", Timeframe: "1h",
 			Golden: "bb-rsi-aapl-1h.json", CSV: "bb-rsi-aapl-1h-reference.csv", Timezone: tvref.TVTimezoneNewYork,
 			Tolerance: twoHoursTwoRub, Discrepancy: exactTVAlignment(),
-			InitialCapital: 100000,
-			PnLDiscrepancy: 1, // trade at 2025-10-09 enters 1h before TV (cold-start: TV had open SHORT from before fixture)
+			InitialCapital:        100000,
+			PnLDiscrepancy:        1, // trade at 2025-10-09 enters 1h before TV (cold-start: TV had open SHORT from before fixture)
+			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
 		},
 		{
 			Name: "BB7 SBERP", Strategy: "bb-strategy-7-rus.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
@@ -191,6 +196,10 @@ func runnerClosedTradesFromResult(result *goldenutil.StrategyResult) []tvref.Run
 	return out
 }
 
+// sizeRelativeTolerance covers floating-point rounding at the lot-quantization step;
+// observed residuals for strategy.cash strategies are < 0.01%.
+const sizeRelativeTolerance = 0.02
+
 func assertTVAlignment(t *testing.T, runner []tvref.RunnerTrade, tv []tvref.TVTrade, tc tvAlignmentCase) {
 	t.Helper()
 	if len(runner) == 0 {
@@ -204,5 +213,22 @@ func assertTVAlignment(t *testing.T, runner []tvref.RunnerTrade, tv []tvref.TVTr
 	if runnerOnly != tc.Discrepancy.RunnerOnly || tvOnly != tc.Discrepancy.TVOnly {
 		t.Errorf("%s TV alignment discrepancy changed: matched=%d runner=%d tv=%d runner-only=%d want %d, tv-only=%d want %d",
 			tc.Name, matched, len(runner), len(tv), runnerOnly, tc.Discrepancy.RunnerOnly, tvOnly, tc.Discrepancy.TVOnly)
+	}
+
+	assertSizeAlignment(t, runner, tv, tc)
+}
+
+func assertSizeAlignment(t *testing.T, runner []tvref.RunnerTrade, tv []tvref.TVTrade, tc tvAlignmentCase) {
+	t.Helper()
+	if tc.SkipSizeRatchetReason != "" {
+		return
+	}
+	if !tvref.HasSizeData(tv) {
+		return
+	}
+	_, sizeMismatch, _ := tvref.MatchSize(runner, tv, tc.Tolerance.Time, tc.Tolerance.Price, sizeRelativeTolerance)
+	if sizeMismatch > 0 {
+		t.Errorf("%s: %d matched trade(s) have size mismatch exceeding %.0f%% tolerance vs TV reference",
+			tc.Name, sizeMismatch, sizeRelativeTolerance*100)
 	}
 }

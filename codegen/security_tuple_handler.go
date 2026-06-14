@@ -27,67 +27,26 @@ func (g *generator) generateTupleSecurityDeclaration(varNames []string, call *as
 }
 
 func parseTupleSecurityArguments(g *generator, varNames []string, call *ast.CallExpression) (*tupleSecurityArguments, error) {
-	if len(call.Arguments) < 3 {
-		return nil, fmt.Errorf("security() requires at least 3 arguments, got %d", len(call.Arguments))
-	}
-
-	elements, err := extractTupleExpressionElements(call.Arguments[2])
-	if err != nil {
-		return nil, fmt.Errorf("security() tuple: %w", err)
-	}
-
-	if len(elements) != len(varNames) {
-		return nil, fmt.Errorf("security() tuple: cardinality mismatch: %d variables vs %d expressions", len(varNames), len(elements))
-	}
-
-	extractor := NewSecurityArgumentExtractor(g)
-
-	symbolResult, err := extractor.ExtractSymbol(call.Arguments[0])
-	if err != nil {
-		return nil, fmt.Errorf("security symbol: %w", err)
-	}
-
-	timeframeResult, err := extractor.ExtractTimeframe(call.Arguments[1])
-	if err != nil {
-		return nil, fmt.Errorf("security timeframe: %w", err)
-	}
-
-	return &tupleSecurityArguments{
-		varNames:        varNames,
-		elements:        elements,
-		symbolResult:    symbolResult,
-		timeframeResult: timeframeResult,
-		cacheKey:        NewSecurityCacheKeyBuilder().Build(symbolResult, timeframeResult),
-		lookahead:       resolveSecurityLookahead(call, g.pineVersion),
-	}, nil
+	return assembleTupleSecurityArguments(g, varNames, call, NewSecurityArgumentExtractor(g))
 }
 
-// parseTupleSecurityArgumentsWithScope is like parseTupleSecurityArguments but
-// passes an arrow-scope map to SecurityArgumentExtractor so parameter identifiers
-// in the symbol/timeframe positions resolve to the variable name, not a string literal.
 func parseTupleSecurityArgumentsWithScope(g *generator, varNames []string, call *ast.CallExpression, arrowScope map[string]string) (*tupleSecurityArguments, error) {
+	return assembleTupleSecurityArguments(g, varNames, call, NewSecurityArgumentExtractor(g).WithArrowScope(arrowScope))
+}
+
+func assembleTupleSecurityArguments(g *generator, varNames []string, call *ast.CallExpression, extractor *SecurityArgumentExtractor) (*tupleSecurityArguments, error) {
 	if len(call.Arguments) < 3 {
 		return nil, fmt.Errorf("security() requires at least 3 arguments, got %d", len(call.Arguments))
 	}
 
-	var elements []ast.Expression
-	var udfCall *ast.CallExpression
-
-	if callArg, ok := call.Arguments[2].(*ast.CallExpression); ok &&
-		NewUserDefinedFunctionDetector(g.variables).IsUserDefinedFunction(extractCallFunctionName(callArg)) {
-		udfCall = callArg
-	} else {
-		var err error
-		elements, err = extractTupleExpressionElements(call.Arguments[2])
-		if err != nil {
-			return nil, fmt.Errorf("security() tuple: %w", err)
-		}
-		if len(elements) != len(varNames) {
-			return nil, fmt.Errorf("security() tuple: cardinality mismatch: %d variables vs %d expressions", len(varNames), len(elements))
-		}
+	elements, udfCall, err := resolveTupleExpressionArg(
+		NewUserDefinedFunctionDetector(g.variables),
+		call.Arguments[2],
+		len(varNames),
+	)
+	if err != nil {
+		return nil, err
 	}
-
-	extractor := NewSecurityArgumentExtractor(g).WithArrowScope(arrowScope)
 
 	symbolResult, err := extractor.ExtractSymbol(call.Arguments[0])
 	if err != nil {
@@ -108,6 +67,27 @@ func parseTupleSecurityArgumentsWithScope(g *generator, varNames []string, call 
 		cacheKey:        NewSecurityCacheKeyBuilder().Build(symbolResult, timeframeResult),
 		lookahead:       resolveSecurityLookahead(call, g.pineVersion),
 	}, nil
+}
+
+// Non-UDF CallExpression arguments (e.g. bare TA calls) are rejected; only array
+// literals and registered UDF calls are valid in the third security() position.
+func resolveTupleExpressionArg(
+	detector *UserDefinedFunctionDetector,
+	arg ast.Expression,
+	expectedCount int,
+) (elements []ast.Expression, udfCall *ast.CallExpression, err error) {
+	if callArg, ok := arg.(*ast.CallExpression); ok &&
+		detector.IsUserDefinedFunction(extractCallFunctionName(callArg)) {
+		return nil, callArg, nil
+	}
+	elems, extractErr := extractTupleExpressionElements(arg)
+	if extractErr != nil {
+		return nil, nil, fmt.Errorf("security() tuple: %w", extractErr)
+	}
+	if len(elems) != expectedCount {
+		return nil, nil, fmt.Errorf("security() tuple: cardinality mismatch: %d variables vs %d expressions", expectedCount, len(elems))
+	}
+	return elems, nil, nil
 }
 
 func (g *generator) emitTupleSecurityBlock(args *tupleSecurityArguments) (string, error) {
@@ -196,7 +176,12 @@ func (g *generator) emitLookaheadAndParentLinkage(args *tupleSecurityArguments) 
 	return code
 }
 
+// Mirrors ArrowTupleSecurityGenerator.emitElementEvaluations — both paths must stay in sync.
 func (g *generator) emitScopedElementEvaluations(args *tupleSecurityArguments) (string, error) {
+	if args.udfCall != nil {
+		return NewSecurityUDFCallGenerator(g).EmitTupleCall(args.varNames, args.udfCall)
+	}
+
 	handler := NewSecurityExpressionHandler(SecurityExpressionConfig{
 		IndentFunc:           g.ind,
 		IncrementIndent:      func() { g.indent++ },

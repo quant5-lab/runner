@@ -1023,3 +1023,149 @@ func TestDirectionFromType(t *testing.T) {
 		}
 	}
 }
+
+func TestHasSizeData(t *testing.T) {
+	cases := []struct {
+		name   string
+		trades []TVTrade
+		want   bool
+	}{
+		{"nil_slice", nil, false},
+		{"empty_slice", []TVTrade{}, false},
+		{"all_zero_sizes", []TVTrade{{Size: 0}, {Size: 0}, {Size: 0}}, false},
+		{"single_nonzero", []TVTrade{{Size: 1}}, true},
+		{"first_nonzero_rest_zero", []TVTrade{{Size: 5}, {Size: 0}, {Size: 0}}, true},
+		{"last_nonzero", []TVTrade{{Size: 0}, {Size: 0}, {Size: 0.001}}, true},
+		{"all_nonzero", []TVTrade{{Size: 10}, {Size: 20.5}, {Size: 387}}, true},
+		{"fractional_crypto_size", []TVTrade{{Size: 0.00000001}}, true},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := HasSizeData(tc.trades)
+			if got != tc.want {
+				t.Errorf("HasSizeData = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatchSize_EdgeCases(t *testing.T) {
+	timeTol := time.Hour
+	priceTol := 1.0
+	relTol := 0.01
+
+	t0 := parseUTC("2025-01-01 10:00")
+	t1 := parseUTC("2025-01-02 10:00")
+	t2 := parseUTC("2025-01-03 10:00")
+
+	cases := []struct {
+		name            string
+		runner          []RunnerTrade
+		tv              []TVTrade
+		wantMatched     int
+		wantMismatched  int
+		wantMaxResidual float64
+	}{
+		{
+			name:        "nil_both",
+			wantMatched: 0, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name:        "nil_runner",
+			tv:          []TVTrade{{EntryUTC: t0, EntryPrice: 100, Size: 10}},
+			wantMatched: 0, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name:        "nil_tv",
+			runner:      []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Size: 10}},
+			wantMatched: 0, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name: "all_sizes_exact",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5.0},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 10.0},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5.0},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 10.0},
+			},
+			wantMatched: 2, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name:        "no_match_time_outside_tolerance",
+			runner:      []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Size: 5}},
+			tv:          []TVTrade{{EntryUTC: t2, EntryPrice: 100, Size: 5}},
+			wantMatched: 0, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name:        "no_match_price_outside_tolerance",
+			runner:      []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Size: 5}},
+			tv:          []TVTrade{{EntryUTC: t0, EntryPrice: 200, Size: 5}},
+			wantMatched: 0, wantMismatched: 0, wantMaxResidual: 0,
+		},
+		{
+			name: "multiple_mismatches_max_residual_is_largest",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 110}, // residual 10/100=0.10
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 105}, // residual  5/100=0.05
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 100},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 100},
+			},
+			wantMatched: 2, wantMismatched: 2, wantMaxResidual: 0.10,
+		},
+		{
+			name: "tv_trade_not_reused_for_second_runner_match",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+			},
+			wantMatched: 1, wantMismatched: 0, wantMaxResidual: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			matched, mismatched, maxResidual := MatchSize(tc.runner, tc.tv, timeTol, priceTol, relTol)
+			if matched != tc.wantMatched {
+				t.Errorf("matched = %d, want %d", matched, tc.wantMatched)
+			}
+			if mismatched != tc.wantMismatched {
+				t.Errorf("mismatched = %d, want %d", mismatched, tc.wantMismatched)
+			}
+			if math.Abs(maxResidual-tc.wantMaxResidual) > 1e-10 {
+				t.Errorf("maxResidual = %.10f, want %.10f", maxResidual, tc.wantMaxResidual)
+			}
+		})
+	}
+}
+
+func TestParseTrades_AbsentSizeColumn_TradesHaveZeroSize(t *testing.T) {
+	rawCSV := "Trade number,Type,Date and time,Price\n" +
+		"1,Entry Long,2025-01-01 10:00,100\n" +
+		"1,Exit Long,2025-01-01 14:00,110\n"
+	tmpPath := filepath.Join(t.TempDir(), "no_size.csv")
+	if err := os.WriteFile(tmpPath, []byte(rawCSV), 0644); err != nil {
+		t.Fatalf("write temp CSV: %v", err)
+	}
+	trades, err := LoadTrades(tmpPath, TVTimezoneUTC)
+	if err != nil {
+		t.Fatalf("LoadTrades: %v", err)
+	}
+	if len(trades) != 1 {
+		t.Fatalf("got %d trades, want 1", len(trades))
+	}
+	if trades[0].Size != 0 {
+		t.Errorf("Size = %v, want 0 when size column is absent", trades[0].Size)
+	}
+	if HasSizeData(trades) {
+		t.Errorf("HasSizeData returned true when CSV had no size column — would produce a false size assertion")
+	}
+}

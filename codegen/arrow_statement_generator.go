@@ -51,6 +51,9 @@ func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, erro
 	case *ast.WhileStatement:
 		return s.generateWhileStatement(st)
 
+	case *ast.IfStatement:
+		return s.generateIfStatement(st)
+
 	default:
 		return s.gen.generateStatement(stmt)
 	}

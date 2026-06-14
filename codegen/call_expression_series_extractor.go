@@ -16,6 +16,7 @@ func (g *generator) extractCallExpression(call *ast.CallExpression) string {
 		g.extractValueFunction,
 		g.extractMathFunction,
 		g.extractColorFunction,
+		g.extractTimeBuiltin,
 		g.extractUserDefinedFunction,
 		g.extractDefaultSeries,
 	}
@@ -86,11 +87,18 @@ func (g *generator) extractUserDefinedFunction(call *ast.CallExpression) string 
 		return ""
 	}
 
+	if g.chartOnlyUDFs[funcName] {
+		return "math.NaN()"
+	}
+
 	arrowCtxVar := g.arrowContextLifecycle.AllocateContextVariable(funcName)
 
 	argsCode := []string{arrowCtxVar}
 	for _, arg := range call.Arguments {
 		argsCode = append(argsCode, g.extractSeriesExpression(arg))
+	}
+	if g.arrowCaptureRegistry != nil {
+		argsCode = g.arrowCaptureRegistry.AppendCallArgs(argsCode, funcName, g.constants)
 	}
 
 	return fmt.Sprintf("%s(%s)", funcName, strings.Join(argsCode, ", "))

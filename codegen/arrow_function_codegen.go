@@ -29,6 +29,12 @@ func (a *ArrowFunctionCodegen) LastReturnType() string {
 }
 
 func (a *ArrowFunctionCodegen) Generate(funcName string, arrowFunc *ast.ArrowFunctionExpression) (string, error) {
+	// Chart-only UDFs produce no numeric output for strategy logic; the full body
+	// would reference chart types that are not available in the runner.
+	if a.gen.chartOnlyUDFs[funcName] {
+		a.lastReturnType = "float64"
+		return fmt.Sprintf("func %s(arrowCtx *context.ArrowContext) float64 { _ = arrowCtx; return math.NaN() }\n\n", funcName), nil
+	}
 	analyzer := NewParameterUsageAnalyzerWithRegistry(a.gen.funcSigRegistry)
 	paramUsage := analyzer.AnalyzeArrowFunction(arrowFunc)
 

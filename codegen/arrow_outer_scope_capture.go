@@ -94,6 +94,17 @@ func (r *ArrowCaptureRegistry) Get(funcName string) []OuterScopeCapture {
 	return r.captures[funcName]
 }
 
+// AppendCallArgs appends the call-site expression for every captured outer-scope
+// variable of funcName to args and returns the extended slice.
+// Uses GoCallSiteExpression (not GoParamName) so bool-scalar constants are bridged
+// to float64 uniformly — a callee expects float64, not bool.
+func (r *ArrowCaptureRegistry) AppendCallArgs(args []string, funcName string, constants map[string]interface{}) []string {
+	for _, cap := range r.captures[funcName] {
+		args = append(args, cap.GoCallSiteExpression(constants))
+	}
+	return args
+}
+
 // OuterScopeCaptureAnalyzer walks an arrow function body to find every identifier
 // that is neither a parameter, a local variable, nor a builtin — but IS declared
 // in the enclosing strategy scope. Those identifiers must be injected as extra

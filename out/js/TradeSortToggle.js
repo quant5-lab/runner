@@ -35,7 +35,9 @@ export class TradeSortToggle {
 
   #syncLabel() {
     if (!this.#button) return;
-    const arrow = this.#direction === SortDirection.DESC ? '▼' : '▲';
-    this.#button.textContent = `${arrow} ${this.#direction === SortDirection.DESC ? 'Newest first' : 'Oldest first'}`;
+    const isAscending = this.#direction === SortDirection.ASC;
+    const arrow = isAscending ? '▲' : '▼';
+    this.#button.textContent = `${arrow} ${isAscending ? 'Oldest first' : 'Newest first'}`;
+    this.#button.setAttribute('aria-pressed', String(isAscending));
   }
 }

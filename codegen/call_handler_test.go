@@ -67,9 +67,15 @@ func TestCallExpressionRouter_HandlersCanHandleCorrectFunctions(t *testing.T) {
 		{"timeframe.in_seconds", 11, "TimeframeFuncCallHandler"},
 		{"timeframe.from_seconds", 11, "TimeframeFuncCallHandler"},
 		{"timeframe.change", 11, "TimeframeFuncCallHandler"},
-		{"alert", 15, "VoidBuiltinHandler"},
-		{"alertcondition", 15, "VoidBuiltinHandler"},
-		{"unknown_function", 16, "UnknownFunctionHandler"},
+		{"label.new", 15, "VoidNamespaceCallHandler"},
+		{"label.delete", 15, "VoidNamespaceCallHandler"},
+		{"label", 15, "VoidNamespaceCallHandler"},
+		{"line.new", 15, "VoidNamespaceCallHandler"},
+		{"box.new", 15, "VoidNamespaceCallHandler"},
+		{"table.cell", 15, "VoidNamespaceCallHandler"},
+		{"alert", 16, "VoidBuiltinHandler"},
+		{"alertcondition", 16, "VoidBuiltinHandler"},
+		{"unknown_function", 17, "UnknownFunctionHandler"},
 	}
 
 	for _, tt := range tests {
@@ -192,6 +198,95 @@ func TestCallExpressionRouter_RouteCall(t *testing.T) {
 				Arguments: []ast.Expression{&ast.Literal{Value: true}},
 			},
 			wantCode: "",
+			wantErr:  false,
+		},
+		// Chart-only namespace calls: all produce math.NaN() so that assignments
+		// in Pine script ("l = label.new(...)") compile cleanly in Go output.
+		{
+			name: "label.new chart draw produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "label"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: 100.0},
+					&ast.Literal{Value: 200.0},
+					&ast.Literal{Value: "text"},
+				},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "label.delete produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "label"},
+					Property: &ast.Identifier{Name: "delete"},
+				},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "lbl"}},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "label bare constructor produces NaN",
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "label"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "na"}},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "line.new produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "line"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "box.new produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "box"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "table.cell produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "table"},
+					Property: &ast.Identifier{Name: "cell"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "tbl"},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: 0.0},
+					&ast.Literal{Value: "val"},
+				},
+			},
+			wantCode: "math.NaN()",
+			wantErr:  false,
+		},
+		{
+			name: "linefill.new produces NaN",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "linefill"},
+					Property: &ast.Identifier{Name: "new"},
+				},
+			},
+			wantCode: "math.NaN()",
 			wantErr:  false,
 		},
 		{

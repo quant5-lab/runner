@@ -95,3 +95,31 @@ func TestExactAlignmentCases_NeverIncludesSkippedPnL(t *testing.T) {
 		}
 	}
 }
+
+// TestTVAlignmentCases_SomeAssertSize guards against the size ratchet becoming
+// universally bypassed via SkipSizeRatchetReason on every case.
+func TestTVAlignmentCases_SomeAssertSize(t *testing.T) {
+	checked := 0
+	for _, tc := range tvAlignmentCases() {
+		if tc.SkipSizeRatchetReason == "" {
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Error("every TV alignment case has SkipSizeRatchetReason set — at least one case must assert position size parity")
+	}
+}
+
+// TestTVAlignmentCases_SomeSkipSizeRatchet confirms SkipSizeRatchetReason is
+// load-bearing: removing all uses would require deleting the field and this test.
+func TestTVAlignmentCases_SomeSkipSizeRatchet(t *testing.T) {
+	skipped := 0
+	for _, tc := range tvAlignmentCases() {
+		if tc.SkipSizeRatchetReason != "" {
+			skipped++
+		}
+	}
+	if skipped == 0 {
+		t.Error("no TV alignment case sets SkipSizeRatchetReason — field is unreachable; remove it or add a case that requires it")
+	}
+}

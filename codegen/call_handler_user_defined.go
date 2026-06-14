@@ -22,6 +22,10 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 		return "", nil
 	}
 
+	if g.chartOnlyUDFs[funcName] {
+		return "math.NaN()", nil
+	}
+
 	argumentList, err := h.buildArgumentList(g, funcName, call.Arguments)
 	if err != nil {
 		return "", err

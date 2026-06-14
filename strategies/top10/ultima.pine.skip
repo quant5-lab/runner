@@ -1,8 +1,14 @@
-BEST Strategy Template (v4) — full risk management framework
+BEST Strategy Template (v4) — signal-source template, by design produces zero trades
 
-Parse: ✅ (v4→v5 preprocessing, \r stripping, multiline continuation, expectingIndent reset)
-Generate: ❌ (time() IIFE not implemented — separate scope from Blocker #4)
-Compile: ❌ Not reached
-Execute: ❌ Not reached
+By-design exclusion: entry conditions are `bull = (ext_source == 1)` and
+`bear = (ext_source == -1)`, where `ext_source` defaults to `close`.
+`close` is never exactly ±1 on any real price feed, so no entries ever trigger.
+This is not a runner defect — the strategy is a template requiring the caller to
+supply an external signal series as `ext_source`.
 
-Blocker: #4 RESOLVED (parse/preprocess). Remaining: time() IIFE generator, #10 (alert)
+Excluded from the 10/10 TV-match denominator: zero-entry-by-design strategies
+are not falsifiable against TradingView Strategy Tester output.
+
+To reactivate: replace the `ext_source` default with a real signal indicator
+(e.g. an RSI crossover) that produces values of exactly +1 or -1 before removing
+this skip sidecar.
