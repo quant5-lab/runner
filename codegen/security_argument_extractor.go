@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/context"
 )
 
 type SecurityArgumentExtractor struct {
@@ -103,7 +104,7 @@ func (e *SecurityArgumentExtractor) ExtractTimeframe(expr ast.Expression) (*Extr
 	switch exp := expr.(type) {
 	case *ast.Literal:
 		if s, ok := exp.Value.(string); ok {
-			normalized := e.normalizeTimeframe(strings.Trim(s, "'\""))
+			normalized := context.CanonicalTimeframe(strings.Trim(s, "'\""))
 			return &ExtractionResult{Code: fmt.Sprintf("%q", normalized), IsRuntime: false}, nil
 		}
 		return nil, fmt.Errorf("invalid timeframe literal type: %T", exp.Value)
@@ -112,7 +113,7 @@ func (e *SecurityArgumentExtractor) ExtractTimeframe(expr ast.Expression) (*Extr
 		if e.gen != nil {
 			if constVal, exists := e.gen.constants[exp.Name]; exists {
 				if strVal, ok := constVal.(string); ok {
-					normalized := e.normalizeTimeframe(strVal)
+					normalized := context.CanonicalTimeframe(strVal)
 					return &ExtractionResult{Code: fmt.Sprintf("%q", normalized), IsRuntime: false}, nil
 				}
 			}
@@ -151,19 +152,6 @@ func (e *SecurityArgumentExtractor) ExtractTimeframe(expr ast.Expression) (*Extr
 
 	default:
 		return nil, fmt.Errorf("unsupported timeframe expression type: %T", expr)
-	}
-}
-
-func (e *SecurityArgumentExtractor) normalizeTimeframe(tf string) string {
-	switch tf {
-	case "D":
-		return "1D"
-	case "W":
-		return "1W"
-	case "M":
-		return "1M"
-	default:
-		return tf
 	}
 }
 

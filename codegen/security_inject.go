@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/context"
 	"github.com/quant5-lab/runner/security"
 )
 
@@ -117,32 +118,33 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		resolved[i] = resolvedSecurityCall{
 			call:           call,
 			resolvedSym:    sym,
-			resolvedTf:     normalizeTimeframe(tf),
+			resolvedTf:     context.CanonicalTimeframe(tf),
 			isSymRuntime:   symRuntime,
 			isTfRuntime:    tfRuntime,
 			modifierPrefix: modPrefix,
 		}
 	}
 
-	var codeBuilder strings.Builder
-
-	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
+	chartOnlyUDFs := NewChartOnlyUDFDetector().Detect(program)
+	lhsIndex := buildSecurityLHSIndex(program)
+	chartOnlyKeys := SecurityChartOnlyClassifier{}.ChartOnlySecurityKeys(resolved, lhsIndex, chartOnlyUDFs, program)
 
 	dedupMap := make(map[string][]resolvedSecurityCall)
 	for _, r := range resolved {
-		sym := r.resolvedSym
-		if r.isSymRuntime {
-			sym = runtimePlaceholder()
+		key := resolvedDedupKey(r)
+		if chartOnlyKeys[key] {
+			continue
 		}
-
-		tf := r.resolvedTf
-		if r.isTfRuntime {
-			tf = runtimePlaceholder()
-		}
-
-		key := fmt.Sprintf("%s:%s", sym, tf)
 		dedupMap[key] = append(dedupMap[key], r)
 	}
+
+	if len(dedupMap) == 0 {
+		return &SecurityInjection{PrefetchCode: "", ImportPaths: []string{}}, nil
+	}
+
+	var codeBuilder strings.Builder
+
+	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
 
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
 	codeBuilder.WriteString("\tvar secTimeframeSeconds int64\n")
@@ -384,20 +386,6 @@ func mergeImports(existing, additional []string) []string {
 	}
 
 	return result
-}
-
-/* normalizeTimeframe converts short forms to canonical format */
-func normalizeTimeframe(tf string) string {
-	switch tf {
-	case "D":
-		return "1D"
-	case "W":
-		return "1W"
-	case "M":
-		return "1M"
-	default:
-		return tf
-	}
 }
 
 // generateContextVarName creates unique variable name for each symbol:timeframe

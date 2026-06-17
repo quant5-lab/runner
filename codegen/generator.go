@@ -102,6 +102,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
+	gen.hasSecurityUDFEvals = detectSecurityUDFEvals(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
 
 	sessionMemberKeys := gen.builtinHandler.registry.SessionSeriesBuiltinNames()
@@ -191,6 +192,7 @@ type generator struct {
 	hasSecurityCalls          bool
 	hasSecurityExprEvals      bool
 	hasArrowSecurityExprEvals bool
+	hasSecurityUDFEvals       bool
 	hasStrategyRuntimeAccess  bool
 	hasBarIndexUsage          bool
 	hasLastBarIndex           bool
@@ -732,6 +734,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		if g.hasArrowSecurityExprEvals {
 			code += g.ind() + "var " + ArrowEvalMapVar + " map[string]security.BarEvaluator\n"
 		}
+		if g.hasSecurityUDFEvals {
+			code += g.ind() + "var secUDFBarEvaluators map[string]security.BarEvaluator\n"
+		}
 		code += "\n"
 	}
 
@@ -950,6 +955,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "_ = secBarEvaluator\n"
 		if g.hasArrowSecurityExprEvals {
 			code += g.ind() + "_ = " + ArrowEvalMapVar + "\n"
+		}
+		if g.hasSecurityUDFEvals {
+			code += g.ind() + "_ = secUDFBarEvaluators\n"
 		}
 	}
 	if g.hasStrategyRuntimeAccess {
@@ -2211,6 +2219,10 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, dir), nil
 		}
 
+		if code, ok := g.resolveStringMemberExpr(expr); ok {
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, code), nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", expr)
 
 	case *ast.CallExpression:
@@ -2221,6 +2233,13 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				return "", err
 			}
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, colorCode), nil
+		}
+		if IsTickerConstructorFunction(funcName) {
+			tickerCode, err := NewTickerFunctionHandler().GenerateCode(g, expr)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, tickerCode), nil
 		}
 		if funcName == "array.join" {
 			readerCodegen := NewArrayReaderCodegen()
@@ -2302,6 +2321,10 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 			return dir, nil
 		}
 
+		if code, ok := g.resolveStringMemberExpr(e); ok {
+			return code, nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", e)
 
 	case *ast.CallExpression:
@@ -2309,11 +2332,30 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 		if g.colorHandler.CanHandle(funcName) {
 			return g.colorHandler.GenerateColorCall(funcName, e.Arguments, g)
 		}
+		if IsTickerConstructorFunction(funcName) {
+			return NewTickerFunctionHandler().GenerateCode(g, e)
+		}
 		return "", fmt.Errorf("unsupported call expression for string expression: %s", funcName)
 
 	default:
 		return "", fmt.Errorf("unsupported string expression: %T", expr)
 	}
+}
+
+// resolveStringMemberExpr returns Go code for any MemberExpression whose resolved
+// type is GoString (e.g. syminfo.tickerid, syminfo.timezone).
+// Returns ("", false) for non-string or unrecognised members so callers can fall
+// through to their own handlers.
+func (g *generator) resolveStringMemberExpr(expr *ast.MemberExpression) (string, bool) {
+	code, ok := g.builtinHandler.TryResolveMemberExpression(expr, BarLoopScope)
+	if !ok {
+		return "", false
+	}
+	goType, found := g.builtinHandler.ResolveMemberExpressionGoType(expr)
+	if !found || goType != GoString {
+		return "", false
+	}
+	return code, true
 }
 
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
@@ -4037,6 +4079,43 @@ func extractConstValue(code string) interface{} {
 /* detectSecurityCalls delegates to security package for complete AST analysis */
 func detectSecurityCalls(program *ast.Program) bool {
 	return len(security.AnalyzeAST(program)) > 0
+}
+
+// detectSecurityUDFEvals runs before code generation so secUDFBarEvaluators can be declared
+// unconditionally when a UDF appears as a security() expression argument.
+func detectSecurityUDFEvals(program *ast.Program) bool {
+	udfs := collectArrowFunctionNames(program)
+	if len(udfs) == 0 {
+		return false
+	}
+	for _, call := range security.AnalyzeAST(program) {
+		if callExpr, ok := call.Expression.(*ast.CallExpression); ok {
+			if udfs[extractCallFunctionName(callExpr)] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func collectArrowFunctionNames(program *ast.Program) map[string]bool {
+	names := make(map[string]bool)
+	for _, stmt := range program.Body {
+		decl, ok := stmt.(*ast.VariableDeclaration)
+		if !ok {
+			continue
+		}
+		for _, d := range decl.Declarations {
+			id, ok := d.ID.(*ast.Identifier)
+			if !ok {
+				continue
+			}
+			if _, ok := d.Init.(*ast.ArrowFunctionExpression); ok {
+				names[id.Name] = true
+			}
+		}
+	}
+	return names
 }
 
 /* detectStrategyRuntimeAccess walks AST to detect strategy.* runtime value access */

@@ -84,11 +84,40 @@ func (h *SecurityInlineHandler) generateExpressionEvaluation(exprArg ast.Express
 			return "\t\treturn " + fieldExpr + "\n", nil
 		}
 		return "\t\treturn math.NaN()\n", nil
-	case *ast.CallExpression, *ast.BinaryExpression, *ast.ConditionalExpression:
+	case *ast.CallExpression:
+		udfGen := NewSecurityUDFCallGenerator(g)
+		if udfGen.IsUDFCall(expr) {
+			return h.generateUDFInlineEval(expr, g)
+		}
+		return h.generateStreamingEvaluation(exprArg, g)
+	case *ast.BinaryExpression, *ast.ConditionalExpression:
 		return h.generateStreamingEvaluation(exprArg, g)
 	default:
 		return "\t\treturn math.NaN()\n", nil
 	}
+}
+
+func (h *SecurityInlineHandler) generateUDFInlineEval(call *ast.CallExpression, g *generator) (string, error) {
+	funcName := extractCallFunctionName(call)
+	callExpr, err := g.generateUserDefinedFunctionCallWithContext(call, "secArrowCtx")
+	if err != nil {
+		return "", fmt.Errorf("inline UDF security eval %s: %w", funcName, err)
+	}
+	g.hasSecurityUDFEvals = true
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\t\tudfKey := secKey + %q\n", ":"+funcName))
+	b.WriteString("\t\tif secUDFBarEvaluators == nil {\n")
+	b.WriteString("\t\t\tsecUDFBarEvaluators = make(map[string]security.BarEvaluator)\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tif secUDFBarEvaluators[udfKey] == nil {\n")
+	b.WriteString("\t\t\tsecUDFBarEvaluators[udfKey] = security.NewUDFBarEvaluator(len(secCtx.Data), secCtx, func(secArrowCtx *context.ArrowContext) float64 {\n")
+	b.WriteString("\t\t\t\treturn " + callExpr + "\n")
+	b.WriteString("\t\t\t})\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tsecUDFVal, _ := secUDFBarEvaluators[udfKey].(security.BarEvaluator).EvaluateAtBar(nil, nil, secBarIdx)\n")
+	b.WriteString("\t\treturn secUDFVal\n")
+	return b.String(), nil
 }
 
 func (h *SecurityInlineHandler) generateStreamingEvaluation(exprArg ast.Expression, g *generator) (string, error) {

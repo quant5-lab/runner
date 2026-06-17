@@ -168,6 +168,104 @@ func TestStringVariableCodeGeneration(t *testing.T) {
 			mustNotHaveNext: "sideSeries.Next()",
 			description:     "Ternary string variable generates conditional scalar",
 		},
+		{
+			name: "string variable with syminfo.tickerid",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "_sym"},
+								Init: &ast.MemberExpression{
+									Object:   &ast.Identifier{Name: "syminfo"},
+									Property: &ast.Identifier{Name: "tickerid"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHaveDecl:    "var _sym string",
+			mustNotHaveDecl: "var _symSeries",
+			mustHaveInit:    "_sym = syminfo_tickerid",
+			mustNotHaveInit: "_symSeries = series.NewSeries",
+			mustHaveUnused:  "_ = _sym",
+			mustNotHaveNext: "_symSeries.Next()",
+			description:     "syminfo.tickerid uses scalar string, not Series",
+		},
+		{
+			name: "string variable with ticker.heikinashi constructor",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "_ha"},
+								Init: &ast.CallExpression{
+									Callee: &ast.MemberExpression{
+										Object:   &ast.Identifier{Name: "ticker"},
+										Property: &ast.Identifier{Name: "heikinashi"},
+									},
+									Arguments: []ast.Expression{
+										&ast.MemberExpression{
+											Object:   &ast.Identifier{Name: "syminfo"},
+											Property: &ast.Identifier{Name: "tickerid"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHaveDecl:    "var _ha string",
+			mustNotHaveDecl: "var _haSeries",
+			mustHaveInit:    "_ha = ticker.Heikinashi(ctx.Symbol)",
+			mustNotHaveInit: "_haSeries = series.NewSeries",
+			mustHaveUnused:  "_ = _ha",
+			mustNotHaveNext: "_haSeries.Next()",
+			description:     "ticker.heikinashi constructor uses scalar string, not Series",
+		},
+		{
+			name: "string variable with conditional ticker vs syminfo.tickerid (zigzag pattern)",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						Declarations: []ast.VariableDeclarator{
+							{
+								ID: &ast.Identifier{Name: "_ticker"},
+								Init: &ast.ConditionalExpression{
+									Test: &ast.Identifier{Name: "useHA"},
+									Consequent: &ast.CallExpression{
+										Callee: &ast.MemberExpression{
+											Object:   &ast.Identifier{Name: "ticker"},
+											Property: &ast.Identifier{Name: "heikinashi"},
+										},
+										Arguments: []ast.Expression{
+											&ast.MemberExpression{
+												Object:   &ast.Identifier{Name: "syminfo"},
+												Property: &ast.Identifier{Name: "tickerid"},
+											},
+										},
+									},
+									Alternate: &ast.MemberExpression{
+										Object:   &ast.Identifier{Name: "syminfo"},
+										Property: &ast.Identifier{Name: "tickerid"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustHaveDecl:    "var _ticker string",
+			mustNotHaveDecl: "var _tickerSeries",
+			mustHaveInit:    "_ticker = func() string {",
+			mustNotHaveInit: "_tickerSeries = series.NewSeries",
+			mustHaveUnused:  "_ = _ticker",
+			mustNotHaveNext: "_tickerSeries.Next()",
+			description:     "Conditional ticker string variable: both branches compile, scalar not Series",
+		},
 	}
 
 	for _, tt := range tests {

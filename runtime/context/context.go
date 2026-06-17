@@ -49,6 +49,27 @@ func New(symbol, timeframe string, bars int) *Context {
 	}
 }
 
+// NewReplayContext returns a Context with an independent BarIndex (starting at
+// zero) that shares source.Data without copying it — so advancing the cursor in a
+// replay loop leaves source and all other consumers unaffected.  Read-only metadata
+// (symbol, timeframe, timezone, flags) is copied so timezone-aware operations
+// inside the replay produce correct results.
+func NewReplayContext(source *Context) *Context {
+	return &Context{
+		Symbol:           source.Symbol,
+		Timeframe:        source.Timeframe,
+		Timezone:         source.Timezone,
+		ReferenceSession: source.ReferenceSession,
+		Bars:             source.Bars,
+		Data:             source.Data,
+		BarIndex:         0,
+		IsMonthly:        source.IsMonthly,
+		IsDaily:          source.IsDaily,
+		IsWeekly:         source.IsWeekly,
+		IsIntraday:       source.IsIntraday,
+	}
+}
+
 func (c *Context) AddBar(bar OHLCV) {
 	c.Data = append(c.Data, bar)
 }

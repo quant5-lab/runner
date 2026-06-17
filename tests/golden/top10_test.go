@@ -45,3 +45,17 @@ func TestUtPlus_SBERP_Hourly(t *testing.T) {
 		GoldenFile:   "ut-plus-sberp-1h.json",
 	})
 }
+
+func TestMax_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "Max",
+		StrategyFile: "top10/max.pine",
+		Symbol:       "SBERP",
+		Timeframe:    "1h",
+		DataFile:     "SBERP-1h.json",
+		GoldenFile:   "max-sberp-1h.json",
+	})
+}

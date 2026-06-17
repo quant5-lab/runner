@@ -32,6 +32,16 @@ func TimeframeFromSeconds(seconds int64) string {
 	return timeframeConverter.FromSeconds(seconds)
 }
 
+func CanonicalTimeframe(tf string) string {
+	secs := TimeframeToSeconds(tf)
+	// Non-positive covers both unrecognised units (zero) and int64 overflow on
+	// pathologically large digit strings (negative after wrapping).
+	if secs <= 0 {
+		return tf
+	}
+	return TimeframeFromSeconds(secs)
+}
+
 func AlignTimestampToTimeframe(timestamp int64, timeframeSeconds int64) int64 {
 	return timestampAligner.AlignToTimeframe(timestamp, timeframeSeconds)
 }
