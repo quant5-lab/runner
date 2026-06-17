@@ -225,3 +225,106 @@ func TestFileFetcher_InvalidJSON(t *testing.T) {
 		t.Error("Expected error for invalid JSON, got nil")
 	}
 }
+
+// TestFileFetcher_CrossEncodingResolution verifies that the fetcher resolves
+// a fixture file for any Pine-native encoding of the same period — the file
+// named "SYM_1h.json" is found for both the "1h" and "60" request, and a file
+// named "SYM_60.json" is found for both the "60" and "1h" request.
+func TestFileFetcher_CrossEncodingResolution(t *testing.T) {
+	cases := []struct {
+		fixtureToken string
+		requestToken string
+	}{
+		// Suffixed fixture, numeric request
+		{"1m", "1"},
+		{"5m", "5"},
+		{"15m", "15"},
+		{"30m", "30"},
+		{"1h", "60"},
+		{"2h", "120"},
+		{"4h", "240"},
+		// Numeric fixture, suffixed request
+		{"1", "1m"},
+		{"5", "5m"},
+		{"15", "15m"},
+		{"30", "30m"},
+		{"60", "1h"},
+		{"120", "2h"},
+		{"240", "4h"},
+		// Identical encoding — baseline that an exact-name match still works
+		{"1h", "1h"},
+		{"1D", "1D"},
+	}
+
+	onebar := `[{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":100}]`
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.fixtureToken+"_via_"+tc.requestToken, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			path := filepath.Join(tmpDir, "SYM_"+tc.fixtureToken+".json")
+			if err := os.WriteFile(path, []byte(onebar), 0644); err != nil {
+				t.Fatal(err)
+			}
+			fetcher := NewFileFetcher(tmpDir, 0)
+			result, err := fetcher.Fetch("SYM", tc.requestToken, 0)
+			if err != nil {
+				t.Fatalf("Fetch(SYM,%q) with fixture %q: %v", tc.requestToken, tc.fixtureToken, err)
+			}
+			if len(result) != 1 {
+				t.Fatalf("want 1 bar, got %d", len(result))
+			}
+		})
+	}
+}
+
+// TestFileFetcher_CalendarScaleHasNoNumericFallback verifies that a calendar-scale
+// timeframe (daily and above) does not acquire a minute-count alternate path.
+// A request for "1D" must not silently succeed against a "1440"-named file,
+// since daily bars are not encoded as minute counts in Pine fixture naming.
+func TestFileFetcher_CalendarScaleHasNoNumericFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	onebar := `[{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":100}]`
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1440.json"), []byte(onebar), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	fetcher := NewFileFetcher(tmpDir, 0)
+	_, err := fetcher.Fetch("SYM", "1D", 0)
+	if err == nil {
+		t.Fatal("Fetch(SYM,\"1D\") must fail when only SYM_1440.json exists: daily tokens have no minute-count alternate")
+	}
+}
+
+// TestFileFetcher_CanonicalFilePrecedesNumericFileWhenBothExist verifies that
+// when both canonical and numeric-named fixtures exist for the same period,
+// the canonical one is returned regardless of whether the request uses the
+// canonical or numeric token.
+func TestFileFetcher_CanonicalFilePrecedesNumericFileWhenBothExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	canonicalBars := `[{"time":1000000,"open":100,"high":110,"low":90,"close":105,"volume":1}]`
+	numericBars := `[{"time":2000000,"open":200,"high":210,"low":190,"close":205,"volume":1}]`
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1h.json"), []byte(canonicalBars), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_60.json"), []byte(numericBars), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	fetcher := NewFileFetcher(tmpDir, 0)
+
+	for _, requestToken := range []string{"1h", "60"} {
+		result, err := fetcher.Fetch("SYM", requestToken, 0)
+		if err != nil {
+			t.Fatalf("request %q: unexpected error: %v", requestToken, err)
+		}
+		if len(result) == 0 {
+			t.Fatalf("request %q: got 0 bars", requestToken)
+		}
+		if result[0].Open != 100 {
+			t.Errorf("request %q: canonical file should win; got open=%.0f", requestToken, result[0].Open)
+		}
+	}
+}

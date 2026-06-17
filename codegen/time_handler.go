@@ -18,6 +18,7 @@ change documented at:
 type TimeHandler struct {
 	parser      *SessionArgumentParser
 	generator   *TimeCodeGenerator
+	tfExtractor *TimeframeArgExtractor
 	pineVersion int
 }
 
@@ -31,20 +32,19 @@ func NewTimeHandlerWithVersion(indentation string, pineVersion int) *TimeHandler
 	return &TimeHandler{
 		parser:      NewSessionArgumentParser(),
 		generator:   NewTimeCodeGeneratorWithVersion(indentation, pineVersion),
+		tfExtractor: NewTimeframeArgExtractor(),
 		pineVersion: pineVersion,
 	}
 }
 
-/* CanHandle checks if this is the time() function */
 func (th *TimeHandler) CanHandle(funcName string) bool {
 	return funcName == "time"
 }
 
 /*
 GenerateInline implements InlineConditionHandler interface. Uses the
-
-	generator's pineVersion when invoked through the inline-condition path
-	so the registry-level instance picks up the script's version.
+generator's pineVersion when invoked through the inline-condition path
+so the registry-level instance picks up the script's version.
 */
 func (th *TimeHandler) GenerateInline(expr *ast.CallExpression, g *generator) (string, error) {
 	v := th.pineVersion
@@ -55,20 +55,17 @@ func (th *TimeHandler) GenerateInline(expr *ast.CallExpression, g *generator) (s
 }
 
 func (h *TimeHandler) HandleVariableInit(varName string, call *ast.CallExpression) string {
-	argCount := len(call.Arguments)
-
-	if argCount == 0 {
+	switch len(call.Arguments) {
+	case 0:
 		return h.generator.GenerateNoArguments(varName)
+	case 1:
+		tfGoExpr := h.tfExtractor.GoExpr(call.Arguments[0])
+		return h.generator.GenerateSingleArgument(varName, tfGoExpr)
+	default:
+		sessionArg := call.Arguments[1]
+		session := h.parser.Parse(sessionArg)
+		return h.generator.GenerateWithSession(varName, session)
 	}
-
-	if argCount == 1 {
-		return h.generator.GenerateSingleArgument(varName)
-	}
-
-	sessionArg := call.Arguments[1]
-	session := h.parser.Parse(sessionArg)
-
-	return h.generator.GenerateWithSession(varName, session)
 }
 
 func (h *TimeHandler) HandleInlineExpression(args []ast.Expression) string {
@@ -76,11 +73,17 @@ func (h *TimeHandler) HandleInlineExpression(args []ast.Expression) string {
 }
 
 func (h *TimeHandler) handleInlineExpressionWithVersion(args []ast.Expression, pineVersion int) string {
-	if len(args) < 2 {
+	switch len(args) {
+	case 0:
 		return barTimestampMsExpr
+	case 1:
+		return alignedBarTimeMsExpr(h.tfExtractor.GoExpr(args[0]))
+	default:
+		return h.generateInlineWithSession(args[1], pineVersion)
 	}
+}
 
-	sessionArg := args[1]
+func (h *TimeHandler) generateInlineWithSession(sessionArg ast.Expression, pineVersion int) string {
 	session := h.parser.Parse(sessionArg)
 
 	if !session.IsValid() {

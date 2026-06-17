@@ -396,3 +396,97 @@ func TestDrawingNamespaceConstants_Distinctness(t *testing.T) {
 		})
 	}
 }
+
+// TestBuiltinNamespaceResolver_ResolveForArrow asserts the arrow-scope overrides
+// for every namespace that has them and that all other namespaces fall through to
+// the regular Resolve path unchanged.
+//
+// UDFs executing inside security() receive an *ArrowContext bound to the secondary
+// series, so identity-sensitive builtins must resolve to that context's fields.
+func TestBuiltinNamespaceResolver_ResolveForArrow(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	tests := []struct {
+		name         string
+		namespace    string
+		prop         string
+		expectedCode string
+		expectedType GoValueType
+		expectFound  bool
+	}{
+		{"syminfo.tickerid in arrow", "syminfo", "tickerid", "ctx.Symbol", GoString, true},
+		{"syminfo.ticker in arrow", "syminfo", "ticker", "ctx.Symbol", GoString, true},
+		{"syminfo.description in arrow", "syminfo", "description", "ctx.Symbol", GoString, true},
+
+		{"syminfo.timezone in arrow", "syminfo", "timezone", "ctx.Timezone", GoString, true},
+		{"syminfo.type in arrow", "syminfo", "type", `"stock"`, GoString, true},
+		{"syminfo.currency in arrow", "syminfo", "currency", `"USD"`, GoString, true},
+		{"syminfo.mintick in arrow", "syminfo", "mintick", "0.01", GoFloat64, true},
+		{"syminfo.unknown in arrow", "syminfo", "no_such_prop", "", GoFloat64, false},
+
+		{"session.ismarket in arrow", "session", "ismarket", "true", GoBool, true},
+		{"session.ispremarket in arrow", "session", "ispremarket", "false", GoBool, true},
+		{"session.ispostmarket in arrow", "session", "ispostmarket", "false", GoBool, true},
+
+		{"dayofweek.sunday in arrow", "dayofweek", "sunday", "1.0", GoFloat64, true},
+		{"barstate.isfirst in arrow", "barstate", "isfirst", "(ctx.BarIndex == 0)", GoBool, true},
+
+		{"unknown namespace in arrow", "nosuchns", "prop", "", GoFloat64, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, found := resolver.ResolveForArrow(tt.namespace, tt.prop)
+			if found != tt.expectFound {
+				t.Fatalf("ResolveForArrow(%s, %s) found = %v, want %v", tt.namespace, tt.prop, found, tt.expectFound)
+			}
+			if !found {
+				return
+			}
+			if res.Code != tt.expectedCode {
+				t.Errorf("ResolveForArrow(%s, %s) code = %q, want %q", tt.namespace, tt.prop, res.Code, tt.expectedCode)
+			}
+			if res.GoType != tt.expectedType {
+				t.Errorf("ResolveForArrow(%s, %s) GoType = %v, want %v", tt.namespace, tt.prop, res.GoType, tt.expectedType)
+			}
+		})
+	}
+}
+
+// TestBuiltinNamespaceResolver_SyminfoArrowVsBarLoop asserts the contractual
+// difference between the two resolution paths for identity-sensitive syminfo
+// properties: bar-loop scope emits the package-level variable name (resolved
+// once at startup from the -symbol flag), arrow scope emits ctx.Symbol
+// (resolved per-call from the ArrowContext, which may be a secondary series).
+func TestBuiltinNamespaceResolver_SyminfoArrowVsBarLoop(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	identityProps := []string{"tickerid", "ticker", "description"}
+	for _, prop := range identityProps {
+		prop := prop
+		t.Run(prop, func(t *testing.T) {
+			barLoop, found := resolver.Resolve("syminfo", prop)
+			if !found {
+				t.Fatalf("Resolve(syminfo, %s) not found", prop)
+			}
+			if barLoop.Code != "syminfo_tickerid" {
+				t.Errorf("Resolve(syminfo, %s) = %q, want \"syminfo_tickerid\"", prop, barLoop.Code)
+			}
+
+			arrow, found := resolver.ResolveForArrow("syminfo", prop)
+			if !found {
+				t.Fatalf("ResolveForArrow(syminfo, %s) not found", prop)
+			}
+			if arrow.Code != "ctx.Symbol" {
+				t.Errorf("ResolveForArrow(syminfo, %s) = %q, want \"ctx.Symbol\"", prop, arrow.Code)
+			}
+
+			if barLoop.Code == arrow.Code {
+				t.Errorf(
+					"bar-loop and arrow resolutions identical (%q) for syminfo.%s — arrow override not active",
+					barLoop.Code, prop,
+				)
+			}
+		})
+	}
+}

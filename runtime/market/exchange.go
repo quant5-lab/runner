@@ -3,6 +3,7 @@ package market
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Exchange string
@@ -11,6 +12,7 @@ const (
 	ExchangeUnknown Exchange = ""
 	ExchangeMOEX    Exchange = "MOEX"
 	ExchangeBinance Exchange = "BINANCE"
+	ExchangeNYSE    Exchange = "NYSE"
 )
 
 type ReferenceSession string
@@ -46,6 +48,9 @@ type Profile struct {
 	SessionSource    string
 	CalendarID       string
 	QtyStep          float64
+	// SessionOpenMinute is minutes since local midnight when the exchange primary
+	// session opens.  Zero means midnight — correct for UTC-aligned and always-open markets.
+	SessionOpenMinute int
 }
 
 func ResolveProfile(symbol, timezone string) Profile {
@@ -68,13 +73,14 @@ func ResolveProfileWithMetadata(symbol string, metadata SourceMetadata) Profile 
 	}
 	session := resolveReferenceSession(metadata, exchange)
 	return Profile{
-		Exchange:         exchange,
-		Timezone:         timezone,
-		Calendar:         CalendarFor(exchange, session, metadata),
-		ReferenceSession: session,
-		SessionSource:    strings.TrimSpace(metadata.SessionSource),
-		CalendarID:       strings.TrimSpace(metadata.CalendarID),
-		QtyStep:          ResolveQtyStep(exchange, metadata),
+		Exchange:          exchange,
+		Timezone:          timezone,
+		Calendar:          CalendarFor(exchange, session, metadata),
+		ReferenceSession:  session,
+		SessionSource:     strings.TrimSpace(metadata.SessionSource),
+		CalendarID:        strings.TrimSpace(metadata.CalendarID),
+		QtyStep:           ResolveQtyStep(exchange, metadata),
+		SessionOpenMinute: sessionOpenMinuteFor(exchange, session),
 	}
 }
 
@@ -92,13 +98,14 @@ func ResolveProfileWithMetadataE(symbol string, metadata SourceMetadata) (Profil
 	}
 
 	return Profile{
-		Exchange:         exchange,
-		Timezone:         timezone,
-		Calendar:         calendar,
-		ReferenceSession: session,
-		SessionSource:    strings.TrimSpace(metadata.SessionSource),
-		CalendarID:       strings.TrimSpace(metadata.CalendarID),
-		QtyStep:          ResolveQtyStep(exchange, metadata),
+		Exchange:          exchange,
+		Timezone:          timezone,
+		Calendar:          calendar,
+		ReferenceSession:  session,
+		SessionSource:     strings.TrimSpace(metadata.SessionSource),
+		CalendarID:        strings.TrimSpace(metadata.CalendarID),
+		QtyStep:           ResolveQtyStep(exchange, metadata),
+		SessionOpenMinute: sessionOpenMinuteFor(exchange, session),
 	}, nil
 }
 
@@ -133,6 +140,8 @@ func ParseExchange(value string) Exchange {
 		return ExchangeMOEX
 	case "BINANCE":
 		return ExchangeBinance
+	case "NYSE", "NASDAQ", "AMEX", "XNAS", "XNYS":
+		return ExchangeNYSE
 	default:
 		return ExchangeUnknown
 	}
@@ -142,6 +151,8 @@ func DefaultTimezone(exchange Exchange) string {
 	switch exchange {
 	case ExchangeMOEX:
 		return "Europe/Moscow"
+	case ExchangeNYSE:
+		return "America/New_York"
 	default:
 		return "UTC"
 	}
@@ -158,7 +169,7 @@ func ParseReferenceSession(value string) ReferenceSession {
 
 func DefaultReferenceSession(exchange Exchange) ReferenceSession {
 	switch exchange {
-	case ExchangeMOEX:
+	case ExchangeMOEX, ExchangeNYSE:
 		return ReferenceSessionRegular
 	default:
 		return ReferenceSessionAlwaysOpen
@@ -228,21 +239,28 @@ func RegularCalendarForExchangeE(exchange Exchange, metadata SourceMetadata) (Ca
 
 func regularClosedWeekdays(exchange Exchange) WeekdaySet {
 	switch exchange {
+	case ExchangeNYSE:
+		return NewWeekdaySet(time.Saturday, time.Sunday)
 	default:
 		return WeekdaySet{}
 	}
 }
 
-// The MOEX regular profile follows the TradingView reference-session bar
-// universe observed by fixture/CSV alignment: weekday [07:00, 23:50) MSK and
-// weekend [10:00, 19:00) MSK. Treat this as a TV reference model unless
-// SourceMetadata supplies an official exchange-specific session override.
+// regularWeekSchedule returns the canonical weekday and weekend session windows
+// for exchanges with known fixed schedules, as observed in TradingView reference data.
+// All session times are in the exchange's local timezone (see DefaultTimezone).
 func regularWeekSchedule(exchange Exchange) WeekSchedule {
 	switch exchange {
 	case ExchangeMOEX:
+		// Weekday [07:00, 23:50) MSK, weekend [10:00, 19:00) MSK — TV bar universe.
 		return WeekSchedule{
 			Weekday: NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50)),
 			Weekend: NewSessionWindow(ClockTimeAt(10, 0), ClockTimeAt(19, 0)),
+		}
+	case ExchangeNYSE:
+		// Regular market session [09:30, 16:00) ET, closed weekends.
+		return WeekSchedule{
+			Weekday: NewSessionWindow(ClockTimeAt(9, 30), ClockTimeAt(16, 0)),
 		}
 	default:
 		return WeekSchedule{}
@@ -288,4 +306,14 @@ func weekScheduleFromMetadata(metadata SourceMetadata) (WeekSchedule, bool, erro
 		hasOverride = true
 	}
 	return schedule, hasOverride, nil
+}
+
+// sessionOpenMinuteFor returns the exchange session's weekday open as minutes
+// since local midnight.  When the session is always-open or the exchange has no
+// known schedule, zero is returned (midnight origin — no tiling offset).
+func sessionOpenMinuteFor(exchange Exchange, session ReferenceSession) int {
+	if session != ReferenceSessionRegular {
+		return 0
+	}
+	return regularWeekSchedule(exchange).Weekday.Start.TotalMinutes()
 }

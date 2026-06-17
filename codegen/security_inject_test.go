@@ -167,6 +167,7 @@ func TestAnalyzeAndGeneratePrefetch_NormalizesSecurityBarsBeforeLimitAndContext(
 		`sec_runtime_1d_ctx := context.New(ctx.Symbol, "1D", len(sec_runtime_1d_data))`,
 		`sec_runtime_1d_ctx.Timezone = sec_runtime_1d_profile.Timezone`,
 		`sec_runtime_1d_ctx.ReferenceSession = string(sec_runtime_1d_profile.ReferenceSession)`,
+		`sec_runtime_1d_ctx.PeriodAnchor = market.DeriveSessionAnchor(sec_runtime_1d_profile, sec_runtime_1d_data)`,
 	}
 
 	last := -1
@@ -1068,5 +1069,77 @@ func TestAnalyzeAndGeneratePrefetch_TransitiveChartOnlyAliasEliminated(t *testin
 	}
 	if injection.PrefetchCode != "" {
 		t.Errorf("expected empty PrefetchCode for transitive chart-only alias, got:\n%s", injection.PrefetchCode)
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_NumericTimeframeToken_Canonicalization(t *testing.T) {
+	cases := []struct {
+		numericToken  string
+		canonicalForm string
+	}{
+		{"1", "1m"},
+		{"5", "5m"},
+		{"15", "15m"},
+		{"30", "30m"},
+		{"60", "1h"},
+		{"240", "4h"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.numericToken, func(t *testing.T) {
+			program := numericTokenSecurityCallProgram("SBERP", tc.numericToken)
+
+			injection, err := AnalyzeAndGeneratePrefetch(program)
+			if err != nil {
+				t.Fatalf("AnalyzeAndGeneratePrefetch: %v", err)
+			}
+			if injection.PrefetchCode == "" {
+				t.Fatal("no prefetch code emitted for numeric token")
+			}
+
+			canonicalQuoted := `"` + tc.canonicalForm + `"`
+			if !strings.Contains(injection.PrefetchCode, canonicalQuoted) {
+				t.Errorf("PrefetchCode lacks canonical form %s for token %q\n%s",
+					canonicalQuoted, tc.numericToken, injection.PrefetchCode)
+			}
+
+			secTimeframeExpr := `TimeframeToSeconds(` + canonicalQuoted + `)`
+			if !strings.Contains(injection.PrefetchCode, secTimeframeExpr) {
+				t.Errorf("secTimeframeSeconds not computed from canonical form %s\n%s",
+					canonicalQuoted, injection.PrefetchCode)
+			}
+		})
+	}
+}
+
+func numericTokenSecurityCallProgram(symbol, numericToken string) *ast.Program {
+	return &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Kind:     "var",
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "secVal"},
+						Init: &ast.CallExpression{
+							NodeType: ast.TypeCallExpression,
+							Callee: &ast.MemberExpression{
+								NodeType: ast.TypeMemberExpression,
+								Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+								Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+							},
+							Arguments: []ast.Expression{
+								&ast.Literal{NodeType: ast.TypeLiteral, Value: symbol},
+								&ast.Literal{NodeType: ast.TypeLiteral, Value: numericToken},
+								&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }

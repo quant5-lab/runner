@@ -177,6 +177,24 @@ func TestRegularCalendarForExchange_WeekdayBehavior(t *testing.T) {
 			},
 		},
 		{
+			// NYSE bars at 12:00 UTC = 720 min, within [09:30,16:00) = [570,960)
+			// minute range used by the session window check (tz="UTC").
+			// Weekdays are accepted by the window; Saturday and Sunday are
+			// rejected by the regularClosedWeekdays mask before the window check.
+			// Precise window boundary tests are in NYSESessionWindowContract.
+			name:     "NYSE_closes_weekends_and_accepts_weekdays_at_midday_UTC",
+			exchange: ExchangeNYSE,
+			acceptWeekdays: map[time.Weekday]bool{
+				time.Monday:    true,
+				time.Tuesday:   true,
+				time.Wednesday: true,
+				time.Thursday:  true,
+				time.Friday:    true,
+				time.Saturday:  false, // closed by regularClosedWeekdays
+				time.Sunday:    false, // closed by regularClosedWeekdays
+			},
+		},
+		{
 			name:     "Binance_accepts_all_seven_days",
 			exchange: ExchangeBinance,
 			acceptWeekdays: map[time.Weekday]bool{
@@ -473,6 +491,7 @@ func TestDefaultReferenceSession(t *testing.T) {
 		want     ReferenceSession
 	}{
 		{ExchangeMOEX, ReferenceSessionRegular},
+		{ExchangeNYSE, ReferenceSessionRegular},
 		{ExchangeBinance, ReferenceSessionAlwaysOpen},
 		{ExchangeUnknown, ReferenceSessionAlwaysOpen},
 	}
@@ -579,6 +598,113 @@ func TestRegularCalendarForExchange_OpenDatesWeekendSessionWindow(t *testing.T) 
 			cal := RegularCalendarForExchange(ExchangeMOEX, tc.metadata)
 			if got := cal.Accepts(bar, "1h", "Europe/Moscow"); got != tc.want {
 				t.Fatalf("Accepts(%s) = %v, want %v", tc.datetime, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestParseExchange_AllKnownCodes verifies that ParseExchange correctly maps
+// every accepted exchange code variant to its canonical Exchange constant,
+// including case-insensitive matching and the full set of NYSE-family codes
+// (NASDAQ and AMEX are treated as equivalent to NYSE for tiling purposes).
+func TestParseExchange_AllKnownCodes(t *testing.T) {
+	cases := []struct {
+		input string
+		want  Exchange
+	}{
+		// MOEX variants
+		{"MOEX", ExchangeMOEX},
+		{"moex", ExchangeMOEX},
+		{"MISX", ExchangeMOEX},
+		{"misx", ExchangeMOEX},
+		// Binance
+		{"BINANCE", ExchangeBinance},
+		{"binance", ExchangeBinance},
+		// NYSE family — all codes map to the same tiling anchor (09:30 ET)
+		{"NYSE", ExchangeNYSE},
+		{"nyse", ExchangeNYSE},
+		{"NASDAQ", ExchangeNYSE},
+		{"nasdaq", ExchangeNYSE},
+		{"AMEX", ExchangeNYSE},
+		{"amex", ExchangeNYSE},
+		{"XNAS", ExchangeNYSE},
+		{"XNYS", ExchangeNYSE},
+		// Unknown
+		{"", ExchangeUnknown},
+		{"UNKNOWN", ExchangeUnknown},
+		{"TSX", ExchangeUnknown},
+	}
+
+	for _, tc := range cases {
+		got := ParseExchange(tc.input)
+		if got != tc.want {
+			t.Errorf("ParseExchange(%q): got %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+// TestDefaultTimezone_AllKnownExchanges verifies that every recognized exchange
+// constant maps to its correct IANA timezone.  ExchangeUnknown and always-open
+// markets both default to UTC.
+func TestDefaultTimezone_AllKnownExchanges(t *testing.T) {
+	cases := []struct {
+		exchange Exchange
+		want     string
+	}{
+		{ExchangeMOEX, "Europe/Moscow"},
+		{ExchangeNYSE, "America/New_York"},
+		{ExchangeBinance, "UTC"},
+		{ExchangeUnknown, "UTC"},
+	}
+
+	for _, tc := range cases {
+		if got := DefaultTimezone(tc.exchange); got != tc.want {
+			t.Errorf("DefaultTimezone(%q): got %q, want %q", tc.exchange, got, tc.want)
+		}
+	}
+}
+
+// TestRegularCalendarForExchange_NYSESessionWindowContract verifies that the
+// NYSE regular-session calendar accepts bars inside [09:30, 16:00) ET and
+// rejects bars outside that window and on weekends.
+func TestRegularCalendarForExchange_NYSESessionWindowContract(t *testing.T) {
+	loc, _ := time.LoadLocation("America/New_York")
+	etUnix := func(datetime string) context.OHLCV {
+		ts, _ := time.ParseInLocation("2006-01-02 15:04", datetime, loc)
+		return context.OHLCV{Time: ts.Unix()}
+	}
+
+	cal := RegularCalendarForExchange(ExchangeNYSE, SourceMetadata{})
+
+	cases := []struct {
+		name string
+		bar  context.OHLCV
+		want bool
+	}{
+		// Below open: 09:29 is the last rejected minute
+		{"before_open_09h00_rejected", etUnix("2025-10-01 09:00"), false},
+		{"before_open_09h29_rejected", etUnix("2025-10-01 09:29"), false},
+		// Session open boundary: 09:30 accepted, one minute before rejected
+		{"at_session_open_accepted", etUnix("2025-10-01 09:30"), true},
+		// Mid-session accepted
+		{"midday_12h00_accepted", etUnix("2025-10-01 12:00"), true},
+		// One minute before close: 15:59 accepted
+		{"one_before_close_15h59_accepted", etUnix("2025-10-01 15:59"), true},
+		// At close: 16:00 rejected
+		{"at_close_16h00_rejected", etUnix("2025-10-01 16:00"), false},
+		// After close rejected
+		{"after_close_17h00_rejected", etUnix("2025-10-01 17:00"), false},
+		// Weekend: Saturday and Sunday are in regularClosedWeekdays for NYSE
+		{"saturday_midday_rejected", etUnix("2025-10-04 12:00"), false},
+		{"sunday_midday_rejected", etUnix("2025-10-05 12:00"), false},
+		// Monday in-session after weekend
+		{"monday_at_open_accepted", etUnix("2025-10-06 09:30"), true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := cal.Accepts(tc.bar, "1h", "America/New_York"); got != tc.want {
+				t.Fatalf("Accepts = %v, want %v", got, tc.want)
 			}
 		})
 	}

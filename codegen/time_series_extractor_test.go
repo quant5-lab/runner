@@ -38,14 +38,31 @@ if x != 0
 `
 }
 
-func TestTimeBuiltinExtractor_BareTimestamp_AllArgArities(t *testing.T) {
+func TestTimeBuiltinExtractor_ZeroArgEmitsBareTimestamp(t *testing.T) {
+	for _, ctx := range extractionContexts {
+		ctx := ctx
+		t.Run(ctx.name, func(t *testing.T) {
+			code := mustCompileVersioned(t, pineScript("//@version=5", "", ctx.wrap("time()")))
+			if strings.Contains(code, `featuregap.Record("time"`) {
+				t.Errorf("time() must not fall back to featuregap:\n%s", code)
+			}
+			if !strings.Contains(code, "ctx.Data[ctx.BarIndex].Time * 1000") {
+				t.Errorf("zero-arg time() must emit bare bar-timestamp ms expression:\n%s", code)
+			}
+		})
+	}
+}
+
+func TestTimeBuiltinExtractor_SingleArgEmitsAlignedBoundary(t *testing.T) {
 	cases := []struct {
-		name string
-		call string
+		name     string
+		call     string
+		wantInTF string // expected timeframe expression in generated code
 	}{
-		{"zero_args", "time()"},
-		{"one_arg_timeframe_period", "time(timeframe.period)"},
-		{"one_arg_string_tf", `time("60")`},
+		{"timeframe_period", "time(timeframe.period)", "ctx.Timeframe"},
+		{"intraday_numeric_60", `time("60")`, `"60"`},
+		{"intraday_numeric_240", `time("240")`, `"240"`},
+		{"daily_literal", `time("1D")`, `"1D"`},
 	}
 
 	for _, ctx := range extractionContexts {
@@ -54,10 +71,13 @@ func TestTimeBuiltinExtractor_BareTimestamp_AllArgArities(t *testing.T) {
 			t.Run(ctx.name+"/"+tc.name, func(t *testing.T) {
 				code := mustCompileVersioned(t, pineScript("//@version=5", "", ctx.wrap(tc.call)))
 				if strings.Contains(code, `featuregap.Record("time"`) {
-					t.Errorf("time() must not fall back to featuregap in extraction position:\n%s", code)
+					t.Errorf("time(tf) must not fall back to featuregap:\n%s", code)
 				}
-				if !strings.Contains(code, "ctx.Data[ctx.BarIndex].Time * 1000") {
-					t.Errorf("time() must emit bar-timestamp ms expression:\n%s", code)
+				if !strings.Contains(code, "BarOpenTimeAtTimeframe") {
+					t.Errorf("time(tf) must emit BarOpenTimeAtTimeframe boundary call:\n%s", code)
+				}
+				if !strings.Contains(code, tc.wantInTF) {
+					t.Errorf("time(tf) must contain timeframe expr %q:\n%s", tc.wantInTF, code)
 				}
 			})
 		}

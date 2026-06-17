@@ -257,6 +257,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			varName, symbolCode, timeframeCode, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.Timezone = %s_profile.Timezone\n", varName, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.ReferenceSession = string(%s_profile.ReferenceSession)\n", varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.PeriodAnchor = market.DeriveSessionAnchor(%s_profile, %s_data)\n", varName, varName, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")

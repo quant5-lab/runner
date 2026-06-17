@@ -4,8 +4,19 @@ import (
 	"fmt"
 )
 
-// bar.Time stores seconds; Pine's time contract and calendar.* both require milliseconds.
+// barTimestampMsExpr is the primary bar's own millisecond timestamp.
 const barTimestampMsExpr = "float64(ctx.Data[ctx.BarIndex].Time * 1000)"
+
+// alignedBarTimeMsExpr returns the bar timestamp floored to the exchange-aware
+// period boundary of timeframeGoExpr, in milliseconds.  ctx.PeriodAnchor carries
+// the exchange timezone and session-open clock so change(time(tf)) fires at
+// secondary-bar boundaries aligned to the exchange session, not UTC midnight.
+func alignedBarTimeMsExpr(timeframeGoExpr string) string {
+	return fmt.Sprintf(
+		"float64(context.BarOpenTimeAtTimeframeWithAnchor(ctx.Data[ctx.BarIndex].Time, %s, ctx.PeriodAnchor) * 1000)",
+		timeframeGoExpr,
+	)
+}
 
 /*
 TimeCodeGenerator emits Go source for Pine's time(timeframe, session)
@@ -32,8 +43,8 @@ func (g *TimeCodeGenerator) GenerateNoArguments(varName string) string {
 	return g.indentation + fmt.Sprintf("%sSeries.Set(%s)\n", varName, barTimestampMsExpr)
 }
 
-func (g *TimeCodeGenerator) GenerateSingleArgument(varName string) string {
-	return g.indentation + fmt.Sprintf("%sSeries.Set(%s)\n", varName, barTimestampMsExpr)
+func (g *TimeCodeGenerator) GenerateSingleArgument(varName, timeframeGoExpr string) string {
+	return g.indentation + fmt.Sprintf("%sSeries.Set(%s)\n", varName, alignedBarTimeMsExpr(timeframeGoExpr))
 }
 
 func (g *TimeCodeGenerator) GenerateWithSession(varName string, session SessionArgument) string {

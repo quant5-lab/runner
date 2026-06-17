@@ -32,7 +32,8 @@ func ParseClockTime(s string) (ClockTime, error) {
 	return ClockTime{Hour: h, Minute: m}, nil
 }
 
-func (c ClockTime) totalMinutes() int {
+// TotalMinutes returns the clock time as minutes elapsed since midnight.
+func (c ClockTime) TotalMinutes() int {
 	return c.Hour*60 + c.Minute
 }
 
@@ -74,8 +75,8 @@ func (w SessionWindow) Contains(t time.Time) bool {
 		return true
 	}
 	barMinutes := t.Hour()*60 + t.Minute()
-	start := w.Start.totalMinutes()
-	end := w.End.totalMinutes()
+	start := w.Start.TotalMinutes()
+	end := w.End.TotalMinutes()
 	if start < end {
 		return barMinutes >= start && barMinutes < end
 	}

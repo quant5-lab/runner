@@ -248,27 +248,87 @@ func TestSessionArgument_IsValid(t *testing.T) {
 	}
 }
 
-func TestTimeCodeGenerator_BareTimestampPaths(t *testing.T) {
-	type genFunc func(varName string) string
-
+func TestTimeCodeGenerator_NoArguments(t *testing.T) {
 	tests := []struct {
 		name    string
 		indent  string
 		varName string
-		method  func(g *TimeCodeGenerator) genFunc
 	}{
-		{"no_args_tab_indent", "\t", "myVar", func(g *TimeCodeGenerator) genFunc { return g.GenerateNoArguments }},
-		{"no_args_double_indent", "\t\t", "tSeries", func(g *TimeCodeGenerator) genFunc { return g.GenerateNoArguments }},
-		{"single_arg_tab_indent", "\t", "myVar", func(g *TimeCodeGenerator) genFunc { return g.GenerateSingleArgument }},
-		{"single_arg_double_indent", "\t\t", "tSeries", func(g *TimeCodeGenerator) genFunc { return g.GenerateSingleArgument }},
+		{"tab_indent", "\t", "myVar"},
+		{"double_indent", "\t\t", "tSeries"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gen := NewTimeCodeGenerator(tt.indent)
-			result := tt.method(gen)(tt.varName)
+			result := NewTimeCodeGenerator(tt.indent).GenerateNoArguments(tt.varName)
 			if !strings.Contains(result, barTimestampMsExpr) {
-				t.Errorf("want ms timestamp %q in output, got:\n%s", barTimestampMsExpr, result)
+				t.Errorf("want %q in output, got:\n%s", barTimestampMsExpr, result)
+			}
+			if !strings.Contains(result, tt.varName+"Series.Set(") {
+				t.Errorf("want %sSeries.Set(...) in output, got:\n%s", tt.varName, result)
+			}
+			if !strings.HasPrefix(result, tt.indent) {
+				t.Errorf("want indentation %q prefix, got:\n%s", tt.indent, result)
+			}
+		})
+	}
+}
+
+func TestTimeCodeGenerator_SingleArgument(t *testing.T) {
+	const wantFunc = "BarOpenTimeAtTimeframe"
+
+	tests := []struct {
+		name         string
+		indent       string
+		varName      string
+		tfGoExpr     string
+		wantContains []string
+	}{
+		{
+			name:         "primary_timeframe_period",
+			indent:       "\t",
+			varName:      "myVar",
+			tfGoExpr:     "ctx.Timeframe",
+			wantContains: []string{wantFunc, "ctx.Timeframe"},
+		},
+		{
+			name:         "intraday_numeric_60",
+			indent:       "\t",
+			varName:      "tSeries",
+			tfGoExpr:     `"60"`,
+			wantContains: []string{wantFunc, `"60"`},
+		},
+		{
+			name:         "intraday_numeric_240",
+			indent:       "\t",
+			varName:      "tSeries",
+			tfGoExpr:     `"240"`,
+			wantContains: []string{wantFunc, `"240"`},
+		},
+		{
+			name:         "daily_literal",
+			indent:       "\t",
+			varName:      "tSeries",
+			tfGoExpr:     `"1D"`,
+			wantContains: []string{wantFunc, `"1D"`},
+		},
+		{
+			name:         "user_variable_tf",
+			indent:       "\t\t",
+			varName:      "tSeries",
+			tfGoExpr:     "tf",
+			wantContains: []string{wantFunc, "tf"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NewTimeCodeGenerator(tt.indent).GenerateSingleArgument(tt.varName, tt.tfGoExpr)
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("want %q in output, got:\n%s", want, result)
+				}
+			}
+			if strings.Contains(result, barTimestampMsExpr) {
+				t.Errorf("must not contain bare timestamp %q — must use aligned boundary:\n%s", barTimestampMsExpr, result)
 			}
 			if !strings.Contains(result, tt.varName+"Series.Set(") {
 				t.Errorf("want %sSeries.Set(...) in output, got:\n%s", tt.varName, result)
@@ -336,9 +396,28 @@ func TestTimeHandler_HandleVariableInit(t *testing.T) {
 			wantContains: []string{barTimestampMsExpr},
 		},
 		{
-			name:         "single_arg_timeframe_emits_ms_timestamp",
-			args:         []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
-			wantContains: []string{barTimestampMsExpr},
+			name:           "single_arg_timeframe_period",
+			args:           []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", "ctx.Timeframe", "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_intraday_numeric_literal",
+			args:           []ast.Expression{&ast.Literal{Value: "60"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", `"60"`, "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_calendar_literal",
+			args:           []ast.Expression{&ast.Literal{Value: "1D"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", `"1D"`, "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_user_variable",
+			args:           []ast.Expression{&ast.Identifier{Name: "tf"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", "tf", "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
 		},
 		{
 			name: "two_args_literal_session_emits_session_filter",
@@ -400,9 +479,28 @@ func TestTimeHandler_HandleInlineExpression(t *testing.T) {
 			wantExact: barTimestampMsExpr,
 		},
 		{
-			name:      "single_arg_timeframe_only_returns_ms_timestamp",
-			args:      []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
-			wantExact: barTimestampMsExpr,
+			name:           "single_arg_timeframe_period",
+			args:           []ast.Expression{&ast.Identifier{Name: "timeframe.period"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", "ctx.Timeframe", "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_intraday_numeric_literal",
+			args:           []ast.Expression{&ast.Literal{Value: "240"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", `"240"`, "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_calendar_literal",
+			args:           []ast.Expression{&ast.Literal{Value: "1D"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", `"1D"`, "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
+		},
+		{
+			name:           "single_arg_user_variable",
+			args:           []ast.Expression{&ast.Identifier{Name: "tf"}},
+			wantContains:   []string{"BarOpenTimeAtTimeframeWithAnchor", "tf", "ctx.PeriodAnchor"},
+			wantNotContain: []string{barTimestampMsExpr},
 		},
 		{
 			name: "two_args_literal_session_emits_session_filter",

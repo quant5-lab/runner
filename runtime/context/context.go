@@ -20,6 +20,7 @@ type Context struct {
 	Timeframe        string
 	Timezone         string // Exchange timezone: "UTC" (Binance), "America/New_York" (NYSE/Yahoo), "Europe/Moscow" (MOEX)
 	ReferenceSession string
+	PeriodAnchor     PeriodAnchor
 	Bars             int
 	Data             []OHLCV
 	BarIndex         int
@@ -60,6 +61,7 @@ func NewReplayContext(source *Context) *Context {
 		Timeframe:        source.Timeframe,
 		Timezone:         source.Timezone,
 		ReferenceSession: source.ReferenceSession,
+		PeriodAnchor:     source.PeriodAnchor,
 		Bars:             source.Bars,
 		Data:             source.Data,
 		BarIndex:         0,
