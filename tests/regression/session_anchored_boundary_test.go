@@ -100,8 +100,11 @@ func firingsEqual(a, b []boundaryFiring) bool {
 func fixtureAnchor(t *testing.T, symbol, path string) (context.PeriodAnchor, []context.OHLCV) {
 	t.Helper()
 	tz := fixtureTimezone(t, path)
-	bars := fixtureBarsToRuntimeBars(loadOHLCVBars(t, path))
-	profile := market.ResolveProfileWithMetadata(symbol, market.SourceMetadata{Timezone: tz})
+	rawBars := fixtureBarsToRuntimeBars(loadOHLCVBars(t, path))
+	bars, profile, err := market.NormalizeBarsWithMetadataE(symbol, "1h", market.SourceMetadata{Timezone: tz}, rawBars)
+	if err != nil {
+		t.Fatalf("normalize bars for %s: %v", symbol, err)
+	}
 	return market.DeriveSessionAnchor(profile, bars), bars
 }
 
@@ -132,7 +135,6 @@ func TestSessionAnchoredBoundary_AAPL_4h_FiresAtSessionOpenNotUTCGrid(t *testing
 		t.Fatal("no boundary firings found -- dataset or boundary computation is broken")
 	}
 
-	// UTC-floor fires a false boundary at 12:30 ET; session-anchored must not.
 	assertNoFiringAtLocalClock(t, firings, "America/New_York", 12, 30)
 	assertAnyFiringAtLocalClock(t, firings, "America/New_York", 13, 30)
 
@@ -172,6 +174,74 @@ func TestSessionAnchoredBoundary_AAPL_4h_DSTTransitionFiresAtLocalSessionTime(t 
 	// UTC-floor (EST = UTC-5) fires at the bar entering the 16:00 UTC slot, which
 	// is 11:00 EST.  Session-anchored must not fire there.
 	assertNoFiringAtLocalClock(t, postDSTFirings, "America/New_York", 11, 0)
+}
+
+// TestSessionAnchoredBoundary_SBERP_3h_FiresAtSessionOpenNotUTCGrid verifies
+// that for a MOEX (Europe/Moscow, UTC+3) symbol, 3h period boundaries tile from
+// the 07:00 MSK session open rather than the UTC-epoch grid.
+//
+// UTC-floor places a 3h grid mark at 09:00 UTC = 12:00 MSK inside the MOEX
+// session, so the bar at 12:00 MSK triggers a spurious boundary change under
+// UTC-floor.  Session-anchored tiling from 07:00 MSK (420 min since midnight)
+// places slot boundaries at 07:00, 10:00, 13:00, …; 12:00 MSK is always
+// mid-slot and must never trigger a change.  The test cannot pass under a
+// UTC-floor implementation.
+func TestSessionAnchoredBoundary_SBERP_3h_FiresAtSessionOpenNotUTCGrid(t *testing.T) {
+	root := projectRootFromCwd()
+	anchor, bars := fixtureAnchor(t, "SBERP",
+		filepath.Join(root, "tests", "golden", "fixtures", "data", "SBERP-1h.json"))
+
+	if anchor.Timezone != "Europe/Moscow" {
+		t.Fatalf("anchor.Timezone = %q, want Europe/Moscow", anchor.Timezone)
+	}
+	const wantSessionOpen = 7 * 60 // 07:00 MSK
+	if anchor.SessionOpenMinute != wantSessionOpen {
+		t.Fatalf("anchor.SessionOpenMinute = %d, want %d (07:00 MSK)", anchor.SessionOpenMinute, wantSessionOpen)
+	}
+
+	firings := collectBoundaryFirings(bars, "180", anchor)
+	if len(firings) == 0 {
+		t.Fatal("no boundary firings found — dataset or boundary computation is broken")
+	}
+
+	assertNoFiringAtLocalClock(t, firings, "Europe/Moscow", 12, 0)
+	assertAnyFiringAtLocalClock(t, firings, "Europe/Moscow", 10, 0)
+}
+
+// TestSessionAnchoredBoundary_UTC_AlwaysOpen_MidnightOriginPreserved verifies
+// that a UTC/always-open anchor (SessionOpenMinute=0) keeps boundaries at
+// UTC midnight multiples, identical to the legacy UTC-floor algorithm.  This
+// is the degenerate case: for 24/7 markets (crypto) the session-anchored
+// function must not shift boundaries away from UTC midnight, because UTC
+// midnight IS the correct origin.
+func TestSessionAnchoredBoundary_UTC_AlwaysOpen_MidnightOriginPreserved(t *testing.T) {
+	root := projectRootFromCwd()
+	anchor, bars := fixtureAnchor(t, "BTCUSDT",
+		filepath.Join(root, "tests", "golden", "fixtures", "data", "BTCUSDT-1h.json"))
+
+	if anchor.Timezone != "UTC" {
+		t.Fatalf("anchor.Timezone = %q, want UTC for BTCUSDT", anchor.Timezone)
+	}
+	if anchor.SessionOpenMinute != 0 {
+		t.Fatalf("anchor.SessionOpenMinute = %d, want 0 for always-open UTC market", anchor.SessionOpenMinute)
+	}
+
+	sessionFirings := collectBoundaryFirings(bars, "240", anchor)
+	if len(sessionFirings) == 0 {
+		t.Fatal("no boundary firings — dataset or boundary computation is broken")
+	}
+
+	utcFirings := collectBoundaryFirings(bars, "240", context.PeriodAnchor{})
+	if !firingsEqual(sessionFirings, utcFirings) {
+		t.Errorf("UTC always-open anchor produces different firings than legacy UTC-floor: "+
+			"session=%d, legacy=%d — zero-offset anchor must degenerate to UTC-floor arithmetic",
+			len(sessionFirings), len(utcFirings))
+	}
+
+	assertAnyFiringAtLocalClock(t, sessionFirings, "UTC", 0, 0)
+	assertAnyFiringAtLocalClock(t, sessionFirings, "UTC", 4, 0)
+	assertAnyFiringAtLocalClock(t, sessionFirings, "UTC", 8, 0)
+	assertAnyFiringAtLocalClock(t, sessionFirings, "UTC", 12, 0)
 }
 
 // TestSessionAnchoredBoundary_CrossExchange_SecondaryUsesOwnAnchor verifies

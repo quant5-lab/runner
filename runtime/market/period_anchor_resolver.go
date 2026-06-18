@@ -20,16 +20,23 @@ func SessionAnchorFor(profile Profile) context.PeriodAnchor {
 	}
 }
 
-// DeriveSessionAnchor returns the PeriodAnchor for profile.
+// For known exchanges whose ReferenceSession is not Regular (e.g. Binance
+// crypto, or an explicitly configured always-open override), bars are never
+// consulted and the anchor is midnight-origin.
 //
-// For known exchanges (ExchangeMOEX, ExchangeNYSE, ExchangeBinance, ...) the
-// table-based answer from SessionAnchorFor is authoritative and bars are ignored.
-// For ExchangeUnknown the table carries no session-open offset, so the dominant
-// first-bar minute observed across trading days is used instead -- generalising
-// to any exchange whose fixture data begins at the session open.
+// For all other cases — regular-session known exchanges (MOEX, NYSE, …) and
+// any unrecognised exchange — the mode of per-day first-bar clock-minutes
+// is used as the session-open anchor.  Unrecognised-exchange tickers observe
+// rather than default, so crypto-unknown datasets naturally return 0
+// (midnight) while unrecognised stock exchanges return their actual session
+// open, with no exchange silently falling back to UTC midnight.  When bars are
+// absent the curated table entry serves as fallback.
 func DeriveSessionAnchor(profile Profile, bars []context.OHLCV) context.PeriodAnchor {
 	base := SessionAnchorFor(profile)
-	if profile.Exchange != ExchangeUnknown || base.SessionOpenMinute != 0 || len(bars) == 0 {
+	if len(bars) == 0 {
+		return base
+	}
+	if profile.Exchange != ExchangeUnknown && profile.ReferenceSession != ReferenceSessionRegular {
 		return base
 	}
 	return context.PeriodAnchor{
@@ -69,9 +76,8 @@ func dailyFirstBarMinutes(bars []context.OHLCV, loc *time.Location) []int {
 	return result
 }
 
-// modeMinute returns the most frequently occurring element.  Ties are broken
-// toward the smaller value so that a genuine session-open minute always wins
-// over a later anomaly when both appear equally often.
+// modeMinute breaks ties toward the smaller value so that a genuine session-open
+// minute always wins over a later anomaly when counts are equal.
 func modeMinute(minutes []int) int {
 	if len(minutes) == 0 {
 		return 0
@@ -87,11 +93,6 @@ func modeMinute(minutes []int) int {
 		}
 	}
 	return best
-}
-
-func barLocalMinute(unixSec int64, loc *time.Location) int {
-	t := time.Unix(unixSec, 0).In(loc)
-	return t.Hour()*60 + t.Minute()
 }
 
 func loadTimezone(tz string) *time.Location {

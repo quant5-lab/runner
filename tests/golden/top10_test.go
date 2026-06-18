@@ -59,3 +59,17 @@ func TestMax_SBERP_Hourly(t *testing.T) {
 		GoldenFile:   "max-sberp-1h.json",
 	})
 }
+
+func TestZigzag_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "Zigzag",
+		StrategyFile: "top10/zigzag.pine",
+		Symbol:       "SBERP",
+		Timeframe:    "1h",
+		DataFile:     "SBERP-1h.json",
+		GoldenFile:   "zigzag-sberp-1h.json",
+	})
+}

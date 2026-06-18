@@ -303,6 +303,24 @@ func TestAlignToPeriodWithAnchor_GateContractWithSessionAnchor(t *testing.T) {
 			},
 			wantChange: []bool{false, false, true, false},
 		},
+		{
+			// UTC/always-open: 4h windows tile from 00:00 UTC (midnight origin).
+			// This is the degenerate case: zero anchor = UTC-floor arithmetic, the
+			// same result as the legacy AlignToPeriod function.  Gates must fire
+			// exactly at 00:00, 04:00, 08:00, … UTC — not at session-relative offsets.
+			name:   "utc_4h_midnight_origin",
+			anchor: PeriodAnchor{Timezone: "UTC", SessionOpenMinute: 0},
+			tf:     "240",
+			barsLocal: []string{
+				"2025-08-15 00:00:00", // bar 0: slot [00:00, 04:00)
+				"2025-08-15 01:00:00", // same slot
+				"2025-08-15 03:59:00", // same slot
+				"2025-08-15 04:00:00", // enters [04:00, 08:00)
+				"2025-08-15 07:00:00", // same slot
+				"2025-08-15 08:00:00", // enters [08:00, 12:00)
+			},
+			wantChange: []bool{false, false, false, true, false, true},
+		},
 	}
 
 	for _, c := range cases {

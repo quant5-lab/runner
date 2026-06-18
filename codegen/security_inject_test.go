@@ -158,16 +158,17 @@ func TestAnalyzeAndGeneratePrefetch_NormalizesSecurityBarsBeforeLimitAndContext(
 	code := injection.PrefetchCode
 	requiredOrder := []string{
 		`fetcher.FetchWithMetadata(ctx.Symbol, "1D", 0)`,
-		`sec_runtime_1d_metadata := sec_runtime_1d_marketData.SourceMetadata`,
-		`sec_runtime_1d_metadata.ReferenceSession = ctx.ReferenceSession`,
-		`sec_runtime_1d_metadata.Timezone = ctx.Timezone`,
+		`sec_runtime_1d_metadata := market.CompleteSecondaryMetadata(ctx.Symbol, sec_runtime_1d_marketData.SourceMetadata, market.SecondaryContextDefaults{Timezone: ctx.Timezone, ReferenceSession: ctx.ReferenceSession})`,
 		`market.NormalizeBarsWithMetadataE(ctx.Symbol, "1D", sec_runtime_1d_metadata`,
 		`if sec_runtime_1d_normErr != nil`,
+		`sec_runtime_1d_tz = sec_runtime_1d_profile.Timezone`,
+		`sec_runtime_1d_refsession = string(sec_runtime_1d_profile.ReferenceSession)`,
+		`sec_runtime_1d_anchor = market.DeriveSessionAnchor(sec_runtime_1d_profile, sec_runtime_1d_normalized)`,
 		`sec_runtime_1d_data = sec_runtime_1d_data[len(sec_runtime_1d_data)-sec_runtime_1d_limit:]`,
 		`sec_runtime_1d_ctx := context.New(ctx.Symbol, "1D", len(sec_runtime_1d_data))`,
-		`sec_runtime_1d_ctx.Timezone = sec_runtime_1d_profile.Timezone`,
-		`sec_runtime_1d_ctx.ReferenceSession = string(sec_runtime_1d_profile.ReferenceSession)`,
-		`sec_runtime_1d_ctx.PeriodAnchor = market.DeriveSessionAnchor(sec_runtime_1d_profile, sec_runtime_1d_data)`,
+		`sec_runtime_1d_ctx.Timezone = sec_runtime_1d_tz`,
+		`sec_runtime_1d_ctx.ReferenceSession = sec_runtime_1d_refsession`,
+		`sec_runtime_1d_ctx.PeriodAnchor = sec_runtime_1d_anchor`,
 	}
 
 	last := -1

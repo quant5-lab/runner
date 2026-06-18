@@ -8,12 +8,16 @@ import (
 	"testing"
 )
 
-const minZigzagClosedTrades = 50
+// minZigzagClosedTrades is pinned to the exact golden count so any regression
+// that re-zeroes or erodes the harmonic-pattern trade series is caught immediately.
+const minZigzagClosedTrades = 97
 
-// TestZigzag_SBERP_Hourly_RuntimeEvidence guards against regressions that
-// re-introduce the syminfo_tickerid scope compile failure or silently zero trades
-// for the ZigZag PA Strategy (Pine v4, harmonic pattern recognition, ticker via
-// string variable in security()).
+// TestZigzag_SBERP_Hourly_RuntimeEvidence verifies that the ZigZag PA Strategy
+// (Pine v4, harmonic pattern recognition) compiles and produces at least the
+// golden trade count end-to-end.  The strategy uses a ticker string variable in
+// security() and a self-referential UDF with series-history lookback
+// (_direction[1]) — both generic codegen capabilities whose absence would
+// silently zero the trade series or fail compilation.
 func TestZigzag_SBERP_Hourly_RuntimeEvidence(t *testing.T) {
 	root := projectRootFromCwd()
 
@@ -25,7 +29,7 @@ func TestZigzag_SBERP_Hourly_RuntimeEvidence(t *testing.T) {
 	tmpDir := t.TempDir()
 	built, ok := codegenAndBuild(t, tmpDir, "zigzag_evidence", string(source), root)
 	if !ok {
-		t.Fatal("zigzag codegen/build failed — syminfo_tickerid scope regression suspected")
+		t.Fatal("zigzag codegen/build failed — ticker-string-in-security or self-referential UDF regression suspected")
 	}
 
 	fixtureDir := filepath.Join(root, "tests", "golden", "fixtures", "data")
