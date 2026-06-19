@@ -125,6 +125,11 @@ func (r *StrategyRunner) parseOutput(t *testing.T, outputPath string) *StrategyR
 		chartOutput.Strategy.Indicators[name] = indicatorToFloats(ind)
 	}
 
+	if n := len(chartOutput.Candlestick); n > 0 {
+		chartOutput.Strategy.MarkClose = chartOutput.Candlestick[n-1].Close
+		chartOutput.Strategy.FromRunner = true
+	}
+
 	return chartOutput.Strategy
 }
 

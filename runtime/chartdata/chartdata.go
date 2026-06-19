@@ -79,10 +79,11 @@ type OpenTrade struct {
 
 /* StrategyData represents strategy execution results */
 type StrategyData struct {
-	Trades     []Trade     `json:"trades"`
-	OpenTrades []OpenTrade `json:"openTrades"`
-	Equity     float64     `json:"equity"`
-	NetProfit  float64     `json:"netProfit"`
+	Trades         []Trade     `json:"trades"`
+	OpenTrades     []OpenTrade `json:"openTrades"`
+	Equity         float64     `json:"equity"`
+	NetProfit      float64     `json:"netProfit"`
+	InitialCapital float64     `json:"initialCapital"`
 }
 
 /* PlotPoint represents a single plot data point */
@@ -277,10 +278,11 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	}
 
 	cd.Strategy = &StrategyData{
-		Trades:     trades,
-		OpenTrades: openTradesData,
-		Equity:     strat.GetEquity(currentPrice),
-		NetProfit:  strat.GetNetProfit(),
+		Trades:         trades,
+		OpenTrades:     openTradesData,
+		Equity:         strat.GetEquity(currentPrice),
+		NetProfit:      strat.GetNetProfit(),
+		InitialCapital: strat.GetInitialCapital(),
 	}
 }
 

@@ -73,7 +73,10 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 	}
 
 	entryID := g.extractStringLiteral(call.Arguments[0])
-	direction := g.extractDirectionConstant(call.Arguments[1])
+	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("strategy.entry: %w", err)
+	}
 	qty := h.qtyResolver.ResolveQuantity(
 		call.Arguments,
 		g.strategyConfig.DefaultQtyValue,
@@ -161,7 +164,10 @@ func (h *StrategyActionHandler) generateOrder(g *generator, call *ast.CallExpres
 	}
 
 	orderID := g.extractStringLiteral(call.Arguments[0])
-	direction := g.extractDirectionConstant(call.Arguments[1])
+	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("strategy.order: %w", err)
+	}
 	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.extractFloatLiteral)
 
 	extractor := &ArgumentExtractor{generator: g}
@@ -252,6 +258,9 @@ func (h *StrategyActionHandler) generateAllowEntryIn(g *generator, call *ast.Cal
 		return g.ind() + "// strategy.risk.allow_entry_in() - invalid arguments\n", nil
 	}
 
-	direction := g.extractDirectionConstant(call.Arguments[0])
+	direction, err := g.extractDirectionConstant(call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("strategy.risk.allow_entry_in: %w", err)
+	}
 	return g.ind() + fmt.Sprintf("strat.SetAllowedDirection(%s)\n", direction), nil
 }

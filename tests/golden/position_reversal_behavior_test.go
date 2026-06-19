@@ -158,8 +158,6 @@ func TestPositionReversal_EquityConsistency(t *testing.T) {
 		strategyFile string
 		symbol       string
 		dataFile     string
-		skip         bool
-		skipReason   string
 	}{
 		{
 			name:         "macd_aapl",
@@ -172,8 +170,6 @@ func TestPositionReversal_EquityConsistency(t *testing.T) {
 			strategyFile: "supertrend.pine",
 			symbol:       "BTCUSDT",
 			dataFile:     "BTCUSDT-1h.json",
-			skip:         true,
-			skipReason:   "Known issue: Equity calculation bug with Supertrend (980.86 vs expected 9980.86)",
 		},
 		{
 			name:         "mtf_nvda",
@@ -186,9 +182,6 @@ func TestPositionReversal_EquityConsistency(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if tt.skip {
-				t.Skip(tt.skipReason)
-			}
 
 			suite := NewTestSuite(t)
 
@@ -197,31 +190,7 @@ func TestPositionReversal_EquityConsistency(t *testing.T) {
 				suite.DataPath(tt.dataFile),
 				tt.symbol, "1h")
 
-			validateEquityConsistency(t, actual)
+			testutil.ValidateEquityConsistency(t, actual)
 		})
-	}
-}
-
-func validateEquityConsistency(t *testing.T, result *testutil.StrategyResult) {
-	t.Helper()
-
-	initialCapital := 10000.0
-
-	for _, openTrade := range result.OpenTrades {
-		t.Logf("Open trade: %s @ %.2f", openTrade.Direction, openTrade.EntryPrice)
-	}
-
-	closedPL := result.NetProfit
-	unrealizedPL := result.Equity - initialCapital - closedPL
-
-	if len(result.OpenTrades) == 0 && unrealizedPL != 0 {
-		t.Errorf("Equity mismatch with no open trades: equity=%.2f, expected=%.2f (initial=%.2f + netProfit=%.2f, unrealized=%.2f)",
-			result.Equity, initialCapital+closedPL, initialCapital, closedPL, unrealizedPL)
-	} else if len(result.OpenTrades) > 0 {
-		t.Logf("✓ Equity breakdown: %.2f = %.2f (initial) + %.2f (closed PL) + %.2f (unrealized PL from %d open trades)",
-			result.Equity, initialCapital, closedPL, unrealizedPL, len(result.OpenTrades))
-	} else {
-		t.Logf("✓ Equity consistent (no open trades): %.2f = %.2f + %.2f",
-			result.Equity, initialCapital, closedPL)
 	}
 }

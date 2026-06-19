@@ -3145,11 +3145,11 @@ func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
 	return 0.0
 }
 
-func (g *generator) extractDirectionConstant(expr ast.Expression) string {
+func (g *generator) extractDirectionConstant(expr ast.Expression) (string, error) {
 	if g.directionExtractor == nil {
 		g.directionExtractor = NewContextAwareDirectionExtractor(g)
 	}
-	return g.directionExtractor.Extract(expr)
+	return g.directionExtractor.Resolve(expr)
 }
 
 func (g *generator) extractMemberName(expr *ast.MemberExpression) string {

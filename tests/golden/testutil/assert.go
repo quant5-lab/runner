@@ -237,3 +237,72 @@ func DescribeResult(result *StrategyResult) string {
 		result.NetProfit,
 		result.Equity)
 }
+
+// closedEquityMismatch must only be called with no open positions; it does not
+// account for unrealized P&L.
+func closedEquityMismatch(equity, initialCapital, netProfit float64) string {
+	expected := initialCapital + netProfit
+	if matchFinancial(equity, expected) {
+		return ""
+	}
+	return fmt.Sprintf("equity=%.2f diverges from expected=%.2f (initial=%.2f + netProfit=%.2f)",
+		equity, expected, initialCapital, netProfit)
+}
+
+func tradeUnrealizedPnL(trade Trade, markClose float64) float64 {
+	dirSign := 1.0
+	if trade.Direction == "short" {
+		dirSign = -1.0
+	}
+	return (markClose - trade.EntryPrice) * trade.Size * dirSign
+}
+
+// openEquityMismatch requires markClose to equal the last-bar close the strategy
+// binary used for equity; using any other mark produces a tautological assertion.
+func openEquityMismatch(equity, initialCapital, netProfit float64, openTrades []Trade, markClose float64) string {
+	totalUnrealized := 0.0
+	for _, trade := range openTrades {
+		totalUnrealized += tradeUnrealizedPnL(trade, markClose)
+	}
+	expected := initialCapital + netProfit + totalUnrealized
+	if matchFinancial(equity, expected) {
+		return ""
+	}
+	return fmt.Sprintf(
+		"equity=%.2f diverges from expected=%.2f "+
+			"(initial=%.2f + closedPL=%.2f + unrealized=%.2f across %d open positions at mark=%.4f)",
+		equity, expected, initialCapital, netProfit, totalUnrealized, len(openTrades), markClose,
+	)
+}
+
+func openEquityCheckRequired(fromRunner bool, markClose float64) bool {
+	return fromRunner || markClose != 0
+}
+
+// ValidateEquityConsistency uses MarkClose sourced from the runner output (identical
+// to the mark the strategy binary itself used), so the open-position assertion is
+// exact, not tautological.  Runner-produced results (FromRunner=true) always assert;
+// the degraded-log path exists only for synthetic results that carry no mark price.
+func ValidateEquityConsistency(t *testing.T, result *StrategyResult) {
+	t.Helper()
+
+	if len(result.OpenTrades) == 0 {
+		if msg := closedEquityMismatch(result.Equity, result.InitialCapital, result.NetProfit); msg != "" {
+			t.Errorf("equity mismatch with no open positions: %s", msg)
+		}
+		return
+	}
+
+	if !openEquityCheckRequired(result.FromRunner, result.MarkClose) {
+		t.Logf("open equity unverified (synthetic result, no mark price): equity=%.2f initial=%.2f closedPL=%.2f (%d open positions)",
+			result.Equity, result.InitialCapital, result.NetProfit, len(result.OpenTrades))
+		return
+	}
+
+	if msg := openEquityMismatch(
+		result.Equity, result.InitialCapital, result.NetProfit,
+		result.OpenTrades, result.MarkClose,
+	); msg != "" {
+		t.Errorf("equity mismatch with open positions: %s", msg)
+	}
+}

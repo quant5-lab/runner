@@ -21,7 +21,7 @@ func TestStrategyCommentTernarySimple(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -76,7 +76,7 @@ func TestStrategyCommentTernaryWithVariables(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -125,7 +125,7 @@ func TestStrategyCommentTernaryBinaryCondition(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -284,7 +284,7 @@ func TestStrategyCommentTernaryInCloseAll(t *testing.T) {
 
 /* TestStrategyCommentTernaryMixedTypes verifies ternary with literal and variable branches */
 func TestStrategyCommentTernaryMixedTypes(t *testing.T) {
-	/* Simulate: strategy.entry("Trade", dir, comment=use_custom ? custom_msg : "Default signal") */
+	/* Simulate: strategy.entry("Trade", strategy.long, comment=use_custom ? custom_msg : "Default signal") */
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{
@@ -296,7 +296,10 @@ func TestStrategyCommentTernaryMixedTypes(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: "long"},
+						},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{

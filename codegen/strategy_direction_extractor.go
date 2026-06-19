@@ -1,6 +1,10 @@
 package codegen
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"fmt"
+
+	"github.com/quant5-lab/runner/ast"
+)
 
 type DirectionExtractor interface {
 	Extract(expr ast.Expression) (string, bool)
@@ -29,14 +33,6 @@ func (e *MemberExpressionDirectionExtractor) Extract(expr ast.Expression) (strin
 	return "", false
 }
 
-// resolveStrategyDirectionMember matches the nested member expression
-// `strategy.direction.{long,short,all}` and returns the corresponding Go
-// runtime constant. Returns ("", false) for any other expression shape.
-//
-// This is the canonical resolver used by both the string-expression generator
-// (for `strat_dir_value = strategy.direction.long` style assignments) and the
-// direction-argument extractor chain (for direct calls like
-// `strategy.risk.allow_entry_in(strategy.direction.all)`).
 func resolveStrategyDirectionMember(expr ast.Expression) (string, bool) {
 	outer, ok := expr.(*ast.MemberExpression)
 	if !ok {
@@ -110,34 +106,26 @@ func NewChainDirectionExtractor(extractors ...DirectionExtractor) *ChainDirectio
 	return &ChainDirectionExtractor{extractors: extractors}
 }
 
-func (e *ChainDirectionExtractor) Extract(expr ast.Expression) string {
+func (e *ChainDirectionExtractor) Resolve(expr ast.Expression) (string, error) {
 	for _, extractor := range e.extractors {
 		if direction, ok := extractor.Extract(expr); ok {
-			return direction
+			return direction, nil
 		}
 	}
-	return "strategy.Long"
-}
-
-// Deprecated: use NewContextAwareDirectionExtractor for production codegen; kept for unit tests of individual extractor components.
-func NewDefaultDirectionExtractor() *ChainDirectionExtractor {
-	return NewChainDirectionExtractor(
-		&MemberExpressionDirectionExtractor{},
-		&BooleanLiteralDirectionExtractor{},
-		&IdentifierDirectionExtractor{},
+	return "", fmt.Errorf(
+		"direction expression %T cannot be resolved to strategy.Long or strategy.Short — "+
+			"use strategy.long, strategy.short, true, false, or a string variable holding a direction value",
+		expr,
 	)
 }
 
-// VariableDirectionExtractor resolves an Identifier to a Go variable name when
-// that identifier exists in the generator's variable registry. This enables
-// `strategy.entry(entry_type, ...)` where entry_type is a runtime string variable.
 type VariableDirectionExtractor struct {
 	variables map[string]string
 }
 
 func (e *VariableDirectionExtractor) Extract(expr ast.Expression) (string, bool) {
 	id, ok := expr.(*ast.Identifier)
-	if !ok {
+	if !ok || id.Name == "" {
 		return "", false
 	}
 	if varType, exists := e.variables[id.Name]; exists && varType == "string" {
@@ -146,48 +134,39 @@ func (e *VariableDirectionExtractor) Extract(expr ast.Expression) (string, bool)
 	return "", false
 }
 
-// ConditionalDirectionExtractor handles ternary direction expressions by emitting
-// a Go IIFE: `func() string { if <cond> { return strategy.Long } else { return strategy.Short } }()`.
-type ConditionalDirectionExtractor struct {
+// namedDirectionArgExtractor handles the Pine named-argument form
+//
+//	strategy.entry(id, long=<direction>, ...)
+//
+// The parser bundles all named arguments into a single *ast.ObjectExpression
+// appended to call.Arguments. The "long" property value is resolved through
+// chain.Resolve, so every direction form supported for positional arguments is
+// automatically available inside a named argument.
+type namedDirectionArgExtractor struct {
 	chain *ChainDirectionExtractor
 }
 
-func (e *ConditionalDirectionExtractor) Extract(expr ast.Expression) (string, bool) {
-	cond, ok := expr.(*ast.ConditionalExpression)
+func (e *namedDirectionArgExtractor) Extract(expr ast.Expression) (string, bool) {
+	obj, ok := expr.(*ast.ObjectExpression)
 	if !ok {
 		return "", false
 	}
-	consequent, consOk := e.chain.extractors[0].Extract(cond.Consequent)
-	if !consOk {
-		// Try full chain for nested ternary
-		for _, ex := range e.chain.extractors {
-			if v, ok2 := ex.Extract(cond.Consequent); ok2 {
-				consequent = v
-				consOk = true
-				break
-			}
+	for _, prop := range obj.Properties {
+		key, ok := prop.Key.(*ast.Identifier)
+		if !ok || key.Name != "long" {
+			continue
 		}
-	}
-	alternate, altOk := e.chain.extractors[0].Extract(cond.Alternate)
-	if !altOk {
-		for _, ex := range e.chain.extractors {
-			if v, ok2 := ex.Extract(cond.Alternate); ok2 {
-				alternate = v
-				altOk = true
-				break
-			}
+		dir, err := e.chain.Resolve(prop.Value)
+		if err != nil {
+			return "", false
 		}
+		return dir, true
 	}
-	if !consOk || !altOk {
-		return "", false
-	}
-	// We can't call generateConditionExpression here without the generator;
-	// delegate to the context-aware extractor which has the generator.
-	_, _ = consequent, alternate
 	return "", false
 }
 
-// contextualConditionalDirectionExtractor has access to the generator for full expression codegen.
+// contextualConditionalDirectionExtractor branch resolution delegates to chain.Resolve
+// so any extractor added to the chain automatically applies to ternary branches.
 type contextualConditionalDirectionExtractor struct {
 	gen   *generator
 	chain *ChainDirectionExtractor
@@ -198,20 +177,12 @@ func (e *contextualConditionalDirectionExtractor) Extract(expr ast.Expression) (
 	if !ok {
 		return "", false
 	}
-	var consequent, alternate string
-	for _, ex := range e.chain.extractors {
-		if v, ok2 := ex.Extract(cond.Consequent); ok2 {
-			consequent = v
-			break
-		}
+	consequent, err := e.chain.Resolve(cond.Consequent)
+	if err != nil {
+		return "", false
 	}
-	for _, ex := range e.chain.extractors {
-		if v, ok2 := ex.Extract(cond.Alternate); ok2 {
-			alternate = v
-			break
-		}
-	}
-	if consequent == "" || alternate == "" {
+	alternate, err := e.chain.Resolve(cond.Alternate)
+	if err != nil {
 		return "", false
 	}
 	condCode, err := e.gen.generateConditionExpression(cond.Test)
@@ -223,8 +194,6 @@ func (e *contextualConditionalDirectionExtractor) Extract(expr ast.Expression) (
 	return iife, true
 }
 
-// NewContextAwareDirectionExtractor returns a chain that handles member expressions,
-// boolean literals, variable identifiers, and conditional expressions.
 func NewContextAwareDirectionExtractor(gen *generator) *ChainDirectionExtractor {
 	chain := &ChainDirectionExtractor{}
 	chain.extractors = []DirectionExtractor{
@@ -232,6 +201,7 @@ func NewContextAwareDirectionExtractor(gen *generator) *ChainDirectionExtractor 
 		&BooleanLiteralDirectionExtractor{},
 		&VariableDirectionExtractor{variables: gen.variables},
 		&IdentifierDirectionExtractor{},
+		&namedDirectionArgExtractor{chain: chain},
 		&contextualConditionalDirectionExtractor{gen: gen, chain: chain},
 	}
 	return chain

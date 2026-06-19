@@ -26,12 +26,13 @@ func baselineTrade() Trade {
 func baselineResult() *StrategyResult {
 	tr := baselineTrade()
 	return &StrategyResult{
-		Trades:      []Trade{tr},
-		OpenTrades:  []Trade{},
-		TotalTrades: 1,
-		Equity:      10000.00,
-		NetProfit:   10.00,
-		Plots:       map[string][]float64{},
+		Trades:         []Trade{tr},
+		OpenTrades:     []Trade{},
+		TotalTrades:    1,
+		Equity:         10010.00,
+		NetProfit:      10.00,
+		InitialCapital: 10000.00,
+		Plots:          map[string][]float64{},
 	}
 }
 
@@ -325,6 +326,33 @@ func TestResultsEqual(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ResultsEqual(tt.a, tt.b); got != tt.want {
 				t.Errorf("ResultsEqual = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCompareResults_InitialCapitalNotCompared guards that InitialCapital stays
+// excluded from golden comparison — existing golden files must not be invalidated
+// when capital declarations change.
+func TestCompareResults_InitialCapitalNotCompared(t *testing.T) {
+	cases := []struct {
+		name    string
+		capital float64
+	}{
+		{"small_1000", 1000.0},
+		{"default_10000", 10000.0},
+		{"large_100000", 100000.0},
+		{"zero", 0.0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expected := baselineResult()
+			actual := baselineResult()
+			actual.InitialCapital = tc.capital
+
+			if err := CompareResults(expected, actual); err != nil {
+				t.Errorf("InitialCapital=%v should not affect CompareResults, but got: %v", tc.capital, err)
 			}
 		})
 	}
