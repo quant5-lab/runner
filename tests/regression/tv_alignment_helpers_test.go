@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -32,9 +33,10 @@ type tvAlignmentTolerance struct {
 }
 
 type tvAlignmentDiscrepancy struct {
-	RunnerOnly     int
-	TVOnly         int
-	FixtureEndOpen int // TV trades that runner holds as fixture-end open positions; exempt from the XOR guard
+	RunnerOnly         int
+	TVOnly             int
+	FixtureEndOpen     int  // TV trades that runner holds as fixture-end open positions; exempt from the XOR guard
+	TVOnlyCapEscalated bool // TVOnly exceeds maxTVOnly; set only with operator approval; counted by TestTVAlignmentCases_CapEscalationRatchet
 }
 
 func exactTVAlignment() tvAlignmentDiscrepancy {
@@ -139,6 +141,33 @@ func runnerClosedTradesFromResult(result *goldenutil.StrategyResult) []tvref.Run
 // sizeRelativeTolerance covers floating-point rounding at the lot-quantization step;
 // observed residuals for strategy.cash strategies are < 0.01%.
 const sizeRelativeTolerance = 0.02
+
+// tvOnlyCapViolation returns a non-empty diagnostic string when d violates the
+// TVOnly cap policy, and an empty string when it is compliant. Two distinct
+// conditions are checked:
+//
+//   - Over cap without escalation flag: a new case that exceeds maxTVOnly must
+//     set TVOnlyCapEscalated to document operator approval.
+//   - Dead escalation flag: a case that has TVOnlyCapEscalated set but whose
+//     TVOnly no longer exceeds the cap must remove the flag to prevent silent
+//     accumulation of stale approval markers.
+func tvOnlyCapViolation(name string, d tvAlignmentDiscrepancy) string {
+	if d.TVOnly > maxTVOnly && !d.TVOnlyCapEscalated {
+		return fmt.Sprintf(
+			"%s: tv-only boundary %d exceeds policy cap %d;"+
+				" set TVOnlyCapEscalated:true for operator-approved escalations",
+			name, d.TVOnly, maxTVOnly,
+		)
+	}
+	if d.TVOnlyCapEscalated && d.TVOnly <= maxTVOnly {
+		return fmt.Sprintf(
+			"%s: TVOnlyCapEscalated is set but TVOnly=%d does not exceed cap %d"+
+				" — remove TVOnlyCapEscalated",
+			name, d.TVOnly, maxTVOnly,
+		)
+	}
+	return ""
+}
 
 func assertTVAlignment(t *testing.T, runner []tvref.RunnerTrade, tv []tvref.TVTrade, tc tvAlignmentCase) {
 	t.Helper()

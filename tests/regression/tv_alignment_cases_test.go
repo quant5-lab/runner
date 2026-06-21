@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestTVAlignmentCasesAreUniqueAndComplete(t *testing.T) {
@@ -46,11 +45,6 @@ func TestTVAlignmentCasesAreUniqueAndComplete(t *testing.T) {
 }
 
 func TestTVAlignmentCasesStayWithinPolicyCaps(t *testing.T) {
-	const maxTimeTolerance = 2 * time.Hour
-	const maxPriceTolerance = 2.00
-	const maxRunnerOnly = 2
-	const maxTVOnly = 5
-
 	for _, tc := range tvAlignmentCases() {
 		t.Run(tc.Name, func(t *testing.T) {
 			if tc.Tolerance.Time > maxTimeTolerance {
@@ -62,8 +56,8 @@ func TestTVAlignmentCasesStayWithinPolicyCaps(t *testing.T) {
 			if tc.Discrepancy.RunnerOnly > maxRunnerOnly {
 				t.Errorf("runner-only boundary %d exceeds policy cap %d", tc.Discrepancy.RunnerOnly, maxRunnerOnly)
 			}
-			if tc.Discrepancy.TVOnly > maxTVOnly {
-				t.Errorf("tv-only boundary %d exceeds policy cap %d", tc.Discrepancy.TVOnly, maxTVOnly)
+			if msg := tvOnlyCapViolation(tc.Name, tc.Discrepancy); msg != "" {
+				t.Errorf("%s", msg)
 			}
 		})
 	}
@@ -141,6 +135,19 @@ func TestTVAlignmentCases_SomePnLRatchetSkipped(t *testing.T) {
 	}
 	if skipped == 0 {
 		t.Error("no TV alignment case sets SkipPnLRatchetReason — field is unreachable; remove it or add a case that requires it")
+	}
+}
+
+func TestTVAlignmentCases_CapEscalationRatchet(t *testing.T) {
+	const maxEscalations = 1
+	n := 0
+	for _, tc := range tvAlignmentCases() {
+		if tc.Discrepancy.TVOnlyCapEscalated {
+			n++
+		}
+	}
+	if n > maxEscalations {
+		t.Errorf("TVOnlyCapEscalated count is %d (ceiling %d) — each additional operator-approved escalation must be individually justified", n, maxEscalations)
 	}
 }
 

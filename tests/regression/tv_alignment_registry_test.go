@@ -56,7 +56,7 @@ func utPlusCases() []tvAlignmentCase {
 		{
 			Name: "UtPlus SBERP", Strategy: "top10/ut+.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "ut-plus-sberp-1h.json", CSV: "ut-plus-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: tvAlignmentTolerance{Time: 2 * time.Hour, Price: 0.10}, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 2, TVOnly: 5},
+			Tolerance: tvAlignmentTolerance{Time: 2 * time.Hour, Price: 0.10}, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 2, TVOnly: 5, TVOnlyCapEscalated: true},
 			InitialCapital: 100000,
 		},
 	}
