@@ -77,11 +77,7 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 	if err != nil {
 		return "", fmt.Errorf("strategy.entry: %w", err)
 	}
-	qty := h.qtyResolver.ResolveQuantity(
-		call.Arguments,
-		g.strategyConfig.DefaultQtyValue,
-		g.extractFloatLiteral,
-	)
+	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
@@ -134,18 +130,22 @@ func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExp
 }
 
 func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 2 {
+	if len(call.Arguments) == 0 {
 		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
 	}
 
-	exitID := g.extractStringLiteral(call.Arguments[0])
-	fromEntry := g.extractStringLiteral(call.Arguments[1])
+	parser := newStrategyExitArgParser(call.Arguments, g)
 
-	extractor := &ArgumentExtractor{generator: g}
-	limitExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "limit", 3, "math.NaN()")
-	stopExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "stop", 5, "math.NaN()")
-	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 6, `""`)
-	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
+	exitID := parser.stringArg(0, "id", "")
+	if exitID == "" {
+		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
+	}
+
+	fromEntry := parser.stringArg(1, "from_entry", "")
+	stopExpr := parser.exprArg(noPositionalFallback, "stop", "math.NaN()")
+	limitExpr := parser.exprArg(noPositionalFallback, "limit", "math.NaN()")
+	comment := parser.commentArg()
+	whenCondition, hasWhen := parser.whenCondition()
 
 	exitCode := g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
 		exitID, fromEntry, stopExpr, limitExpr, comment)
@@ -168,7 +168,7 @@ func (h *StrategyActionHandler) generateOrder(g *generator, call *ast.CallExpres
 	if err != nil {
 		return "", fmt.Errorf("strategy.order: %w", err)
 	}
-	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.extractFloatLiteral)
+	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)

@@ -54,7 +54,9 @@ func TestZigzag_SBERP_Hourly_RuntimeEvidence(t *testing.T) {
 
 	var result struct {
 		Strategy struct {
-			Trades []struct{} `json:"trades"`
+			Trades []struct {
+				Size float64 `json:"size"`
+			} `json:"trades"`
 		} `json:"strategy"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
@@ -64,5 +66,12 @@ func TestZigzag_SBERP_Hourly_RuntimeEvidence(t *testing.T) {
 	got := len(result.Strategy.Trades)
 	if got < minZigzagClosedTrades {
 		t.Errorf("closed trades: got %d, want >= %d", got, minZigzagClosedTrades)
+	}
+
+	const target01TradeSizeDefval = 10000
+	for i, tr := range result.Strategy.Trades {
+		if tr.Size != target01TradeSizeDefval {
+			t.Errorf("trade[%d] size=%.0f, want %d (qty= named arg must resolve input identifier at codegen time)", i, tr.Size, target01TradeSizeDefval)
+		}
 	}
 }

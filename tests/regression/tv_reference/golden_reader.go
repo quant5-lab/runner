@@ -33,14 +33,22 @@ func LoadRunnerTrades(path string) ([]RunnerTrade, error) {
 		return nil, fmt.Errorf("parse golden %s: %w", path, err)
 	}
 
-	all := append(g.Result.Trades, g.Result.OpenTrades...)
-	out := make([]RunnerTrade, 0, len(all))
-	for _, t := range all {
+	out := make([]RunnerTrade, 0, len(g.Result.Trades)+len(g.Result.OpenTrades))
+	for _, t := range g.Result.Trades {
 		out = append(out, RunnerTrade{
 			EntryUTC:   time.Unix(t.EntryTime, 0).UTC(),
 			EntryPrice: t.EntryPrice,
 			Direction:  t.Direction,
 			Size:       t.Size,
+		})
+	}
+	for _, t := range g.Result.OpenTrades {
+		out = append(out, RunnerTrade{
+			EntryUTC:   time.Unix(t.EntryTime, 0).UTC(),
+			EntryPrice: t.EntryPrice,
+			Direction:  t.Direction,
+			Size:       t.Size,
+			IsOpen:     true,
 		})
 	}
 	return out, nil

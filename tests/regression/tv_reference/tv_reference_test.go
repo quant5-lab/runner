@@ -157,6 +157,18 @@ func TestMatchExact(t *testing.T) {
 			0, 1, 1,
 		},
 		{
+			"time_tolerance_symmetric_tv_before_runner",
+			[]RunnerTrade{makeRunnerTrade("2025-01-01 11:00", 100)},
+			[]TVTrade{makeTVTrade("2025-01-01 10:00", 100)},
+			1, 0, 0,
+		},
+		{
+			"price_tolerance_symmetric_runner_above_tv",
+			[]RunnerTrade{makeRunnerTrade("2025-01-01 10:00", 101)},
+			[]TVTrade{makeTVTrade("2025-01-01 10:00", 100)},
+			1, 0, 0,
+		},
+		{
 			"direction_mismatch_fails",
 			[]RunnerTrade{makeRunnerTradeWithDirection("2025-01-01 10:00", 100, "long")},
 			[]TVTrade{makeTVTradeWithDirection("2025-01-01 10:00", 100, "short")},
@@ -169,7 +181,7 @@ func TestMatchExact(t *testing.T) {
 			1, 0, 0,
 		},
 		{
-			"partial_greedy_ordered",
+			"partial_match_unmatched_on_both_sides",
 			[]RunnerTrade{
 				makeRunnerTrade("2025-01-01 10:00", 100),
 				makeRunnerTrade("2025-01-02 12:00", 200),
@@ -196,8 +208,7 @@ func TestMatchExact(t *testing.T) {
 			1, 0, 10,
 		},
 		{
-			"greedy_advances_j_past_consumed_tv_trades",
-			// runner[0] consumes tv[0]; runner[1] must look from tv[1], not tv[0]
+			"matched_tv_slot_not_consumed_twice",
 			[]RunnerTrade{
 				makeRunnerTrade("2025-01-01 10:00", 100),
 				makeRunnerTrade("2025-01-02 10:00", 200),
@@ -612,6 +623,16 @@ func TestIndexColumns(t *testing.T) {
 			0, 1, 2, 3, 4, -1,
 		},
 		{
+			"size_underscore_qty_normalized",
+			[]string{"Trade number", "Type", "Date and time", "Price", "Size_(qty)"},
+			0, 1, 2, 3, 4, -1,
+		},
+		{
+			"net_pnl_no_currency_suffix_detected",
+			[]string{"Trade number", "Type", "Date and time", "Price", "Net PnL"},
+			0, 1, 2, 3, -1, 4,
+		},
+		{
 			"all_columns_missing",
 			[]string{"Foo", "Bar", "Baz"},
 			-1, -1, -1, -1, -1, -1,
@@ -710,7 +731,7 @@ func TestParseTrades_FullCSVRoundTrip(t *testing.T) {
 }
 
 func TestParseTrades_SizeColumnAliases(t *testing.T) {
-	aliases := []string{"Size", "Quantity", "Contracts", "Size (qty)", "qty"}
+	aliases := []string{"Size", "Quantity", "Contracts", "Size (qty)", "Size_(qty)", "qty"}
 	for _, alias := range aliases {
 		alias := alias
 		t.Run(alias, func(t *testing.T) {
@@ -1168,4 +1189,266 @@ func TestParseTrades_AbsentSizeColumn_TradesHaveZeroSize(t *testing.T) {
 	if HasSizeData(trades) {
 		t.Errorf("HasSizeData returned true when CSV had no size column — would produce a false size assertion")
 	}
+}
+
+func TestTVEquityAtWindowStart(t *testing.T) {
+	const capital = 10000.0
+	windowStart := parseUTC("2025-01-05 00:00")
+
+	makeTrade := func(datetime string, pnl float64) TVTrade {
+		return TVTrade{EntryUTC: parseUTC(datetime), NetPnL: pnl}
+	}
+
+	cases := []struct {
+		name      string
+		allTrades []TVTrade
+		want      float64
+	}{
+		{
+			"nil_trades_returns_initial_capital",
+			nil,
+			capital,
+		},
+		{
+			"empty_slice_returns_initial_capital",
+			[]TVTrade{},
+			capital,
+		},
+		{
+			"trade_exactly_at_window_start_excluded",
+			[]TVTrade{makeTrade("2025-01-05 00:00", 500)},
+			capital,
+		},
+		{
+			"all_trades_after_window_start_ignored",
+			[]TVTrade{makeTrade("2025-01-06 00:00", 500), makeTrade("2025-01-07 00:00", 200)},
+			capital,
+		},
+		{
+			"single_pre_window_profitable_trade",
+			[]TVTrade{makeTrade("2025-01-04 23:59", 500)},
+			capital + 500,
+		},
+		{
+			"single_pre_window_losing_trade",
+			[]TVTrade{makeTrade("2025-01-04 23:59", -200)},
+			capital - 200,
+		},
+		{
+			"multiple_pre_window_trades_accumulated",
+			[]TVTrade{makeTrade("2025-01-03 00:00", 100), makeTrade("2025-01-04 00:00", 200)},
+			capital + 300,
+		},
+		{
+			"mixed_pre_and_post_window_only_pre_counted",
+			[]TVTrade{makeTrade("2025-01-04 00:00", 100), makeTrade("2025-01-06 00:00", 999)},
+			capital + 100,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := TVEquityAtWindowStart(tc.allTrades, windowStart, capital)
+			if got != tc.want {
+				t.Errorf("TVEquityAtWindowStart = %.2f, want %.2f", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatchNetPnL(t *testing.T) {
+	t0 := parseUTC("2025-01-01 10:00")
+	t1 := parseUTC("2025-01-02 10:00")
+	timeTol := time.Hour
+	priceTol := 1.0
+	relTol := 0.01
+
+	makeRunner := func(dt time.Time, price, pnl float64) RunnerTrade {
+		return RunnerTrade{EntryUTC: dt, EntryPrice: price, Direction: "long", NetPnL: pnl}
+	}
+	makeTV := func(dt time.Time, price, pnl float64) TVTrade {
+		return TVTrade{EntryUTC: dt, EntryPrice: price, Direction: "long", NetPnL: pnl}
+	}
+
+	t.Run("empty_runner_and_tv", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(nil, nil, 1.0, timeTol, priceTol, relTol)
+		if matched != 0 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (0, 0)", matched, mismatch)
+		}
+	})
+
+	t.Run("empty_runner_with_tv_trades", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(nil, []TVTrade{makeTV(t0, 100, 50)}, 1.0, timeTol, priceTol, relTol)
+		if matched != 0 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (0, 0)", matched, mismatch)
+		}
+	})
+
+	t.Run("exact_pnl_equity_ratio_one", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 50)},
+			[]TVTrade{makeTV(t0, 100, 50)},
+			1.0, timeTol, priceTol, relTol,
+		)
+		if matched != 1 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (1, 0)", matched, mismatch)
+		}
+	})
+
+	t.Run("pnl_exceeds_relative_tolerance", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 60)},
+			[]TVTrade{makeTV(t0, 100, 50)},
+			1.0, timeTol, priceTol, relTol,
+		)
+		if matched != 1 || mismatch != 1 {
+			t.Errorf("got (%d, %d), want (1, 1)", matched, mismatch)
+		}
+	})
+
+	t.Run("equity_ratio_scales_runner_pnl_before_comparison", func(t *testing.T) {
+		// runner made 100 profit; TV equity at window start was half of runner initial capital,
+		// so runner position sizes are 2x TV — equityRatio=0.5 normalises to TV basis → scaled=50
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 100)},
+			[]TVTrade{makeTV(t0, 100, 50)},
+			0.5, timeTol, priceTol, relTol,
+		)
+		if matched != 1 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (1, 0) — scaled runner PnL should match TV PnL", matched, mismatch)
+		}
+	})
+
+	t.Run("runner_with_no_tv_match_not_counted_as_matched", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 50)},
+			[]TVTrade{makeTV(t1, 100, 50)},
+			1.0, time.Minute, priceTol, relTol,
+		)
+		if matched != 0 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (0, 0) — unmatched runner trade silently skipped", matched, mismatch)
+		}
+	})
+
+	t.Run("tv_trade_not_reused_across_runner_matches", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 50), makeRunner(t0, 100, 50)},
+			[]TVTrade{makeTV(t0, 100, 50)},
+			1.0, timeTol, priceTol, relTol,
+		)
+		if matched != 1 || mismatch != 0 {
+			t.Errorf("got (%d, %d), want (1, 0) — TV trade must not be consumed twice", matched, mismatch)
+		}
+	})
+
+	t.Run("multiple_trades_mixed_pnl_match", func(t *testing.T) {
+		matched, mismatch := MatchNetPnL(
+			[]RunnerTrade{makeRunner(t0, 100, 50), makeRunner(t1, 200, 60)},
+			[]TVTrade{makeTV(t0, 100, 50), makeTV(t1, 200, 40)},
+			1.0, timeTol, priceTol, relTol,
+		)
+		if matched != 2 || mismatch != 1 {
+			t.Errorf("got (%d, %d), want (2, 1)", matched, mismatch)
+		}
+	})
+}
+
+func TestPnlMatchRelative(t *testing.T) {
+	cases := []struct {
+		name   string
+		a, b   float64
+		relTol float64
+		want   bool
+	}{
+		{"equal_values", 100, 100, 0.01, true},
+		{"both_zero", 0, 0, 0.01, true},
+		{"within_relative_tolerance", 100, 101, 0.02, true},
+		{"exceeds_relative_tolerance", 100, 103, 0.02, false},
+		{"at_exact_boundary_inclusive", 100, 120, 0.20, true},
+		{"larger_magnitude_used_as_denominator", 50, 100, 0.5, true},
+		{"negative_values_within_tolerance", -100, -99, 0.02, true},
+		{"runner_zero_tv_nonzero_fails", 0, 10, 0.50, false},
+		{"opposite_signs_large_deviation", 10, -10, 0.99, false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := pnlMatchRelative(tc.a, tc.b, tc.relTol)
+			if got != tc.want {
+				t.Errorf("pnlMatchRelative(%.0f, %.0f, %.2f) = %v, want %v", tc.a, tc.b, tc.relTol, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestLoadRunnerTrades_IsOpenFlag verifies that LoadRunnerTrades marks closed
+// and open trades correctly via the IsOpen field introduced to RunnerTrade.
+// This is separate from TestLoadRunnerTrades, which checks count and field values
+// but not the IsOpen flag.
+func TestLoadRunnerTrades_IsOpenFlag(t *testing.T) {
+	data := `{
+		"result": {
+			"trades": [
+				{"entryTime": 1700000000, "entryPrice": 100.0, "direction": "long",  "size": 1.0},
+				{"entryTime": 1700003600, "entryPrice": 200.0, "direction": "short", "size": 2.0}
+			],
+			"openTrades": [
+				{"entryTime": 1700007200, "entryPrice": 300.0, "direction": "long",  "size": 3.0}
+			]
+		}
+	}`
+	tmpPath := filepath.Join(t.TempDir(), "golden.json")
+	if err := os.WriteFile(tmpPath, []byte(data), 0644); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+
+	trades, err := LoadRunnerTrades(tmpPath)
+	if err != nil {
+		t.Fatalf("LoadRunnerTrades: %v", err)
+	}
+	if len(trades) != 3 {
+		t.Fatalf("got %d trades, want 3", len(trades))
+	}
+
+	t.Run("first_closed_trade_is_not_open", func(t *testing.T) {
+		if trades[0].IsOpen {
+			t.Errorf("trades[0].IsOpen = true, want false (closed trade)")
+		}
+	})
+	t.Run("second_closed_trade_is_not_open", func(t *testing.T) {
+		if trades[1].IsOpen {
+			t.Errorf("trades[1].IsOpen = true, want false (closed trade)")
+		}
+	})
+	t.Run("open_trade_is_marked_open", func(t *testing.T) {
+		if !trades[2].IsOpen {
+			t.Errorf("trades[2].IsOpen = false, want true (open trade)")
+		}
+	})
+
+	t.Run("all_closed_when_no_open_trades_key", func(t *testing.T) {
+		d := `{"result": {"trades": [{"entryTime": 1, "entryPrice": 1.0, "direction": "long"}], "openTrades": []}}`
+		p := filepath.Join(t.TempDir(), "closed_only.json")
+		os.WriteFile(p, []byte(d), 0644)
+		got, _ := LoadRunnerTrades(p)
+		for i, tr := range got {
+			if tr.IsOpen {
+				t.Errorf("trades[%d].IsOpen = true, want false (no open trades in result)", i)
+			}
+		}
+	})
+
+	t.Run("open_trade_field_values_preserved", func(t *testing.T) {
+		if trades[2].EntryPrice != 300.0 {
+			t.Errorf("open trade EntryPrice = %.1f, want 300.0", trades[2].EntryPrice)
+		}
+		if trades[2].Size != 3.0 {
+			t.Errorf("open trade Size = %.1f, want 3.0", trades[2].Size)
+		}
+		if trades[2].Direction != "long" {
+			t.Errorf("open trade Direction = %q, want long", trades[2].Direction)
+		}
+	})
 }

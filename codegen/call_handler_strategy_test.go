@@ -341,100 +341,282 @@ func TestStrategyActionHandler_EdgeCases(t *testing.T) {
 	}
 }
 
-// TestStrategyExit_NamedArguments verifies named stop/limit args are extracted and not defaulted to NaN
-func TestStrategyExit_NamedArguments(t *testing.T) {
-	handler := NewStrategyActionHandler()
-	g := newTestGenerator()
+// TestStrategyExit_CallShapes verifies ID, from_entry, stop, and limit extraction for all three
+// Pine call shapes across a representative set of level combinations.
+//
+// Shape A: strategy.exit(id="X", from_entry="Y", stop=s, limit=l)  — single ObjectExpression
+// Shape B: strategy.exit("X", stop=s, limit=l)                     — positional id, no from_entry
+// Shape C: strategy.exit("X", "Y", stop=s, limit=l)                — all positional + named ObjExpr
+func TestStrategyExit_CallShapes(t *testing.T) {
+	namedObjExpr := func(props ...ast.Property) *ast.ObjectExpression {
+		return &ast.ObjectExpression{Properties: props}
+	}
+	prop := func(key string, val ast.Expression) ast.Property {
+		return ast.Property{Key: &ast.Identifier{Name: key}, Value: val}
+	}
+	lit := func(v float64) ast.Expression { return &ast.Literal{Value: v} }
 
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Literal{Value: "Exit"},
-			&ast.Literal{Value: "Long"},
-			&ast.ObjectExpression{
-				Properties: []ast.Property{
-					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 95.0}},
-					{Key: &ast.Identifier{Name: "limit"}, Value: &ast.Literal{Value: 110.0}},
-				},
+	tests := []struct {
+		name      string
+		args      []ast.Expression
+		wantID    string
+		wantEntry string
+		wantStop  string
+		wantLimit string
+		wantNoNaN bool
+	}{
+		{
+			name: "shape A: id, from_entry, stop and limit",
+			args: []ast.Expression{namedObjExpr(
+				prop("id", &ast.Literal{Value: "X"}),
+				prop("from_entry", &ast.Literal{Value: "Long"}),
+				prop("stop", lit(90)),
+				prop("limit", lit(110)),
+			)},
+			wantID: "X", wantEntry: "Long", wantStop: "90", wantLimit: "110", wantNoNaN: true,
+		},
+		{
+			name: "shape A: stop only, limit absent",
+			args: []ast.Expression{namedObjExpr(
+				prop("id", &ast.Literal{Value: "StopOnly"}),
+				prop("stop", lit(85)),
+			)},
+			wantID: "StopOnly", wantEntry: "", wantStop: "85", wantLimit: "math.NaN()",
+		},
+		{
+			name: "shape A: limit only, stop absent",
+			args: []ast.Expression{namedObjExpr(
+				prop("id", &ast.Literal{Value: "LimitOnly"}),
+				prop("limit", lit(120)),
+			)},
+			wantID: "LimitOnly", wantEntry: "", wantStop: "math.NaN()", wantLimit: "120",
+		},
+		{
+			name: "shape B: positional id, no from_entry, stop and limit",
+			args: []ast.Expression{
+				&ast.Literal{Value: "TP/SL"},
+				namedObjExpr(prop("stop", lit(230)), prop("limit", lit(260))),
 			},
+			wantID: "TP/SL", wantEntry: "", wantStop: "230", wantLimit: "260", wantNoNaN: true,
+		},
+		{
+			name: "shape B: stop only, limit absent",
+			args: []ast.Expression{
+				&ast.Literal{Value: "SL"},
+				namedObjExpr(prop("stop", lit(200))),
+			},
+			wantID: "SL", wantEntry: "", wantStop: "200", wantLimit: "math.NaN()",
+		},
+		{
+			name: "shape B: limit only, stop absent",
+			args: []ast.Expression{
+				&ast.Literal{Value: "TP"},
+				namedObjExpr(prop("limit", lit(300))),
+			},
+			wantID: "TP", wantEntry: "", wantStop: "math.NaN()", wantLimit: "300",
+		},
+		{
+			name: "shape C: positional id and from_entry, stop and limit",
+			args: []ast.Expression{
+				&ast.Literal{Value: "Exit"},
+				&ast.Literal{Value: "Long"},
+				namedObjExpr(prop("stop", lit(95)), prop("limit", lit(110))),
+			},
+			wantID: "Exit", wantEntry: "Long", wantStop: "95", wantLimit: "110", wantNoNaN: true,
+		},
+		{
+			name: "shape C: stop only, limit absent",
+			args: []ast.Expression{
+				&ast.Literal{Value: "Exit"},
+				&ast.Literal{Value: "Short"},
+				namedObjExpr(prop("stop", lit(50))),
+			},
+			wantID: "Exit", wantEntry: "Short", wantStop: "50", wantLimit: "math.NaN()",
+		},
+		{
+			name: "shape C: limit only, stop absent",
+			args: []ast.Expression{
+				&ast.Literal{Value: "TakeProfit"},
+				&ast.Literal{Value: "Long"},
+				namedObjExpr(prop("limit", lit(180))),
+			},
+			wantID: "TakeProfit", wantEntry: "Long", wantStop: "math.NaN()", wantLimit: "180",
 		},
 	}
 
-	code, err := handler.generateExit(g, call)
-	if err != nil {
-		t.Fatalf("generateExit failed: %v", err)
-	}
-
-	if !strings.Contains(code, "95") {
-		t.Errorf("Expected stop value 95 in generated code, got:\n%s", code)
-	}
-	if !strings.Contains(code, "110") {
-		t.Errorf("Expected limit value 110 in generated code, got:\n%s", code)
-	}
-	if strings.Contains(code, "math.NaN()") {
-		t.Errorf("Should not contain math.NaN() when named args provided, got:\n%s", code)
+	handler := NewStrategyActionHandler()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			call := &ast.CallExpression{Arguments: tt.args}
+			code, err := handler.generateExit(g, call)
+			if err != nil {
+				t.Fatalf("generateExit failed: %v", err)
+			}
+			if !strings.Contains(code, `"`+tt.wantID+`"`) {
+				t.Errorf("id=%q not found in output:\n%s", tt.wantID, code)
+			}
+			if !strings.Contains(code, `"`+tt.wantEntry+`"`) {
+				t.Errorf("from_entry=%q not found in output:\n%s", tt.wantEntry, code)
+			}
+			if !strings.Contains(code, tt.wantStop) {
+				t.Errorf("stop=%q not found in output:\n%s", tt.wantStop, code)
+			}
+			if !strings.Contains(code, tt.wantLimit) {
+				t.Errorf("limit=%q not found in output:\n%s", tt.wantLimit, code)
+			}
+			if tt.wantNoNaN && strings.Contains(code, "math.NaN()") {
+				t.Errorf("unexpected math.NaN() when all levels provided:\n%s", code)
+			}
+		})
 	}
 }
 
-// TestStrategyExit_NamedVariables verifies identifier stop/limit args resolve to series accessors
-func TestStrategyExit_NamedVariables(t *testing.T) {
-	handler := NewStrategyActionHandler()
-	g := newTestGenerator()
-	g.variables["stop_level"] = "float64"
-	g.variables["limit_level"] = "float64"
+// TestStrategyExit_VariableResolution verifies that identifier stop/limit arguments resolve
+// to series accessor expressions in all three call shapes.
+func TestStrategyExit_VariableResolution(t *testing.T) {
+	namedObjExpr := func(props ...ast.Property) *ast.ObjectExpression {
+		return &ast.ObjectExpression{Properties: props}
+	}
+	prop := func(key, varName string) ast.Property {
+		return ast.Property{Key: &ast.Identifier{Name: key}, Value: &ast.Identifier{Name: varName}}
+	}
 
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Literal{Value: "Exit"},
-			&ast.Literal{Value: "Long"},
-			&ast.ObjectExpression{
-				Properties: []ast.Property{
-					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Identifier{Name: "stop_level"}},
-					{Key: &ast.Identifier{Name: "limit"}, Value: &ast.Identifier{Name: "limit_level"}},
-				},
+	tests := []struct {
+		name string
+		args []ast.Expression
+	}{
+		{
+			name: "shape A: variables in named ObjExpr",
+			args: []ast.Expression{namedObjExpr(
+				ast.Property{Key: &ast.Identifier{Name: "id"}, Value: &ast.Literal{Value: "X"}},
+				prop("stop", "sl"),
+				prop("limit", "tp"),
+			)},
+		},
+		{
+			name: "shape B: variables after positional id",
+			args: []ast.Expression{
+				&ast.Literal{Value: "X"},
+				namedObjExpr(prop("stop", "sl"), prop("limit", "tp")),
+			},
+		},
+		{
+			name: "shape C: variables after positional id and from_entry",
+			args: []ast.Expression{
+				&ast.Literal{Value: "X"},
+				&ast.Literal{Value: "Long"},
+				namedObjExpr(prop("stop", "sl"), prop("limit", "tp")),
 			},
 		},
 	}
 
-	code, err := handler.generateExit(g, call)
-	if err != nil {
-		t.Fatalf("generateExit failed: %v", err)
-	}
-
-	if !strings.Contains(code, "stop_levelSeries.GetCurrent()") {
-		t.Errorf("Expected stop_levelSeries.GetCurrent() in code, got:\n%s", code)
-	}
-	if !strings.Contains(code, "limit_levelSeries.GetCurrent()") {
-		t.Errorf("Expected limit_levelSeries.GetCurrent() in code, got:\n%s", code)
+	handler := NewStrategyActionHandler()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			g.variables["sl"] = "float64"
+			g.variables["tp"] = "float64"
+			call := &ast.CallExpression{Arguments: tt.args}
+			code, err := handler.generateExit(g, call)
+			if err != nil {
+				t.Fatalf("generateExit failed: %v", err)
+			}
+			if !strings.Contains(code, "slSeries.GetCurrent()") {
+				t.Errorf("expected slSeries.GetCurrent(); got:\n%s", code)
+			}
+			if !strings.Contains(code, "tpSeries.GetCurrent()") {
+				t.Errorf("expected tpSeries.GetCurrent(); got:\n%s", code)
+			}
+			if strings.Contains(code, "math.NaN()") {
+				t.Errorf("unexpected math.NaN() when variables supplied:\n%s", code)
+			}
+		})
 	}
 }
 
-// TestStrategyExit_OnlyStop verifies absent limit defaults to math.NaN()
-func TestStrategyExit_OnlyStop(t *testing.T) {
-	handler := NewStrategyActionHandler()
-	g := newTestGenerator()
-
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.Literal{Value: "Exit"},
-			&ast.Literal{Value: "Long"},
-			&ast.ObjectExpression{
-				Properties: []ast.Property{
-					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 95.0}},
-				},
+// TestStrategyExit_WhenCondition verifies that a when= named argument wraps the exit call in an
+// if-block, and that the inner ExitWithLevels call is still emitted correctly.
+func TestStrategyExit_WhenCondition(t *testing.T) {
+	tests := []struct {
+		name string
+		args []ast.Expression
+	}{
+		{
+			name: "shape B with when",
+			args: []ast.Expression{
+				&ast.Literal{Value: "Exit"},
+				&ast.ObjectExpression{Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 100.0}},
+					{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "myCondition"}},
+				}},
+			},
+		},
+		{
+			name: "shape C with when",
+			args: []ast.Expression{
+				&ast.Literal{Value: "Exit"},
+				&ast.Literal{Value: "Long"},
+				&ast.ObjectExpression{Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "stop"}, Value: &ast.Literal{Value: 100.0}},
+					{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "myCondition"}},
+				}},
 			},
 		},
 	}
 
-	code, err := handler.generateExit(g, call)
-	if err != nil {
-		t.Fatalf("generateExit failed: %v", err)
+	handler := NewStrategyActionHandler()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			g.variables["myCondition"] = "bool"
+			call := &ast.CallExpression{Arguments: tt.args}
+			code, err := handler.generateExit(g, call)
+			if err != nil {
+				t.Fatalf("generateExit failed: %v", err)
+			}
+			if !strings.Contains(code, "if ") {
+				t.Errorf("expected if-wrapper for when= condition; got:\n%s", code)
+			}
+			if !strings.Contains(code, "ExitWithLevels") {
+				t.Errorf("expected ExitWithLevels inside when wrapper; got:\n%s", code)
+			}
+		})
+	}
+}
+
+// TestStrategyExit_InvalidArgs verifies graceful degradation when arguments are structurally invalid.
+func TestStrategyExit_InvalidArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args []ast.Expression
+	}{
+		{
+			name: "zero arguments",
+			args: []ast.Expression{},
+		},
+		{
+			name: "empty string id",
+			args: []ast.Expression{&ast.Literal{Value: ""}},
+		},
 	}
 
-	if !strings.Contains(code, "95") {
-		t.Errorf("Expected stop value 95, got:\n%s", code)
-	}
-	if !strings.Contains(code, "math.NaN()") {
-		t.Errorf("Expected limit=math.NaN() when not provided, got:\n%s", code)
+	handler := NewStrategyActionHandler()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
+			call := &ast.CallExpression{Arguments: tt.args}
+			code, err := handler.generateExit(g, call)
+			if err != nil {
+				t.Fatalf("generateExit returned unexpected error: %v", err)
+			}
+			if !strings.Contains(code, "// strategy.exit()") {
+				t.Errorf("expected comment stub for invalid args; got:\n%s", code)
+			}
+			if strings.Contains(code, "ExitWithLevels") {
+				t.Errorf("must not emit ExitWithLevels for invalid args; got:\n%s", code)
+			}
+		})
 	}
 }
 
@@ -915,5 +1097,99 @@ func TestStrategyRiskNoOps(t *testing.T) {
 				t.Errorf("%s: expected empty code (no-op), got:\n%s", funcName, code)
 			}
 		})
+	}
+}
+
+// TestStrategyEntry_QtyResolution tests that strategy.entry and strategy.order resolve
+// qty from named arguments, including via constant-registry-backed identifiers.
+// This covers the two call shapes Pine emits for named parameters:
+//
+//	mixed:  strategy.entry("id", long=strategy.long, qty=expr, ...)
+//	all-named: strategy.entry(id="id", long=strategy.long, qty=expr, ...)
+func TestStrategyEntry_QtyResolution(t *testing.T) {
+	stratLong := &ast.MemberExpression{
+		Object:   &ast.Identifier{Name: "strategy"},
+		Property: &ast.Identifier{Name: "long"},
+	}
+
+	type callShape struct {
+		name      string
+		buildArgs func(qtyExpr ast.Expression) []ast.Expression
+	}
+	shapes := []callShape{
+		{
+			name: "mixed (positional id + named rest)",
+			buildArgs: func(qtyExpr ast.Expression) []ast.Expression {
+				return []ast.Expression{
+					&ast.Literal{Value: "Buy"},
+					&ast.ObjectExpression{Properties: []ast.Property{
+						{Key: &ast.Identifier{Name: "long"}, Value: stratLong},
+						{Key: &ast.Identifier{Name: "qty"}, Value: qtyExpr},
+					}},
+				}
+			},
+		},
+	}
+
+	type qtyCase struct {
+		name           string
+		qtyExpr        func() ast.Expression
+		registerConst  func(g *generator)
+		wantLiteralQty string // fragment expected in emitted code
+	}
+	qtyCases := []qtyCase{
+		{
+			name:           "named qty literal",
+			qtyExpr:        func() ast.Expression { return &ast.Literal{Value: float64(300)} },
+			registerConst:  func(g *generator) {},
+			wantLiteralQty: "300,",
+		},
+		{
+			name:    "named qty backed by constant registry identifier",
+			qtyExpr: func() ast.Expression { return &ast.Identifier{Name: "myQty_"} },
+			registerConst: func(g *generator) {
+				g.constantRegistry.Register("myQty_", float64(5000))
+			},
+			wantLiteralQty: "5000,",
+		},
+	}
+
+	stratFuncs := []struct {
+		funcName string
+	}{
+		{"entry"},
+		{"order"},
+	}
+
+	handler := NewStrategyActionHandler()
+
+	for _, fn := range stratFuncs {
+		for _, shape := range shapes {
+			for _, qc := range qtyCases {
+				testName := fn.funcName + "/" + shape.name + "/" + qc.name
+				t.Run(testName, func(t *testing.T) {
+					g := newTestGenerator()
+					g.strategyConfig.DefaultQtyType = "fixed"
+					g.strategyConfig.DefaultQtyValue = 1.0
+					qc.registerConst(g)
+
+					call := &ast.CallExpression{
+						Callee: &ast.MemberExpression{
+							Object:   &ast.Identifier{Name: "strategy"},
+							Property: &ast.Identifier{Name: fn.funcName},
+						},
+						Arguments: shape.buildArgs(qc.qtyExpr()),
+					}
+
+					code, err := handler.GenerateCode(g, call)
+					if err != nil {
+						t.Fatalf("GenerateCode failed: %v", err)
+					}
+					if !strings.Contains(code, qc.wantLiteralQty) {
+						t.Errorf("expected qty %q in output, got:\n%s", qc.wantLiteralQty, code)
+					}
+				})
+			}
+		}
 	}
 }

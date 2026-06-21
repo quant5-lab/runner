@@ -32,74 +32,13 @@ type tvAlignmentTolerance struct {
 }
 
 type tvAlignmentDiscrepancy struct {
-	RunnerOnly int
-	TVOnly     int
+	RunnerOnly     int
+	TVOnly         int
+	FixtureEndOpen int // TV trades that runner holds as fixture-end open positions; exempt from the XOR guard
 }
 
 func exactTVAlignment() tvAlignmentDiscrepancy {
 	return tvAlignmentDiscrepancy{}
-}
-
-func tvAlignmentCases() []tvAlignmentCase {
-	oneHour := tvAlignmentTolerance{Time: time.Hour, Price: 1.00}
-	twoHoursTwoRub := tvAlignmentTolerance{Time: 2 * time.Hour, Price: 2.00}
-	return []tvAlignmentCase{
-		{
-			Name: "Hull SBERP", Strategy: "top10/hull.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
-			Golden: "hull-sberp-1h.json", CSV: "hull-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 1, TVOnly: 3},
-			InitialCapital:        100000,
-			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start is inflated by 316+ pre-window trades since 2021; runner starts fresh at 100,000 RUB — position sizes are not comparable.",
-		},
-		{
-			Name: "UtPlus SBERP", Strategy: "top10/ut+.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
-			Golden: "ut-plus-sberp-1h.json", CSV: "ut-plus-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: tvAlignmentTolerance{Time: 2 * time.Hour, Price: 0.10}, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 2, TVOnly: 4},
-			InitialCapital: 100000,
-		},
-		{
-			Name: "BB+RSI SBERP", Strategy: "bb-rsi-strategy.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
-			Golden: "bb-rsi-sberp-1h.json", CSV: "bb-rsi-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 1, TVOnly: 1},
-			InitialCapital:        100000,
-			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
-		},
-		{
-			Name: "BB+RSI BTCUSDT", Strategy: "bb-rsi-strategy.pine", Data: "BTCUSDT-1h.json", Symbol: "BTCUSDT", Timeframe: "1h",
-			Golden: "bb-rsi-btcusdt-1h.json", CSV: "bb-rsi-btcusdt-1h-reference.csv", Timezone: tvref.TVTimezoneUTC,
-			Tolerance: oneHour, Discrepancy: exactTVAlignment(),
-			InitialCapital:        100000,
-			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
-		},
-		{
-			Name: "BB+RSI AAPL", Strategy: "bb-rsi-strategy.pine", Data: "AAPL-1h.json", Symbol: "AAPL", Timeframe: "1h",
-			Golden: "bb-rsi-aapl-1h.json", CSV: "bb-rsi-aapl-1h-reference.csv", Timezone: tvref.TVTimezoneNewYork,
-			Tolerance: twoHoursTwoRub, Discrepancy: exactTVAlignment(),
-			InitialCapital:        100000,
-			PnLDiscrepancy:        1, // trade at 2025-10-09 enters 1h before TV (cold-start: TV had open SHORT from before fixture)
-			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start diverges from runner initial capital due to pre-window trade history — position sizes are not comparable.",
-		},
-		{
-			Name: "BB7 SBERP", Strategy: "bb-strategy-7-rus.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
-			Golden: "bb7-sberp-1h.json", CSV: "bb7-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: oneHour, Discrepancy: exactTVAlignment(),
-			InitialCapital: 1000000,
-			SkipPnLRatchetReason: "strategy.cash sizing: TV equity at fixture start (1,453,603 RUB) diverges from " +
-				"runner initial capital (1,000,000 RUB) due to pre-window trade history — equityRatio inapplicable. " +
-				"Exit-timing shifts (trailing-stop + close_all execution-order difference) further invalidate per-trade PnL comparison.",
-		},
-		{
-			Name: "BB7 BTCUSDT", Strategy: "bb-strategy-7-rus.pine", Data: "BTCUSDT-1h.json", Symbol: "BTCUSDT", Timeframe: "1h",
-			Golden: "bb7-btcusdt-1h.json", CSV: "bb7-btcusdt-1h-reference.csv", Timezone: tvref.TVTimezoneUTC,
-			Tolerance: oneHour, Discrepancy: exactTVAlignment(),
-			InitialCapital:       1000000,
-			SkipPnLRatchetReason: "strategy.cash sizing: same pre-window equity divergence as BB7 SBERP — equityRatio inapplicable.",
-		},
-		// supertrend-sberp-1h-reference.csv is NOT a ratchet candidate: the CSV is exported from the
-		// Alorse Supertrend variant (2 trades in fixture window) while runner uses supertrend.pine
-		// (139 trades). This is a strategy-identity mismatch, not a runner defect — same boundary
-		// as the accepted [~] supertrend-btcusdt item in TODO.md.
-	}
 }
 
 func tvAlignmentCaseByName(t *testing.T, name string) tvAlignmentCase {
@@ -177,6 +116,7 @@ func runnerTradesFromResult(result *goldenutil.StrategyResult) []tvref.RunnerTra
 			EntryPrice: tr.EntryPrice,
 			Direction:  tr.Direction,
 			Size:       tr.Size,
+			IsOpen:     true,
 		})
 	}
 	return out

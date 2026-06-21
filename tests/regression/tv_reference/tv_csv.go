@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +35,7 @@ type RunnerTrade struct {
 	Direction  string
 	Size       float64
 	NetPnL     float64
+	IsOpen     bool
 }
 
 const SizeResidualDenominatorFloor = 1.0
@@ -59,24 +59,19 @@ func FilterByEntryWindow(trades []TVTrade, start, end time.Time) []TVTrade {
 	return out
 }
 
+// MatchExact counts how many closed runner trades pair with a TV trade within the
+// given tolerances (one-to-one). Open runner trades (IsOpen == true) are excluded —
+// TV CSVs are closed-trades-only exports and open positions must never consume TV slots.
 func MatchExact(runner []RunnerTrade, tv []TVTrade, timeTol time.Duration, priceTol float64) (matched, runnerOnly, tvOnly int) {
-	orderedRunner := append([]RunnerTrade(nil), runner...)
-	orderedTV := append([]TVTrade(nil), tv...)
-	sort.Slice(orderedRunner, func(i, j int) bool { return orderedRunner[i].EntryUTC.Before(orderedRunner[j].EntryUTC) })
-	sort.Slice(orderedTV, func(i, j int) bool { return orderedTV[i].EntryUTC.Before(orderedTV[j].EntryUTC) })
-
-	usedTV := make([]bool, len(orderedTV))
-	for _, rt := range orderedRunner {
-		k := firstMatchingTVTrade(rt, orderedTV, usedTV, timeTol, priceTol)
-		if k < 0 {
-			runnerOnly++
-			continue
+	tol := MatchTolerance{Time: timeTol, Price: priceTol}
+	pairs := closedRunnerPairs(runner, tv, tol)
+	closedCount := 0
+	for _, r := range runner {
+		if !r.IsOpen {
+			closedCount++
 		}
-		usedTV[k] = true
-		matched++
 	}
-	tvOnly = len(orderedTV) - matched
-	return
+	return len(pairs), closedCount - len(pairs), len(tv) - len(pairs)
 }
 
 // TVEquityAtWindowStart returns the strategy equity at the start of windowStart,
@@ -93,50 +88,41 @@ func TVEquityAtWindowStart(allTrades []TVTrade, windowStart time.Time, initialCa
 	return equity
 }
 
-// MatchNetPnL pairs each runner closed trade to a TV trade by entry time,
-// direction, and entry price (same tolerances as MatchExact), then checks
-// each matched pair's net PnL within relTol (relative).
+// MatchNetPnL pairs each closed runner trade to a TV trade by entry time, direction,
+// and entry price (same tolerances as MatchExact), then checks each matched pair's
+// net PnL within relTol (relative).
 //
 // equityRatio scales runner PnL to the TV equity basis before comparison:
 //
 //	equityRatio = tvEquityAtWindowStart / runnerInitialCapital
 //
-// Pass 1.0 when runner and TV share the same starting equity. When the TV
-// history predates the fixture window the runner starts at a higher nominal
-// equity; multiplying runner PnL by equityRatio normalises it to the TV equity
-// basis, making the comparison equity-invariant for percent-of-equity strategies.
+// Pass 1.0 when runner and TV share the same starting equity. When the TV history
+// predates the fixture window the runner starts at a higher nominal equity; multiplying
+// runner PnL by equityRatio normalises it to the TV equity basis, making the comparison
+// equity-invariant for percent-of-equity strategies.
 //
-// TV trades that have no matching runner trade (e.g. still-open positions) are
-// silently skipped; runner trades with no TV match increment pnlMismatch.
-// Returns the count of matched pairs and the count whose scaled PnL deviates
-// beyond relTol.
+// Runner trades with no TV match are silently skipped.
 func MatchNetPnL(runner []RunnerTrade, tv []TVTrade, equityRatio float64, timeTol time.Duration, priceTol, relTol float64) (matched, pnlMismatch int) {
-	usedTV := make([]bool, len(tv))
-	for _, rt := range runner {
-		k := firstMatchingTVTrade(rt, tv, usedTV, timeTol, priceTol)
-		if k < 0 {
-			continue
-		}
-		usedTV[k] = true
-		matched++
-		scaled := rt.NetPnL * equityRatio
-		if !pnlMatchRelative(scaled, tv[k].NetPnL, relTol) {
+	tol := MatchTolerance{Time: timeTol, Price: priceTol}
+	pairs := closedRunnerPairs(runner, tv, tol)
+	matched = len(pairs)
+	for _, p := range pairs {
+		scaled := runner[p.RunnerIdx].NetPnL * equityRatio
+		if !pnlMatchRelative(scaled, tv[p.TVIdx].NetPnL, relTol) {
 			pnlMismatch++
 		}
 	}
 	return
 }
 
+// MatchSize pairs closed runner trades to TV trades and reports how many matched
+// pairs have a size residual exceeding relTol.
 func MatchSize(runner []RunnerTrade, tv []TVTrade, timeTol time.Duration, priceTol, relTol float64) (matched, sizeMismatch int, maxResidual float64) {
-	usedTV := make([]bool, len(tv))
-	for _, rt := range runner {
-		k := firstMatchingTVTrade(rt, tv, usedTV, timeTol, priceTol)
-		if k < 0 {
-			continue
-		}
-		usedTV[k] = true
-		matched++
-		residual := SizeResidual(rt.Size, tv[k].Size)
+	tol := MatchTolerance{Time: timeTol, Price: priceTol}
+	pairs := closedRunnerPairs(runner, tv, tol)
+	matched = len(pairs)
+	for _, p := range pairs {
+		residual := SizeResidual(runner[p.RunnerIdx].Size, tv[p.TVIdx].Size)
 		if residual > maxResidual {
 			maxResidual = residual
 		}
@@ -178,62 +164,6 @@ func pnlMatchRelative(a, b, relTol float64) bool {
 		return true
 	}
 	return floatAbs(a-b)/floatAbs(scale) <= relTol
-}
-
-func firstMatchingTVTrade(rt RunnerTrade, tv []TVTrade, used []bool, timeTol time.Duration, priceTol float64) int {
-	for i, tt := range tv {
-		if used[i] {
-			continue
-		}
-		if tradesMatch(rt, tt, timeTol, priceTol) {
-			return i
-		}
-	}
-	return -1
-}
-
-func tradesMatch(rt RunnerTrade, tt TVTrade, timeTol time.Duration, priceTol float64) bool {
-	return durationAbs(tt.EntryUTC.Sub(rt.EntryUTC)) <= timeTol &&
-		floatAbs(tt.EntryPrice-rt.EntryPrice) <= priceTol &&
-		directionsMatch(rt.Direction, tt.Direction)
-}
-
-func durationAbs(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-	return d
-}
-
-func floatAbs(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
-func mathMax(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func directionsMatch(runnerDirection, tvDirection string) bool {
-	runnerDirection, runnerOK := normalizeDirection(runnerDirection)
-	tvDirection, tvOK := normalizeDirection(tvDirection)
-	return runnerOK && tvOK && runnerDirection == tvDirection
-}
-
-func normalizeDirection(direction string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(direction)) {
-	case "long":
-		return "long", true
-	case "short":
-		return "short", true
-	default:
-		return "", false
-	}
 }
 
 type csvRow struct {

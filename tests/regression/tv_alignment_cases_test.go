@@ -49,7 +49,7 @@ func TestTVAlignmentCasesStayWithinPolicyCaps(t *testing.T) {
 	const maxTimeTolerance = 2 * time.Hour
 	const maxPriceTolerance = 2.00
 	const maxRunnerOnly = 2
-	const maxTVOnly = 4
+	const maxTVOnly = 5
 
 	for _, tc := range tvAlignmentCases() {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestTVAlignmentCasesUseSharedPolicyObjects(t *testing.T) {
 			if tc.Tolerance == (tvAlignmentTolerance{}) {
 				t.Fatalf("missing tolerance policy")
 			}
-			if tc.Discrepancy.RunnerOnly == 0 && tc.Discrepancy.TVOnly > 0 {
+			if tc.Discrepancy.RunnerOnly == 0 && tc.Discrepancy.TVOnly > tc.Discrepancy.FixtureEndOpen {
 				t.Fatalf("tv-only discrepancy without runner-only boundary needs an explicit case review")
 			}
 			if tc.Discrepancy.RunnerOnly > 0 && tc.Discrepancy.TVOnly == 0 {
@@ -121,5 +121,37 @@ func TestTVAlignmentCases_SomeSkipSizeRatchet(t *testing.T) {
 	}
 	if skipped == 0 {
 		t.Error("no TV alignment case sets SkipSizeRatchetReason — field is unreachable; remove it or add a case that requires it")
+	}
+}
+
+func TestTVAlignmentCases_InitialCapitalNonZero(t *testing.T) {
+	for _, tc := range tvAlignmentCases() {
+		if tc.InitialCapital == 0 {
+			t.Errorf("case %q has InitialCapital=0; PnL ratchet divides by equity which is derived from InitialCapital — zero causes division by zero", tc.Name)
+		}
+	}
+}
+
+func TestTVAlignmentCases_SomePnLRatchetSkipped(t *testing.T) {
+	skipped := 0
+	for _, tc := range tvAlignmentCases() {
+		if tc.SkipPnLRatchetReason != "" {
+			skipped++
+		}
+	}
+	if skipped == 0 {
+		t.Error("no TV alignment case sets SkipPnLRatchetReason — field is unreachable; remove it or add a case that requires it")
+	}
+}
+
+func TestSkippedPnLCases_ExcludedFromExactAlignment(t *testing.T) {
+	exactSet := make(map[string]bool)
+	for _, tc := range exactAlignmentCases() {
+		exactSet[tc.Name] = true
+	}
+	for _, tc := range tvAlignmentCases() {
+		if tc.SkipPnLRatchetReason != "" && exactSet[tc.Name] {
+			t.Errorf("case %q has SkipPnLRatchetReason but appears in exactAlignmentCases — the filter must exclude it from PnL comparison", tc.Name)
+		}
 	}
 }

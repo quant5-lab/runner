@@ -6,6 +6,10 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
+// noPositionalFallback marks a named-only parameter; any value beyond Pine's max
+// positional arg count (~15) serves as the sentinel — 99 is used by convention.
+const noPositionalFallback = 99
+
 // strategyExitArgParser resolves strategy.exit() arguments regardless of call shape.
 //
 // Pine allows three call shapes:

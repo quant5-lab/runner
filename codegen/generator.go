@@ -104,6 +104,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.hasSecurityCalls = detectSecurityCalls(program)
 	gen.hasSecurityUDFEvals = detectSecurityUDFEvals(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
+	gen.needsIntrabarExitChecking = detectStrategyExitCalls(program)
 
 	sessionMemberKeys := gen.builtinHandler.registry.SessionSeriesBuiltinNames()
 	usageDetector := NewBuiltinUsageDetectorWithMembers(
@@ -194,6 +195,7 @@ type generator struct {
 	hasArrowSecurityExprEvals bool
 	hasSecurityUDFEvals       bool
 	hasStrategyRuntimeAccess  bool
+	needsIntrabarExitChecking bool
 	hasBarIndexUsage          bool
 	hasLastBarIndex           bool
 	hasLastBarTime            bool
@@ -940,14 +942,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += stmtCode
 	}
 
+	if g.hasStrategyRuntimeAccess || g.needsIntrabarExitChecking {
+		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
+	}
+
 	if g.plotCollector != nil && g.plotCollector.HasPlots() {
 		for _, plotStmt := range g.plotCollector.GetPlots() {
 			code += g.ind() + plotStmt.code
 		}
-	}
-
-	if g.hasStrategyRuntimeAccess {
-		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
 	}
 
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
@@ -3145,6 +3147,24 @@ func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
 	return 0.0
 }
 
+func (g *generator) makeQtyEvaluator() QtyEvaluator {
+	return func(expr ast.Expression) (float64, bool) {
+		if lit, ok := expr.(*ast.Literal); ok {
+			if val, ok := lit.Value.(float64); ok && val > 0 {
+				return val, true
+			}
+			return 0, false
+		}
+		if ident, ok := expr.(*ast.Identifier); ok {
+			name := SanitizeGoIdentifier(ident.Name)
+			if val, ok := g.constantRegistry.GetFloat(name); ok && val > 0 {
+				return val, true
+			}
+		}
+		return 0, false
+	}
+}
+
 func (g *generator) extractDirectionConstant(expr ast.Expression) (string, error) {
 	if g.directionExtractor == nil {
 		g.directionExtractor = NewContextAwareDirectionExtractor(g)
@@ -4116,6 +4136,71 @@ func collectArrowFunctionNames(program *ast.Program) map[string]bool {
 		}
 	}
 	return names
+}
+
+/*
+	strategy.exit with stop/limit registers pending exits checked only in OnBarMetrics;
+
+this detector ensures OnBarMetrics is emitted even when no strategy runtime values are read.
+*/
+func detectStrategyExitCalls(program *ast.Program) bool {
+	if program == nil {
+		return false
+	}
+	for _, node := range program.Body {
+		if strategyExitPresentInNode(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func strategyExitPresentInNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.ExpressionStatement:
+		return strategyExitPresentInExpr(n.Expression)
+	case *ast.IfStatement:
+		if strategyExitPresentInExpr(n.Test) {
+			return true
+		}
+		for _, c := range n.Consequent {
+			if strategyExitPresentInNode(c) {
+				return true
+			}
+		}
+		for _, a := range n.Alternate {
+			if strategyExitPresentInNode(a) {
+				return true
+			}
+		}
+	case *ast.VariableDeclaration:
+		for _, decl := range n.Declarations {
+			if strategyExitPresentInExpr(decl.Init) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func strategyExitPresentInExpr(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+	call, ok := expr.(*ast.CallExpression)
+	if !ok {
+		return false
+	}
+	member, ok := call.Callee.(*ast.MemberExpression)
+	if !ok {
+		return false
+	}
+	obj, ok := member.Object.(*ast.Identifier)
+	if !ok || obj.Name != "strategy" {
+		return false
+	}
+	prop, ok := member.Property.(*ast.Identifier)
+	return ok && prop.Name == "exit"
 }
 
 /* detectStrategyRuntimeAccess walks AST to detect strategy.* runtime value access */

@@ -341,3 +341,84 @@ func TestConstantRegistry_Integration_MultipleTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestConstantRegistry_GetFloat(t *testing.T) {
+	t.Run("float64 stored values", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			value float64
+		}{
+			{"positive", 10000.0},
+			{"fractional", 1.5},
+			{"zero", 0.0},
+			{"negative", -3.5},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reg := NewConstantRegistry()
+				reg.Register("x", tc.value)
+				got, ok := reg.GetFloat("x")
+				if !ok {
+					t.Fatalf("GetFloat: want ok=true, got false")
+				}
+				if got != tc.value {
+					t.Errorf("GetFloat: want %v, got %v", tc.value, got)
+				}
+			})
+		}
+	})
+
+	t.Run("int stored values coerce to float64", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			value int
+			want  float64
+		}{
+			{"positive", 20, 20.0},
+			{"zero", 0, 0.0},
+			{"negative", -5, -5.0},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reg := NewConstantRegistry()
+				reg.Register("x", tc.value)
+				got, ok := reg.GetFloat("x")
+				if !ok {
+					t.Fatalf("GetFloat int→float64: want ok=true, got false")
+				}
+				if got != tc.want {
+					t.Errorf("GetFloat int→float64: want %v, got %v", tc.want, got)
+				}
+			})
+		}
+	})
+
+	t.Run("non-numeric types return not-found", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			value interface{}
+		}{
+			{"bool true", true},
+			{"bool false", false},
+			{"string", "EMA"},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reg := NewConstantRegistry()
+				reg.Register("x", tc.value)
+				got, ok := reg.GetFloat("x")
+				if ok {
+					t.Errorf("GetFloat(%T): want ok=false, got (%.2f, true)", tc.value, got)
+				}
+			})
+		}
+	})
+
+	t.Run("absent name returns not-found", func(t *testing.T) {
+		reg := NewConstantRegistry()
+		got, ok := reg.GetFloat("nonexistent")
+		if ok || got != 0 {
+			t.Errorf("GetFloat absent: want (0, false), got (%v, %v)", got, ok)
+		}
+	})
+}
