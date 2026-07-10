@@ -32,20 +32,6 @@ func TestHull_SBERP_Hourly(t *testing.T) {
 	})
 }
 
-func TestUt_SBERP_Hourly(t *testing.T) {
-	t.Parallel()
-	suite := NewTestSuite(t)
-
-	suite.RunAndValidate(t, TestConfig{
-		StrategyName: "Ut",
-		StrategyFile: "top10/ut.pine",
-		Symbol:       "SBERP",
-		Timeframe:    "1h",
-		DataFile:     "SBERP-1h.json",
-		GoldenFile:   "ut-sberp-1h.json",
-	})
-}
-
 func TestUtPlus_SBERP_Hourly(t *testing.T) {
 	t.Parallel()
 	suite := NewTestSuite(t)
@@ -57,6 +43,20 @@ func TestUtPlus_SBERP_Hourly(t *testing.T) {
 		Timeframe:    "1h",
 		DataFile:     "SBERP-1h.json",
 		GoldenFile:   "ut-plus-sberp-1h.json",
+	})
+}
+
+func TestUT_SBERP_Hourly(t *testing.T) {
+	t.Parallel()
+	suite := NewTestSuite(t)
+
+	suite.RunAndValidate(t, TestConfig{
+		StrategyName: "UT",
+		StrategyFile: "top10/ut.pine",
+		Symbol:       "SBERP",
+		Timeframe:    "1h",
+		DataFile:     "SBERP-1h.json",
+		GoldenFile:   "ut-sberp-1h.json",
 	})
 }
 

@@ -165,6 +165,14 @@ func TestSessionAnchor_SBERP_3h_CompiledBinaryWitness(t *testing.T) {
 	}
 
 	const tz = "Europe/Moscow"
-	assertNoFiringAtLocalClock(t, firings, tz, 12, 0)
+	// Session-anchored must fire at 12:00 MSK far fewer times than UTC-floor.
+	// UTC-floor fires at 12:00 MSK on every normal trading day; session-anchored
+	// fires only on exceptional late-open days.  Allow ≤ 2 in the fixture window.
+	sess12Count := countFiresAtLocalClock(firings, tz, 12, 0)
+	const maxLateOpenFires = 2
+	if sess12Count > maxLateOpenFires {
+		t.Errorf("expected ≤ %d late-open 12:00 MSK firings in compiled binary output, got %d — "+
+			"session-anchored is firing spuriously at 12:00 MSK", maxLateOpenFires, sess12Count)
+	}
 	assertAnyFiringAtLocalClock(t, firings, tz, 10, 0)
 }

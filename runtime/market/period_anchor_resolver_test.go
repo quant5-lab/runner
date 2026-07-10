@@ -137,15 +137,17 @@ func TestProfile_RegularSessionHasNonZeroOpenMinute(t *testing.T) {
 }
 
 // TestDeriveSessionAnchor_ObservationGating verifies which profile+bar
-// combinations trigger per-bar observation vs. which return a fixed anchor:
+// combinations return the curated table anchor vs. which trigger per-bar
+// observation:
 //
-//   - Known exchange + Regular session + bars → observed mode (table is ignored)
+//   - Known exchange + Regular session + bars → table value (observation bypassed)
 //   - Known exchange + AlwaysOpen session + bars → midnight (0), never observes
 //   - Unknown exchange + any session type + bars → observed mode (unknown always observes)
 //   - Any profile + no bars → table fallback, no observation
 //
-// The "observed prevails over table" cases use multi-day bar data so that the
-// mode algorithm is exercised, not just a degenerate single-value frequency.
+// The "unknown exchange + regular session" cases use multi-day bar data so
+// that the mode algorithm is exercised, not just a degenerate single-value
+// frequency.
 func TestDeriveSessionAnchor_ObservationGating(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -154,22 +156,41 @@ func TestDeriveSessionAnchor_ObservationGating(t *testing.T) {
 		wantOpen int
 	}{
 		{
-			// Five MOEX trading days each opening at 09:30 MSK, not 07:00 MSK.
-			// Intentional mismatch with the curated MOEX table entry (07:00=420)
-			// to prove that the observed mode (09:30=570) beats the table.
-			name:     "known_regular_MOEX_observed_mode_beats_table",
+			// Known MOEX exchange: the curated table value (07:00 MSK = 420) is
+			// returned regardless of when the fixture's first bar falls.  Bars
+			// opening at 09:30 MSK (e.g. pre-auction prints) must not shift the
+			// anchor; TV tiles multi-hour boundaries from the declared session open.
+			name:     "known_regular_MOEX_uses_table_session_open",
 			profile:  ResolveProfile("SBERP", ""),
 			bars:     barsForWeek(t, "Europe/Moscow", 1, 6, 9, 30),
+			wantOpen: 7 * 60,
+		},
+		{
+			// Known NYSE exchange: the curated table value (09:30 ET = 570) is
+			// returned regardless of when the fixture's first bar falls.
+			name:     "known_regular_NYSE_uses_table_session_open",
+			profile:  ResolveProfileWithMetadata("AAPL", SourceMetadata{Exchange: "NYSE"}),
+			bars:     barsForWeek(t, "America/New_York", 1, 6, 10, 0),
 			wantOpen: 9*60 + 30,
 		},
 		{
-			// Five NYSE trading days each opening at 10:00 ET, not 09:30 ET.
-			// Intentional mismatch with the curated NYSE table entry (09:30=570)
-			// to prove that the observed mode (10:00=600) beats the table.
-			name:     "known_regular_NYSE_observed_mode_beats_table",
+			// Known MOEX exchange: bars opening at 06:00 MSK (before the 07:00 MSK
+			// table start) still return the table entry.  This is the exact pre-
+			// session-bar scenario that caused the 5.5yr SBERP fixture regression:
+			// the fixture's modal first bar was 09:00 MSK (pre-auction); the table
+			// value (420) must win regardless of how early or late bars arrive.
+			name:     "known_regular_MOEX_pre_session_bars_use_table",
+			profile:  ResolveProfile("SBERP", ""),
+			bars:     barsForWeek(t, "Europe/Moscow", 1, 6, 6, 0),
+			wantOpen: 7 * 60,
+		},
+		{
+			// Known NYSE exchange: bars opening at 08:00 ET (before the 09:30 ET
+			// table start) still return the table entry.
+			name:     "known_regular_NYSE_pre_session_bars_use_table",
 			profile:  ResolveProfileWithMetadata("AAPL", SourceMetadata{Exchange: "NYSE"}),
-			bars:     barsForWeek(t, "America/New_York", 1, 6, 10, 0),
-			wantOpen: 10 * 60,
+			bars:     barsForWeek(t, "America/New_York", 1, 6, 8, 0),
+			wantOpen: 9*60 + 30,
 		},
 		{
 			// No bars supplied for a regular NYSE profile → table fallback.
@@ -227,6 +248,41 @@ func TestDeriveSessionAnchor_ObservationGating(t *testing.T) {
 			anchor := DeriveSessionAnchor(tc.profile, tc.bars)
 			if anchor.SessionOpenMinute != tc.wantOpen {
 				t.Errorf("SessionOpenMinute: got %d, want %d", anchor.SessionOpenMinute, tc.wantOpen)
+			}
+		})
+	}
+}
+
+// TestDeriveSessionAnchor_KnownExchangeAlwaysUsesTable proves that for any
+// known exchange the curated session-open table value is the authoritative TV
+// boundary origin and is returned regardless of when bars start relative to the
+// declared session open.  Fixtures may include pre-trading auction bars whose
+// modal first-bar minute differs from the exchange's declared session open; the
+// table must win in all cases.  The invariant covers bars that arrive before,
+// at, and after the session open as well as a single midday bar.
+func TestDeriveSessionAnchor_KnownExchangeAlwaysUsesTable(t *testing.T) {
+	profile := ResolveProfile("SBERP", "")
+	const moexTable = 7 * 60 // 07:00 MSK — curated MOEX session open
+
+	cases := []struct {
+		name string
+		bars []context.OHLCV
+	}{
+		{"before_session_open", barsForWeek(t, "Europe/Moscow", 1, 6, 6, 0)}, // 06:00 MSK
+		{"at_session_open", barsForWeek(t, "Europe/Moscow", 1, 6, 7, 0)},     // 07:00 MSK
+		{"pre_auction_open", barsForWeek(t, "Europe/Moscow", 1, 6, 9, 0)},    // 09:00 MSK (pre-trading auction)
+		{"main_session_open", barsForWeek(t, "Europe/Moscow", 1, 6, 10, 0)},  // 10:00 MSK
+		{"mid_session", barsForWeek(t, "Europe/Moscow", 1, 6, 14, 0)},        // 14:00 MSK
+		{"single_midday_bar", []context.OHLCV{barAtLocal(t, "Europe/Moscow", 12, 0)}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			anchor := DeriveSessionAnchor(profile, tc.bars)
+			if anchor.SessionOpenMinute != moexTable {
+				t.Errorf("SessionOpenMinute = %d, want %d (MOEX table) — "+
+					"known exchange must return table value regardless of bar content",
+					anchor.SessionOpenMinute, moexTable)
 			}
 		})
 	}

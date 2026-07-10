@@ -5,13 +5,18 @@ import (
 	"time"
 )
 
-/* RFC 2822 and ISO 8601 layouts ordered from most specific to least */
+/*
+	RFC 2822 and ISO 8601 layouts ordered from most specific to least.
+
+"2006-01-02:15:04" is the Pine Script v4 timestamp() string form.
+*/
 var dateFormats = []string{
 	time.RFC1123Z,
 	time.RFC3339,
 	"02 Jan 2006 15:04:05 -0700",
 	"2006-01-02T15:04:05",
 	"2006-01-02 15:04:05",
+	"2006-01-02:15:04",
 	"2 Jan 2006",
 	"2006-01-02",
 }

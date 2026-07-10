@@ -98,12 +98,24 @@ func checkPriceTrigger(exit ExitOrder, trade Trade, barOpen, barHigh, barLow flo
 	case !stopHit && !limitHit:
 		return false, 0, ""
 	case stopHit && !limitHit:
-		return true, exit.StopLevel, "stop"
+		return true, stopFillPrice(exit.StopLevel, isLong, barOpen), "stop"
 	case !stopHit && limitHit:
 		return true, exit.LimitLevel, "limit"
 	default:
-		return fillOnIntrabarPath(exit, barOpen, barHigh, barLow)
+		return fillOnIntrabarPath(exit, isLong, barOpen, barHigh, barLow)
 	}
+}
+
+// stopFillPrice matches the TV broker-emulator gap-fill convention: a stop that
+// is gapped through at open fills at open, not at the stop level.
+func stopFillPrice(stopLevel float64, isLong bool, barOpen float64) float64 {
+	if isLong && barOpen < stopLevel {
+		return barOpen
+	}
+	if !isLong && barOpen > stopLevel {
+		return barOpen
+	}
+	return stopLevel
 }
 
 func isStopBreached(stopLevel float64, isLong bool, barHigh, barLow float64) bool {
@@ -126,14 +138,11 @@ func isLimitBreached(limitLevel float64, isLong bool, barHigh, barLow float64) b
 	return barLow <= limitLevel
 }
 
-// fillOnIntrabarPath resolves the fill when BOTH stop and limit breach within
-// the same bar. TradingView's broker emulator applies a conservative-fill rule:
-// without sub-bar tick data, intrabar ordering is indeterminate, so the worse-
-// for-trader outcome wins. For any pending exit with both levels breached, the
-// stop always fills first. The proximityToStart heuristic was incorrect — it
-// inferred ordering from bar OHLC alone, which the emulator does not do.
-//
-// Precondition: checkPriceTrigger confirms both levels are within [low, high].
-func fillOnIntrabarPath(exit ExitOrder, barOpen, barHigh, barLow float64) (bool, float64, string) {
-	return true, exit.StopLevel, "stop"
+// fillOnIntrabarPath handles the case where both stop and limit breach within
+// the same bar. TV broker emulator applies a conservative-fill rule: without
+// sub-bar tick data, intrabar ordering is indeterminate, so stop always fills
+// first (worse-for-trader outcome). Precondition: both levels are within
+// [barLow, barHigh] as confirmed by checkPriceTrigger.
+func fillOnIntrabarPath(exit ExitOrder, isLong bool, barOpen, barHigh, barLow float64) (bool, float64, string) {
+	return true, stopFillPrice(exit.StopLevel, isLong, barOpen), "stop"
 }

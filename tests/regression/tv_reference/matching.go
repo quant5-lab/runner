@@ -106,3 +106,8 @@ func mathMax(a, b float64) float64 {
 	}
 	return b
 }
+
+// ClosedRunnerPairs exposes closedRunnerPairs for callers that need pair indices, not just the aggregate counts returned by MatchExact.
+func ClosedRunnerPairs(runner []RunnerTrade, tv []TVTrade, tol MatchTolerance) []MatchPair {
+	return closedRunnerPairs(runner, tv, tol)
+}

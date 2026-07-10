@@ -3,6 +3,7 @@ package datafetcher
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,16 +65,58 @@ func TestFileFetcher_FetchWithLimit(t *testing.T) {
 	}
 }
 
+// TestFileFetcher_Fetch_LimitLargerThanBarsReturnsAll verifies that when limit
+// exceeds the number of bars in the file, all bars are returned without error.
+func TestFileFetcher_Fetch_LimitLargerThanBarsReturnsAll(t *testing.T) {
+	tmpDir := t.TempDir()
+	barsJSON := `[
+		{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":10},
+		{"time":1700003600,"open":1.5,"high":2.5,"low":1,"close":2,"volume":20}
+	]`
+	if err := os.WriteFile(filepath.Join(tmpDir, "X-1h.json"), []byte(barsJSON), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	bars, err := NewFileFetcher(tmpDir, 0).Fetch("X", "1h", 9999)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(bars) != 2 {
+		t.Errorf("limit > len: got %d bars, want 2 (all bars)", len(bars))
+	}
+}
+
+// TestFileFetcher_Fetch_LimitEqualsBarsReturnsAll verifies that when limit
+// equals the number of bars exactly, all bars are returned (boundary condition).
+func TestFileFetcher_Fetch_LimitEqualsBarsReturnsAll(t *testing.T) {
+	tmpDir := t.TempDir()
+	barsJSON := `[
+		{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":10},
+		{"time":1700003600,"open":1.5,"high":2.5,"low":1,"close":2,"volume":20},
+		{"time":1700007200,"open":2,"high":3,"low":1.5,"close":2.5,"volume":30}
+	]`
+	if err := os.WriteFile(filepath.Join(tmpDir, "X-1h.json"), []byte(barsJSON), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	bars, err := NewFileFetcher(tmpDir, 0).Fetch("X", "1h", 3)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(bars) != 3 {
+		t.Errorf("limit == len: got %d bars, want 3 (all bars)", len(bars))
+	}
+}
+
 func TestFileFetcher_FetchWithMetadata_PreservesSourceMetadataAndLimit(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "SBERP_1h.json")
 
 	testData := `{
 		"timezone": "Europe/Moscow",
-			"exchange": "MOEX",
-			"referenceSession": "regular",
-			"qtyStep": 0.00001,
-			"openDates": ["2025-08-16"],
+		"exchange": "MOEX",
+		"referenceSession": "regular",
+		"openDates": ["2025-08-16"],
 		"bars": [
 			{"time": 1700000000, "open": 100, "high": 105, "low": 95, "close": 102, "volume": 1000},
 			{"time": 1700003600, "open": 102, "high": 107, "low": 97, "close": 104, "volume": 1100},
@@ -98,9 +141,6 @@ func TestFileFetcher_FetchWithMetadata_PreservesSourceMetadataAndLimit(t *testin
 	}
 	if marketData.Exchange != "MOEX" {
 		t.Fatalf("exchange = %q, want MOEX", marketData.Exchange)
-	}
-	if marketData.QtyStep != 0.00001 {
-		t.Fatalf("qty step = %.8f, want 0.00001000", marketData.QtyStep)
 	}
 	if len(marketData.OpenDates) != 1 || marketData.OpenDates[0] != "2025-08-16" {
 		t.Fatalf("open dates = %#v, want [2025-08-16]", marketData.OpenDates)
@@ -226,105 +266,179 @@ func TestFileFetcher_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestFileFetcher_CrossEncodingResolution verifies that the fetcher resolves
-// a fixture file for any Pine-native encoding of the same period — the file
-// named "SYM_1h.json" is found for both the "1h" and "60" request, and a file
-// named "SYM_60.json" is found for both the "60" and "1h" request.
-func TestFileFetcher_CrossEncodingResolution(t *testing.T) {
+// TestFixtureCandidatePaths_OrderAndEncoding verifies that fixtureCandidatePaths
+// emits paths in priority order: hyphen-canonical, underscore-canonical, then
+// hyphen-numeric and underscore-numeric (intraday only). Calendar-scale tokens
+// have no numeric alternate so only two paths are produced.
+func TestFixtureCandidatePaths_OrderAndEncoding(t *testing.T) {
 	cases := []struct {
-		fixtureToken string
-		requestToken string
+		symbol    string
+		timeframe string
+		want      []string
 	}{
-		// Suffixed fixture, numeric request
-		{"1m", "1"},
-		{"5m", "5"},
-		{"15m", "15"},
-		{"30m", "30"},
-		{"1h", "60"},
-		{"2h", "120"},
-		{"4h", "240"},
-		// Numeric fixture, suffixed request
-		{"1", "1m"},
-		{"5", "5m"},
-		{"15", "15m"},
-		{"30", "30m"},
-		{"60", "1h"},
-		{"120", "2h"},
-		{"240", "4h"},
-		// Identical encoding — baseline that an exact-name match still works
-		{"1h", "1h"},
-		{"1D", "1D"},
+		// Intraday: 4 paths (canonical + numeric alternate, each in hyphen then underscore form).
+		{"SBERP", "1h", []string{"SBERP-1h.json", "SBERP_1h.json", "SBERP-60.json", "SBERP_60.json"}},
+		{"SBERP", "60", []string{"SBERP-1h.json", "SBERP_1h.json", "SBERP-60.json", "SBERP_60.json"}},
+		{"AAPL", "4h", []string{"AAPL-4h.json", "AAPL_4h.json", "AAPL-240.json", "AAPL_240.json"}},
+		{"AAPL", "240", []string{"AAPL-4h.json", "AAPL_4h.json", "AAPL-240.json", "AAPL_240.json"}},
+		{"NVDA", "30m", []string{"NVDA-30m.json", "NVDA_30m.json", "NVDA-30.json", "NVDA_30.json"}},
+		{"NVDA", "30", []string{"NVDA-30m.json", "NVDA_30m.json", "NVDA-30.json", "NVDA_30.json"}},
+		// Calendar-scale: 2 paths (no numeric alternate).
+		{"AAPL", "1D", []string{"AAPL-1D.json", "AAPL_1D.json"}},
+		{"BTCUSDT", "1M", []string{"BTCUSDT-1M.json", "BTCUSDT_1M.json"}},
 	}
-
-	onebar := `[{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":100}]`
-
 	for _, tc := range cases {
 		tc := tc
-		t.Run(tc.fixtureToken+"_via_"+tc.requestToken, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			path := filepath.Join(tmpDir, "SYM_"+tc.fixtureToken+".json")
-			if err := os.WriteFile(path, []byte(onebar), 0644); err != nil {
-				t.Fatal(err)
+		t.Run(tc.symbol+":"+tc.timeframe, func(t *testing.T) {
+			paths := fixtureCandidatePaths("/data", tc.symbol, tc.timeframe)
+			if len(paths) != len(tc.want) {
+				t.Fatalf("got %d paths %v, want %d %v", len(paths), paths, len(tc.want), tc.want)
 			}
-			fetcher := NewFileFetcher(tmpDir, 0)
-			result, err := fetcher.Fetch("SYM", tc.requestToken, 0)
-			if err != nil {
-				t.Fatalf("Fetch(SYM,%q) with fixture %q: %v", tc.requestToken, tc.fixtureToken, err)
-			}
-			if len(result) != 1 {
-				t.Fatalf("want 1 bar, got %d", len(result))
+			for i, w := range tc.want {
+				if !strings.HasSuffix(paths[i], w) {
+					t.Errorf("[%d]: got %q, want suffix %q", i, paths[i], w)
+				}
 			}
 		})
 	}
 }
 
-// TestFileFetcher_CalendarScaleHasNoNumericFallback verifies that a calendar-scale
-// timeframe (daily and above) does not acquire a minute-count alternate path.
-// A request for "1D" must not silently succeed against a "1440"-named file,
-// since daily bars are not encoded as minute counts in Pine fixture naming.
-func TestFileFetcher_CalendarScaleHasNoNumericFallback(t *testing.T) {
-	tmpDir := t.TempDir()
-	onebar := `[{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":100}]`
-
-	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1440.json"), []byte(onebar), 0644); err != nil {
-		t.Fatal(err)
+// TestFixtureCandidatePaths_SymmetricEquivalence verifies the invariant that two
+// tokens denoting the same period produce identical candidate path lists. This
+// ensures fixture resolution is stable regardless of whether the caller uses the
+// suffixed form ("1h") or the numeric form ("60").
+func TestFixtureCandidatePaths_SymmetricEquivalence(t *testing.T) {
+	pairs := [][2]string{
+		{"1m", "1"}, {"5m", "5"}, {"15m", "15"}, {"30m", "30"},
+		{"1h", "60"}, {"2h", "120"}, {"3h", "180"}, {"4h", "240"},
 	}
-
-	fetcher := NewFileFetcher(tmpDir, 0)
-	_, err := fetcher.Fetch("SYM", "1D", 0)
-	if err == nil {
-		t.Fatal("Fetch(SYM,\"1D\") must fail when only SYM_1440.json exists: daily tokens have no minute-count alternate")
+	const dir = "/fixtures"
+	const sym = "SYM"
+	for _, pair := range pairs {
+		a := fixtureCandidatePaths(dir, sym, pair[0])
+		b := fixtureCandidatePaths(dir, sym, pair[1])
+		if len(a) != len(b) {
+			t.Errorf("(%q,%q) path count mismatch: %v vs %v", pair[0], pair[1], a, b)
+			continue
+		}
+		for i := range a {
+			if a[i] != b[i] {
+				t.Errorf("(%q,%q)[%d]: %q vs %q", pair[0], pair[1], i, a[i], b[i])
+			}
+		}
 	}
 }
 
-// TestFileFetcher_CanonicalFilePrecedesNumericFileWhenBothExist verifies that
-// when both canonical and numeric-named fixtures exist for the same period,
-// the canonical one is returned regardless of whether the request uses the
-// canonical or numeric token.
-func TestFileFetcher_CanonicalFilePrecedesNumericFileWhenBothExist(t *testing.T) {
+// TestFixtureCandidatePaths_UnknownTokenPassthrough verifies that an unrecognised
+// timeframe token is passed through unchanged and results in exactly two candidate
+// paths: hyphen-separated and underscore-separated. No panic or empty list.
+func TestFixtureCandidatePaths_UnknownTokenPassthrough(t *testing.T) {
+	for _, token := range []string{"", "unknown", "9999x"} {
+		token := token
+		t.Run(token, func(t *testing.T) {
+			paths := fixtureCandidatePaths("/data", "SYM", token)
+			if len(paths) != 2 {
+				t.Fatalf("got %d paths %v, want 2 (hyphen + underscore)", len(paths), paths)
+			}
+			if !strings.HasSuffix(paths[0], "SYM-"+token+".json") {
+				t.Errorf("paths[0] = %q, want hyphen-separated suffix", paths[0])
+			}
+			if !strings.HasSuffix(paths[1], "SYM_"+token+".json") {
+				t.Errorf("paths[1] = %q, want underscore-separated suffix", paths[1])
+			}
+		})
+	}
+}
+
+// TestFileFetcher_HyphenWinsOverUnderscore verifies that when both
+// SYMBOL-TF.json (hyphen) and SYMBOL_TF.json (underscore) exist, the
+// hyphen-named file is returned (first candidate wins).
+func TestFileFetcher_HyphenWinsOverUnderscore(t *testing.T) {
 	tmpDir := t.TempDir()
-	canonicalBars := `[{"time":1000000,"open":100,"high":110,"low":90,"close":105,"volume":1}]`
-	numericBars := `[{"time":2000000,"open":200,"high":210,"low":190,"close":205,"volume":1}]`
+	hyphenData := `[{"time":1,"open":10,"high":11,"low":9,"close":10,"volume":1}]`
+	underscoreData := `[{"time":2,"open":20,"high":21,"low":19,"close":20,"volume":2}]`
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1h.json"), []byte(canonicalBars), 0644); err != nil {
-		t.Fatal(err)
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM-1h.json"), []byte(hyphenData), 0644); err != nil {
+		t.Fatalf("write hyphen: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_60.json"), []byte(numericBars), 0644); err != nil {
-		t.Fatal(err)
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1h.json"), []byte(underscoreData), 0644); err != nil {
+		t.Fatalf("write underscore: %v", err)
 	}
 
-	fetcher := NewFileFetcher(tmpDir, 0)
+	bars, err := NewFileFetcher(tmpDir, 0).Fetch("SYM", "1h", 0)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(bars) == 0 || bars[0].Time != 1 {
+		t.Errorf("expected hyphen fixture (time=1), got time=%d", bars[0].Time)
+	}
+}
 
-	for _, requestToken := range []string{"1h", "60"} {
-		result, err := fetcher.Fetch("SYM", requestToken, 0)
-		if err != nil {
-			t.Fatalf("request %q: unexpected error: %v", requestToken, err)
-		}
-		if len(result) == 0 {
-			t.Fatalf("request %q: got 0 bars", requestToken)
-		}
-		if result[0].Open != 100 {
-			t.Errorf("request %q: canonical file should win; got open=%.0f", requestToken, result[0].Open)
-		}
+// TestFileFetcher_UnderscoreFallbackWhenHyphenAbsent verifies that when only
+// SYMBOL_TF.json (underscore, legacy convention) exists and no hyphen file is
+// present, the fetcher finds it as the second candidate.
+func TestFileFetcher_UnderscoreFallbackWhenHyphenAbsent(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "SYM_1h.json"), []byte(
+		`[{"time":42,"open":1,"high":2,"low":0.5,"close":1.5,"volume":10}]`,
+	), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	bars, err := NewFileFetcher(tmpDir, 0).Fetch("SYM", "1h", 0)
+	if err != nil {
+		t.Fatalf("Fetch with underscore-only fixture: %v", err)
+	}
+	if len(bars) != 1 || bars[0].Time != 42 {
+		t.Errorf("expected 1 bar with time=42, got %v", bars)
+	}
+}
+
+// TestFileFetcher_CrossEncodingResolution verifies that a fixture named with one
+// encoding of a timeframe period is resolved when the fetcher is called with the
+// equivalent encoding, and vice versa. Covers both hyphen-canonical and
+// underscore-numeric naming so that all four candidate path positions are exercised.
+func TestFileFetcher_CrossEncodingResolution(t *testing.T) {
+	onebar := `[{"time":1700000000,"open":1,"high":2,"low":0.5,"close":1.5,"volume":100}]`
+
+	cases := []struct {
+		fixtureFile  string // filename created in tmpDir
+		requestToken string // timeframe arg passed to Fetch
+	}{
+		// Hyphen-canonical fixture resolved via numeric request (candidate 3).
+		{"SYM-1h.json", "60"},
+		{"SYM-4h.json", "240"},
+		{"SYM-5m.json", "5"},
+		{"SYM-30m.json", "30"},
+		// Hyphen-numeric fixture resolved via canonical request (candidate 1 misses, candidate 3 matches).
+		{"SYM-60.json", "1h"},
+		{"SYM-240.json", "4h"},
+		// Hyphen-canonical fixture resolved via same token (candidate 1 matches).
+		{"SYM-1h.json", "1h"},
+		{"SYM-1D.json", "1D"},
+		// Underscore-canonical fixture resolved via same token (candidate 2 matches).
+		{"SYM_1h.json", "1h"},
+		{"SYM_1D.json", "1D"},
+		// Underscore-numeric fixture resolved via canonical request (candidate 4 matches).
+		{"SYM_60.json", "1h"},
+		{"SYM_240.json", "4h"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		name := strings.TrimSuffix(tc.fixtureFile, ".json") + "_via_" + tc.requestToken
+		t.Run(name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(tmpDir, tc.fixtureFile), []byte(onebar), 0644); err != nil {
+				t.Fatal(err)
+			}
+			bars, err := NewFileFetcher(tmpDir, 0).Fetch("SYM", tc.requestToken, 0)
+			if err != nil {
+				t.Fatalf("Fetch(SYM,%q) with fixture %q: %v", tc.requestToken, tc.fixtureFile, err)
+			}
+			if len(bars) != 1 {
+				t.Fatalf("want 1 bar, got %d", len(bars))
+			}
+		})
 	}
 }

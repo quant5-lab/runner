@@ -250,3 +250,128 @@ func TestSizeResidual_SurplusTradesDoNotInfluenceResult(t *testing.T) {
 		t.Errorf("got %.15e, want %.15e — surplus trade must not be compared", got, want)
 	}
 }
+
+func resultWithCount(n int) *StrategyResult {
+	r := &StrategyResult{}
+	for i := 0; i < n; i++ {
+		r.Trades = append(r.Trades, baselineTrade())
+	}
+	return r
+}
+
+func TestTradeCountFidelity_BothEmpty(t *testing.T) {
+	got := TradeCountFidelity(resultWithCount(0), resultWithCount(0))
+	if got != 0 {
+		t.Errorf("got %.6f, want 0", got)
+	}
+}
+
+func TestTradeCountFidelity_EqualCounts(t *testing.T) {
+	for _, n := range []int{1, 10, 103, 422} {
+		if got := TradeCountFidelity(resultWithCount(n), resultWithCount(n)); got != 0 {
+			t.Errorf("n=%d: got %.6f, want 0", n, got)
+		}
+	}
+}
+
+func TestTradeCountFidelity_OneEmpty(t *testing.T) {
+	got := TradeCountFidelity(resultWithCount(0), resultWithCount(5))
+	if got != 1.0 {
+		t.Errorf("got %.6f, want 1.0", got)
+	}
+}
+
+func TestTradeCountFidelity_Symmetry(t *testing.T) {
+	pairs := [][2]int{{0, 5}, {1, 2}, {103, 422}, {62, 63}, {100, 110}}
+	for _, p := range pairs {
+		fwd := TradeCountFidelity(resultWithCount(p[0]), resultWithCount(p[1]))
+		rev := TradeCountFidelity(resultWithCount(p[1]), resultWithCount(p[0]))
+		if fwd != rev {
+			t.Errorf("(%d,%d): not symmetric: %.15f != %.15f", p[0], p[1], fwd, rev)
+		}
+	}
+}
+
+func TestTradeCountFidelity_FixtureWindowExpansion(t *testing.T) {
+	// Reproduces the 5499-bar→21927-bar fixture swap: 103 golden trades vs 422
+	// live trades — drift ≈ 0.756, far above MaxGoldenTradeCountDrift.
+	got := TradeCountFidelity(resultWithCount(103), resultWithCount(422))
+	want := float64(422-103) / float64(422) // ≈ 0.756
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("got %.6f, want %.6f", got, want)
+	}
+	if got <= MaxGoldenTradeCountDrift {
+		t.Errorf("drift %.6f should exceed MaxGoldenTradeCountDrift %.6f", got, MaxGoldenTradeCountDrift)
+	}
+}
+
+func TestTradeCountFidelity_BoundaryVariance(t *testing.T) {
+	// ±1 trade from fixture boundary on a 62-trade golden (max.pine) stays well
+	// within MaxGoldenTradeCountDrift.
+	got := TradeCountFidelity(resultWithCount(62), resultWithCount(63))
+	want := 1.0 / 63.0
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("got %.6f, want %.6f", got, want)
+	}
+	if got > MaxGoldenTradeCountDrift {
+		t.Errorf("boundary drift %.6f must not exceed MaxGoldenTradeCountDrift %.6f", got, MaxGoldenTradeCountDrift)
+	}
+}
+
+func TestTradeCountFidelity_ThresholdBoundary(t *testing.T) {
+	// Verify the constant separates legitimate boundary variance from window
+	// expansion: 100 vs 115 drifts at 0.130 (passes); 100 vs 116 at 0.138
+	// (passes); 100 vs 120 at 0.167 (fails the threshold).
+	under := TradeCountFidelity(resultWithCount(100), resultWithCount(115))
+	if under > MaxGoldenTradeCountDrift {
+		t.Errorf("100 vs 115: drift %.6f should be under MaxGoldenTradeCountDrift %.6f", under, MaxGoldenTradeCountDrift)
+	}
+	over := TradeCountFidelity(resultWithCount(100), resultWithCount(120))
+	if over <= MaxGoldenTradeCountDrift {
+		t.Errorf("100 vs 120: drift %.6f should exceed MaxGoldenTradeCountDrift %.6f", over, MaxGoldenTradeCountDrift)
+	}
+}
+
+func TestTradeCountFidelity_SyntheticBaselineReplacedByRealFixture(t *testing.T) {
+	cases := []struct {
+		syntheticTrades int
+		realTrades      int
+	}{
+		{3, 38},   // monthly strategy: placeholder vs real multi-decade OHLCV (12× expansion)
+		{5, 62},   // small placeholder vs real multi-year monthly series
+		{10, 103}, // short pilot window vs multi-year hourly window
+	}
+	for _, c := range cases {
+		drift := TradeCountFidelity(resultWithCount(c.syntheticTrades), resultWithCount(c.realTrades))
+		if drift <= MaxGoldenTradeCountDrift {
+			t.Errorf("synthetic=%d real=%d: drift %.6f must exceed MaxGoldenTradeCountDrift %.6f",
+				c.syntheticTrades, c.realTrades, drift, MaxGoldenTradeCountDrift)
+		}
+	}
+}
+
+func TestTradeCountFidelity_ThresholdExactBoundaries(t *testing.T) {
+	// guard fires when drift strictly exceeds MaxGoldenTradeCountDrift (0.15);
+	// cases at and below the boundary must pass, the case just above must fail.
+	cases := []struct {
+		name        string
+		a, b        int
+		expectAbove bool
+	}{
+		{"one_boundary_trade_on_62_series", 62, 63, false},
+		{"two_boundary_trades_on_62_series", 62, 64, false},
+		{"exactly_15pct_not_above", 85, 100, false},
+		{"16pct_above_threshold", 84, 100, true},
+		{"large_expansion_always_triggers", 50, 100, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := TradeCountFidelity(resultWithCount(c.a), resultWithCount(c.b))
+			above := got > MaxGoldenTradeCountDrift
+			if above != c.expectAbove {
+				t.Errorf("a=%d b=%d: drift=%.6f expectAbove=%v gotAbove=%v",
+					c.a, c.b, got, c.expectAbove, above)
+			}
+		})
+	}
+}

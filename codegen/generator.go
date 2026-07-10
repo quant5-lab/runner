@@ -648,6 +648,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
 	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.SetProcessOrdersOnClose(true)\n"
+	}
 	code += "\n"
 
 	if g.inputHandler != nil && len(g.inputHandler.inputConstants) > 0 {
@@ -920,6 +923,15 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += "\n"
 
+	/* B1 fix: OnBarMetrics fires BEFORE Pine statements so TV-style intrabar
+	   exit checking (stop/limit fills at bar open using OHLC) happens before
+	   any Pine code that could call strategy.close_all() and dispose of
+	   pending exits. This mirrors TV's execution order: broker emulator
+	   evaluates pending stop/limit orders BEFORE user Pine code each bar. */
+	if g.hasStrategyRuntimeAccess || g.needsIntrabarExitChecking || g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
+	}
+
 	/* Interleaved emission — period .Set() must precede .Get(0) within the same bar */
 	statementCounter.Reset()
 	for stmtIdx, stmt := range program.Body {
@@ -940,10 +952,6 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 			return "", err
 		}
 		code += stmtCode
-	}
-
-	if g.hasStrategyRuntimeAccess || g.needsIntrabarExitChecking {
-		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
 	}
 
 	if g.plotCollector != nil && g.plotCollector.HasPlots() {
@@ -997,6 +1005,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	if g.hasTimenow {
 		code += g.ind() + "_ = timenow\n"
+	}
+
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarClose(bar.Close, bar.Time)\n"
 	}
 
 	// Advance Series cursors at end of bar loop
@@ -3534,11 +3546,17 @@ func (g *generator) generatePlaceholder() string {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
 	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.SetProcessOrdersOnClose(true)\n"
+	}
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)\n"
 	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].Open, ctx.Data[i].High, ctx.Data[i].Low, ctx.Data[i].Time)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarClose(ctx.Data[i].Close, ctx.Data[i].Time)\n"
+	}
 	g.indent--
 	code += g.ind() + "}\n"
 	return code

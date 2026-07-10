@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Keltner Squeeze",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-06-13T14:23:46Z",
+  "generatedAt": "2026-07-09T22:19:57Z",
   "result": {
     "trades": [
       {
@@ -137,12 +137,12 @@
         "entryTime": 1755914400,
         "entryPrice": 116453.59,
         "entryComment": "",
-        "exitBar": 2015,
-        "exitTime": 1755954000,
-        "exitPrice": 115056.14692,
+        "exitBar": 2004,
+        "exitTime": 1755914400,
+        "exitPrice": 116866.04436,
         "exitComment": "",
         "size": 0.0008600000000000001,
-        "profit": 1.1818912114248776,
+        "profit": -0.3747762381549629,
         "direction": "short"
       },
       {
@@ -193,12 +193,40 @@
         "entryTime": 1759129200,
         "entryPrice": 111632.83,
         "entryComment": "",
-        "exitBar": 3175,
-        "exitTime": 1760130000,
-        "exitPrice": 110293.23604,
+        "exitBar": 2897,
+        "exitTime": 1759129200,
+        "exitPrice": 111773.06244000001,
         "exitComment": "",
         "size": 0.0009000000000000001,
-        "profit": 1.1856612180563986,
+        "profit": -0.14631572631960635,
+        "direction": "short"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 2919,
+        "entryTime": 1759208400,
+        "entryPrice": 114091.63,
+        "entryComment": "",
+        "exitBar": 2924,
+        "exitTime": 1759226400,
+        "exitPrice": 112722.53044,
+        "exitComment": "",
+        "size": 0.00088,
+        "profit": 1.1848479666812821,
+        "direction": "short"
+      },
+      {
+        "entryId": "Short",
+        "entryBar": 2968,
+        "entryTime": 1759384800,
+        "entryPrice": 118377.34,
+        "entryComment": "",
+        "exitBar": 3173,
+        "exitTime": 1760122800,
+        "exitPrice": 116956.81192,
+        "exitComment": "",
+        "size": 0.0008500000000000001,
+        "profit": 1.1874454650868034,
         "direction": "short"
       },
       {
@@ -277,12 +305,12 @@
         "entryTime": 1764244800,
         "entryPrice": 91371.87,
         "entryComment": "",
-        "exitBar": 4347,
-        "exitTime": 1764349200,
-        "exitPrice": 90275.40755999999,
+        "exitBar": 4318,
+        "exitTime": 1764244800,
+        "exitPrice": 96208.88108,
         "exitComment": "",
         "size": 0.0011,
-        "profit": 1.1861274834684032,
+        "profit": -5.341346070618813,
         "direction": "short"
       },
       {
@@ -295,8 +323,8 @@
         "exitTime": 1764637200,
         "exitPrice": 87018.6922,
         "exitComment": "",
-        "size": 0.00117,
-        "profit": 1.187013725562599,
+        "size": 0.00116,
+        "profit": 1.1768683091047991,
         "direction": "long"
       },
       {
@@ -309,8 +337,8 @@
         "exitTime": 1764770400,
         "exitPrice": 91884,
         "exitComment": "",
-        "size": 0.00108,
-        "profit": 1.1853125279999999,
+        "size": 0.00107,
+        "profit": 1.174337412,
         "direction": "short"
       },
       {
@@ -323,8 +351,8 @@
         "exitTime": 1765476000,
         "exitPrice": 90950.98012,
         "exitComment": "",
-        "size": 0.0011200000000000001,
-        "profit": 1.187634303506558,
+        "size": 0.00111,
+        "profit": 1.1770304257966782,
         "direction": "long"
       },
       {
@@ -337,8 +365,8 @@
         "exitTime": 1765983600,
         "exitPrice": 90313.23796,
         "exitComment": "",
-        "size": 0.0011300000000000001,
-        "profit": 1.1898362156205164,
+        "size": 0.0011200000000000001,
+        "profit": 1.1793066915884765,
         "direction": "long"
       },
       {
@@ -365,8 +393,8 @@
         "exitTime": 1767009600,
         "exitPrice": 87043.294,
         "exitComment": "",
-        "size": 0.0011500000000000002,
-        "profit": 1.1956453636900066,
+        "size": 0.0011400000000000002,
+        "profit": 1.1852484474840064,
         "direction": "short"
       }
     ],
@@ -381,14 +409,15 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 0.0011300000000000001,
+        "size": 0.0011200000000000001,
         "profit": 0,
         "direction": "short"
       }
     ],
-    "equity": 1008.2155665355062,
-    "netProfit": 15.905182635506241,
+    "equity": 1001.1871408688255,
+    "netProfit": 8.80870726882555,
     "totalTrades": 0,
+    "initialCapital": 1000,
     "plots": {}
   }
 }

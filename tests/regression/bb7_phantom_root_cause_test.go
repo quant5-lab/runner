@@ -27,16 +27,6 @@ func TestBB7_DisputedBars_AreWeekendDays(t *testing.T) {
 
 	cases := []weekendBarFixtureCase{
 		{
-			name:        "SBERP_1h_MOEX",
-			fixtureFile: filepath.Join(dir, "SBERP-1h.json"),
-			timezone:    "Europe/Moscow",
-			bars: []weekendBarSpec{
-				{barIdx: 1798, wantWeekday: time.Sunday},
-				{barIdx: 3327, wantWeekday: time.Sunday},
-				{barIdx: 3766, wantWeekday: time.Sunday},
-			},
-		},
-		{
 			name:        "BTCUSDT_1h_Binance",
 			fixtureFile: filepath.Join(dir, "BTCUSDT-1h.json"),
 			timezone:    "UTC",

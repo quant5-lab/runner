@@ -16,10 +16,6 @@ const (
 	maxPriceTolerance = 2.00
 	maxRunnerOnly     = 2
 	maxTVOnly         = 4
-
-	// maxPrimaryFlatBarFraction: flat O=H=L=C bars in a primary fixture degrade
-	// direction-toggle strategies, consuming RunnerOnly headroom toward the cap.
-	maxPrimaryFlatBarFraction = 0.05
 )
 
 // TestPolicyCapConstants_AntiScopeAligned pins every cap to its authoritative
@@ -38,9 +34,6 @@ func TestPolicyCapConstants_AntiScopeAligned(t *testing.T) {
 	}
 	if maxTVOnly != 4 {
 		t.Errorf("maxTVOnly = %d; anti-scope cap is 4 — escalation requires operator approval", maxTVOnly)
-	}
-	if maxPrimaryFlatBarFraction != 0.05 {
-		t.Errorf("maxPrimaryFlatBarFraction = %.4f; fixture-quality threshold is 0.05 — escalation requires operator approval", maxPrimaryFlatBarFraction)
 	}
 }
 
@@ -79,48 +72,78 @@ func TestPolicyCap_TVOnlyExceedsRunnerOnly(t *testing.T) {
 	}
 }
 
-// TestPolicyCap_FlatBarFractionIsStrictlyWithinUnitInterval guards both boundary
-// degenerate cases: a fraction of 0 would reject every fixture that contains even
-// a single flat bar, including currently-aligning strategies whose logic is not
-// flat-bar-sensitive; a fraction of 1 accepts any fixture regardless of flat-bar
-// density, making the threshold vacuous and the preflight ineffective.
-func TestPolicyCap_FlatBarFractionIsStrictlyWithinUnitInterval(t *testing.T) {
-	if maxPrimaryFlatBarFraction <= 0 {
-		t.Errorf("maxPrimaryFlatBarFraction = %.4f; must be > 0 — zero threshold rejects every flat-bar-bearing fixture unconditionally, including non-sensitive strategies", maxPrimaryFlatBarFraction)
+func TestDiscrepancyCapViolation(t *testing.T) {
+	boundaries := []struct {
+		name      string
+		cap       int
+		make      func(actual int, escalated bool) tvAlignmentDiscrepancy
+		validate  func(string, tvAlignmentDiscrepancy) string
+		fieldName string
+	}{
+		{
+			name: "runner-only",
+			cap:  maxRunnerOnly,
+			make: func(actual int, escalated bool) tvAlignmentDiscrepancy {
+				return tvAlignmentDiscrepancy{RunnerOnly: actual, RunnerOnlyCapEscalated: escalated}
+			},
+			validate:  runnerOnlyCapViolation,
+			fieldName: "RunnerOnly",
+		},
+		{
+			name: "tv-only",
+			cap:  maxTVOnly,
+			make: func(actual int, escalated bool) tvAlignmentDiscrepancy {
+				return tvAlignmentDiscrepancy{TVOnly: actual, TVOnlyCapEscalated: escalated}
+			},
+			validate:  tvOnlyCapViolation,
+			fieldName: "TVOnly",
+		},
+		{
+			name: "export-horizon-runner-only",
+			cap:  maxRunnerOnly,
+			make: func(actual int, escalated bool) tvAlignmentDiscrepancy {
+				return tvAlignmentDiscrepancy{ExportHorizonRunnerOnly: actual, ExportHorizonRunnerOnlyCapEscalated: escalated}
+			},
+			validate:  exportHorizonRunnerOnlyCapViolation,
+			fieldName: "ExportHorizonRunnerOnly",
+		},
 	}
-	if maxPrimaryFlatBarFraction >= 1 {
-		t.Errorf("maxPrimaryFlatBarFraction = %.4f; must be < 1 — threshold of 1.0 accepts any fixture regardless of flat-bar density, making the preflight vacuous", maxPrimaryFlatBarFraction)
-	}
-}
 
-// TestTVOnlyCapViolation exercises all eight boundary combinations of the
-// TVOnly cap-enforcement algorithm — independently of any wired alignment case
-// in the registry — so the policy rules are verified as pure logic.
-func TestTVOnlyCapViolation(t *testing.T) {
-	cases := []struct {
+	states := []struct {
 		name          string
-		d             tvAlignmentDiscrepancy
+		actualOffset  int
+		escalated     bool
 		wantViolation bool
 	}{
-		{name: "zero_tvonly_no_flag", d: tvAlignmentDiscrepancy{TVOnly: 0}, wantViolation: false},
-		{name: "below_cap_no_flag", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly - 1}, wantViolation: false},
-		{name: "at_cap_no_flag", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly}, wantViolation: false},
-		{name: "one_above_cap_no_flag", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly + 1}, wantViolation: true},
-		{name: "well_above_cap_no_flag", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly + 10}, wantViolation: true},
-		{name: "above_cap_with_escalation_approved", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly + 1, TVOnlyCapEscalated: true}, wantViolation: false},
-		{name: "large_escalation_approved", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly + 10, TVOnlyCapEscalated: true}, wantViolation: false},
-		{name: "dead_escalation_at_cap", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly, TVOnlyCapEscalated: true}, wantViolation: true},
-		{name: "dead_escalation_below_cap", d: tvAlignmentDiscrepancy{TVOnly: maxTVOnly - 1, TVOnlyCapEscalated: true}, wantViolation: true},
-		{name: "dead_escalation_zero", d: tvAlignmentDiscrepancy{TVOnly: 0, TVOnlyCapEscalated: true}, wantViolation: true},
+		{name: "zero_without_flag", actualOffset: -999, escalated: false, wantViolation: false},
+		{name: "below_cap_without_flag", actualOffset: -1, escalated: false, wantViolation: false},
+		{name: "at_cap_without_flag", actualOffset: 0, escalated: false, wantViolation: false},
+		{name: "above_cap_without_flag", actualOffset: 1, escalated: false, wantViolation: true},
+		{name: "far_above_cap_without_flag", actualOffset: 10, escalated: false, wantViolation: true},
+		{name: "above_cap_with_flag", actualOffset: 1, escalated: true, wantViolation: false},
+		{name: "far_above_cap_with_flag", actualOffset: 10, escalated: true, wantViolation: false},
+		{name: "at_cap_with_dead_flag", actualOffset: 0, escalated: true, wantViolation: true},
+		{name: "below_cap_with_dead_flag", actualOffset: -1, escalated: true, wantViolation: true},
+		{name: "zero_with_dead_flag", actualOffset: -999, escalated: true, wantViolation: true},
 	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			msg := tvOnlyCapViolation(tc.name, tc.d)
-			gotViolation := msg != ""
-			if gotViolation != tc.wantViolation {
-				t.Errorf("tvOnlyCapViolation(%+v) violation=%v, want %v (msg=%q)",
-					tc.d, gotViolation, tc.wantViolation, msg)
+
+	for _, boundary := range boundaries {
+		boundary := boundary
+		t.Run(boundary.name, func(t *testing.T) {
+			for _, state := range states {
+				state := state
+				t.Run(state.name, func(t *testing.T) {
+					actual := boundary.cap + state.actualOffset
+					if actual < 0 {
+						actual = 0
+					}
+					msg := boundary.validate(state.name, boundary.make(actual, state.escalated))
+					gotViolation := msg != ""
+					if gotViolation != state.wantViolation {
+						t.Errorf("%s cap violation=%v, want %v for actual=%d escalated=%v (msg=%q)",
+							boundary.fieldName, gotViolation, state.wantViolation, actual, state.escalated, msg)
+					}
+				})
 			}
 		})
 	}

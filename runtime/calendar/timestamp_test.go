@@ -139,6 +139,7 @@ func TestTimestampFromString_AllFormats(t *testing.T) {
 		{"RFC2822_date_only", "20 Feb 2020", 1582156800000},
 		{"Pine_doc_example_1", "20 Feb 2020", 1582156800000},
 		{"Pine_doc_example_2", "2011-10-10T14:48:00", 1318258080000},
+		{"Pine_v4_colon_separator", "2021-01-13:05:00", 1610514000000},
 	}
 
 	for _, tt := range tests {

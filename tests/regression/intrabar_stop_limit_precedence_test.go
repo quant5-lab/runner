@@ -10,10 +10,15 @@ import (
 /*
 TestIntrabarStopLimitPrecedence_StopWins ratchets the TradingView conservative-fill
 rule: when both stop and limit levels are breached within the same bar (each level
-falls within [barLow, barHigh]), the stop fills first regardless of bar OHLC
-ordering. This matches the TV broker emulator under default settings
+falls within [barLow, barHigh]), the STOP wins over the limit regardless of bar
+OHLC ordering. This matches the TV broker emulator under default settings
 (calc_on_every_tick=false, no intrabar tick data): without sub-bar resolution the
 worse-for-trader outcome is assumed.
+
+The fill PRICE itself follows TV's gap-fill rule: when barOpen is already past
+the stop level (below for long, above for short), the fill happens at barOpen —
+the market gapped through the stop and the trader takes the open price, not the
+stop level.
 
 Previously a proximity-to-open heuristic returned whichever level was nearer to
 the segment start of the assumed intrabar path. That selection diverged from
@@ -49,11 +54,13 @@ func TestIntrabarStopLimitPrecedence_StopWins(t *testing.T) {
 			wantPrice: 95,
 		},
 		{
-			name:      "long_open_near_low_both_breach_stop_wins",
+			// Gap-fill: barOpen (93) is below stopLevel (95), so TV fills at
+			// barOpen rather than stopLevel — the market gapped past the stop.
+			name:      "long_open_below_stop_gap_fills_at_open",
 			direction: strategy.Long,
 			stopLevel: 95, limitLevel: 110,
 			barOpen: 93, barHigh: 115, barLow: 90,
-			wantPrice: 95,
+			wantPrice: 93,
 		},
 		{
 			name:      "long_open_equidistant_both_breach_stop_wins",
@@ -64,11 +71,13 @@ func TestIntrabarStopLimitPrecedence_StopWins(t *testing.T) {
 		},
 		// Short: stop is above entry, limit is below. Both inside [low, high].
 		{
-			name:      "short_open_near_high_both_breach_stop_wins",
+			// Gap-fill: barOpen (108) is above stopLevel (105), so TV fills at
+			// barOpen rather than stopLevel — the market gapped past the stop.
+			name:      "short_open_above_stop_gap_fills_at_open",
 			direction: strategy.Short,
 			stopLevel: 105, limitLevel: 90,
 			barOpen: 108, barHigh: 110, barLow: 85,
-			wantPrice: 105,
+			wantPrice: 108,
 		},
 		{
 			name:      "short_open_near_low_both_breach_stop_wins",

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/quant5-lab/runner/runtime/market"
 	goldenutil "github.com/quant5-lab/runner/tests/golden/testutil"
 )
 
@@ -113,4 +114,102 @@ func fixtureQtyStep(t *testing.T, path string) float64 {
 		t.Fatalf("parse fixture %s: %v", path, err)
 	}
 	return envelope.QtyStep
+}
+
+// A per-timeframe fixture written without qtyStep silently quantises positions
+// differently from its sibling, masking lot-size errors that only surface when
+// a strategy switches to that timeframe.
+func TestFixtureMetadata_SameSymbolSameQtyStep(t *testing.T) {
+	root := projectRootFromCwd()
+	fixtureDir := filepath.Join(root, "tests", "golden", "fixtures", "data")
+
+	type fixtureEntry struct {
+		dataFile string
+		qtyStep  float64
+	}
+	bySymbol := make(map[string][]fixtureEntry)
+	for _, tc := range tvAlignmentCases() {
+		path := filepath.Join(fixtureDir, tc.Data)
+		qs := fixtureQtyStep(t, path)
+		bySymbol[tc.Symbol] = append(bySymbol[tc.Symbol], fixtureEntry{tc.Data, qs})
+	}
+
+	for symbol, entries := range bySymbol {
+		if len(entries) < 2 {
+			continue
+		}
+		first := entries[0]
+		for _, e := range entries[1:] {
+			if e.dataFile == first.dataFile {
+				continue
+			}
+			if e.qtyStep != first.qtyStep {
+				t.Errorf(
+					"symbol %s: qtyStep mismatch across fixtures: %s=%.8g vs %s=%.8g"+
+						" — qtyStep is instrument metadata, not bar-resolution metadata;"+
+						" all timeframe fixtures for the same symbol must agree",
+					symbol, first.dataFile, first.qtyStep, e.dataFile, e.qtyStep,
+				)
+			}
+		}
+	}
+}
+
+// step <= 0 intentionally degrades to a whole-lot check so Binance's offline
+// zero sentinel never silently accepts fractional quantities.
+func TestMultipleOfStep_BoundaryValues(t *testing.T) {
+	cases := []struct {
+		name  string
+		value float64
+		step  float64
+		want  bool
+	}{
+		{"exact multiple", 3e-05, 1e-05, true},
+		{"zero is always a multiple of any step", 0.0, 1e-05, true},
+		{"just inside epsilon band", 1e-05 + 9e-10, 1e-05, true},
+		{"just outside epsilon band", 1e-05 + 1.1e-9, 1e-05, false},
+		{"large value exact", 1.23456, 0.00001, true},
+		{"large value with fractional remainder", 1.234565, 0.00001, false},
+
+		{"zero step: whole value is valid", 1.0, 0, true},
+		{"zero step: fractional value is invalid", 1.5, 0, false},
+		{"negative step: treated as zero, whole value", 2.0, -1, true},
+		{"negative step: treated as zero, fractional value", 2.5, -1, false},
+
+		{"step equals value: always a multiple", 0.001, 0.001, true},
+		{"half step is not a multiple", 0.0005, 0.001, false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if got := multipleOfStep(tc.value, tc.step); got != tc.want {
+				t.Errorf("multipleOfStep(%.16g, %.16g) = %v, want %v",
+					tc.value, tc.step, got, tc.want)
+			}
+		})
+	}
+}
+
+// A divergence between isStockSymbol and the exchange resolution silently routes
+// a Binance symbol through the whole-lot path, bypassing the fixture-level
+// qtyStep guard entirely.
+func TestIsStockSymbol_AgreesWithExchangeResolution(t *testing.T) {
+	for _, tc := range tvAlignmentCases() {
+		tc := tc
+		t.Run(tc.Name, func(t *testing.T) {
+			exchange := market.ResolveExchange(tc.Symbol)
+			defaultStep := market.InstrumentQtyStep(exchange)
+			exchangeIsWholeLot := defaultStep >= 1
+
+			if isStockSymbol(tc.Symbol) != exchangeIsWholeLot {
+				t.Errorf(
+					"symbol %q: isStockSymbol=%v but InstrumentQtyStep(%q)=%.8g"+
+						" (exchangeIsWholeLot=%v) — isStockSymbol must agree with exchange"+
+						" resolution so the qtyStep fixture-metadata guard is never bypassed",
+					tc.Symbol, isStockSymbol(tc.Symbol),
+					exchange, defaultStep, exchangeIsWholeLot,
+				)
+			}
+		})
+	}
 }

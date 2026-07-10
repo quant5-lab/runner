@@ -260,3 +260,65 @@ func TestRegularSessionCalendar_DateSessionWindowPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func TestRegularSessionCalendar_SpecialOpenWeekendSessionRouting(t *testing.T) {
+	// Two-window MOEX-style schedule: wider weekday, narrower weekend.
+	// The invariant under test: a date present in openDates is treated as a
+	// weekday regardless of which calendar day of the week it falls on, so the
+	// wider weekday window governs.  A date absent from openDates on a weekend
+	// day uses the narrower weekend window.
+	weekdayWindow := NewSessionWindow(ClockTimeAt(7, 0), ClockTimeAt(23, 50))
+	weekendWindow := NewSessionWindow(ClockTimeAt(10, 0), ClockTimeAt(19, 0))
+	schedule := WeekSchedule{Weekday: weekdayWindow, Weekend: weekendWindow}
+
+	openSat := "2025-10-11"
+	closedSat := "2025-10-04"
+	openSun := "2025-10-12"
+	closedSun := "2025-10-05"
+	weekdayInOpen := "2025-10-06" // control: openDates membership has no net effect on weekdays
+
+	cal := NewRegularSessionCalendar(nil, NewDateSet(openSat, openSun, weekdayInOpen), nil, schedule, nil)
+
+	cases := []struct {
+		name string
+		time string
+		want bool
+	}{
+		{"saturday-unlisted/before-weekend-start", closedSat + " 09:59", false},
+		{"saturday-unlisted/at-weekend-start", closedSat + " 10:00", true},
+		{"saturday-unlisted/one-before-weekend-end", closedSat + " 18:59", true},
+		{"saturday-unlisted/at-weekend-end", closedSat + " 19:00", false},
+		{"saturday-unlisted/past-weekend-end", closedSat + " 21:00", false},
+
+		{"saturday-listed/before-weekday-start", openSat + " 06:59", false},
+		{"saturday-listed/at-weekday-start", openSat + " 07:00", true},
+		{"saturday-listed/below-weekend-start", openSat + " 09:00", true},
+		{"saturday-listed/inside-both-windows", openSat + " 14:00", true},
+		{"saturday-listed/past-weekend-end-but-in-weekday", openSat + " 19:00", true},
+		{"saturday-listed/late-weekday-hour", openSat + " 21:00", true},
+		{"saturday-listed/one-before-weekday-end", openSat + " 23:49", true},
+		{"saturday-listed/at-weekday-end", openSat + " 23:50", false},
+
+		{"sunday-unlisted/before-weekend-start", closedSun + " 09:59", false},
+		{"sunday-unlisted/at-weekend-start", closedSun + " 10:00", true},
+		{"sunday-unlisted/past-weekend-end", closedSun + " 19:00", false},
+
+		{"sunday-listed/at-weekday-start", openSun + " 07:00", true},
+		{"sunday-listed/past-weekend-end", openSun + " 19:00", true},
+		{"sunday-listed/at-weekday-end", openSun + " 23:50", false},
+
+		{"weekday-listed/at-weekday-start", weekdayInOpen + " 07:00", true},
+		{"weekday-listed/before-weekday-start", weekdayInOpen + " 06:59", false},
+		{"weekday-listed/at-weekday-end", weekdayInOpen + " 23:50", false},
+		{"weekday-listed/one-before-weekday-end", weekdayInOpen + " 23:49", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bar := context.OHLCV{Time: unixInMoscow(t, tc.time)}
+			if got := cal.Accepts(bar, "1h", "Europe/Moscow"); got != tc.want {
+				t.Fatalf("Accepts(%s) = %v, want %v", tc.time, got, tc.want)
+			}
+		})
+	}
+}

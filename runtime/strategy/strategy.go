@@ -180,6 +180,16 @@ func (om *OrderManager) GetPendingOrders(currentBar int) []Order {
 	return pending
 }
 
+func (om *OrderManager) GetCurrentBarOrders(currentBar int) []Order {
+	var current []Order
+	for _, order := range om.orders {
+		if order.CreatedBar == currentBar {
+			current = append(current, order)
+		}
+	}
+	return current
+}
+
 func (om *OrderManager) RemoveOrder(id string) {
 	for i, order := range om.orders {
 		if order.ID == id {
@@ -405,26 +415,27 @@ func (ec *EquityCalculator) GetNetProfit() float64 {
 }
 
 type Strategy struct {
-	context            interface{} // Context with OHLCV data
-	orderManager       *OrderManager
-	positionTracker    *PositionTracker
-	tradeHistory       *TradeHistory
-	equityCalculator   *EquityCalculator
-	reversalHandler    *PositionReversalHandler
-	defaultQtyCalc     *DefaultQtyCalculator
-	currencyConverter  *CurrencyConverter
-	pendingExitManager *PendingExitManager
-	initialized        bool
-	currentBar         int
-	currentPrice       float64
-	currentBarTime     int64
-	pyramiding         int
-	commissionValue    float64
-	commissionType     string
-	defaultQtyValue    float64
-	defaultQtyType     string
-	qtyStep            float64
-	allowedDirection   string
+	context              interface{} // Context with OHLCV data
+	orderManager         *OrderManager
+	positionTracker      *PositionTracker
+	tradeHistory         *TradeHistory
+	equityCalculator     *EquityCalculator
+	reversalHandler      *PositionReversalHandler
+	defaultQtyCalc       *DefaultQtyCalculator
+	currencyConverter    *CurrencyConverter
+	pendingExitManager   *PendingExitManager
+	initialized          bool
+	currentBar           int
+	currentPrice         float64
+	currentBarTime       int64
+	pyramiding           int
+	commissionValue      float64
+	commissionType       string
+	defaultQtyValue      float64
+	defaultQtyType       string
+	qtyStep              float64
+	allowedDirection     string
+	processOrdersOnClose bool
 }
 
 func NewStrategy() *Strategy {
@@ -802,6 +813,48 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 			s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), openPrice, currentBar, openTime, order.EntryComment)
 		}
 
+		s.orderManager.RemoveOrder(order.ID)
+	}
+}
+
+func (s *Strategy) SetProcessOrdersOnClose(v bool) {
+	s.processOrdersOnClose = v
+}
+
+// OnBarClose must be called after all bar-N signals and before advancing to bar N+1.
+func (s *Strategy) OnBarClose(closePrice float64, closeTime int64) {
+	if !s.initialized || !s.processOrdersOnClose {
+		return
+	}
+	pendingOrders := s.orderManager.GetCurrentBarOrders(s.currentBar)
+	for _, order := range pendingOrders {
+		switch order.Action {
+		case OrderActionEntry:
+			s.reversalHandler.HandleReversal(order.Direction, closePrice, s.currentBar, closeTime)
+			qty := order.Qty
+			if order.UseDefaultQty {
+				qty = s.DefaultEntryQty(closePrice)
+			}
+			qty = s.applyQtyStep(qty)
+			s.positionTracker.UpdatePosition(qty, closePrice, order.Direction)
+			entryCommission := s.calcCommission(qty, closePrice)
+			s.tradeHistory.AddOpenTrade(Trade{
+				EntryID:      order.ID,
+				Direction:    order.Direction,
+				Size:         qty,
+				EntryPrice:   closePrice,
+				EntryBar:     s.currentBar,
+				EntryTime:    s.currentBarTime,
+				EntryComment: order.EntryComment,
+				Commission:   entryCommission,
+			})
+		case OrderActionClose:
+			s.executeCloseOrder(order.ExitID, order.FromEntry, closePrice, s.currentBar, closeTime, order.ExitComment)
+		case OrderActionCloseAll:
+			s.executeCloseAllOrder(closePrice, s.currentBar, closeTime, order.ExitComment)
+		case OrderActionOrder:
+			s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), closePrice, s.currentBar, closeTime, order.EntryComment)
+		}
 		s.orderManager.RemoveOrder(order.ID)
 	}
 }

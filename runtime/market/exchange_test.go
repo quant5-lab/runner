@@ -709,3 +709,96 @@ func TestRegularCalendarForExchange_NYSESessionWindowContract(t *testing.T) {
 		})
 	}
 }
+
+func TestRegularCalendarForExchangeE_ErrorPropagation(t *testing.T) {
+	// RegularCalendarForExchangeE is the generated/user-facing code path
+	// (NormalizeBarsWithMetadataE calls it under the hood).  This test
+	// asserts that every metadata parse error surfaces as a non-nil error
+	// rather than being silently swallowed, and that valid metadata returns
+	// a usable calendar.
+	loc, _ := time.LoadLocation("Europe/Moscow")
+	mosUnix := func(datetime string) context.OHLCV {
+		ts, _ := time.ParseInLocation("2006-01-02 15:04", datetime, loc)
+		return context.OHLCV{Time: ts.Unix()}
+	}
+
+	cases := []struct {
+		name     string
+		exchange Exchange
+		metadata SourceMetadata
+		wantErr  bool
+		probe    *struct {
+			bar  context.OHLCV
+			want bool
+		}
+	}{
+		{
+			name:     "empty metadata yields always-open calendar",
+			exchange: ExchangeUnknown,
+			metadata: SourceMetadata{},
+		},
+		{
+			name:     "invalid date in DateSessionWindows returns error",
+			exchange: ExchangeMOEX,
+			metadata: SourceMetadata{DateSessionWindows: map[string]string{"not-a-date": "0900-1800"}},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid window in DateSessionWindows returns error",
+			exchange: ExchangeMOEX,
+			metadata: SourceMetadata{DateSessionWindows: map[string]string{"2025-10-01": "bad"}},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid SessionWindow in metadata returns error",
+			exchange: ExchangeMOEX,
+			metadata: SourceMetadata{SessionWindow: "9999"},
+			wantErr:  true,
+		},
+		{
+			name:     "valid metadata returns calendar that accepts in-session bar",
+			exchange: ExchangeMOEX,
+			metadata: SourceMetadata{},
+			probe: &struct {
+				bar  context.OHLCV
+				want bool
+			}{
+				bar:  mosUnix("2025-10-01 13:00"),
+				want: true,
+			},
+		},
+		{
+			name:     "openDates metadata accepted without error",
+			exchange: ExchangeMOEX,
+			metadata: SourceMetadata{OpenDates: []string{"2025-10-11"}},
+			probe: &struct {
+				bar  context.OHLCV
+				want bool
+			}{
+				bar:  mosUnix("2025-10-11 09:00"),
+				want: true,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cal, err := RegularCalendarForExchangeE(tc.exchange, tc.metadata)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.probe == nil {
+				return
+			}
+			if got := cal.Accepts(tc.probe.bar, "1h", "Europe/Moscow"); got != tc.probe.want {
+				t.Fatalf("calendar.Accepts = %v, want %v", got, tc.probe.want)
+			}
+		})
+	}
+}

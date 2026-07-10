@@ -54,6 +54,12 @@ func (ih *InputHandler) GenerateInputInt(call *ast.CallExpression, varName strin
 		if result.IsValid {
 			defval = result.MustBeInt()
 		} else if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+			if ms, ok := extractTimestampFromDefval(obj); ok {
+				sanitizedName := SanitizeGoIdentifier(varName)
+				code := fmt.Sprintf("const %s = %d\n", sanitizedName, ms)
+				ih.inputConstants[varName] = code
+				return code, nil
+			}
 			defval = int(ih.extractFloatFromObject(obj, "defval", 0.0))
 		}
 	}

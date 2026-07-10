@@ -2,6 +2,8 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/quant5-lab/runner/ast"
 )
@@ -75,11 +77,53 @@ func (ice *InputConstantExtractor) extractInputIntValue(call *ast.CallExpression
 	}
 
 	if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+		if ms, ok := extractTimestampFromDefval(obj); ok {
+			return strconv.FormatInt(ms, 10)
+		}
 		val := int(ice.extractFloatFromObject(obj, "defval", 0.0))
 		return fmt.Sprintf("%d", val)
 	}
 
 	return "0"
+}
+
+func extractTimestampFromDefval(obj *ast.ObjectExpression) (int64, bool) {
+	for _, prop := range obj.Properties {
+		keyID, ok := prop.Key.(*ast.Identifier)
+		if !ok || keyID.Name != "defval" {
+			continue
+		}
+		callExpr, ok := prop.Value.(*ast.CallExpression)
+		if !ok {
+			continue
+		}
+		callee, ok := callExpr.Callee.(*ast.Identifier)
+		if !ok || callee.Name != "timestamp" || len(callExpr.Arguments) != 1 {
+			continue
+		}
+		lit, ok := callExpr.Arguments[0].(*ast.Literal)
+		if !ok {
+			continue
+		}
+		str, ok := lit.Value.(string)
+		if !ok {
+			continue
+		}
+		for _, layout := range pineTimestampLayouts {
+			if t, err := time.Parse(layout, str); err == nil {
+				return t.UnixMilli(), true
+			}
+		}
+	}
+	return 0, false
+}
+
+var pineTimestampLayouts = []string{
+	"2006-01-02:15:04",
+	"2006-01-02 15:04",
+	"2006-01-02T15:04",
+	"2006-01-02T15:04:05",
+	"2006-01-02 15:04:05",
 }
 
 func (ice *InputConstantExtractor) extractInputBoolValue(call *ast.CallExpression) string {

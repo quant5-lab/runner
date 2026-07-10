@@ -188,3 +188,46 @@ func TestGoldenManager_LoadExpected_ParsesPersistedResult(t *testing.T) {
 		t.Error("loaded result does not match original")
 	}
 }
+
+func TestGoldenManager_SaveGolden_MetadataCorrectOnOverwrite(t *testing.T) {
+	mgr, root := goldenManagerOverTempDir(t)
+	const newStrategy = "NewStrategy"
+	const newDataSource = "new-data.json"
+
+	writeGoldenFile(t, root, "overwrite_meta.json", GoldenFile{
+		Version:        "1.0",
+		Strategy:       "OldStrategy",
+		DataSource:     "old-data.json",
+		GeneratedAt:    "2020-01-01T00:00:00Z",
+		StrategyResult: baselineResult(),
+	})
+
+	updated := baselineResult()
+	updated.Trades[0].Profit = 999.0
+	updated.NetProfit = 999.0
+	updated.Equity = 10999.0
+	mgr.SaveGolden(t, "overwrite_meta.json", newStrategy, newDataSource, updated)
+
+	got := readGoldenFile(t, root, "overwrite_meta.json")
+	if got.Version != "1.0" {
+		t.Errorf("version: expected 1.0, got %q", got.Version)
+	}
+	if got.Strategy != newStrategy {
+		t.Errorf("strategy: expected %q, got %q", newStrategy, got.Strategy)
+	}
+	if got.DataSource != newDataSource {
+		t.Errorf("dataSource: expected %q, got %q", newDataSource, got.DataSource)
+	}
+}
+
+func TestGoldenFile_DataSourceSurvivesJSONRoundTrip(t *testing.T) {
+	mgr, root := goldenManagerOverTempDir(t)
+	const dataSource = "AAPL-M.json"
+
+	mgr.SaveGolden(t, "ds_roundtrip.json", "TestStrategy", dataSource, baselineResult())
+
+	got := readGoldenFile(t, root, "ds_roundtrip.json")
+	if got.DataSource != dataSource {
+		t.Errorf("DataSource: expected %q, got %q after JSON round-trip", dataSource, got.DataSource)
+	}
+}

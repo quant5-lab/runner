@@ -862,3 +862,129 @@ func TestInputConstantExtractor_ObjectPropertyExtraction(t *testing.T) {
 		})
 	}
 }
+
+func TestInputConstantExtractor_TimestampDefval(t *testing.T) {
+	extractor := NewInputConstantExtractor()
+
+	makeCall := func(defvalExpr ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Arguments: []ast.Expression{
+				&ast.ObjectExpression{
+					Properties: []ast.Property{
+						{Key: &ast.Identifier{Name: "defval"}, Value: defvalExpr},
+					},
+				},
+			},
+		}
+	}
+
+	timestampCall := func(arg ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee:    &ast.Identifier{Name: "timestamp"},
+			Arguments: []ast.Expression{arg},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		funcName string
+		call     *ast.CallExpression
+		expected string
+	}{
+		{
+			name:     "Pine colon form (2006-01-02:15:04) resolves to milliseconds",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01:00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "ISO space form (2006-01-02 15:04) resolves to milliseconds",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01 00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "ISO T form (2006-01-02T15:04) resolves to milliseconds",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01T00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "ISO full (2006-01-02T15:04:05) resolves to milliseconds",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01T00:00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "ISO full space form (2006-01-02 15:04:05) resolves to milliseconds",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01 00:00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "input.int with timestamp() defval also resolves (same code path)",
+			funcName: "input.int",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "2024-01-01:00:00"})),
+			expected: "1704067200000",
+		},
+		{
+			name:     "unparseable timestamp string falls back to zero",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: "not-a-date"})),
+			expected: "0",
+		},
+		{
+			name:     "non-string argument to timestamp() falls back to zero",
+			funcName: "input.time",
+			call:     makeCall(timestampCall(&ast.Literal{Value: 12345})),
+			expected: "0",
+		},
+		{
+			name:     "timestamp() with two arguments not recognised (count != 1)",
+			funcName: "input.time",
+			call: makeCall(&ast.CallExpression{
+				Callee: &ast.Identifier{Name: "timestamp"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "2024"},
+					&ast.Literal{Value: "01"},
+				},
+			}),
+			expected: "0",
+		},
+		{
+			name:     "non-timestamp callee is ignored, falls back to zero",
+			funcName: "input.time",
+			call: makeCall(&ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "timenow"},
+				Arguments: []ast.Expression{&ast.Literal{Value: "2024-01-01:00:00"}},
+			}),
+			expected: "0",
+		},
+		{
+			name:     "wrong property key bypasses extraction, falls back to zero",
+			funcName: "input.time",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: timestampCall(&ast.Literal{Value: "2024-01-01:00:00"}),
+							},
+						},
+					},
+				},
+			},
+			expected: "0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractor.ExtractInputConstant(tt.call, tt.funcName)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}

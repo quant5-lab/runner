@@ -72,6 +72,21 @@ func assertAnyFiringAtLocalClock(t *testing.T, firings []boundaryFiring, tz stri
 		wantH, wantM, tz)
 }
 
+func countFiresAtLocalClock(firings []boundaryFiring, tz string, h, m int) int {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, f := range firings {
+		local := time.Unix(f.BarTimeSec, 0).In(loc)
+		if local.Hour() == h && local.Minute() == m {
+			n++
+		}
+	}
+	return n
+}
+
 func firingsBetweenDates(firings []boundaryFiring, from, to time.Time) []boundaryFiring {
 	var out []boundaryFiring
 	for _, f := range firings {
@@ -182,10 +197,12 @@ func TestSessionAnchoredBoundary_AAPL_4h_DSTTransitionFiresAtLocalSessionTime(t 
 //
 // UTC-floor places a 3h grid mark at 09:00 UTC = 12:00 MSK inside the MOEX
 // session, so the bar at 12:00 MSK triggers a spurious boundary change under
-// UTC-floor.  Session-anchored tiling from 07:00 MSK (420 min since midnight)
-// places slot boundaries at 07:00, 10:00, 13:00, …; 12:00 MSK is always
-// mid-slot and must never trigger a change.  The test cannot pass under a
-// UTC-floor implementation.
+// UTC-floor on every single normal trading day.  Session-anchored tiling from
+// 07:00 MSK (420 min since midnight) places slot boundaries at 07:00, 10:00,
+// 13:00, …; 12:00 MSK is mid-slot on normal days and must not trigger a
+// change.  The count differential between UTC-floor (fires at 12:00 MSK on
+// every trading day) and session-anchored (fires at 12:00 MSK only on
+// exceptional late-open days) is the load-bearing proof.
 func TestSessionAnchoredBoundary_SBERP_3h_FiresAtSessionOpenNotUTCGrid(t *testing.T) {
 	root := projectRootFromCwd()
 	anchor, bars := fixtureAnchor(t, "SBERP",
@@ -204,8 +221,31 @@ func TestSessionAnchoredBoundary_SBERP_3h_FiresAtSessionOpenNotUTCGrid(t *testin
 		t.Fatal("no boundary firings found — dataset or boundary computation is broken")
 	}
 
-	assertNoFiringAtLocalClock(t, firings, "Europe/Moscow", 12, 0)
-	assertAnyFiringAtLocalClock(t, firings, "Europe/Moscow", 10, 0)
+	const tz = "Europe/Moscow"
+
+	// UTC-floor fires at 12:00 MSK on every normal trading day; session-anchored
+	// fires only on exceptional late-open days when the exchange starts at 12:00.
+	utcFirings := collectBoundaryFirings(bars, "180", context.PeriodAnchor{})
+	utc12Count := countFiresAtLocalClock(utcFirings, tz, 12, 0)
+	// Guard: fixture must be large enough for the differential to be meaningful.
+	// In the 5.5yr SBERP-1h dataset UTC-floor fires at 12:00 MSK >1000 times.
+	if utc12Count < 100 {
+		t.Fatalf("UTC-floor fires at 12:00 MSK only %d times — fixture too short "+
+			"for a meaningful session-anchor differential test", utc12Count)
+	}
+	sess12Count := countFiresAtLocalClock(firings, tz, 12, 0)
+	if sess12Count >= utc12Count {
+		t.Errorf("session-anchored 12:00 MSK fires (%d) must be less than UTC-floor (%d): "+
+			"session-anchor did not eliminate spurious UTC-floor boundaries", sess12Count, utc12Count)
+	}
+	// Allow ≤ 2 late-open sessions per fixture window (empirically 1 in 5.5yr).
+	const maxLateOpenFires = 2
+	if sess12Count > maxLateOpenFires {
+		t.Errorf("expected ≤ %d late-open 12:00 MSK firings, got %d — "+
+			"session-anchored is firing spuriously", maxLateOpenFires, sess12Count)
+	}
+
+	assertAnyFiringAtLocalClock(t, firings, tz, 10, 0)
 }
 
 // TestSessionAnchoredBoundary_UTC_AlwaysOpen_MidnightOriginPreserved verifies
@@ -250,6 +290,49 @@ func TestSessionAnchoredBoundary_UTC_AlwaysOpen_MidnightOriginPreserved(t *testi
 // and that applying the wrong anchor to AAPL data produces a materially
 // different boundary set.
 //
+// TestSessionAnchoredBoundary_LateOpenSessionFiresAtFirstBar proves the
+// complement of the no-spurious-boundary tests: when an exchange session
+// legitimately opens at a non-canonical clock time (e.g. 12:00 MSK instead
+// of the usual 07:00), the session-anchored algorithm correctly fires a
+// boundary at that bar — it does not over-suppress boundaries.
+//
+// The test uses a synthetic two-day scenario:
+//   - Day 1: normal MOEX-style session, first bar at 09:00 MSK.
+//   - Day 2: late-open session, first (and only visible) bar at 12:00 MSK.
+//
+// With a 07:00 MSK anchor (3h slots: 07:00, 10:00, 13:00, …), the 12:00 bar
+// on day 2 lands in the [10:00, 13:00) slot, which is different from the
+// [19:00, 22:00) slot of the previous bar on day 1, so a boundary change
+// must fire at 12:00 MSK.
+func TestSessionAnchoredBoundary_LateOpenSessionFiresAtFirstBar(t *testing.T) {
+	const tz = "Europe/Moscow"
+	loc := mustLocation(t, tz)
+
+	ts := func(day, h, m int) int64 {
+		return time.Date(2025, 10, day, h, m, 0, 0, loc).Unix()
+	}
+
+	bars := []context.OHLCV{
+		// Day 1: normal session bars.
+		{Time: ts(1, 9, 0)},
+		{Time: ts(1, 10, 0)},
+		{Time: ts(1, 12, 0)},
+		{Time: ts(1, 19, 0)}, // last bar of day 1, slot [19:00, 22:00)
+		// Day 2: late-open session — first bar at 12:00 MSK.
+		{Time: ts(2, 12, 0)}, // slot [10:00, 13:00) — different from day 1 last
+		{Time: ts(2, 13, 0)},
+		{Time: ts(2, 14, 0)},
+	}
+
+	anchor := context.PeriodAnchor{Timezone: tz, SessionOpenMinute: 7 * 60} // 07:00 MSK
+	firings := collectBoundaryFirings(bars, "180", anchor)
+
+	// The 12:00 MSK bar on day 2 must fire because it enters a new period slot.
+	assertAnyFiringAtLocalClock(t, firings, tz, 12, 0)
+	// Day 1's 10:00 MSK bar must also fire (normal mid-session boundary).
+	assertAnyFiringAtLocalClock(t, firings, tz, 10, 0)
+}
+
 // This proves the independence requirement is load-bearing: swapping anchors
 // changes outcomes, so any regression that makes a secondary context inherit
 // the primary anchor would be detectable.

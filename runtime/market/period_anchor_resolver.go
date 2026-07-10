@@ -20,23 +20,22 @@ func SessionAnchorFor(profile Profile) context.PeriodAnchor {
 	}
 }
 
-// For known exchanges whose ReferenceSession is not Regular (e.g. Binance
-// crypto, or an explicitly configured always-open override), bars are never
-// consulted and the anchor is midnight-origin.
+// For known exchanges (MOEX, NYSE, Binance, …) the curated table value is the
+// authoritative TV session-open anchor; bars are not consulted.  Fixtures may
+// include pre-trading bars (e.g. MOEX 09:00 MSK auction, 09:00 MSK pre-open)
+// that fall inside the defined session window but are not the canonical TV
+// boundary origin — observation would pick those up and shift the 3h (or any
+// multi-hour) grid to a wrong slot.
 //
-// For all other cases — regular-session known exchanges (MOEX, NYSE, …) and
-// any unrecognised exchange — the mode of per-day first-bar clock-minutes
-// is used as the session-open anchor.  Unrecognised-exchange tickers observe
-// rather than default, so crypto-unknown datasets naturally return 0
-// (midnight) while unrecognised stock exchanges return their actual session
-// open, with no exchange silently falling back to UTC midnight.  When bars are
-// absent the curated table entry serves as fallback.
+// For unknown exchanges the mode of per-day first-bar clock-minutes is used.
+// Unrecognised-exchange tickers observe rather than default, so
+// crypto-unknown datasets naturally return 0 (midnight) while unrecognised
+// stock exchanges return their actual session open, with no exchange silently
+// falling back to UTC midnight.  When bars are absent the curated table entry
+// serves as fallback.
 func DeriveSessionAnchor(profile Profile, bars []context.OHLCV) context.PeriodAnchor {
 	base := SessionAnchorFor(profile)
-	if len(bars) == 0 {
-		return base
-	}
-	if profile.Exchange != ExchangeUnknown && profile.ReferenceSession != ReferenceSessionRegular {
+	if len(bars) == 0 || profile.Exchange != ExchangeUnknown {
 		return base
 	}
 	return context.PeriodAnchor{

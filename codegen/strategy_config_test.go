@@ -29,6 +29,9 @@ func TestStrategyConfig_NewStrategyConfig(t *testing.T) {
 	if config.Pyramiding != defaultPyramiding {
 		t.Errorf("Expected pyramiding %d, got %d", defaultPyramiding, config.Pyramiding)
 	}
+	if config.ProcessOrdersOnClose {
+		t.Error("Expected ProcessOrdersOnClose to default to false")
+	}
 }
 
 /* TestStrategyConfig_MergeFrom_NilHandling verifies nil safety */
@@ -219,12 +222,13 @@ func TestStrategyConfig_MergeFrom_DefaultQtyTypeMerge(t *testing.T) {
 func TestStrategyConfig_MergeFrom_MultipleFields(t *testing.T) {
 	config := NewStrategyConfig()
 	other := &StrategyConfig{
-		Name:            "Multi-Field Strategy",
-		InitialCapital:  25000.0,
-		DefaultQtyValue: 3.0,
-		DefaultQtyType:  "strategy.fixed",
-		CommissionType:  "percent",
-		CommissionValue: 0.1,
+		Name:                 "Multi-Field Strategy",
+		InitialCapital:       25000.0,
+		DefaultQtyValue:      3.0,
+		DefaultQtyType:       "strategy.fixed",
+		CommissionType:       "percent",
+		CommissionValue:      0.1,
+		ProcessOrdersOnClose: true,
 	}
 
 	config.MergeFrom(other)
@@ -246,6 +250,9 @@ func TestStrategyConfig_MergeFrom_MultipleFields(t *testing.T) {
 	}
 	if config.CommissionValue != 0.1 {
 		t.Errorf("Expected commission_value 0.1, got %.4f", config.CommissionValue)
+	}
+	if !config.ProcessOrdersOnClose {
+		t.Error("Expected ProcessOrdersOnClose to be merged as true")
 	}
 }
 
@@ -421,6 +428,39 @@ func TestStrategyConfig_MergeFrom_Commission(t *testing.T) {
 			}
 			if config.CommissionValue != tt.expectedCommissionValue {
 				t.Errorf("Expected commission_value %.4f, got %.4f", tt.expectedCommissionValue, config.CommissionValue)
+			}
+		})
+	}
+}
+
+/*
+	TestStrategyConfig_MergeFrom_ProcessOrdersOnClose verifies the one-way latch:
+
+true propagates into base; false never clears a true already on base.
+*/
+func TestStrategyConfig_MergeFrom_ProcessOrdersOnClose(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     bool
+		incoming bool
+		want     bool
+	}{
+		{name: "false base + true incoming → true", base: false, incoming: true, want: true},
+		{name: "false base + false incoming → false", base: false, incoming: false, want: false},
+		{name: "true base + false incoming → true (latch)", base: true, incoming: false, want: true},
+		{name: "true base + true incoming → true", base: true, incoming: true, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := NewStrategyConfig()
+			config.ProcessOrdersOnClose = tt.base
+			other := &StrategyConfig{ProcessOrdersOnClose: tt.incoming}
+
+			config.MergeFrom(other)
+
+			if config.ProcessOrdersOnClose != tt.want {
+				t.Errorf("ProcessOrdersOnClose = %v, want %v (base=%v incoming=%v)", config.ProcessOrdersOnClose, tt.want, tt.base, tt.incoming)
 			}
 		})
 	}

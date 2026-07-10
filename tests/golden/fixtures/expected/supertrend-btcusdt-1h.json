@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Supertrend",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-06-13T14:23:50Z",
+  "generatedAt": "2026-07-09T22:19:57Z",
   "result": {
     "trades": [
       {
@@ -431,12 +431,12 @@
         "entryTime": 1760288400,
         "entryPrice": 114069.35,
         "entryComment": "",
-        "exitBar": 3255,
-        "exitTime": 1760418000,
-        "exitPrice": 113115.775,
+        "exitBar": 3256,
+        "exitTime": 1760421600,
+        "exitPrice": 112078,
         "exitComment": "",
         "size": 0.0008600000000000001,
-        "profit": -0.8396124207500102,
+        "profit": -1.7320096721000051,
         "direction": "long"
       },
       {
@@ -459,12 +459,12 @@
         "entryTime": 1761058800,
         "entryPrice": 112170.52,
         "entryComment": "",
-        "exitBar": 3441,
-        "exitTime": 1761087600,
-        "exitPrice": 108861.08499999999,
+        "exitBar": 3442,
+        "exitTime": 1761091200,
+        "exitPrice": 107922.06,
         "exitComment": "",
         "size": 0.00088,
-        "profit": -2.9317535812400113,
+        "profit": -3.7580129470400054,
         "direction": "long"
       },
       {
@@ -533,8 +533,8 @@
         "exitTime": 1763931600,
         "exitPrice": 87914.12499999999,
         "exitComment": "",
-        "size": 0.0011300000000000001,
-        "profit": 1.0942250559749802,
+        "size": 0.0011200000000000001,
+        "profit": 1.0845416483999806,
         "direction": "long"
       },
       {
@@ -707,9 +707,10 @@
       }
     ],
     "openTrades": [],
-    "equity": 979.9698866243449,
-    "netProfit": -20.030113375655123,
+    "equity": 978.2415465996199,
+    "netProfit": -21.75845340038011,
     "totalTrades": 0,
+    "initialCapital": 1000,
     "plots": {}
   }
 }

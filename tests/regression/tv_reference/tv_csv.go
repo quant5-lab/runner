@@ -152,6 +152,22 @@ func HasSizeData(trades []TVTrade) bool {
 	return false
 }
 
+// ZeroSizeRunnerMatches returns the count of matched pairs where the runner trade
+// has Size == 0. A zero size on a matched runner trade is a distinct defect from a
+// size residual: MatchSize cannot catch it when tvSize is also zero, and the error
+// message differs — this function surfaces the exact "absent quantity" case.
+func ZeroSizeRunnerMatches(runner []RunnerTrade, tv []TVTrade, timeTol time.Duration, priceTol float64) int {
+	tol := MatchTolerance{Time: timeTol, Price: priceTol}
+	pairs := closedRunnerPairs(runner, tv, tol)
+	n := 0
+	for _, p := range pairs {
+		if runner[p.RunnerIdx].Size == 0 {
+			n++
+		}
+	}
+	return n
+}
+
 func pnlMatchRelative(a, b, relTol float64) bool {
 	if a == b {
 		return true
@@ -336,6 +352,9 @@ var newYorkLocation = func() *time.Location {
 }()
 
 func parseDateTime(s string, tz TVTimezone) (time.Time, error) {
+	if len(s) == 10 {
+		return parseDateOnly(s, tz)
+	}
 	switch tz {
 	case TVTimezoneMoscow:
 		t, err := time.Parse("2006-01-02 15:04", s)
@@ -357,6 +376,29 @@ func parseDateTime(s string, tz TVTimezone) (time.Time, error) {
 		return t, nil
 	default:
 		t, err := time.Parse("2006-01-02 15:04", s)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t, nil
+	}
+}
+
+func parseDateOnly(s string, tz TVTimezone) (time.Time, error) {
+	switch tz {
+	case TVTimezoneMoscow:
+		t, err := time.Parse("2006-01-02 15:04", s+" 00:00")
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t.Add(-3 * time.Hour), nil
+	case TVTimezoneNewYork:
+		t, err := time.ParseInLocation("2006-01-02 15:04", s+" 00:00", newYorkLocation)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t.UTC(), nil
+	default:
+		t, err := time.Parse("2006-01-02", s)
 		if err != nil {
 			return time.Time{}, err
 		}

@@ -1,6 +1,7 @@
 package tv_reference
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -56,6 +57,7 @@ func TestFilterByEntryWindow(t *testing.T) {
 		{"single_bar_window", "2025-01-02 12:00", "2025-01-02 12:00", []float64{101}},
 		{"partial_overlap", "2025-01-02 00:00", "2025-01-04 00:00", []float64{101, 102}},
 		{"empty_input", "2025-01-01 00:00", "2025-01-06 00:00", nil},
+		{"inverted_window_start_after_end_returns_empty", "2025-01-05 00:00", "2025-01-01 00:00", nil},
 	}
 
 	for _, tc := range cases {
@@ -286,6 +288,71 @@ func TestMatchExact(t *testing.T) {
 	}
 }
 
+func TestMatchExact_ZeroTimeTolerance(t *testing.T) {
+	priceTol := 1.0
+
+	t.Run("identical_timestamps_match", func(t *testing.T) {
+		ts := parseUTC("2025-06-01 09:00")
+		runner := []RunnerTrade{{EntryUTC: ts, EntryPrice: 100, Direction: "long"}}
+		tv := []TVTrade{{EntryUTC: ts, EntryPrice: 100, Direction: "long"}}
+		matched, ro, to := MatchExact(runner, tv, 0, priceTol)
+		if matched != 1 || ro != 0 || to != 0 {
+			t.Errorf("matched=%d ro=%d to=%d, want 1/0/0", matched, ro, to)
+		}
+	})
+
+	t.Run("one_second_ahead_no_match", func(t *testing.T) {
+		ts := parseUTC("2025-06-01 09:00")
+		runner := []RunnerTrade{{EntryUTC: ts, EntryPrice: 100, Direction: "long"}}
+		tv := []TVTrade{{EntryUTC: ts.Add(time.Second), EntryPrice: 100, Direction: "long"}}
+		matched, ro, to := MatchExact(runner, tv, 0, priceTol)
+		if matched != 0 || ro != 1 || to != 1 {
+			t.Errorf("matched=%d ro=%d to=%d, want 0/1/1", matched, ro, to)
+		}
+	})
+
+	t.Run("one_second_behind_no_match", func(t *testing.T) {
+		ts := parseUTC("2025-06-01 09:00")
+		runner := []RunnerTrade{{EntryUTC: ts, EntryPrice: 100, Direction: "long"}}
+		tv := []TVTrade{{EntryUTC: ts.Add(-time.Second), EntryPrice: 100, Direction: "long"}}
+		matched, ro, to := MatchExact(runner, tv, 0, priceTol)
+		if matched != 0 || ro != 1 || to != 1 {
+			t.Errorf("matched=%d ro=%d to=%d, want 0/1/1", matched, ro, to)
+		}
+	})
+}
+
+func TestMatchExact_ZeroPriceTolerance(t *testing.T) {
+	timeTol := time.Hour
+
+	t.Run("exact_same_price_matches", func(t *testing.T) {
+		runner := []RunnerTrade{makeRunnerTrade("2025-06-01 09:00", 100.00)}
+		tv := []TVTrade{makeTVTrade("2025-06-01 09:00", 100.00)}
+		matched, ro, to := MatchExact(runner, tv, timeTol, 0)
+		if matched != 1 || ro != 0 || to != 0 {
+			t.Errorf("matched=%d ro=%d to=%d, want 1/0/0", matched, ro, to)
+		}
+	})
+
+	t.Run("price_above_by_smallest_representable_diff_no_match", func(t *testing.T) {
+		runner := []RunnerTrade{makeRunnerTrade("2025-06-01 09:00", 100.000)}
+		tv := []TVTrade{makeTVTrade("2025-06-01 09:00", 100.001)}
+		matched, ro, to := MatchExact(runner, tv, timeTol, 0)
+		if matched != 0 || ro != 1 || to != 1 {
+			t.Errorf("matched=%d ro=%d to=%d, want 0/1/1", matched, ro, to)
+		}
+	})
+
+	t.Run("price_below_by_smallest_representable_diff_no_match", func(t *testing.T) {
+		runner := []RunnerTrade{makeRunnerTrade("2025-06-01 09:00", 99.999)}
+		tv := []TVTrade{makeTVTrade("2025-06-01 09:00", 100.000)}
+		matched, ro, to := MatchExact(runner, tv, timeTol, 0)
+		if matched != 0 || ro != 1 || to != 1 {
+			t.Errorf("matched=%d ro=%d to=%d, want 0/1/1", matched, ro, to)
+		}
+	})
+}
+
 func TestDirectionsMatch(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -451,12 +518,116 @@ func TestParseDateTime_NewYork_EST(t *testing.T) {
 }
 
 func TestParseDateTime_InvalidFormat(t *testing.T) {
-	cases := []string{"not-a-date", "2025/01/15 13:00", "", "2025-01-15"}
-	for _, tz := range []TVTimezone{TVTimezoneUTC, TVTimezoneMoscow, TVTimezoneNewYork} {
-		for _, s := range cases {
+	datetimeCases := []string{
+		"not-a-date",
+		"2025/01/15 13:00",
+		"",
+		"2025-01-15 bad",
+	}
+	dateOnlyCases := []string{
+		"2025-13-01",
+		"2025-00-15",
+		"2025-02-30",
+	}
+	tzs := []TVTimezone{TVTimezoneUTC, TVTimezoneMoscow, TVTimezoneNewYork}
+	for _, tz := range tzs {
+		for _, s := range append(datetimeCases, dateOnlyCases...) {
 			if _, err := parseDateTime(s, tz); err == nil {
 				t.Errorf("tz=%d input=%q: expected error, got nil", tz, s)
 			}
+		}
+	}
+}
+
+func TestParseDateTime_DateOnly(t *testing.T) {
+	type dateCase struct{ input, wantUTC string }
+	run := func(tz TVTimezone, cases []dateCase) {
+		t.Helper()
+		for _, tc := range cases {
+			tc := tc
+			t.Run(fmt.Sprintf("tz=%d/%s", tz, tc.input), func(t *testing.T) {
+				got, err := parseDateTime(tc.input, tz)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				want, _ := time.Parse("2006-01-02 15:04", tc.wantUTC)
+				if !got.UTC().Equal(want) {
+					t.Errorf("got %s, want %s", got.UTC().Format("2006-01-02 15:04"), want.Format("2006-01-02 15:04"))
+				}
+			})
+		}
+	}
+
+	// UTC: midnight is midnight regardless of timezone parameter.
+	run(TVTimezoneUTC, []dateCase{
+		{"2025-01-15", "2025-01-15 00:00"},
+		{"2018-02-01", "2018-02-01 00:00"},
+		{"2024-02-29", "2024-02-29 00:00"}, // leap year
+		{"1970-01-01", "1970-01-01 00:00"}, // Unix epoch
+	})
+
+	// Moscow: UTC+3 with no DST since 2014 — always subtract exactly 3h.
+	// Midnight MSK falls on the preceding UTC calendar day.
+	run(TVTimezoneMoscow, []dateCase{
+		{"2025-01-15", "2025-01-14 21:00"}, // winter
+		{"2025-07-04", "2025-07-03 21:00"}, // summer — offset identical to winter (no DST)
+		{"2026-01-01", "2025-12-31 21:00"}, // year boundary: midnight Jan 1 MSK → Dec 31 21:00 UTC
+		{"2024-02-29", "2024-02-28 21:00"}, // leap-year date
+		{"1970-01-01", "1969-12-31 21:00"}, // Unix epoch boundary
+	})
+
+	// New York: DST-aware (EST = UTC-5 in winter, EDT = UTC-4 in summer).
+	// Midnight is always before any intra-day DST switch, so the offset at midnight
+	// is determined by which regime the date falls in.
+	run(TVTimezoneNewYork, []dateCase{
+		{"2025-01-15", "2025-01-15 05:00"}, // EST (UTC-5)
+		{"2025-07-04", "2025-07-04 04:00"}, // EDT (UTC-4)
+		// DST transitions: spring-forward is 2025-03-09 02:00 EST→EDT;
+		// fall-back is 2025-11-02 02:00 EDT→EST. Midnight on each day
+		// precedes the switch, so the offset matches the regime before the switch.
+		{"2025-03-09", "2025-03-09 05:00"}, // spring-forward day — midnight still EST
+		{"2025-11-02", "2025-11-02 04:00"}, // fall-back day   — midnight still EDT
+		{"2024-02-29", "2024-02-29 05:00"}, // leap-year date (EST)
+		{"2026-01-01", "2026-01-01 05:00"}, // year boundary (EST)
+	})
+}
+
+// TestParseDateTime_DateOnly_EquivalentToMidnightDatetime verifies the contractual
+// invariant of parseDateOnly: for every supported timezone, parsing a bare date is
+// exactly equivalent to parsing that date suffixed with " 00:00" in datetime format.
+// This invariant is the reason the date-only branch must honour the tz parameter —
+// without it the two forms produce different UTC timestamps.
+func TestParseDateTime_DateOnly_EquivalentToMidnightDatetime(t *testing.T) {
+	dates := []string{
+		"2025-01-15", // EST, MSK winter
+		"2025-07-04", // EDT, MSK summer
+		"2025-03-09", // NY DST spring-forward day
+		"2025-11-02", // NY DST fall-back day
+		"2024-02-29", // leap year
+		"2026-01-01", // year boundary
+		"1970-01-01", // Unix epoch
+	}
+	tzs := []TVTimezone{TVTimezoneUTC, TVTimezoneMoscow, TVTimezoneNewYork}
+	for _, tz := range tzs {
+		for _, date := range dates {
+			tz, date := tz, date
+			t.Run(fmt.Sprintf("tz=%d/%s", tz, date), func(t *testing.T) {
+				dateOnly, err := parseDateTime(date, tz)
+				if err != nil {
+					t.Fatalf("date-only parse(%q, tz=%d): %v", date, tz, err)
+				}
+				midnight, err := parseDateTime(date+" 00:00", tz)
+				if err != nil {
+					t.Fatalf("midnight parse(%q, tz=%d): %v", date+" 00:00", tz, err)
+				}
+				if !dateOnly.UTC().Equal(midnight.UTC()) {
+					t.Errorf(
+						"date-only %q → %s, midnight %q → %s; must be equal",
+						date, dateOnly.UTC().Format("2006-01-02 15:04:05"),
+						date+" 00:00", midnight.UTC().Format("2006-01-02 15:04:05"),
+					)
+				}
+			})
 		}
 	}
 }
@@ -821,6 +992,70 @@ func TestParseTrades_NewYorkTimezone_HonoursDST(t *testing.T) {
 	}
 }
 
+// TestParseTrades_DateOnlyFormat_MoscowTimezone mirrors TestParseTrades_MoscowTimezone_ConvertsToUTC
+// but exercises the date-only branch (YYYY-MM-DD without a time component), as exported
+// by TV's Strategy Tester for monthly-bar strategies.
+func TestParseTrades_DateOnlyFormat_MoscowTimezone(t *testing.T) {
+	rawCSV := `Trade number,Type,Date and time,Price
+1,Entry Long,2025-07-01,100
+1,Exit Long,2025-08-01,110
+`
+	tmpPath := filepath.Join(t.TempDir(), "mos_dateonly.csv")
+	if err := os.WriteFile(tmpPath, []byte(rawCSV), 0644); err != nil {
+		t.Fatalf("write temp CSV: %v", err)
+	}
+
+	trades, err := LoadTrades(tmpPath, TVTimezoneMoscow)
+	if err != nil {
+		t.Fatalf("LoadTrades: %v", err)
+	}
+	if len(trades) != 1 {
+		t.Fatalf("got %d trades, want 1", len(trades))
+	}
+
+	wantEntry := time.Date(2025, 6, 30, 21, 0, 0, 0, time.UTC) // midnight Jul 1 MSK → Jun 30 21:00 UTC
+	wantExit := time.Date(2025, 7, 31, 21, 0, 0, 0, time.UTC)  // midnight Aug 1 MSK → Jul 31 21:00 UTC
+	if !trades[0].EntryUTC.Equal(wantEntry) {
+		t.Errorf("entry = %s, want %s (date-only 2025-07-01 MSK)", trades[0].EntryUTC.UTC().Format(time.RFC3339), wantEntry.Format(time.RFC3339))
+	}
+	if !trades[0].ExitUTC.Equal(wantExit) {
+		t.Errorf("exit = %s, want %s (date-only 2025-08-01 MSK)", trades[0].ExitUTC.UTC().Format(time.RFC3339), wantExit.Format(time.RFC3339))
+	}
+}
+
+// TestParseTrades_DateOnlyFormat_NewYorkTimezone mirrors TestParseTrades_NewYorkTimezone_HonoursDST
+// but exercises the date-only branch with DST-sensitive dates: a summer date (EDT) and a winter
+// date (EST) both round-tripped to their correct UTC midnight.
+func TestParseTrades_DateOnlyFormat_NewYorkTimezone(t *testing.T) {
+	rawCSV := `Trade number,Type,Date and time,Price
+1,Entry Long,2025-07-01,100
+1,Exit Long,2025-08-01,110
+2,Entry Long,2025-01-15,200
+2,Exit Long,2025-02-15,210
+`
+	tmpPath := filepath.Join(t.TempDir(), "ny_dateonly.csv")
+	if err := os.WriteFile(tmpPath, []byte(rawCSV), 0644); err != nil {
+		t.Fatalf("write temp CSV: %v", err)
+	}
+
+	trades, err := LoadTrades(tmpPath, TVTimezoneNewYork)
+	if err != nil {
+		t.Fatalf("LoadTrades: %v", err)
+	}
+	if len(trades) != 2 {
+		t.Fatalf("got %d trades, want 2", len(trades))
+	}
+
+	wantSummerEntry := time.Date(2025, 7, 1, 4, 0, 0, 0, time.UTC)  // midnight EDT → 04:00 UTC
+	wantWinterEntry := time.Date(2025, 1, 15, 5, 0, 0, 0, time.UTC) // midnight EST → 05:00 UTC
+	if !trades[0].EntryUTC.Equal(wantSummerEntry) {
+		t.Errorf("summer entry = %s, want %s (date-only 2025-07-01 EDT)", trades[0].EntryUTC.UTC().Format(time.RFC3339), wantSummerEntry.Format(time.RFC3339))
+	}
+	if !trades[1].EntryUTC.Equal(wantWinterEntry) {
+		t.Errorf("winter entry = %s, want %s (date-only 2025-01-15 EST)", trades[1].EntryUTC.UTC().Format(time.RFC3339), wantWinterEntry.Format(time.RFC3339))
+	}
+}
+
 func TestLoadRunnerTrades(t *testing.T) {
 	t.Run("closed_and_open_trades_concatenated", func(t *testing.T) {
 		data := `{
@@ -1139,6 +1374,26 @@ func TestMatchSize_EdgeCases(t *testing.T) {
 			wantMatched: 2, wantMismatched: 2, wantMaxResidual: 0.10,
 		},
 		{
+			name: "zero_runner_size_with_tv_size_is_mismatch",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+			},
+			wantMatched: 1, wantMismatched: 1, wantMaxResidual: 1.0,
+		},
+		{
+			name: "zero_tv_size_with_runner_size_uses_denominator_floor",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0.5},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+			},
+			wantMatched: 1, wantMismatched: 1, wantMaxResidual: 0.5,
+		},
+		{
 			name: "tv_trade_not_reused_for_second_runner_match",
 			runner: []RunnerTrade{
 				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
@@ -1163,6 +1418,187 @@ func TestMatchSize_EdgeCases(t *testing.T) {
 			}
 			if math.Abs(maxResidual-tc.wantMaxResidual) > 1e-10 {
 				t.Errorf("maxResidual = %.10f, want %.10f", maxResidual, tc.wantMaxResidual)
+			}
+		})
+	}
+}
+
+func TestZeroSizeRunnerMatches(t *testing.T) {
+	timeTol := time.Hour
+	priceTol := 1.0
+
+	t0 := parseUTC("2025-01-01 10:00")
+	t1 := parseUTC("2025-01-02 10:00")
+	t2 := parseUTC("2025-01-03 10:00")
+	tFar := parseUTC("2025-02-01 10:00")
+
+	cases := []struct {
+		name   string
+		runner []RunnerTrade
+		tv     []TVTrade
+		want   int
+	}{
+		{
+			name: "nil_both",
+			want: 0,
+		},
+		{
+			name: "nil_runner",
+			tv:   []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want: 0,
+		},
+		{
+			name:   "nil_tv",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0}},
+			want:   0,
+		},
+		{
+			name:   "empty_both",
+			runner: []RunnerTrade{},
+			tv:     []TVTrade{},
+			want:   0,
+		},
+		{
+			name:   "all_positive_sizes_no_zero",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+		{
+			name:   "single_zero_size_runner_matched",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   1,
+		},
+		{
+			name:   "zero_size_runner_outside_time_tolerance_not_counted",
+			runner: []RunnerTrade{{EntryUTC: tFar, EntryPrice: 100, Direction: "long", Size: 0}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+		{
+			name:   "zero_size_runner_outside_price_tolerance_not_counted",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 999, Direction: "long", Size: 0}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+		{
+			name:   "zero_size_runner_direction_mismatch_not_counted",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "short", Size: 0}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+		{
+			name: "multiple_zero_size_runners_all_matched",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 0},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 5},
+			},
+			want: 2,
+		},
+		{
+			name: "mixed_zero_and_positive_runner_sizes_counts_only_zeros",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 5},
+				{EntryUTC: t2, EntryPrice: 300, Direction: "long", Size: 0},
+			},
+			tv: []TVTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5},
+				{EntryUTC: t1, EntryPrice: 200, Direction: "long", Size: 5},
+				{EntryUTC: t2, EntryPrice: 300, Direction: "long", Size: 5},
+			},
+			want: 2,
+		},
+		{
+			name:   "open_runner_with_zero_size_excluded",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0, IsOpen: true}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+		{
+			// Distinguishes from MatchSize: SizeResidual(0,0)==0 would not flag this,
+			// but a zero runner size is a defect regardless of the TV size.
+			name:   "tv_size_also_zero_runner_zero_still_detected",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0}},
+			want:   1,
+		},
+		{
+			name: "single_tv_slot_not_reused_for_two_zero_size_runners",
+			runner: []RunnerTrade{
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+				{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0},
+			},
+			tv:   []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want: 1,
+		},
+		{
+			name:   "fractional_positive_size_not_treated_as_zero",
+			runner: []RunnerTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 0.00000001}},
+			tv:     []TVTrade{{EntryUTC: t0, EntryPrice: 100, Direction: "long", Size: 5}},
+			want:   0,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := ZeroSizeRunnerMatches(tc.runner, tc.tv, timeTol, priceTol)
+			if got != tc.want {
+				t.Errorf("ZeroSizeRunnerMatches = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestZeroSizeRunnerMatches_InputOrderInvariant verifies that rearranging the
+// runner or TV slices does not change the count, since the underlying matching
+// uses maximum bipartite matching (not greedy, not position-dependent).
+func TestZeroSizeRunnerMatches_InputOrderInvariant(t *testing.T) {
+	timeTol := time.Hour
+	priceTol := 1.0
+
+	runner := []RunnerTrade{
+		{EntryUTC: parseUTC("2025-01-03 10:00"), EntryPrice: 300, Direction: "long", Size: 0},
+		{EntryUTC: parseUTC("2025-01-01 10:00"), EntryPrice: 100, Direction: "long", Size: 0},
+		{EntryUTC: parseUTC("2025-01-02 10:00"), EntryPrice: 200, Direction: "long", Size: 5},
+	}
+	tv := []TVTrade{
+		{EntryUTC: parseUTC("2025-01-02 10:00"), EntryPrice: 200, Direction: "long", Size: 5},
+		{EntryUTC: parseUTC("2025-01-03 10:00"), EntryPrice: 300, Direction: "long", Size: 5},
+		{EntryUTC: parseUTC("2025-01-01 10:00"), EntryPrice: 100, Direction: "long", Size: 5},
+	}
+
+	want := ZeroSizeRunnerMatches(runner, tv, timeTol, priceTol)
+
+	revRunner := append([]RunnerTrade(nil), runner...)
+	for i, j := 0, len(revRunner)-1; i < j; i, j = i+1, j-1 {
+		revRunner[i], revRunner[j] = revRunner[j], revRunner[i]
+	}
+	revTV := append([]TVTrade(nil), tv...)
+	for i, j := 0, len(revTV)-1; i < j; i, j = i+1, j-1 {
+		revTV[i], revTV[j] = revTV[j], revTV[i]
+	}
+
+	for _, tc := range []struct {
+		name   string
+		runner []RunnerTrade
+		tv     []TVTrade
+	}{
+		{"runner_reversed", revRunner, tv},
+		{"tv_reversed", runner, revTV},
+		{"both_reversed", revRunner, revTV},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := ZeroSizeRunnerMatches(tc.runner, tc.tv, timeTol, priceTol)
+			if got != want {
+				t.Errorf("ZeroSizeRunnerMatches = %d, want %d", got, want)
 			}
 		})
 	}

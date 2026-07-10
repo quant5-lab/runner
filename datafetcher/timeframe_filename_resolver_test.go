@@ -1,7 +1,6 @@
 package datafetcher
 
 import (
-	"path/filepath"
 	"testing"
 )
 
@@ -84,64 +83,51 @@ func TestEquivalentTimeframeTokens_SymmetricEquivalence(t *testing.T) {
 	}
 }
 
-func TestCandidateFixturePaths(t *testing.T) {
-	dir := "/data"
-	cases := []struct {
-		symbol    string
-		timeframe string
-		want      []string
-	}{
-		// Intraday suffixed — canonical then numeric alternate.
-		{"SBERP", "1h", []string{filepath.Join(dir, "SBERP_1h.json"), filepath.Join(dir, "SBERP_60.json")}},
-		{"SBERP", "4h", []string{filepath.Join(dir, "SBERP_4h.json"), filepath.Join(dir, "SBERP_240.json")}},
-		{"BTCUSDT", "1h", []string{filepath.Join(dir, "BTCUSDT_1h.json"), filepath.Join(dir, "BTCUSDT_60.json")}},
-		// Intraday numeric — identical path list as the suffixed counterpart.
-		{"SBERP", "60", []string{filepath.Join(dir, "SBERP_1h.json"), filepath.Join(dir, "SBERP_60.json")}},
-		{"SBERP", "240", []string{filepath.Join(dir, "SBERP_4h.json"), filepath.Join(dir, "SBERP_240.json")}},
-		// Calendar-scale — single candidate, no numeric fallback.
-		{"AAPL", "1D", []string{filepath.Join(dir, "AAPL_1D.json")}},
-		{"AAPL", "2D", []string{filepath.Join(dir, "AAPL_2D.json")}},
-		{"AAPL", "1W", []string{filepath.Join(dir, "AAPL_1W.json")}},
-		{"AAPL", "1M", []string{filepath.Join(dir, "AAPL_1M.json")}},
-	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.symbol+":"+tc.timeframe, func(t *testing.T) {
-			got := candidateFixturePaths(dir, tc.symbol, tc.timeframe)
-			if len(got) != len(tc.want) {
-				t.Fatalf("got %v, want %v", got, tc.want)
+// TestEquivalentTimeframeTokens_UnknownTokenPassthrough verifies that tokens
+// unrecognised by TimeframeToSeconds (secs == 0) are returned as a single-element
+// slice containing the original token unchanged. This ensures callers that rely
+// on "at least try the literal token" behaviour never receive an empty path list.
+func TestEquivalentTimeframeTokens_UnknownTokenPassthrough(t *testing.T) {
+	for _, token := range []string{"", "unknown", "wtf", "9999x"} {
+		token := token
+		t.Run(token, func(t *testing.T) {
+			got := equivalentTimeframeTokens(token)
+			if len(got) != 1 {
+				t.Fatalf("got %v (len %d), want single-element passthrough", got, len(got))
 			}
-			for i, w := range tc.want {
-				if got[i] != w {
-					t.Errorf("[%d]: got %q, want %q", i, got[i], w)
-				}
+			if got[0] != token {
+				t.Errorf("got %q, want passthrough of original token %q", got[0], token)
 			}
 		})
 	}
 }
 
-// TestCandidateFixturePaths_EquivalentInputsProduceSamePaths verifies that two
-// tokens naming the same period generate the same ordered candidate list —
-// resolution is a property of the period, not the token encoding.
-func TestCandidateFixturePaths_EquivalentInputsProduceSamePaths(t *testing.T) {
-	pairs := [][2]string{
-		{"1h", "60"},
-		{"4h", "240"},
-		{"2h", "120"},
-		{"15m", "15"},
-		{"30m", "30"},
-	}
-	for _, pair := range pairs {
-		a := candidateFixturePaths("/dir", "SYM", pair[0])
-		b := candidateFixturePaths("/dir", "SYM", pair[1])
-		if len(a) != len(b) {
-			t.Errorf("(%q,%q) path count mismatch: %d vs %d", pair[0], pair[1], len(a), len(b))
-			continue
-		}
-		for i := range a {
-			if a[i] != b[i] {
-				t.Errorf("(%q,%q)[%d]: %q vs %q", pair[0], pair[1], i, a[i], b[i])
+// TestEquivalentTimeframeTokens_SubMinutePeriodHasNoNumericAlternate verifies
+// that seconds-scale periods are not assigned a minute-count alternate because
+// they are not expressible as a whole number of minutes.
+func TestEquivalentTimeframeTokens_SubMinutePeriodHasNoNumericAlternate(t *testing.T) {
+	for _, token := range []string{"1s", "5s", "10s", "30s"} {
+		token := token
+		t.Run(token, func(t *testing.T) {
+			got := equivalentTimeframeTokens(token)
+			if len(got) != 1 {
+				t.Errorf("got %v, want exactly one token (no minute-count alternate for sub-minute period)", got)
 			}
-		}
+		})
+	}
+}
+
+// TestEquivalentTimeframeTokens_CalendarScaleHasNoNumericAlternate verifies
+// that daily-and-above periods carry no numeric minute-count alternate because
+// Pine Script does not accept minute counts for calendar-scale timeframes.
+func TestEquivalentTimeframeTokens_CalendarScaleHasNoNumericAlternate(t *testing.T) {
+	for _, token := range []string{"1D", "2D", "3D", "1W", "1M", "12M"} {
+		token := token
+		t.Run(token, func(t *testing.T) {
+			got := equivalentTimeframeTokens(token)
+			if len(got) != 1 {
+				t.Errorf("got %v, want exactly one token (no numeric alternate for calendar-scale)", got)
+			}
+		})
 	}
 }

@@ -484,3 +484,129 @@ func TestCloseAll_WithNoPendingExits(t *testing.T) {
 		})
 	}
 }
+
+// TestExitWithLevels_BothNaN_NeverFires verifies that registering an exit with
+// stop=NaN and limit=NaN on every bar never triggers a close, regardless of how
+// large the price moves are. This is the base case for strategies that compute
+// their TP/SL from secondary-timeframe data (e.g. daily pivots): when the data
+// feed returns all-NaN, no exit must silently fire.
+func TestExitWithLevels_BothNaN_NeverFires(t *testing.T) {
+	for _, dir := range []struct {
+		name  string
+		setup func() (*Strategy, string)
+	}{
+		{"long", func() (*Strategy, string) { return newStrategyWithLongTrade(1, 100), "buy" }},
+		{"short", func() (*Strategy, string) { return newStrategyWithShortTrade(1, 100), "sell" }},
+	} {
+		t.Run(dir.name, func(t *testing.T) {
+			strat, entryID := dir.setup()
+
+			for bar := 2; bar <= 30; bar++ {
+				strat.OnBarUpdate(bar, 100, int64(bar)*1000)
+				strat.ExitWithLevels("exit", entryID, math.NaN(), math.NaN(),
+					200, 50, 100, int64(bar)*1000, "")
+				// Large bar range (50..200) that would breach any non-NaN stop or limit
+				strat.OnBarMetrics(100, 200, 50, int64(bar)*1000)
+			}
+
+			if got := len(strat.tradeHistory.GetClosedTrades()); got != 0 {
+				t.Errorf("expected 0 closed trades when stop=NaN and limit=NaN, got %d", got)
+			}
+			if got := len(strat.tradeHistory.GetOpenTrades()); got != 1 {
+				t.Errorf("expected 1 open trade, got %d", got)
+			}
+		})
+	}
+}
+
+// TestExitWithLevels_IndependentPerEntry_OnlyMatchingBreachFires verifies that
+// when two concurrent open trades have separate exit registrations, breaching
+// one trade's stop level closes only that trade and leaves the other open. This
+// covers the per-entry isolation invariant: a pending exit bound to entryID A
+// must never close a trade for entryID B.
+func TestExitWithLevels_IndependentPerEntry_OnlyMatchingBreachFires(t *testing.T) {
+	strat := NewStrategy()
+	strat.Call("test", 100000)
+	strat.SetDefaultQty(1, "fixed")
+
+	// Bar 0: schedule two long entries with different IDs via pyramiding.
+	strat.OnBarUpdate(0, 99, 1000)
+	strat.Entry("buy1", Long, 1, "")
+	strat.Entry("buy2", Long, 1, "")
+	strat.OnBarMetrics(99, 100, 98, 1000)
+
+	// Bar 1: both entries fill at open 100.
+	strat.OnBarUpdate(1, 100, 2000)
+	strat.OnBarMetrics(100, 101, 99, 2000)
+
+	if got := len(strat.tradeHistory.GetOpenTrades()); got != 2 {
+		t.Fatalf("expected 2 open trades after dual entry, got %d", got)
+	}
+
+	// Bar 2: register stop exits — buy1 stop=90, buy2 stop=80 (not eligible yet).
+	strat.OnBarUpdate(2, 100, 3000)
+	strat.ExitWithLevels("exit1", "buy1", 90, math.NaN(), 102, 98, 100, 3000, "")
+	strat.ExitWithLevels("exit2", "buy2", 80, math.NaN(), 102, 98, 100, 3000, "")
+	strat.OnBarMetrics(100, 102, 98, 3000)
+
+	// Bar 3: eligible; low=88 breaches buy1 stop (88 ≤ 90) but not buy2 stop (88 > 80).
+	strat.OnBarUpdate(3, 100, 4000)
+	strat.ExitWithLevels("exit1", "buy1", 90, math.NaN(), 95, 88, 100, 4000, "")
+	strat.ExitWithLevels("exit2", "buy2", 80, math.NaN(), 95, 88, 100, 4000, "")
+	strat.OnBarMetrics(100, 95, 88, 4000)
+
+	closed := strat.tradeHistory.GetClosedTrades()
+	if len(closed) != 1 {
+		t.Fatalf("expected 1 closed trade (buy1), got %d", len(closed))
+	}
+	if closed[0].EntryID != "buy1" {
+		t.Errorf("wrong trade closed: got entryID=%q, want buy1", closed[0].EntryID)
+	}
+	if closed[0].ExitPrice != 90 {
+		t.Errorf("exit price: got %.2f, want 90 (buy1 stop level)", closed[0].ExitPrice)
+	}
+
+	open := strat.tradeHistory.GetOpenTrades()
+	if len(open) != 1 {
+		t.Fatalf("expected 1 open trade (buy2), got %d", len(open))
+	}
+	if open[0].EntryID != "buy2" {
+		t.Errorf("wrong trade remains open: got entryID=%q, want buy2", open[0].EntryID)
+	}
+}
+
+// TestExitWithLevels_UnknownEntryId_SafeNoOp verifies that calling ExitWithLevels
+// with an entryId that has no corresponding open trade is a safe no-op: it must
+// not crash, must not close the unrelated open trade, and must not corrupt pending
+// exit state. This covers the class of strategies that call strategy.exit() for an
+// entry that was already closed or was never opened (e.g. conditional entry blocks
+// where the entry did not fire on that bar).
+func TestExitWithLevels_UnknownEntryId_SafeNoOp(t *testing.T) {
+	strat := newStrategyWithLongTrade(1, 100)
+
+	// Bar 2: register exit for "buy" (the open trade) and also for "ghost"
+	// (an entryId with no open trade). ghost must be silently ignored.
+	strat.OnBarUpdate(2, 100, 3000)
+	strat.ExitWithLevels("exit", "buy", 90, 120, 102, 98, 100, 3000, "")
+	strat.ExitWithLevels("ghost_exit", "ghost", 95, 115, 102, 98, 100, 3000, "")
+	strat.OnBarMetrics(100, 102, 98, 3000)
+
+	// Bar 3: eligible; price breaches ghost stop (if it were active) but not buy stop.
+	// Only the active exit for "buy" should be evaluated.
+	strat.OnBarUpdate(3, 100, 4000)
+	strat.ExitWithLevels("exit", "buy", 90, 120, 108, 93, 100, 4000, "")
+	strat.ExitWithLevels("ghost_exit", "ghost", 95, 115, 108, 93, 100, 4000, "")
+	// low=93 < ghost_stop=95 → would fire if ghost were active
+	// low=93 > buy_stop=90 → buy exit must NOT fire
+	strat.OnBarMetrics(100, 108, 93, 4000)
+
+	if got := len(strat.tradeHistory.GetClosedTrades()); got != 0 {
+		t.Errorf("expected 0 closed trades (ghost exit must be ignored, buy not breached), got %d", got)
+	}
+	if got := len(strat.tradeHistory.GetOpenTrades()); got != 1 {
+		t.Errorf("expected 1 open trade, got %d", got)
+	}
+	if got := strat.tradeHistory.GetOpenTrades()[0].EntryID; got != "buy" {
+		t.Errorf("open trade entryID: got %q, want buy", got)
+	}
+}

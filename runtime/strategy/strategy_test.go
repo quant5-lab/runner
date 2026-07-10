@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -3097,5 +3098,539 @@ func TestEntryWithDefaultQty_PostReversalEquity(t *testing.T) {
 				t.Errorf("size: got %.6f, want %.6f", open[0].Size, tt.wantQty)
 			}
 		})
+	}
+}
+
+// TestOnBarClose_NoOpWhenDisabled verifies that when process_orders_on_close is
+// disabled, OnBarClose is a no-op and pending orders defer to bar N+1 open.
+func TestOnBarClose_NoOpWhenDisabled(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 0)
+
+	const (
+		barOpen    = 100.0
+		closePrice = 90.0
+		nextOpen   = 107.0
+	)
+	s.OnBarUpdate(0, barOpen, 1000)
+	s.Entry("e1", Long, 1, "")
+	s.OnBarMetrics(barOpen, barOpen+5, barOpen-5, 1000)
+	s.OnBarClose(closePrice, 1000)
+
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Error("OnBarClose must not fill orders when process_orders_on_close is false")
+	}
+
+	s.OnBarUpdate(1, nextOpen, 2000)
+	s.OnBarMetrics(nextOpen, nextOpen+5, nextOpen-5, 2000)
+
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(opens) != 1 {
+		t.Fatalf("deferred entry: want 1 open trade after next bar, got %d", len(opens))
+	}
+	if opens[0].EntryPrice != nextOpen {
+		t.Errorf("deferred entry price: got %.2f, want %.2f (next bar open)", opens[0].EntryPrice, nextOpen)
+	}
+	if opens[0].EntryBar != 1 {
+		t.Errorf("deferred entry bar: got %d, want 1", opens[0].EntryBar)
+	}
+}
+
+// TestOnBarClose_FillsEntryAtClosePrice verifies that an Entry order placed during
+// bar N fills at bar N's close price and time when process_orders_on_close is
+// enabled, for both long and short directions.
+func TestOnBarClose_FillsEntryAtClosePrice(t *testing.T) {
+	tests := []struct {
+		name      string
+		direction string
+	}{
+		{"long_entry_fills_at_close", Long},
+		{"short_entry_fills_at_close", Short},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("test", 10000, 0)
+			s.SetProcessOrdersOnClose(true)
+
+			const closePrice = 105.0
+			const barTime = int64(1000)
+
+			s.OnBarUpdate(0, 100, barTime)
+			s.Entry("e1", tt.direction, 2, "")
+			s.OnBarMetrics(100, 110, 95, barTime)
+			s.OnBarClose(closePrice, barTime)
+
+			opens := s.GetTradeHistory().GetOpenTrades()
+			if len(opens) != 1 {
+				t.Fatalf("want 1 open trade, got %d", len(opens))
+			}
+			if opens[0].EntryPrice != closePrice {
+				t.Errorf("entry price: got %.2f, want %.2f", opens[0].EntryPrice, closePrice)
+			}
+			if opens[0].EntryTime != barTime {
+				t.Errorf("entry time: got %d, want %d (bar open time)", opens[0].EntryTime, barTime)
+			}
+			if opens[0].EntryBar != 0 {
+				t.Errorf("entry bar: got %d, want 0 (same bar as signal)", opens[0].EntryBar)
+			}
+			if opens[0].Size != 2 {
+				t.Errorf("size: got %.2f, want 2", opens[0].Size)
+			}
+			if opens[0].Direction != tt.direction {
+				t.Errorf("direction: got %q, want %q", opens[0].Direction, tt.direction)
+			}
+		})
+	}
+}
+
+// TestOnBarClose_CloseAllAtClosePrice verifies that CloseAll filled via OnBarClose
+// uses the bar close price, for both long and short directions.
+func TestOnBarClose_CloseAllAtClosePrice(t *testing.T) {
+	tests := []struct {
+		name      string
+		direction string
+	}{
+		{"long_closeall_fills_at_close", Long},
+		{"short_closeall_fills_at_close", Short},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s *Strategy
+			if tt.direction == Long {
+				s = newStrategyWithLongTrade(1, 100)
+			} else {
+				s = newStrategyWithShortTrade(1, 100)
+			}
+			s.SetProcessOrdersOnClose(true)
+
+			const closePrice = 120.0
+			const closeTime = int64(3000)
+			s.OnBarUpdate(2, 110, closeTime)
+			s.CloseAll(closePrice, closeTime, "")
+			s.OnBarMetrics(110, 120, 110, closeTime)
+			s.OnBarClose(closePrice, closeTime)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("want 1 closed trade, got %d", len(closed))
+			}
+			if closed[0].ExitPrice != closePrice {
+				t.Errorf("exit price: got %.2f, want %.2f", closed[0].ExitPrice, closePrice)
+			}
+			if closed[0].ExitBar != 2 {
+				t.Errorf("exit bar: got %d, want 2 (same bar as signal)", closed[0].ExitBar)
+			}
+		})
+	}
+}
+
+/* TestOnBarClose_ReversalSameBarTimestamp verifies that when a strategy reverses direction
+ * under process_orders_on_close, the exit and new entry share the same bar timestamp. */
+func TestOnBarClose_ReversalSameBarTimestamp(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 0)
+	s.SetProcessOrdersOnClose(true)
+
+	s.OnBarUpdate(0, 100, 1000)
+	s.Entry("long1", Long, 1, "")
+	s.OnBarMetrics(100, 100, 100, 1000)
+	s.OnBarClose(100, 1000)
+
+	const reverseTime = int64(2000)
+	s.OnBarUpdate(1, 110, reverseTime)
+	s.CloseAll(110, reverseTime, "")
+	s.Entry("short1", Short, 1, "")
+	s.OnBarMetrics(110, 110, 110, reverseTime)
+	s.OnBarClose(110, reverseTime)
+
+	closed := s.GetTradeHistory().GetClosedTrades()
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(closed) != 1 || len(opens) != 1 {
+		t.Fatalf("want 1 closed + 1 open, got %d closed %d open", len(closed), len(opens))
+	}
+	if closed[0].ExitTime != reverseTime {
+		t.Errorf("exit time: got %d, want %d", closed[0].ExitTime, reverseTime)
+	}
+	if opens[0].EntryTime != reverseTime {
+		t.Errorf("entry time: got %d, want %d", opens[0].EntryTime, reverseTime)
+	}
+}
+
+/* TestGetCurrentBarOrders verifies that GetCurrentBarOrders filters by bar index. */
+func TestGetCurrentBarOrders(t *testing.T) {
+	om := NewOrderManager()
+	om.CreateEntryOrder("a", Long, 1, 0, "")
+	om.CreateEntryOrder("b", Long, 1, 1, "")
+	om.CreateCloseAllOrder(1, "") // bar 1, auto-ID
+	om.CreateEntryOrder("d", Long, 1, 2, "")
+
+	bar1Orders := om.GetCurrentBarOrders(1)
+	if len(bar1Orders) != 2 {
+		t.Fatalf("want 2 orders for bar 1, got %d", len(bar1Orders))
+	}
+	// bar 0 and bar 2 must not appear
+	for _, o := range bar1Orders {
+		if o.CreatedBar != 1 {
+			t.Errorf("unexpected order from bar %d in bar-1 result: %+v", o.CreatedBar, o)
+		}
+	}
+	// Bar 0 and bar 2 orders must still be retrievable
+	if len(om.GetCurrentBarOrders(0)) != 1 {
+		t.Errorf("expected 1 order for bar 0")
+	}
+	if len(om.GetCurrentBarOrders(2)) != 1 {
+		t.Errorf("expected 1 order for bar 2")
+	}
+}
+
+/* TestOnBarClose_ShortEntryFillsAtClosePrice verifies that a Short entry order
+ * placed during bar N is filled at bar N's close price when process_orders_on_close
+ * is enabled, mirroring the Long direction test. */
+func TestOnBarClose_ShortEntryFillsAtClosePrice(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 0)
+	s.SetProcessOrdersOnClose(true)
+
+	const closePrice = 95.0
+	const barTime = int64(1000)
+
+	s.OnBarUpdate(0, 100, barTime)
+	s.Entry("e1", Short, 2, "")
+	s.OnBarMetrics(100, 100, 90, barTime)
+	s.OnBarClose(closePrice, barTime)
+
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(opens) != 1 {
+		t.Fatalf("want 1 open short trade, got %d", len(opens))
+	}
+	if opens[0].Direction != Short {
+		t.Errorf("direction: got %q, want %q", opens[0].Direction, Short)
+	}
+	if opens[0].EntryPrice != closePrice {
+		t.Errorf("entry price: got %.2f, want %.2f", opens[0].EntryPrice, closePrice)
+	}
+	if opens[0].Size != 2 {
+		t.Errorf("size: got %.2f, want 2", opens[0].Size)
+	}
+}
+
+/* TestOnBarClose_CloseSpecificEntry verifies that strategy.close("id") queued during bar N
+ * is filled at bar N's close price when process_orders_on_close is enabled, while leaving
+ * other open trades untouched. */
+func TestOnBarClose_CloseSpecificEntry(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 2) // pyramiding=2 allows two same-direction concurrent open trades
+	s.SetProcessOrdersOnClose(true)
+
+	// Bar 0: open two long positions.
+	s.OnBarUpdate(0, 100, 1000)
+	s.Entry("e1", Long, 1, "")
+	s.Entry("e2", Long, 1, "")
+	s.OnBarMetrics(100, 100, 100, 1000)
+	s.OnBarClose(100, 1000)
+
+	if got := len(s.GetTradeHistory().GetOpenTrades()); got != 2 {
+		t.Fatalf("setup: want 2 open trades after bar 0, got %d", got)
+	}
+
+	// Bar 1: close only e1; e2 must remain open.
+	const exitPrice = 120.0
+	const exitTime = int64(2000)
+	s.OnBarUpdate(1, 110, exitTime)
+	s.Close("e1", 0, 0, "")
+	s.OnBarMetrics(110, 125, 110, exitTime)
+	s.OnBarClose(exitPrice, exitTime)
+
+	closed := s.GetTradeHistory().GetClosedTrades()
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(closed) != 1 {
+		t.Fatalf("want 1 closed trade, got %d", len(closed))
+	}
+	if len(opens) != 1 {
+		t.Fatalf("want 1 remaining open trade (e2), got %d", len(opens))
+	}
+	if closed[0].ExitPrice != exitPrice {
+		t.Errorf("exit price: got %.2f, want %.2f", closed[0].ExitPrice, exitPrice)
+	}
+	if closed[0].EntryID != "e1" {
+		t.Errorf("closed trade entry ID: got %q, want %q", closed[0].EntryID, "e1")
+	}
+	if opens[0].EntryID != "e2" {
+		t.Errorf("remaining open trade ID: got %q, want %q", opens[0].EntryID, "e2")
+	}
+}
+
+/* TestOnBarClose_NetOrderFillsAtClosePrice verifies that strategy.order() (net order)
+ * queued during bar N is filled at bar N's close price when process_orders_on_close is
+ * enabled, exercising the OrderActionOrder path in OnBarClose. */
+func TestOnBarClose_NetOrderFillsAtClosePrice(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 0)
+	s.SetProcessOrdersOnClose(true)
+
+	const closePrice = 110.0
+	const barTime = int64(1000)
+
+	s.OnBarUpdate(0, 100, barTime)
+	s.Order("net1", Long, 3, "")
+	s.OnBarMetrics(100, 115, 100, barTime)
+	s.OnBarClose(closePrice, barTime)
+
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(opens) != 1 {
+		t.Fatalf("want 1 open trade from net order, got %d", len(opens))
+	}
+	if opens[0].EntryPrice != closePrice {
+		t.Errorf("net order fill price: got %.2f, want %.2f", opens[0].EntryPrice, closePrice)
+	}
+	if opens[0].Size != 3 {
+		t.Errorf("net order size: got %.2f, want 3", opens[0].Size)
+	}
+}
+
+/* TestOnBarClose_MultipleOrdersSameBar verifies that when two entry orders are placed
+ * on the same bar, both are processed by OnBarClose and filled at the bar close price. */
+func TestOnBarClose_MultipleOrdersSameBar(t *testing.T) {
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 2) // pyramiding=2: two simultaneous same-direction entries allowed
+	s.SetProcessOrdersOnClose(true)
+
+	const closePrice = 105.0
+	const barTime = int64(1000)
+
+	s.OnBarUpdate(0, 100, barTime)
+	s.Entry("e1", Long, 1, "")
+	s.Entry("e2", Long, 1, "")
+	s.OnBarMetrics(100, 110, 100, barTime)
+	s.OnBarClose(closePrice, barTime)
+
+	opens := s.GetTradeHistory().GetOpenTrades()
+	if len(opens) != 2 {
+		t.Fatalf("want 2 open trades after two same-bar entries, got %d", len(opens))
+	}
+	for _, tr := range opens {
+		if tr.EntryPrice != closePrice {
+			t.Errorf("trade %q: entry price got %.2f, want %.2f", tr.EntryID, tr.EntryPrice, closePrice)
+		}
+		if tr.EntryTime != barTime {
+			t.Errorf("trade %q: entry time got %d, want %d", tr.EntryID, tr.EntryTime, barTime)
+		}
+	}
+}
+
+/* TestOnBarClose_NotInitializedIsNoOp verifies that OnBarClose returns without
+ * panicking or modifying strategy state when the strategy has not yet been
+ * initialized via CallWithPyramiding, even if process_orders_on_close is set. */
+func TestOnBarClose_NotInitializedIsNoOp(t *testing.T) {
+	s := NewStrategy()
+	s.SetProcessOrdersOnClose(true)
+
+	// Must not panic.
+	s.OnBarClose(100, 1000)
+
+	if s.GetPositionSize() != 0 {
+		t.Errorf("position size after pre-init OnBarClose: got %.2f, want 0", s.GetPositionSize())
+	}
+	if len(s.GetTradeHistory().GetOpenTrades()) != 0 {
+		t.Errorf("open trades after pre-init OnBarClose: got %d, want 0", len(s.GetTradeHistory().GetOpenTrades()))
+	}
+}
+
+/* TestGetCurrentBarOrders_EmptyManager verifies that an order manager with no orders
+ * returns an empty (not nil) slice for any bar index. */
+func TestGetCurrentBarOrders_EmptyManager(t *testing.T) {
+	om := NewOrderManager()
+	orders := om.GetCurrentBarOrders(0)
+	if len(orders) != 0 {
+		t.Errorf("want 0 orders from empty manager, got %d", len(orders))
+	}
+}
+
+/* TestGetCurrentBarOrders_NoOrdersForBar verifies that GetCurrentBarOrders returns
+ * no orders when the requested bar index has no orders, even if orders exist for
+ * other bars. */
+func TestGetCurrentBarOrders_NoOrdersForBar(t *testing.T) {
+	om := NewOrderManager()
+	om.CreateEntryOrder("a", Long, 1, 0, "")
+	om.CreateEntryOrder("b", Long, 1, 2, "")
+
+	// Bar 1 has no orders; bars 0 and 2 do.
+	orders := om.GetCurrentBarOrders(1)
+	if len(orders) != 0 {
+		t.Errorf("want 0 orders for bar 1, got %d", len(orders))
+	}
+}
+
+func TestEntryFill_PriceIsNextBarOpen(t *testing.T) {
+	tests := []struct {
+		name          string
+		signalBarOpen float64
+		fillBarOpen   float64
+		direction     string
+	}{
+		{"long_no_gap", 100, 100, Long},
+		{"long_gap_down", 100, 90, Long},
+		{"long_gap_up", 100, 115, Long},
+		{"short_no_gap", 200, 200, Short},
+		{"short_gap_down", 200, 185, Short},
+		{"short_gap_up", 200, 210, Short},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("test", 10000, 0)
+
+			s.OnBarUpdate(0, tt.signalBarOpen, 1000)
+			if err := s.Entry("e1", tt.direction, 1, ""); err != nil {
+				t.Fatalf("Entry: %v", err)
+			}
+
+			s.OnBarUpdate(1, tt.fillBarOpen, 2000)
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != 1 {
+				t.Fatalf("open trades: want 1, got %d", len(open))
+			}
+			if open[0].EntryPrice != tt.fillBarOpen {
+				t.Errorf("entry price: got %.4f, want %.4f (bar N+1 open, not signal bar price or prior close)",
+					open[0].EntryPrice, tt.fillBarOpen)
+			}
+		})
+	}
+}
+
+func TestEntryFill_TimeIsNextBarOpenTime(t *testing.T) {
+	const signalBarTime = int64(1000)
+	const fillBarTime = int64(3600)
+
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 10000, 0)
+
+	s.OnBarUpdate(0, 100, signalBarTime)
+	if err := s.Entry("e1", Long, 1, ""); err != nil {
+		t.Fatalf("Entry: %v", err)
+	}
+	s.OnBarUpdate(1, 105, fillBarTime)
+
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != 1 {
+		t.Fatalf("open trades: want 1, got %d", len(open))
+	}
+	if open[0].EntryTime != fillBarTime {
+		t.Errorf("entry time: got %d, want %d (fill bar open time, not signal bar time %d)",
+			open[0].EntryTime, fillBarTime, signalBarTime)
+	}
+}
+
+func TestExitFill_PriceIsNextBarOpen(t *testing.T) {
+	tests := []struct {
+		name        string
+		fillBarOpen float64
+		direction   string
+	}{
+		{"long_exit_no_gap", 110, Long},
+		{"long_exit_gap_down", 95, Long},
+		{"long_exit_gap_up", 130, Long},
+		{"short_exit_no_gap", 90, Short},
+		{"short_exit_gap_down", 75, Short},
+		{"short_exit_gap_up", 110, Short},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("test", 10000, 0)
+
+			s.OnBarUpdate(0, 100, 1000)
+			if err := s.Entry("e1", tt.direction, 1, ""); err != nil {
+				t.Fatalf("Entry: %v", err)
+			}
+			s.OnBarUpdate(1, 100, 2000)
+			s.Close("e1", 0, 3000, "")
+			s.OnBarUpdate(2, tt.fillBarOpen, 3000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("closed trades: want 1, got %d", len(closed))
+			}
+			if closed[0].ExitPrice != tt.fillBarOpen {
+				t.Errorf("exit price: got %.4f, want %.4f (fill bar open, not signal price or prior close)",
+					closed[0].ExitPrice, tt.fillBarOpen)
+			}
+		})
+	}
+}
+
+func TestCloseAllFill_PriceIsNextBarOpen(t *testing.T) {
+	tests := []struct {
+		name        string
+		fillBarOpen float64
+	}{
+		{"no_gap", 100},
+		{"gap_down", 85},
+		{"gap_up", 120},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("test", 10000, 5)
+
+			s.OnBarUpdate(0, 100, 1000)
+			if err := s.Entry("e1", Long, 1, ""); err != nil {
+				t.Fatalf("Entry e1: %v", err)
+			}
+			s.OnBarUpdate(1, 100, 2000)
+			if err := s.Entry("e2", Long, 1, ""); err != nil {
+				t.Fatalf("Entry e2: %v", err)
+			}
+			s.OnBarUpdate(2, 100, 3000)
+			s.CloseAll(0, 4000, "")
+			s.OnBarUpdate(3, tt.fillBarOpen, 4000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 2 {
+				t.Fatalf("closed trades: want 2, got %d", len(closed))
+			}
+			for _, c := range closed {
+				if c.ExitPrice != tt.fillBarOpen {
+					t.Errorf("exit price for %s: got %.4f, want %.4f (fill bar open)",
+						c.EntryID, c.ExitPrice, tt.fillBarOpen)
+				}
+			}
+		})
+	}
+}
+
+func TestEntryFill_ConsecutiveGapBars(t *testing.T) {
+	barOpens := []float64{100, 90, 115, 85, 120}
+	wantFills := barOpens[1:]
+
+	s := NewStrategy()
+	s.CallWithPyramiding("test", 1000000, 10)
+
+	for i, openPrice := range barOpens {
+		s.OnBarUpdate(i, openPrice, int64(i*3600))
+		if i < len(barOpens)-1 {
+			id := fmt.Sprintf("e%d", i)
+			if err := s.Entry(id, Long, 1, ""); err != nil {
+				t.Fatalf("bar %d: Entry %s: %v", i, id, err)
+			}
+		}
+	}
+
+	open := s.GetTradeHistory().GetOpenTrades()
+	if len(open) != len(wantFills) {
+		t.Fatalf("open trades: want %d, got %d", len(wantFills), len(open))
+	}
+	for idx, trade := range open {
+		if trade.EntryPrice != wantFills[idx] {
+			t.Errorf("trade[%d] entry price: got %.4f, want %.4f (bar %d open)",
+				idx, trade.EntryPrice, wantFills[idx], idx+1)
+		}
 	}
 }

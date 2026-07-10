@@ -54,17 +54,19 @@ func TestCheckPriceTrigger_Long(t *testing.T) {
 		{"nan_stop_nan_limit", nan, nan, 100, 200, 50, false, 0, ""},
 		// Both breached: conservative-fill rule — stop always wins regardless of
 		// intrabar path heuristics. Matches TradingView broker emulator: without
-		// sub-bar tick data, the worse-for-trader outcome fills.
+		// sub-bar tick data, the worse-for-trader outcome fills. When the bar
+		// opens beyond the stop level (gap-down for long), the fill happens at
+		// the open price, not the stop level (TV gap-fill rule).
 		{"both_breached_open_near_high_stop_wins", 95, 110, 112, 115, 90, true, 95, "stop"},
-		{"both_breached_open_near_low_stop_wins", 95, 110, 93, 115, 90, true, 95, "stop"},
+		{"both_breached_open_near_low_stop_wins", 95, 110, 93, 115, 90, true, 93, "stop"},
 		{"both_breached_equidistant_stop_wins", 95, 110, 102.5, 115, 90, true, 95, "stop"},
-		{"both_above_open_stop_wins", 108, 112, 105, 115, 90, true, 108, "stop"},
-		{"both_above_open_limit_higher_stop_wins", 112, 108, 105, 115, 90, true, 112, "stop"},
+		{"both_above_open_gap_fills_at_open", 108, 112, 105, 115, 90, true, 105, "stop"},
+		{"both_above_open_limit_higher_gap_fills_at_open", 112, 108, 105, 115, 90, true, 105, "stop"},
 		{"both_below_open_stop_wins", 92, 96, 100, 115, 85, true, 92, "stop"},
 		{"both_below_open_limit_higher_stop_wins", 96, 92, 100, 115, 85, true, 96, "stop"},
-		{"path_low_first_both_above_stop_wins", 108, 112, 87, 115, 85, true, 108, "stop"},
+		{"path_low_first_both_above_gap_fills_at_open", 108, 112, 87, 115, 85, true, 87, "stop"},
 		{"path_low_first_both_below_stop_wins", 92, 88, 97, 115, 85, true, 92, "stop"},
-		{"equal_levels_stop_wins", 100, 100, 87, 115, 85, true, 100, "stop"},
+		{"equal_levels_gap_fills_at_open", 100, 100, 87, 115, 85, true, 87, "stop"},
 	}
 
 	for _, tt := range tests {
@@ -110,15 +112,17 @@ func TestCheckPriceTrigger_Short(t *testing.T) {
 		{"limit_not_hit", nan, 90, 100, 100, 91, false, 0, ""},
 		// Both breached: conservative-fill rule — stop always wins regardless of
 		// intrabar path. For shorts the stop is on the high side, limit on the
-		// low side, but the precedence is identical: stop fills first.
-		{"both_breached_open_near_high_stop_wins", 105, 90, 108, 110, 85, true, 105, "stop"},
+		// low side, but the precedence is identical: stop fills first. When the
+		// bar opens beyond the stop level (gap-up for short), the fill happens
+		// at the open price, not the stop level (TV gap-fill rule).
+		{"both_breached_open_near_high_gap_fills_at_open", 105, 90, 108, 110, 85, true, 108, "stop"},
 		{"both_breached_open_near_low_stop_wins", 105, 90, 87, 110, 85, true, 105, "stop"},
 		{"both_above_open_stop_lower_stop_wins", 112, 108, 105, 115, 90, true, 112, "stop"},
 		{"both_above_open_stop_wins", 108, 112, 105, 115, 90, true, 108, "stop"},
-		{"both_below_open_stop_higher_stop_wins", 96, 92, 100, 115, 85, true, 96, "stop"},
-		{"both_below_open_limit_higher_stop_wins", 92, 96, 100, 115, 85, true, 92, "stop"},
+		{"both_below_open_stop_higher_gap_fills_at_open", 96, 92, 100, 115, 85, true, 100, "stop"},
+		{"both_below_open_limit_higher_gap_fills_at_open", 92, 96, 100, 115, 85, true, 100, "stop"},
 		{"path_low_first_both_above_stop_wins", 108, 112, 87, 115, 85, true, 108, "stop"},
-		{"path_low_first_both_below_stop_wins", 92, 88, 97, 115, 85, true, 92, "stop"},
+		{"path_low_first_both_below_gap_fills_at_open", 92, 88, 97, 115, 85, true, 97, "stop"},
 		{"equal_levels_stop_wins", 100, 100, 87, 115, 85, true, 100, "stop"},
 	}
 
@@ -439,4 +443,36 @@ func exitIDs(exits []ExitOrder) []string {
 		ids[i] = e.ExitID
 	}
 	return ids
+}
+
+// TestStopFillPrice verifies the gap-fill rule for stop orders: when price opens
+// beyond the stop level (long: open < stop; short: open > stop), the fill price
+// is the bar open, not the stop level. When no gap exists, the fill price is the
+// stop level. The boundary case (open exactly at stop) does not trigger gap-fill.
+func TestStopFillPrice(t *testing.T) {
+	tests := []struct {
+		name      string
+		isLong    bool
+		stopLevel float64
+		barOpen   float64
+		want      float64
+	}{
+		// Long: adverse gap when open < stop (gap below stop level)
+		{"long_gap_below_stop_fills_at_open", true, 95, 80, 80},
+		{"long_open_exactly_at_stop_fills_at_stop", true, 95, 95, 95},
+		{"long_open_above_stop_no_gap_fills_at_stop", true, 95, 100, 95},
+		// Short: adverse gap when open > stop (gap above stop level)
+		{"short_gap_above_stop_fills_at_open", false, 105, 120, 120},
+		{"short_open_exactly_at_stop_fills_at_stop", false, 105, 105, 105},
+		{"short_open_below_stop_no_gap_fills_at_stop", false, 105, 100, 105},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stopFillPrice(tt.stopLevel, tt.isLong, tt.barOpen)
+			if got != tt.want {
+				t.Errorf("stopFillPrice(level=%.2f, isLong=%v, open=%.2f) = %.2f, want %.2f",
+					tt.stopLevel, tt.isLong, tt.barOpen, got, tt.want)
+			}
+		})
+	}
 }

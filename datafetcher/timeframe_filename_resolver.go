@@ -2,7 +2,6 @@ package datafetcher
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/quant5-lab/runner/runtime/context"
 )
@@ -31,17 +30,4 @@ func equivalentTimeframeTokens(timeframe string) []string {
 	}
 
 	return tokens
-}
-
-// candidateFixturePaths expands symbol+timeframe into an ordered list of file
-// paths covering all equivalent Pine encodings of the same period, so a fixture
-// named "SBERP_1h.json" is reached whether the caller passes "1h" or "60" —
-// and vice-versa.
-func candidateFixturePaths(dataDir, symbol, timeframe string) []string {
-	tokens := equivalentTimeframeTokens(timeframe)
-	paths := make([]string, len(tokens))
-	for i, token := range tokens {
-		paths[i] = filepath.Join(dataDir, symbol+"_"+token+".json")
-	}
-	return paths
 }
