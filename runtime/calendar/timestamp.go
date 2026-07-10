@@ -15,7 +15,9 @@ var dateFormats = []string{
 	time.RFC3339,
 	"02 Jan 2006 15:04:05 -0700",
 	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
 	"2006-01-02 15:04:05",
+	"2006-01-02 15:04",
 	"2006-01-02:15:04",
 	"2 Jan 2006",
 	"2006-01-02",
@@ -52,4 +54,22 @@ func TimestampFromString(dateStr string, timezone string) float64 {
 	}
 
 	return math.NaN()
+}
+
+// ParsePineTimestampMillisUTC parses a Pine timestamp() date string against the
+// shared dateFormats layouts interpreted as UTC, returning ok=false if none
+// match. It is the single source of Pine-timestamp layout parsing for
+// compile-time constant folding, where the runtime chart timezone is not yet
+// known. A bare (timezone-less) date string folds to UTC here; on a non-UTC
+// exchange full timezone fidelity would require runtime evaluation via
+// TimestampFromString(dateStr, tz). No current strategy emits a timezone-sensitive
+// timestamp default, so the UTC fold is a documented, non-exercised limitation
+// rather than an observed defect.
+func ParsePineTimestampMillisUTC(dateStr string) (int64, bool) {
+	for _, layout := range dateFormats {
+		if t, err := time.Parse(layout, dateStr); err == nil {
+			return t.UnixMilli(), true
+		}
+	}
+	return 0, false
 }

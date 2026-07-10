@@ -70,12 +70,12 @@ func fixtureCandidatePaths(dir, symbol, timeframe string) []string {
 }
 
 func readFixture(dir, symbol, timeframe string) (data []byte, path string, err error) {
-	for _, p := range fixtureCandidatePaths(dir, symbol, timeframe) {
+	candidates := fixtureCandidatePaths(dir, symbol, timeframe)
+	for _, p := range candidates {
 		if d, e := os.ReadFile(p); e == nil {
 			return d, p, nil
 		}
 	}
-	candidates := fixtureCandidatePaths(dir, symbol, timeframe)
 	return nil, "", fmt.Errorf("no fixture for %s:%s (tried: %s)",
 		symbol, timeframe, strings.Join(candidates, ", "))
 }

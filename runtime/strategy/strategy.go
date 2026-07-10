@@ -779,42 +779,51 @@ func (s *Strategy) OnBarUpdate(currentBar int, openPrice float64, openTime int64
 	pendingOrders := s.orderManager.GetPendingOrders(currentBar)
 
 	for _, order := range pendingOrders {
-		switch order.Action {
-		case OrderActionEntry:
-			s.reversalHandler.HandleReversal(order.Direction, openPrice, currentBar, openTime)
-
-			qty := order.Qty
-			if order.UseDefaultQty {
-				qty = s.DefaultEntryQty(openPrice)
-			}
-			qty = s.applyQtyStep(qty)
-
-			s.positionTracker.UpdatePosition(qty, openPrice, order.Direction)
-
-			entryCommission := s.calcCommission(qty, openPrice)
-			s.tradeHistory.AddOpenTrade(Trade{
-				EntryID:      order.ID,
-				Direction:    order.Direction,
-				Size:         qty,
-				EntryPrice:   openPrice,
-				EntryBar:     currentBar,
-				EntryTime:    openTime,
-				EntryComment: order.EntryComment,
-				Commission:   entryCommission,
-			})
-
-		case OrderActionClose:
-			s.executeCloseOrder(order.ExitID, order.FromEntry, openPrice, currentBar, openTime, order.ExitComment)
-
-		case OrderActionCloseAll:
-			s.executeCloseAllOrder(openPrice, currentBar, openTime, order.ExitComment)
-
-		case OrderActionOrder:
-			s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), openPrice, currentBar, openTime, order.EntryComment)
-		}
-
-		s.orderManager.RemoveOrder(order.ID)
+		s.dispatchOrder(order, openPrice, currentBar, openTime)
 	}
+}
+
+// dispatchOrder executes one queued order at the given fill price, bar, and time.
+// It is the single owner of the four-case order dispatch, shared by OnBarUpdate
+// (open-price fills) and OnBarClose (close-price fills). Fill time is explicit at
+// each call site instead of read from a stored field, so the two paths cannot
+// silently diverge on entry timestamps.
+func (s *Strategy) dispatchOrder(order Order, fillPrice float64, fillBar int, fillTime int64) {
+	switch order.Action {
+	case OrderActionEntry:
+		s.reversalHandler.HandleReversal(order.Direction, fillPrice, fillBar, fillTime)
+
+		qty := order.Qty
+		if order.UseDefaultQty {
+			qty = s.DefaultEntryQty(fillPrice)
+		}
+		qty = s.applyQtyStep(qty)
+
+		s.positionTracker.UpdatePosition(qty, fillPrice, order.Direction)
+
+		entryCommission := s.calcCommission(qty, fillPrice)
+		s.tradeHistory.AddOpenTrade(Trade{
+			EntryID:      order.ID,
+			Direction:    order.Direction,
+			Size:         qty,
+			EntryPrice:   fillPrice,
+			EntryBar:     fillBar,
+			EntryTime:    fillTime,
+			EntryComment: order.EntryComment,
+			Commission:   entryCommission,
+		})
+
+	case OrderActionClose:
+		s.executeCloseOrder(order.ExitID, order.FromEntry, fillPrice, fillBar, fillTime, order.ExitComment)
+
+	case OrderActionCloseAll:
+		s.executeCloseAllOrder(fillPrice, fillBar, fillTime, order.ExitComment)
+
+	case OrderActionOrder:
+		s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), fillPrice, fillBar, fillTime, order.EntryComment)
+	}
+
+	s.orderManager.RemoveOrder(order.ID)
 }
 
 func (s *Strategy) SetProcessOrdersOnClose(v bool) {
@@ -828,34 +837,7 @@ func (s *Strategy) OnBarClose(closePrice float64, closeTime int64) {
 	}
 	pendingOrders := s.orderManager.GetCurrentBarOrders(s.currentBar)
 	for _, order := range pendingOrders {
-		switch order.Action {
-		case OrderActionEntry:
-			s.reversalHandler.HandleReversal(order.Direction, closePrice, s.currentBar, closeTime)
-			qty := order.Qty
-			if order.UseDefaultQty {
-				qty = s.DefaultEntryQty(closePrice)
-			}
-			qty = s.applyQtyStep(qty)
-			s.positionTracker.UpdatePosition(qty, closePrice, order.Direction)
-			entryCommission := s.calcCommission(qty, closePrice)
-			s.tradeHistory.AddOpenTrade(Trade{
-				EntryID:      order.ID,
-				Direction:    order.Direction,
-				Size:         qty,
-				EntryPrice:   closePrice,
-				EntryBar:     s.currentBar,
-				EntryTime:    s.currentBarTime,
-				EntryComment: order.EntryComment,
-				Commission:   entryCommission,
-			})
-		case OrderActionClose:
-			s.executeCloseOrder(order.ExitID, order.FromEntry, closePrice, s.currentBar, closeTime, order.ExitComment)
-		case OrderActionCloseAll:
-			s.executeCloseAllOrder(closePrice, s.currentBar, closeTime, order.ExitComment)
-		case OrderActionOrder:
-			s.executeNetOrder(order.ID, order.Direction, s.applyQtyStep(order.Qty), closePrice, s.currentBar, closeTime, order.EntryComment)
-		}
-		s.orderManager.RemoveOrder(order.ID)
+		s.dispatchOrder(order, closePrice, s.currentBar, closeTime)
 	}
 }
 

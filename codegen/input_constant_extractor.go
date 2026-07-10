@@ -3,9 +3,9 @@ package codegen
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/calendar"
 )
 
 /*
@@ -109,21 +109,11 @@ func extractTimestampFromDefval(obj *ast.ObjectExpression) (int64, bool) {
 		if !ok {
 			continue
 		}
-		for _, layout := range pineTimestampLayouts {
-			if t, err := time.Parse(layout, str); err == nil {
-				return t.UnixMilli(), true
-			}
+		if ms, ok := calendar.ParsePineTimestampMillisUTC(str); ok {
+			return ms, true
 		}
 	}
 	return 0, false
-}
-
-var pineTimestampLayouts = []string{
-	"2006-01-02:15:04",
-	"2006-01-02 15:04",
-	"2006-01-02T15:04",
-	"2006-01-02T15:04:05",
-	"2006-01-02 15:04:05",
 }
 
 func (ice *InputConstantExtractor) extractInputBoolValue(call *ast.CallExpression) string {
