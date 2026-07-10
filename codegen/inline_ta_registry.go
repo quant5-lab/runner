@@ -277,7 +277,11 @@ func (g *RSIIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpre
 }
 
 func (g *WMAIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, sourceHash string) string {
-	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := %s - float64(j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsFloat64Cast(), accessor.GenerateLoopValueAccess("j"))
+	// Pine casts a fractional wma length to int (truncation), so both the term
+	// count AND the weights use the truncated period. Using the raw float period
+	// for the weight (e.g. 27.5 for wma(src, 55/2)) while truncating the count to
+	// 27 offsets every weight by the fractional part and diverges from TradingView.
+	body := fmt.Sprintf("sum := 0.0; weightSum := 0.0; for j := 0; j < %s; j++ { weight := float64(%s) - float64(j); sum += weight * %s; weightSum += weight }; ", period.AsIntCast(), period.AsIntCast(), accessor.GenerateLoopValueAccess("j"))
 	body += "return sum / weightSum"
 
 	return NewIIFECodeBuilder().
