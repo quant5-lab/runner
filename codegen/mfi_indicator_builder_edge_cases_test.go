@@ -228,8 +228,17 @@ func TestMFIIndicatorBuilder_DirectionalSplitLogic(t *testing.T) {
 	})
 
 	t.Run("negative_change_branch", func(t *testing.T) {
-		if !strings.Contains(code, "else") {
-			t.Error("Missing else branch for negative/zero change")
+		if !strings.Contains(code, "< 0") {
+			t.Error("Missing negative change branch")
+		}
+	})
+
+	t.Run("zero_change_excluded_from_both_flows", func(t *testing.T) {
+		if got := strings.Count(code, "posMF = 0.0"); got < 3 {
+			t.Errorf("posMF must be zeroed in at least 3 branches (NaN+neg+zero), got %d", got)
+		}
+		if got := strings.Count(code, "negMF = 0.0"); got < 3 {
+			t.Errorf("negMF must be zeroed in at least 3 branches (NaN+pos+zero), got %d", got)
 		}
 	})
 
@@ -435,4 +444,37 @@ func TestMFIIndicatorBuilder_MFIFormulaAccuracy(t *testing.T) {
 			t.Error("Missing assignment of 100 after zero-denom check")
 		}
 	})
+}
+
+func TestMFIIndicatorBuilder_ZeroChangeExplicitlyZeroInBothFlows(t *testing.T) {
+	cases := []struct {
+		name   string
+		period int
+		src    AccessGenerator
+	}{
+		{"period_1_close", 1, NewOHLCVFieldAccessGenerator("Close")},
+		{"period_14_close", 14, NewOHLCVFieldAccessGenerator("Close")},
+		{"period_14_high", 14, NewOHLCVFieldAccessGenerator("High")},
+		{"period_14_truerange", 14, NewTrueRangeAccessGenerator()},
+		{"period_100_close", 100, NewOHLCVFieldAccessGenerator("Close")},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := NewTopLevelIndicatorContext()
+			builder := NewMFIIndicatorBuilder("mfi", NewConstantPeriod(tc.period), tc.src, ctx)
+			code := builder.Build()
+
+			if got := strings.Count(code, "= rawMF"); got != 2 {
+				t.Errorf("rawMF must appear in exactly 2 branches (pos + neg), got %d", got)
+			}
+
+			if got := strings.Count(code, "posMF = 0.0"); got < 3 {
+				t.Errorf("posMF must be zeroed in at least 3 branches (NaN+neg+zero), got %d", got)
+			}
+			if got := strings.Count(code, "negMF = 0.0"); got < 3 {
+				t.Errorf("negMF must be zeroed in at least 3 branches (NaN+pos+zero), got %d", got)
+			}
+		})
+	}
 }

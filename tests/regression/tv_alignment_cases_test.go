@@ -144,7 +144,7 @@ func TestTVAlignmentCases_SomePnLRatchetSkipped(t *testing.T) {
 
 func TestTVAlignmentCases_CapEscalationRatchet(t *testing.T) {
 	const (
-		maxTVOnlyEscalations     = 1 // operator-approved: UtPlus SBERP
+		maxTVOnlyEscalations     = 0 // none currently operator-approved
 		maxRunnerOnlyEscalations = 0 // none currently operator-approved
 	)
 	nTVOnly, nRunnerOnly := 0, 0
@@ -181,7 +181,7 @@ func TestSkippedPnLCases_ExcludedFromExactAlignment(t *testing.T) {
 // uses the same maxRunnerOnly cap as RunnerOnly and each escalation must be individually
 // justified — this ratchet prevents silent accumulation.
 func TestTVAlignmentCases_ExportHorizonCapEscalationRatchet(t *testing.T) {
-	const maxEscalations = 0 // none currently operator-approved
+	const maxEscalations = 1 // operator-approved: UtPlus SBERP — TV CSV export ends 2026-05-28, fixture ends 2026-06-07; 12 runner trades after horizon are truncated reference, not phantom
 	n := 0
 	for _, tc := range tvAlignmentCases() {
 		if tc.Discrepancy.ExportHorizonRunnerOnlyCapEscalated {

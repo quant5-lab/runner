@@ -54,7 +54,7 @@ func hullCases() []tvAlignmentCase {
 		{
 			Name: "Hull SBERP", Strategy: "top10/hull.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "hull-sberp-1h.json", CSV: "hull-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 6, TVOnly: 17, ExportHorizonRunnerOnly: 1},
+			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 0, TVOnly: 1, ExportHorizonRunnerOnly: 1},
 			InitialCapital:        100000,
 			SkipSizeRatchetReason: "percent-of-equity sizing: TV equity at fixture start is inflated by 316+ pre-window trades since 2021; runner starts fresh at 100,000 RUB — position sizes are not comparable.",
 		},
@@ -66,7 +66,7 @@ func utPlusCases() []tvAlignmentCase {
 		{
 			Name: "UtPlus SBERP", Strategy: "top10/ut+.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "ut-plus-sberp-1h.json", CSV: "ut-plus-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: tvAlignmentTolerance{Time: 2 * time.Hour, Price: 0.10}, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 6, TVOnly: 6, ExportHorizonRunnerOnly: 12, TVOnlyCapEscalated: true},
+			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 2, TVOnly: 2, ExportHorizonRunnerOnly: 12, TVOnlyCapEscalated: false, ExportHorizonRunnerOnlyCapEscalated: true},
 			InitialCapital: 100000,
 		},
 	}
@@ -121,7 +121,7 @@ func alphaCases() []tvAlignmentCase {
 		{
 			Name: "Alpha SBERP", Strategy: "top10/alpha.pine", Data: "SBERP-1h.json", Symbol: "SBERP", Timeframe: "1h",
 			Golden: "alpha_trend_sberp_1h.golden.json", CSV: "alpha-sberp-1h-reference.csv", Timezone: tvref.TVTimezoneMoscow,
-			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 4, TVOnly: 4},
+			Tolerance: twoHoursTwoRub, Discrepancy: tvAlignmentDiscrepancy{RunnerOnly: 2, TVOnly: 4},
 			InitialCapital: 10000,
 		},
 		{

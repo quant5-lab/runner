@@ -2,21 +2,21 @@
   "version": "1.0",
   "strategy": "AlphaTrend Strategy",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-03-22T20:23:15Z",
+  "generatedAt": "2026-07-15T18:23:44Z",
   "result": {
     "trades": [
       {
         "entryId": "Long",
-        "entryBar": 29,
-        "entryTime": 1759941000,
-        "entryPrice": 258.19000244140625,
+        "entryBar": 28,
+        "entryTime": 1759937400,
+        "entryPrice": 258.05499267578125,
         "entryComment": "",
         "exitBar": 35,
         "exitTime": 1760023800,
         "exitPrice": 254.47000122070312,
         "exitComment": "Position reversal",
         "size": 1,
-        "profit": -3.720001220703125,
+        "profit": -3.584991455078125,
         "direction": "long"
       },
       {
@@ -162,9 +162,10 @@
         "direction": "long"
       }
     ],
-    "equity": 10012.410095214844,
-    "netProfit": 13.300079345703125,
+    "equity": 10012.545104980469,
+    "netProfit": 13.435089111328125,
     "totalTrades": 0,
+    "initialCapital": 10000,
     "plots": {}
   }
 }
