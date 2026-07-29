@@ -7,9 +7,18 @@ import (
 	"testing"
 )
 
-// TestTop10_StaleSkipGuard uses TV reference CSV presence as the strict-verified
-// signal: a strategy with a passing golden but no operator-side CSV is legitimately
-// still pending and keeps its .skip without triggering this guard.
+// Strategies here run end-to-end but produce zero trades by design because their signal
+// source requires external ±1 wiring absent from the SBERP-1h fixture. A .pine.skip on
+// any of them is stale; the guard rejects it.
+//
+// Strategies absent from both this list and tvAlignmentCases() are legitimately pending
+// and are never flagged.
+func inertByDesignStrategies() []string {
+	return []string{
+		"top10/ultima.pine",
+	}
+}
+
 func TestTop10_StaleSkipGuard(t *testing.T) {
 	root := projectRootFromCwd()
 	csvFixturesDir := filepath.Join(root, "tests", "regression", "tv_reference", "fixtures")
@@ -30,6 +39,20 @@ func TestTop10_StaleSkipGuard(t *testing.T) {
 				t.Errorf(
 					"stale .pine.skip: %q is strict-verified (TV reference %q present) but %q still exists — delete it",
 					tc.Strategy, tc.CSV, skipPath,
+				)
+			}
+		})
+	}
+
+	for _, strategy := range inertByDesignStrategies() {
+		strategy := strategy
+		name := strings.TrimSuffix(filepath.Base(strategy), ".pine")
+		t.Run(name, func(t *testing.T) {
+			skipPath := filepath.Join(strategiesDir, strategy+".skip")
+			if _, err := os.Stat(skipPath); err == nil {
+				t.Errorf(
+					"stale .pine.skip: %q is inert by design and executes end-to-end, but %q still exists — delete it",
+					strategy, skipPath,
 				)
 			}
 		})
