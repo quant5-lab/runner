@@ -236,6 +236,7 @@ testdata/*-output.json
 # Contribot
 contribot.*.json
 transcripts/
+AGENTS.md
 
 .playwright-cli
 # Editor and tool artifacts
