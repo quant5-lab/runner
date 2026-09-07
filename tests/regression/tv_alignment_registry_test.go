@@ -14,11 +14,12 @@ var (
 
 // Blocked wiring — CSV + golden on disk, but cases cannot be wired until data-layer prerequisites are met:
 //
-// Zigzag SBERP (RunnerOnly=20, TVOnly=5 > caps 2/4): measured on real MOEX 5.5-yr SBERP-1h.json
-// (21927 bars, no synthetic flat bars). ZigZag PA V4.1 fires harmonic patterns on
-// valuewhen(sz,sz,0..4) pivot windows; over the full window, 20 runner entries have no TV
-// counterpart and 5 TV entries have no runner counterpart. Both exceed policy caps. No wiring
-// possible without BANDAIDing the policy caps.
+// Zigzag SBERP — TVOnly=5 open blocker (2026-07-29).
+// RunnerOnly=1 (within cap 2), TVOnly=5 (exceeds cap 4), matched=483.
+// The residual RunnerOnly=1 is a genuine boundary trade; the TVOnly=5 are not near-misses
+// (no runner trade within ±6h of any of the 5 TV entries) and constitute a distinct defect class.
+// Wiring blocked by TVOnly=5 > cap 4 until TVOnly class is resolved.
+// Pivot-machinery canary: TestZigzag_SBERP_Hourly_PivotWindowBehavior.
 //
 // Moon AAPL (matched=0): real 498-bar AAPL-M.json exists (NASDAQ:AAPL monthly, 1985-01→2026-05,
 // tz=America/New_York). TV reference CSV contains trades from 1981; those pre-1985 entries have

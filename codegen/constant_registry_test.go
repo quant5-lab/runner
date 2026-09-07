@@ -95,6 +95,11 @@ func TestConstantRegistry_ExtractFromGeneratedCode_Float(t *testing.T) {
 		expected interface{}
 	}{
 		{
+			name:     "extract float shortest-form",
+			code:     "const multiplier = 1.5\n",
+			expected: 1.5,
+		},
+		{
 			name:     "extract float with decimals",
 			code:     "const multiplier = 1.50\n",
 			expected: 1.5,

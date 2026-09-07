@@ -8,10 +8,6 @@ import (
 	"testing"
 )
 
-// minZigzagClosedTrades is pinned to the exact golden count so any regression
-// that re-zeroes or erodes the harmonic-pattern trade series is caught immediately.
-const minZigzagClosedTrades = 97
-
 // TestZigzag_SBERP_Hourly_RuntimeEvidence verifies that the ZigZag PA Strategy
 // (Pine v4, harmonic pattern recognition) compiles and produces at least the
 // golden trade count end-to-end.  The strategy uses a ticker string variable in

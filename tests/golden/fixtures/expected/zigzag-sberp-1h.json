@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Zigzag",
   "dataSource": "SBERP-1h.json",
-  "generatedAt": "2026-07-10T02:08:54Z",
+  "generatedAt": "2026-07-29T13:41:15Z",
   "result": {
     "trades": [
       {
@@ -1169,20 +1169,6 @@
       },
       {
         "entryId": "target01_buy",
-        "entryBar": 3977,
-        "entryTime": 1642413600,
-        "entryPrice": 245.96,
-        "entryComment": "",
-        "exitBar": 3978,
-        "exitTime": 1642417200,
-        "exitPrice": 244.64,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -13200.000000000216,
-        "direction": "long"
-      },
-      {
-        "entryId": "target01_buy",
         "entryBar": 3982,
         "entryTime": 1642431600,
         "entryPrice": 242.66,
@@ -1403,20 +1389,6 @@
         "exitComment": "",
         "size": 10000,
         "profit": -3499.999999999943,
-        "direction": "long"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 4554,
-        "entryTime": 1649426400,
-        "entryPrice": 148.58,
-        "entryComment": "",
-        "exitBar": 4555,
-        "exitTime": 1649430000,
-        "exitPrice": 148.39,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -1900.0000000002615,
         "direction": "long"
       },
       {
@@ -2135,20 +2107,6 @@
       },
       {
         "entryId": "target01_sell",
-        "entryBar": 6167,
-        "entryTime": 1667390400,
-        "entryPrice": 121.34,
-        "entryComment": "",
-        "exitBar": 6168,
-        "exitTime": 1667394000,
-        "exitPrice": 121.4,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -600.0000000000227,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
         "entryBar": 6192,
         "entryTime": 1667804400,
         "entryPrice": 120.4,
@@ -2499,34 +2457,6 @@
       },
       {
         "entryId": "target01_sell",
-        "entryBar": 7326,
-        "entryTime": 1676995200,
-        "entryPrice": 162.12,
-        "entryComment": "",
-        "exitBar": 7327,
-        "exitTime": 1676998800,
-        "exitPrice": 162.28,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -1599.999999999966,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 7335,
-        "entryTime": 1677060000,
-        "entryPrice": 161.45,
-        "entryComment": "",
-        "exitBar": 7336,
-        "exitTime": 1677063600,
-        "exitPrice": 161.31,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -1399.9999999998636,
-        "direction": "long"
-      },
-      {
-        "entryId": "target01_sell",
         "entryBar": 7392,
         "entryTime": 1677654000,
         "entryPrice": 168.22,
@@ -2579,20 +2509,6 @@
         "exitComment": "",
         "size": 10000,
         "profit": -6500.000000000056,
-        "direction": "long"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 7538,
-        "entryTime": 1678903200,
-        "entryPrice": 172.25,
-        "entryComment": "",
-        "exitBar": 7539,
-        "exitTime": 1678906800,
-        "exitPrice": 173.16,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 9099.999999999965,
         "direction": "long"
       },
       {
@@ -2650,20 +2566,6 @@
         "size": 10000,
         "profit": 10500.000000000113,
         "direction": "short"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 7692,
-        "entryTime": 1680159600,
-        "entryPrice": 217.35,
-        "entryComment": "",
-        "exitBar": 7693,
-        "exitTime": 1680163200,
-        "exitPrice": 217.7,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 3499.999999999943,
-        "direction": "long"
       },
       {
         "entryId": "target01_buy",
@@ -2747,20 +2649,6 @@
         "exitComment": "",
         "size": 10000,
         "profit": -5799.999999999841,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
-        "entryBar": 8069,
-        "entryTime": 1683277200,
-        "entryPrice": 238.98,
-        "entryComment": "",
-        "exitBar": 8070,
-        "exitTime": 1683280800,
-        "exitPrice": 238.99,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -100.00000000019327,
         "direction": "short"
       },
       {
@@ -3409,20 +3297,6 @@
       },
       {
         "entryId": "target01_sell",
-        "entryBar": 10227,
-        "entryTime": 1701068400,
-        "entryPrice": 286.39,
-        "entryComment": "",
-        "exitBar": 10228,
-        "exitTime": 1701072000,
-        "exitPrice": 287.87,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -14800.000000000182,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
         "entryBar": 10240,
         "entryTime": 1701115200,
         "entryPrice": 282.41,
@@ -3811,20 +3685,6 @@
         "exitComment": "",
         "size": 10000,
         "profit": -4300.000000000068,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
-        "entryBar": 11102,
-        "entryTime": 1708347600,
-        "entryPrice": 289.44,
-        "entryComment": "",
-        "exitBar": 11106,
-        "exitTime": 1708362000,
-        "exitPrice": 289.08,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 3600.0000000001364,
         "direction": "short"
       },
       {
@@ -4795,20 +4655,6 @@
       },
       {
         "entryId": "target01_sell",
-        "entryBar": 13524,
-        "entryTime": 1728331200,
-        "entryPrice": 263.14,
-        "entryComment": "",
-        "exitBar": 13525,
-        "exitTime": 1728367200,
-        "exitPrice": 262.4,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 7400.000000000091,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
         "entryBar": 13601,
         "entryTime": 1728975600,
         "entryPrice": 261.46,
@@ -4904,20 +4750,6 @@
         "size": 10000,
         "profit": -800.000000000125,
         "direction": "short"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 13902,
-        "entryTime": 1731409200,
-        "entryPrice": 258.49,
-        "entryComment": "",
-        "exitBar": 13903,
-        "exitTime": 1731412800,
-        "exitPrice": 257.78,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -7100.000000000364,
-        "direction": "long"
       },
       {
         "entryId": "target01_buy",
@@ -5172,20 +5004,6 @@
         "direction": "short"
       },
       {
-        "entryId": "target01_sell",
-        "entryBar": 14498,
-        "entryTime": 1736492400,
-        "entryPrice": 272.25,
-        "entryComment": "",
-        "exitBar": 14499,
-        "exitTime": 1736496000,
-        "exitPrice": 273.05,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -8000.000000000114,
-        "direction": "short"
-      },
-      {
         "entryId": "target01_buy",
         "entryBar": 14603,
         "entryTime": 1737442800,
@@ -5368,20 +5186,6 @@
         "direction": "short"
       },
       {
-        "entryId": "target01_buy",
-        "entryBar": 15217,
-        "entryTime": 1741752000,
-        "entryPrice": 316.7,
-        "entryComment": "",
-        "exitBar": 15218,
-        "exitTime": 1741755600,
-        "exitPrice": 317.69,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 9900.000000000091,
-        "direction": "long"
-      },
-      {
         "entryId": "target01_sell",
         "entryBar": 15260,
         "entryTime": 1741957200,
@@ -5449,20 +5253,6 @@
         "exitComment": "",
         "size": 10000,
         "profit": -6899.999999999977,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
-        "entryBar": 15493,
-        "entryTime": 1743487200,
-        "entryPrice": 310.1,
-        "entryComment": "",
-        "exitBar": 15496,
-        "exitTime": 1743498000,
-        "exitPrice": 310,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 1000.0000000002274,
         "direction": "short"
       },
       {
@@ -5590,20 +5380,6 @@
         "size": 10000,
         "profit": -2700.0000000003865,
         "direction": "long"
-      },
-      {
-        "entryId": "target01_sell",
-        "entryBar": 16053,
-        "entryTime": 1747069200,
-        "entryPrice": 307.85,
-        "entryComment": "",
-        "exitBar": 16054,
-        "exitTime": 1747072800,
-        "exitPrice": 308.1,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -2500,
-        "direction": "short"
       },
       {
         "entryId": "target01_sell",
@@ -6320,20 +6096,6 @@
         "direction": "long"
       },
       {
-        "entryId": "target01_buy",
-        "entryBar": 18881,
-        "entryTime": 1764651600,
-        "entryPrice": 300.84,
-        "entryComment": "",
-        "exitBar": 18883,
-        "exitTime": 1764658800,
-        "exitPrice": 301.41,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 5700.0000000005,
-        "direction": "long"
-      },
-      {
         "entryId": "target01_sell",
         "entryBar": 18910,
         "entryTime": 1764781200,
@@ -6433,30 +6195,16 @@
       },
       {
         "entryId": "target01_sell",
-        "entryBar": 19246,
-        "entryTime": 1766844000,
-        "entryPrice": 300.46,
+        "entryBar": 19247,
+        "entryTime": 1766847600,
+        "entryPrice": 300.43,
         "entryComment": "",
         "exitBar": 19248,
         "exitTime": 1766905200,
         "exitPrice": 300.16,
         "exitComment": "",
         "size": 10000,
-        "profit": 2999.9999999995453,
-        "direction": "short"
-      },
-      {
-        "entryId": "target01_sell",
-        "entryBar": 19378,
-        "entryTime": 1768284000,
-        "entryPrice": 298.94,
-        "entryComment": "",
-        "exitBar": 19379,
-        "exitTime": 1768287600,
-        "exitPrice": 298.13,
-        "exitComment": "",
-        "size": 10000,
-        "profit": 8100.000000000023,
+        "profit": 2699.999999999818,
         "direction": "short"
       },
       {
@@ -6528,20 +6276,6 @@
         "size": 10000,
         "profit": 1499.9999999997726,
         "direction": "short"
-      },
-      {
-        "entryId": "target01_buy",
-        "entryBar": 19836,
-        "entryTime": 1770919200,
-        "entryPrice": 305.59,
-        "entryComment": "",
-        "exitBar": 19837,
-        "exitTime": 1770922800,
-        "exitPrice": 305.53,
-        "exitComment": "",
-        "size": 10000,
-        "profit": -600.0000000000227,
-        "direction": "long"
       },
       {
         "entryId": "target01_sell",
@@ -7049,8 +6783,8 @@
       }
     ],
     "openTrades": [],
-    "equity": -214499.99999999674,
-    "netProfit": -314499.99999999674,
+    "equity": -211299.9999999964,
+    "netProfit": -311299.9999999964,
     "totalTrades": 0,
     "initialCapital": 100000,
     "plots": {}

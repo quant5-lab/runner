@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/quant5-lab/runner/ast"
 )
@@ -41,7 +42,7 @@ func (ih *InputHandler) GenerateInputFloat(call *ast.CallExpression, varName str
 	}
 
 	sanitizedName := SanitizeGoIdentifier(varName)
-	code := fmt.Sprintf("const %s = %.2f\n", sanitizedName, defval)
+	code := fmt.Sprintf("const %s = %s\n", sanitizedName, strconv.FormatFloat(defval, 'f', -1, 64))
 	ih.inputConstants[varName] = code
 	return code, nil
 }
@@ -187,7 +188,6 @@ func (ih *InputHandler) extractColorFromObject(obj *ast.ObjectExpression, key st
 	return ""
 }
 
-/* Converts input constants to float64 map for security evaluator */
 func (ih *InputHandler) GetInputConstantsMap() map[string]float64 {
 	result := make(map[string]float64)
 	for varName, code := range ih.inputConstants {

@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
@@ -22,7 +21,7 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 				},
 			},
 			varName:  "mult",
-			expected: "const mult = 1.50\n",
+			expected: "const mult = 1.5\n",
 		},
 		{
 			name: "named defval",
@@ -43,7 +42,7 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 				},
 			},
 			varName:  "factor",
-			expected: "const factor = 2.50\n",
+			expected: "const factor = 2.5\n",
 		},
 		{
 			name: "positional with metadata properties",
@@ -75,7 +74,7 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 				},
 			},
 			varName:  "offset",
-			expected: "const offset = -2.50\n",
+			expected: "const offset = -2.5\n",
 		},
 		{
 			name: "zero value",
@@ -85,7 +84,7 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 				},
 			},
 			varName:  "baseline",
-			expected: "const baseline = 0.00\n",
+			expected: "const baseline = 0\n",
 		},
 		{
 			name: "no arguments defaults to 0",
@@ -93,7 +92,38 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 				Arguments: []ast.Expression{},
 			},
 			varName:  "value",
-			expected: "const value = 0.00\n",
+			expected: "const value = 0\n",
+		},
+		{
+			name: "named defval with multi-decimal value",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{
+						Properties: []ast.Property{
+							{
+								Key:   &ast.Identifier{Name: "defval"},
+								Value: &ast.Literal{Value: 0.618},
+							},
+							{
+								Key:   &ast.Identifier{Name: "title"},
+								Value: &ast.Literal{Value: "Fib Rate"},
+							},
+						},
+					},
+				},
+			},
+			varName:  "fibRate",
+			expected: "const fibRate = 0.618\n",
+		},
+		{
+			name: "non-literal argument falls back to zero",
+			call: &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "someVar"},
+				},
+			},
+			varName:  "rate",
+			expected: "const rate = 0\n",
 		},
 	}
 
@@ -106,6 +136,45 @@ func TestInputHandler_GenerateInputFloat(t *testing.T) {
 			}
 			if result != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestInputHandler_GenerateInputFloat_RoundtripFidelity(t *testing.T) {
+	cases := []struct {
+		name   string
+		defval float64
+		want   string
+	}{
+		{"zero", 0.0, "const v = 0\n"},
+		{"integer-valued", 10000.0, "const v = 10000\n"},
+		{"one-decimal", 1.5, "const v = 1.5\n"},
+		{"two-decimal", 3.14, "const v = 3.14\n"},
+		{"three-decimal", 0.236, "const v = 0.236\n"},
+		{"four-decimal", 1.618, "const v = 1.618\n"},
+		{"sub-milli", 0.0001, "const v = 0.0001\n"},
+		{"negative-one-decimal", -2.5, "const v = -2.5\n"},
+		{"negative-three-decimal", -0.236, "const v = -0.236\n"},
+		{"price-one-decimal", 99.5, "const v = 99.5\n"},
+		{"integer-valued-large", 100.0, "const v = 100\n"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ih := NewInputHandler()
+			call := &ast.CallExpression{Arguments: []ast.Expression{&ast.Literal{Value: c.defval}}}
+
+			code, err := ih.GenerateInputFloat(call, "v")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if code != c.want {
+				t.Errorf("emitted %q, want %q", code, c.want)
+			}
+
+			if got := ih.GetInputConstantsMap()["v"]; got != c.defval {
+				t.Errorf("GetInputConstantsMap round-trip: got %v, want %v", got, c.defval)
 			}
 		})
 	}
@@ -418,7 +487,6 @@ func TestInputHandler_DetectInputFunction(t *testing.T) {
 		call     *ast.CallExpression
 		expected bool
 	}{
-		/* All recognized input.* types */
 		{name: "input.float", call: memberCall("input", "float"), expected: true},
 		{name: "input.int", call: memberCall("input", "int"), expected: true},
 		{name: "input.bool", call: memberCall("input", "bool"), expected: true},
@@ -431,10 +499,8 @@ func TestInputHandler_DetectInputFunction(t *testing.T) {
 		{name: "input.price", call: memberCall("input", "price"), expected: true},
 		{name: "input.time", call: memberCall("input", "time"), expected: true},
 		{name: "input.color", call: memberCall("input", "color"), expected: true},
-		/* Negative: non-input member expressions */
 		{name: "ta.sma", call: memberCall("ta", "sma"), expected: false},
 		{name: "strategy.entry", call: memberCall("strategy", "entry"), expected: false},
-		/* Negative: bare identifier (not member expression) */
 		{
 			name: "bare input",
 			call: &ast.CallExpression{
@@ -700,7 +766,6 @@ func TestInputHandler_GenerateInputColor(t *testing.T) {
 	}
 }
 
-/* Multiple input types stored independently in constant map */
 func TestInputHandler_Integration(t *testing.T) {
 	ih := NewInputHandler()
 
@@ -722,10 +787,56 @@ func TestInputHandler_Integration(t *testing.T) {
 		t.Errorf("expected 2 constants, got %d", len(ih.inputConstants))
 	}
 
-	if !strings.Contains(ih.inputConstants["mult"], "1.50") {
-		t.Errorf("mult constant not stored correctly: %s", ih.inputConstants["mult"])
+	if ih.inputConstants["mult"] != "const mult = 1.5\n" {
+		t.Errorf("mult: got %q", ih.inputConstants["mult"])
 	}
-	if !strings.Contains(ih.inputConstants["length"], "20") {
-		t.Errorf("length constant not stored correctly: %s", ih.inputConstants["length"])
+	if ih.inputConstants["length"] != "const length = 20\n" {
+		t.Errorf("length: got %q", ih.inputConstants["length"])
+	}
+}
+
+func TestInputHandler_GetInputConstantsMap(t *testing.T) {
+	numericCall := func(v float64) *ast.CallExpression {
+		return &ast.CallExpression{Arguments: []ast.Expression{&ast.Literal{Value: v}}}
+	}
+	boolCall := func(v bool) *ast.CallExpression {
+		return &ast.CallExpression{Arguments: []ast.Expression{&ast.Literal{Value: v}}}
+	}
+
+	ih := NewInputHandler()
+	ih.GenerateInputFloat(numericCall(0.236), "rate")
+	ih.GenerateInputInt(numericCall(14), "period")
+	ih.GenerateInputBool(boolCall(true), "enabled")
+	ih.GenerateInputBool(boolCall(false), "disabled")
+
+	m := ih.GetInputConstantsMap()
+
+	if got := m["rate"]; got != 0.236 {
+		t.Errorf("float: got %v, want 0.236", got)
+	}
+	if got := m["period"]; got != 14.0 {
+		t.Errorf("int: got %v, want 14", got)
+	}
+	if got := m["enabled"]; got != 1.0 {
+		t.Errorf("bool true: got %v, want 1", got)
+	}
+	if got := m["disabled"]; got != 0.0 {
+		t.Errorf("bool false: got %v, want 0", got)
+	}
+}
+
+func TestInputHandler_IsInputConstant(t *testing.T) {
+	ih := NewInputHandler()
+	call := &ast.CallExpression{Arguments: []ast.Expression{&ast.Literal{Value: 1.5}}}
+
+	if ih.IsInputConstant("rate") {
+		t.Error("before registration: expected false")
+	}
+	ih.GenerateInputFloat(call, "rate")
+	if !ih.IsInputConstant("rate") {
+		t.Error("after registration: expected true")
+	}
+	if ih.IsInputConstant("other") {
+		t.Error("unregistered name: expected false")
 	}
 }
