@@ -147,3 +147,81 @@ func TestSummary_ContainsAllHitFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordStatic_MergesWithRuntimeObservation(t *testing.T) {
+	Reset()
+	RecordStaticAt("line.get_price", "chart_namespace_getter", "lines.pine", 4, 5, "codegen", "backtest-critical", "NaN", []string{"strategy.entry"})
+	Record("line.get_price", "chart_namespace_getter", 3)
+	Record("line.get_price", "chart_namespace_getter", 5)
+
+	snap := Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("len(Snapshot()) = %d, want 1", len(snap))
+	}
+	h := snap[0]
+	if h.Impact != "backtest-critical" {
+		t.Fatalf("Impact = %q, want backtest-critical", h.Impact)
+	}
+	if h.FirstSeenBar != 3 || h.LastSeenBar != 5 {
+		t.Fatalf("bar range = %d..%d, want 3..5", h.FirstSeenBar, h.LastSeenBar)
+	}
+	if h.HitCount != 2 {
+		t.Fatalf("HitCount = %d, want 2 runtime observations", h.HitCount)
+	}
+	if h.File != "lines.pine" || h.Line != 4 || h.Column != 5 {
+		t.Fatalf("location = %s:%d:%d, want lines.pine:4:5", h.File, h.Line, h.Column)
+	}
+}
+
+func TestRecordStaticAt_FillsLocationAfterRuntimeObservation(t *testing.T) {
+	Reset()
+	Record("line.get_price", "chart_namespace_getter", 3)
+	RecordStaticAt("line.get_price", "chart_namespace_getter", "lines.pine", 4, 5, "codegen", "backtest-critical", "NaN", []string{"strategy.entry"})
+
+	h := Snapshot()[0]
+	if h.File != "lines.pine" || h.Line != 4 || h.Column != 5 {
+		t.Fatalf("location = %s:%d:%d, want lines.pine:4:5", h.File, h.Line, h.Column)
+	}
+	if h.FirstSeenBar != 3 || h.LastSeenBar != 3 || h.HitCount != 1 {
+		t.Fatalf("runtime counters = %d..%d hits=%d, want 3..3 hits=1", h.FirstSeenBar, h.LastSeenBar, h.HitCount)
+	}
+}
+
+func TestRecordDiagnostic_EscalatesImpactAndDeduplicatesSinks(t *testing.T) {
+	Reset()
+	RecordDiagnostic("gap", "src", "runtime", "observable-non-backtest", "NaN", []string{"strategy.entry", "strategy.entry"}, 1)
+	RecordDiagnostic("gap", "src", "runtime", "backtest-critical", "NaN", []string{"strategy.close", "strategy.entry"}, 2)
+
+	h := Snapshot()[0]
+	if h.Impact != "backtest-critical" {
+		t.Fatalf("Impact = %q, want backtest-critical", h.Impact)
+	}
+	want := []string{"strategy.close", "strategy.entry"}
+	if len(h.Sinks) != len(want) {
+		t.Fatalf("Sinks = %v, want %v", h.Sinks, want)
+	}
+	for i := range want {
+		if h.Sinks[i] != want[i] {
+			t.Fatalf("Sinks = %v, want %v", h.Sinks, want)
+		}
+	}
+}
+
+func TestBacktestSinks_OnlyBacktestCriticalSortedUnique(t *testing.T) {
+	snap := []Hit{
+		{Impact: "observable-non-backtest", Sinks: []string{"strategy.entry"}},
+		{Impact: "backtest-critical", Sinks: []string{"strategy.close", "strategy.entry"}},
+		{Impact: "backtest-critical", Sinks: []string{"strategy.entry"}},
+	}
+
+	got := BacktestSinks(snap)
+	want := []string{"strategy.close", "strategy.entry"}
+	if len(got) != len(want) {
+		t.Fatalf("BacktestSinks() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("BacktestSinks() = %v, want %v", got, want)
+		}
+	}
+}

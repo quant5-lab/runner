@@ -19,6 +19,7 @@ type StrategyCode struct {
 	StrategyName         string   // Pine Script strategy name
 	AdditionalImports    []string // Additional imports needed for security() streaming evaluation
 	FeatureGaps          []string // Deduplicated list of unimplemented function names encountered
+	CompatibilitySetup   string   // Generated static compatibility records
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -162,12 +163,14 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		additionalImports = append(additionalImports, "sort")
 	}
 
+	featureGaps := deduplicateFeatureGaps(gen.featureGaps)
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
 		FunctionBody:         body,
 		StrategyName:         gen.strategyConfig.Name,
 		AdditionalImports:    additionalImports,
-		FeatureGaps:          deduplicateFeatureGaps(gen.featureGaps),
+		FeatureGaps:          featureGaps,
+		CompatibilitySetup:   compatibilitySetupCode(analyzeCompatibility(program, featureGaps)),
 	}
 
 	return code, nil

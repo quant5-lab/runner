@@ -297,6 +297,7 @@ type MemberAccess struct {
 }
 
 type CallExpr struct {
+	Pos    lexer.Position
 	Callee *CallCallee `parser:"@@"`
 	Args   []*Argument `parser:"'(' ( @@ ( ',' @@ )* )? ')'"`
 }

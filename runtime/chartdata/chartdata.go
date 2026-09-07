@@ -7,6 +7,7 @@ import (
 
 	"github.com/quant5-lab/runner/runtime/clock"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/featuregap"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/strategy"
 )
@@ -86,6 +87,16 @@ type StrategyData struct {
 	InitialCapital float64     `json:"initialCapital"`
 }
 
+type CompatibilityData struct {
+	Status      string           `json:"status"`
+	Diagnostics []featuregap.Hit `json:"diagnostics,omitempty"`
+}
+
+type BacktestData struct {
+	Status        string   `json:"status"`
+	AffectedSinks []string `json:"affectedSinks,omitempty"`
+}
+
 /* PlotPoint represents a single plot data point */
 type PlotPoint struct {
 	Time    int64                  `json:"time"`
@@ -123,11 +134,13 @@ type PlotSeries struct {
 
 /* ChartData represents complete unified chart output */
 type ChartData struct {
-	Metadata    Metadata                   `json:"metadata"`
-	Candlestick []context.OHLCV            `json:"candlestick"`
-	Indicators  map[string]IndicatorSeries `json:"indicators"`
-	Strategy    *StrategyData              `json:"strategy,omitempty"`
-	UI          UIConfig                   `json:"ui"`
+	Metadata            Metadata                   `json:"metadata"`
+	ScriptCompatibility CompatibilityData          `json:"scriptCompatibility"`
+	Backtest            BacktestData               `json:"backtest"`
+	Candlestick         []context.OHLCV            `json:"candlestick"`
+	Indicators          map[string]IndicatorSeries `json:"indicators"`
+	Strategy            *StrategyData              `json:"strategy,omitempty"`
+	UI                  UIConfig                   `json:"ui"`
 }
 
 /* NewChartData creates a new chart data structure */
@@ -145,14 +158,41 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 			Title:     title,
 			Timestamp: clock.Now().Format(time.RFC3339),
 		},
-		Candlestick: ctx.Data,
-		Indicators:  make(map[string]IndicatorSeries),
+		ScriptCompatibility: CompatibilityData{Status: "complete"},
+		Backtest:            BacktestData{Status: "complete"},
+		Candlestick:         ctx.Data,
+		Indicators:          make(map[string]IndicatorSeries),
 		UI: UIConfig{
 			Panes: map[string]PaneConfig{
 				"main": {Height: 400, Fixed: true},
 			},
 		},
 	}
+}
+
+func (cd *ChartData) AddCompatibility(diagnostics []featuregap.Hit) {
+	if len(diagnostics) == 0 {
+		cd.ScriptCompatibility = CompatibilityData{Status: "complete"}
+		cd.Backtest = BacktestData{Status: "complete"}
+		return
+	}
+
+	cd.ScriptCompatibility = CompatibilityData{
+		Status:      "degraded",
+		Diagnostics: diagnostics,
+	}
+	if featuregap.HasBacktestCritical(diagnostics) {
+		cd.Backtest = BacktestData{
+			Status:        "unsupported_dependency",
+			AffectedSinks: featuregap.BacktestSinks(diagnostics),
+		}
+		return
+	}
+	cd.Backtest = BacktestData{Status: "complete"}
+}
+
+func (cd *ChartData) BacktestComplete() bool {
+	return cd.Backtest.Status == "complete"
 }
 
 /* AddPlots adds plot data to chart as indicators */

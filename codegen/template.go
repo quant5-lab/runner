@@ -28,7 +28,7 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 %s
 
 	return collector, strat
-}`, code.FunctionBody)
+}`, code.CompatibilitySetup+code.FunctionBody)
 
 	/* Replace placeholders */
 	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)

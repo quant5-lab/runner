@@ -102,26 +102,28 @@ func TestVoidNamespaceCallHandler_CanHandle(t *testing.T) {
 	}
 }
 
-// TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls verifies that any call
-// the handler claims to handle produces "math.NaN()" regardless of argument count,
-// argument shape, or which specific namespace method is targeted.
+// TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls verifies the split
+// between silent presentation calls and calculation-bearing drawing getters.
 func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 	h := &VoidNamespaceCallHandler{}
-	g := newTestGenerator()
 
 	tests := []struct {
-		name string
-		call *ast.CallExpression
+		name         string
+		call         *ast.CallExpression
+		wantContains string
+		wantGap      string
 	}{
 		{
-			name: "bare label constructor with na",
+			name:         "bare label constructor with na",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee:    &ast.Identifier{Name: "label"},
 				Arguments: []ast.Expression{&ast.Identifier{Name: "na"}},
 			},
 		},
 		{
-			name: "label.new with all positional arguments",
+			name:         "label.new with all positional arguments",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -137,7 +139,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "label.delete with label reference",
+			name:         "label.delete with label reference",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -147,7 +150,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "label.set_xy mutator",
+			name:         "label.set_xy mutator",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -161,7 +165,9 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "label.get_x getter",
+			name:         "label.get_x getter",
+			wantContains: `featuregap.Record("label.get_x"`,
+			wantGap:      "label.get_x",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -171,7 +177,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "label.copy returns new reference",
+			name:         "label.copy returns new reference",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -181,7 +188,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "line.new with coordinate arguments",
+			name:         "line.new with coordinate arguments",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "line"},
@@ -191,7 +199,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "line.delete",
+			name:         "line.delete",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "line"},
@@ -201,7 +210,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "box.new",
+			name:         "box.new",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "box"},
@@ -211,7 +221,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "table.new with rows and cols",
+			name:         "table.new with rows and cols",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "table"},
@@ -225,7 +236,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "table.cell populates a cell",
+			name:         "table.cell populates a cell",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "table"},
@@ -240,7 +252,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "linefill.new",
+			name:         "linefill.new",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "linefill"},
@@ -250,7 +263,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "call with no arguments",
+			name:         "call with no arguments",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -260,7 +274,8 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 			},
 		},
 		{
-			name: "call with complex expression argument",
+			name:         "call with complex expression argument",
+			wantContains: "math.NaN()",
 			call: &ast.CallExpression{
 				Callee: &ast.MemberExpression{
 					Object:   &ast.Identifier{Name: "label"},
@@ -279,12 +294,19 @@ func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator()
 			code, err := h.GenerateCode(g, tt.call)
 			if err != nil {
 				t.Fatalf("GenerateCode() unexpected error: %v", err)
 			}
-			if code != "math.NaN()" {
-				t.Errorf("GenerateCode() = %q, want %q", code, "math.NaN()")
+			if !contains(code, tt.wantContains) {
+				t.Errorf("GenerateCode() = %q, want containing %q", code, tt.wantContains)
+			}
+			if tt.wantGap != "" && !containsGap(g.featureGaps, tt.wantGap) {
+				t.Errorf("featureGaps = %v, want %q", g.featureGaps, tt.wantGap)
+			}
+			if tt.wantGap == "" && len(g.featureGaps) != 0 {
+				t.Errorf("featureGaps = %v, want none", g.featureGaps)
 			}
 		})
 	}

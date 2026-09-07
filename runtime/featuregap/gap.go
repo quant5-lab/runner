@@ -12,11 +12,18 @@ import (
 )
 
 type Hit struct {
-	Name         string
-	Source       string
-	FirstSeenBar int
-	LastSeenBar  int
-	HitCount     int
+	Name         string   `json:"featureId"`
+	Source       string   `json:"source"`
+	File         string   `json:"file,omitempty"`
+	Line         int      `json:"line,omitempty"`
+	Column       int      `json:"column,omitempty"`
+	Phase        string   `json:"phase"`
+	Impact       string   `json:"impact"`
+	Substitution string   `json:"substitution"`
+	Sinks        []string `json:"affectedSinks,omitempty"`
+	FirstSeenBar int      `json:"firstReachedBar"`
+	LastSeenBar  int      `json:"lastReachedBar"`
+	HitCount     int      `json:"hitCount"`
 }
 
 type key struct {
@@ -31,14 +38,46 @@ var (
 )
 
 func Record(name, source string, barIdx int) float64 {
+	return RecordDiagnostic(name, source, "runtime", "observable-non-backtest", "NaN", nil, barIdx)
+}
+
+func RecordDiagnostic(name, source, phase, impact, substitution string, sinks []string, barIdx int) float64 {
+	return RecordDiagnosticAt(name, source, "", 0, 0, phase, impact, substitution, sinks, barIdx)
+}
+
+func RecordDiagnosticAt(name, source, file string, line, column int, phase, impact, substitution string, sinks []string, barIdx int) float64 {
 	mu.Lock()
 	k := key{name: name, source: source}
 	h, ok := hits[k]
 	if !ok {
-		h = &Hit{Name: name, Source: source, FirstSeenBar: barIdx, LastSeenBar: barIdx}
+		h = &Hit{
+			Name:         name,
+			Source:       source,
+			File:         file,
+			Line:         line,
+			Column:       column,
+			Phase:        phase,
+			Impact:       impact,
+			Substitution: substitution,
+			Sinks:        append([]string(nil), sinks...),
+			FirstSeenBar: barIdx,
+			LastSeenBar:  barIdx,
+		}
 		hits[k] = h
 	}
+	if impactRank(impact) > impactRank(h.Impact) {
+		h.Impact = impact
+	}
+	if h.File == "" && file != "" {
+		h.File = file
+		h.Line = line
+		h.Column = column
+	}
+	h.Sinks = mergeStrings(h.Sinks, sinks)
 	h.HitCount++
+	if h.FirstSeenBar < 0 && barIdx >= 0 {
+		h.FirstSeenBar = barIdx
+	}
 	if barIdx > h.LastSeenBar {
 		h.LastSeenBar = barIdx
 	}
@@ -48,6 +87,42 @@ func Record(name, source string, barIdx int) float64 {
 	}
 	mu.Unlock()
 	return math.NaN()
+}
+
+func RecordStatic(name, source, phase, impact, substitution string, sinks []string) {
+	RecordStaticAt(name, source, "", 0, 0, phase, impact, substitution, sinks)
+}
+
+func RecordStaticAt(name, source, file string, line, column int, phase, impact, substitution string, sinks []string) {
+	mu.Lock()
+	k := key{name: name, source: source}
+	h, ok := hits[k]
+	if !ok {
+		h = &Hit{
+			Name:         name,
+			Source:       source,
+			File:         file,
+			Line:         line,
+			Column:       column,
+			Phase:        phase,
+			Impact:       impact,
+			Substitution: substitution,
+			Sinks:        append([]string(nil), sinks...),
+			FirstSeenBar: -1,
+			LastSeenBar:  -1,
+		}
+		hits[k] = h
+	}
+	if impactRank(impact) > impactRank(h.Impact) {
+		h.Impact = impact
+	}
+	if h.File == "" && file != "" {
+		h.File = file
+		h.Line = line
+		h.Column = column
+	}
+	h.Sinks = mergeStrings(h.Sinks, sinks)
+	mu.Unlock()
 }
 
 func Snapshot() []Hit {
@@ -63,6 +138,62 @@ func Snapshot() []Hit {
 		}
 		return out[i].Source < out[j].Source
 	})
+	return out
+}
+
+func HasBacktestCritical(snap []Hit) bool {
+	for _, h := range snap {
+		if h.Impact == "backtest-critical" {
+			return true
+		}
+	}
+	return false
+}
+
+func BacktestSinks(snap []Hit) []string {
+	var sinks []string
+	for _, h := range snap {
+		if h.Impact == "backtest-critical" {
+			sinks = mergeStrings(sinks, h.Sinks)
+		}
+	}
+	sort.Strings(sinks)
+	return sinks
+}
+
+func impactRank(impact string) int {
+	switch impact {
+	case "silent-presentation":
+		return 1
+	case "observable-non-backtest":
+		return 2
+	case "backtest-critical":
+		return 3
+	case "structural":
+		return 4
+	default:
+		return 0
+	}
+}
+
+func mergeStrings(existing, incoming []string) []string {
+	seen := make(map[string]bool, len(existing)+len(incoming))
+	out := make([]string, 0, len(existing)+len(incoming))
+	for _, value := range existing {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	for _, value := range incoming {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
 	return out
 }
 

@@ -122,7 +122,10 @@ func main() {
 
 	cd := chartdata.NewChartData(ctx, *symbolFlag, *timeframeFlag, "{{STRATEGY_NAME}}")
 	cd.AddPlots(plotCollector)
-	cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
+	cd.AddCompatibility(featuregap.Snapshot())
+	if cd.BacktestComplete() {
+		cd.AddStrategy(strat, ctx.Data[len(ctx.Data)-1].Close)
+	}
 
 	jsonBytes, err := cd.ToJSON()
 	if err != nil {
@@ -147,6 +150,8 @@ func main() {
 		th := strat.GetTradeHistory()
 		closedTrades := th.GetClosedTrades()
 		fmt.Printf("Closed trades: %d\n", len(closedTrades))
-		fmt.Printf("Final equity: %.2f\n", strat.GetEquity(ctx.Data[len(ctx.Data)-1].Close))
+		if cd.BacktestComplete() {
+			fmt.Printf("Final equity: %.2f\n", strat.GetEquity(ctx.Data[len(ctx.Data)-1].Close))
+		}
 	}
 }

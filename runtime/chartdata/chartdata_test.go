@@ -6,6 +6,7 @@ import (
 
 	"github.com/quant5-lab/runner/runtime/clock"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/featuregap"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/strategy"
 )
@@ -391,6 +392,67 @@ func TestAddStrategy(t *testing.T) {
 	}
 	if cd.Strategy.Equity != 10100 {
 		t.Errorf("Expected equity 10100, got %.2f", cd.Strategy.Equity)
+	}
+}
+
+func TestAddCompatibility_StatusBoundaries(t *testing.T) {
+	tests := []struct {
+		name               string
+		diagnostics        []featuregap.Hit
+		wantScriptStatus   string
+		wantBacktestStatus string
+		wantSinks          []string
+	}{
+		{
+			name:               "no diagnostics",
+			wantScriptStatus:   "complete",
+			wantBacktestStatus: "complete",
+		},
+		{
+			name: "observable diagnostic",
+			diagnostics: []featuregap.Hit{{
+				Name:   "plot_only_gap",
+				Impact: "observable-non-backtest",
+			}},
+			wantScriptStatus:   "degraded",
+			wantBacktestStatus: "complete",
+		},
+		{
+			name: "backtest critical diagnostic",
+			diagnostics: []featuregap.Hit{{
+				Name:   "line.get_price",
+				Impact: "backtest-critical",
+				Sinks:  []string{"strategy.entry", "strategy.close", "strategy.entry"},
+			}},
+			wantScriptStatus:   "degraded",
+			wantBacktestStatus: "unsupported_dependency",
+			wantSinks:          []string{"strategy.close", "strategy.entry"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cd := NewChartData(context.New("TEST", "1h", 10), "TEST", "1h", "")
+			cd.AddCompatibility(tt.diagnostics)
+
+			if cd.ScriptCompatibility.Status != tt.wantScriptStatus {
+				t.Fatalf("scriptCompatibility.status = %q, want %q", cd.ScriptCompatibility.Status, tt.wantScriptStatus)
+			}
+			if cd.Backtest.Status != tt.wantBacktestStatus {
+				t.Fatalf("backtest.status = %q, want %q", cd.Backtest.Status, tt.wantBacktestStatus)
+			}
+			if cd.BacktestComplete() != (tt.wantBacktestStatus == "complete") {
+				t.Fatalf("BacktestComplete() = %v for status %q", cd.BacktestComplete(), cd.Backtest.Status)
+			}
+			if len(cd.Backtest.AffectedSinks) != len(tt.wantSinks) {
+				t.Fatalf("AffectedSinks = %v, want %v", cd.Backtest.AffectedSinks, tt.wantSinks)
+			}
+			for i := range tt.wantSinks {
+				if cd.Backtest.AffectedSinks[i] != tt.wantSinks[i] {
+					t.Fatalf("AffectedSinks = %v, want %v", cd.Backtest.AffectedSinks, tt.wantSinks)
+				}
+			}
+		})
 	}
 }
 

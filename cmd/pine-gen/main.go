@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 
+	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/quant5-lab/runner/codegen"
 	"github.com/quant5-lab/runner/parser"
 	"github.com/quant5-lab/runner/preprocessor"
@@ -51,7 +53,7 @@ func main() {
 	sourceFilename := filepath.Base(*inputFlag)
 	parsedAST, err := pineParser.ParseString(sourceFilename, sourceStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
+		reportBlockedParse(sourceFilename, err)
 		os.Exit(1)
 	}
 
@@ -141,6 +143,74 @@ func main() {
 	fmt.Printf("Generated: %s\n", temporaryGoFile)
 	fmt.Printf("AST size: %d bytes\n", len(astJSON))
 	fmt.Printf("Next: Compile with: go build -o %s %s\n", *outputFlag, temporaryGoFile)
+}
+
+type blockedCompatibilityResult struct {
+	ScriptCompatibility blockedCompatibility `json:"scriptCompatibility"`
+	Backtest            blockedBacktest      `json:"backtest"`
+}
+
+type blockedCompatibility struct {
+	Status      string              `json:"status"`
+	Diagnostics []blockedDiagnostic `json:"diagnostics"`
+}
+
+type blockedBacktest struct {
+	Status string `json:"status"`
+}
+
+type blockedDiagnostic struct {
+	FeatureID    string `json:"featureId"`
+	Phase        string `json:"phase"`
+	Impact       string `json:"impact"`
+	Substitution string `json:"substitution"`
+	Source       string `json:"source"`
+	File         string `json:"file,omitempty"`
+	Line         int    `json:"line,omitempty"`
+	Column       int    `json:"column,omitempty"`
+	Message      string `json:"message"`
+}
+
+func reportBlockedParse(sourceFilename string, err error) {
+	pos := errorPosition(err)
+	result := blockedCompatibilityResult{
+		ScriptCompatibility: blockedCompatibility{
+			Status: "blocked",
+			Diagnostics: []blockedDiagnostic{{
+				FeatureID:    "parser.unrecoverable",
+				Phase:        "parse",
+				Impact:       "structural",
+				Substitution: "none",
+				Source:       sourceFilename,
+				File:         fallbackString(pos.Filename, sourceFilename),
+				Line:         pos.Line,
+				Column:       pos.Column,
+				Message:      err.Error(),
+			}},
+		},
+		Backtest: blockedBacktest{Status: "blocked"},
+	}
+	payload, marshalErr := json.Marshal(result)
+	if marshalErr != nil {
+		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "%s\n", payload)
+}
+
+func errorPosition(err error) lexer.Position {
+	positioned, ok := err.(interface{ Position() lexer.Position })
+	if !ok {
+		return lexer.Position{}
+	}
+	return positioned.Position()
+}
+
+func fallbackString(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
 }
 
 func reportFeatureGaps(gaps []string) {

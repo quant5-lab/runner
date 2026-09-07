@@ -8,12 +8,14 @@ import (
 
 var chartOnlyNamespaces = []string{"label", "line", "box", "table", "linefill"}
 
-// VoidNamespaceCallHandler stubs Pine drawing-object calls with math.NaN() so
-// assignments compile in any expression position. Chart-object IDs never reach
-// strategy logic, making NaN the correct numeric placeholder throughout.
+// VoidNamespaceCallHandler keeps drawing-object calls compilable while recording
+// getter calls that can feed calculations.
 type VoidNamespaceCallHandler struct{}
 
 func (h *VoidNamespaceCallHandler) CanHandle(funcName string) bool {
+	if isCalculationBearingChartCall(funcName) {
+		return true
+	}
 	for _, ns := range chartOnlyNamespaces {
 		if funcName == ns || strings.HasPrefix(funcName, ns+".") {
 			return true
@@ -22,9 +24,31 @@ func (h *VoidNamespaceCallHandler) CanHandle(funcName string) bool {
 	return false
 }
 
-func (h *VoidNamespaceCallHandler) GenerateCode(_ *generator, call *ast.CallExpression) (string, error) {
-	if !h.CanHandle(extractCallFunctionName(call)) {
+func (h *VoidNamespaceCallHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
+	funcName := extractCallFunctionName(call)
+	if !h.CanHandle(funcName) {
 		return "", nil
 	}
+	if isCalculationBearingChartCall(funcName) {
+		g.featureGaps = append(g.featureGaps, funcName)
+		return "featuregap.Record(" + quote(funcName) + `, "chart_namespace_getter", ctx.BarIndex)`, nil
+	}
 	return "math.NaN()", nil
+}
+
+func isCalculationBearingChartCall(funcName string) bool {
+	parts := strings.Split(funcName, ".")
+	if len(parts) != 2 {
+		return false
+	}
+	switch parts[0] {
+	case "label", "line", "box", "table", "linefill":
+		return strings.HasPrefix(parts[1], "get_")
+	default:
+		return false
+	}
+}
+
+func quote(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
 }
