@@ -187,9 +187,8 @@ result = custom(daily_close)
 			codeAfterInjection.UserDefinedFunctions)
 	}
 
-	// Verify security prefetch code is also present
-	if !strings.Contains(codeAfterInjection.FunctionBody, "request.security") {
-		t.Error("Security prefetch code not injected")
+	if !strings.Contains(codeAfterInjection.FunctionBody, "FetchWithMetadata") {
+		t.Error("security prefetch code not injected")
 	}
 }
 

@@ -133,6 +133,7 @@ dist/
 .pnp.*
 
 # Generated files
+chart-data.json
 out/chart-data.json
 out/chart-config.json
 out/e2e-*-output.json
@@ -172,11 +173,16 @@ __pycache__/
 *.so
 .pyc
 
-# GitHub - track CI workflows only
+# GitHub - track CI workflows, reference time-series CSVs, and audit narratives
 .github/*
 !.github/workflows/
 .github/workflows/local-*.yaml
-.github/workflows/draft-*.yaml# Binaries for programs and plugins
+.github/workflows/draft-*.yaml
+
+# docs/ - internal working notes; never tracked (audit narratives carry internal reasoning)
+docs/**
+
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
@@ -230,3 +236,11 @@ testdata/*-output.json
 # Contribot
 contribot.*.json
 transcripts/
+AGENTS.md
+
+.playwright-cli
+# Editor and tool artifacts
+*.backup
+
+# Claude Code agent artifacts
+.claude/scheduled_tasks.lock

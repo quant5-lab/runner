@@ -77,6 +77,10 @@ func resolveFromExplicitTypeParam(call *ast.CallExpression) string {
 		return ""
 	}
 
+	if ident, ok := typeExpr.(*ast.Identifier); ok {
+		return v4InputTypeMapping[ident.Name]
+	}
+
 	memExpr, ok := typeExpr.(*ast.MemberExpression)
 	if !ok {
 		return ""
@@ -104,6 +108,14 @@ func resolveFromDefvalType(call *ast.CallExpression) string {
 	if ident, ok := defvalExpr.(*ast.Identifier); ok {
 		if sourceIdentifierNames[ident.Name] {
 			return "input.source"
+		}
+		return ""
+	}
+
+	// The Pine parser emits UnaryExpression for a negative literal, not a signed Literal.
+	if unary, ok := defvalExpr.(*ast.UnaryExpression); ok && unary.Operator == "-" {
+		if inner, ok := unary.Argument.(*ast.Literal); ok {
+			return inputFuncNameFromLiteral(inner)
 		}
 		return ""
 	}

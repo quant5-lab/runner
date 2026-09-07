@@ -68,9 +68,6 @@ func TestStatefulIndicatorBuilder_NaNHandling(t *testing.T) {
 				if strings.Contains(code, "return\n") || strings.Contains(code, "return\t") {
 					t.Error("Code has naked 'return' in warmup loop - this causes compilation errors")
 				}
-
-				// Deferred flag pattern: flag declared before loop, checked after loop.
-				// Ensures the series NaN update is outside the loop body (safe in generated Go).
 				if !strings.Contains(code, "_sma_has_nan := false") {
 					t.Error("NaN checking must declare _sma_has_nan flag before loop")
 				}

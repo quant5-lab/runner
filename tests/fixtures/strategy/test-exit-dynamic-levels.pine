@@ -6,7 +6,7 @@ if bar_index == 1
     strategy.entry("Long", strategy.long)
 
 // Exit levels update each bar - trailing stop pattern
-trailingStop = close * 0.95
+trailingStop = close * 0.99 // 1% trailing stop (tight enough to trigger within 10-bar simple-bars fixture)
 
 if strategy.position_size > 0
     strategy.exit("Exit", "Long", stop=trailingStop)

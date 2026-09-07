@@ -90,6 +90,12 @@ func (g *ArrowSecurityCallGenerator) generateEvaluation(exprArg ast.Expression) 
 		}
 		return "\t\treturn math.NaN()\n", nil
 	}
+	if callExpr, ok := exprArg.(*ast.CallExpression); ok {
+		udfGen := NewSecurityUDFCallGenerator(g.gen)
+		if udfGen.IsUDFCall(callExpr) {
+			return udfGen.EmitArrowContextUDFEval(callExpr)
+		}
+	}
 	return g.generateStreamingEvaluation(exprArg)
 }
 

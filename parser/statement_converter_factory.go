@@ -30,6 +30,7 @@ func NewStatementConverterFactory(
 			NewTypedAssignmentConverter(expressionConverter),
 			NewAssignmentConverter(expressionConverter),
 			NewReassignmentConverter(expressionConverter),
+			NewCompoundAssignmentConverter(expressionConverter),
 			NewIfStatementConverter(orExprConverter, statementConverter),
 			NewForInStatementConverter(arithExprConverter, statementConverter),
 			NewForStatementConverter(arithExprConverter, statementConverter),

@@ -486,14 +486,16 @@ tally(len) =>
 plot(tally(20))
 `,
 			mustContainAll: []string{
-				"upsSeries.Set((upsSeries.GetCurrent() + 1))",
-				"downsSeries.Set((downsSeries.GetCurrent() + 1))",
+				"ups = (upsSeries.GetCurrent() + 1)",
+				"upsSeries.Set(ups)",
+				"downs = (downsSeries.GetCurrent() + 1)",
+				"downsSeries.Set(downs)",
 			},
 			forbiddenPattern: []string{
 				"ups := (ups + 1)",
 				"downs := (downs + ",
 			},
-			description: "multiple loop-modified variables tracked independently",
+			description: "multiple loop-modified variables tracked independently with dual-storage",
 		},
 		{
 			name: "unmodified variable stays scalar",

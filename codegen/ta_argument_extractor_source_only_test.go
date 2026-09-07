@@ -171,8 +171,8 @@ func TestTAArgumentExtractor_ExtractSourceOnly_TrBuiltin(t *testing.T) {
 			if comp.Period != 0 {
 				t.Errorf("Period = %d, want 0", comp.Period)
 			}
-			if _, ok := comp.AccessGen.(*TrueRangeAccessGenerator); !ok {
-				t.Errorf("AccessGen = %T, want *TrueRangeAccessGenerator", comp.AccessGen)
+			if _, ok := comp.AccessGen.(*BuiltinTrueRangeAccessor); !ok {
+				t.Errorf("AccessGen = %T, want *BuiltinTrueRangeAccessor", comp.AccessGen)
 			}
 			if !comp.NeedsNaNCheck {
 				t.Error("NeedsNaNCheck = false, want true: ta.tr needs NaN check")

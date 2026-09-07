@@ -16,6 +16,7 @@ func (g *generator) extractCallExpression(call *ast.CallExpression) string {
 		g.extractValueFunction,
 		g.extractMathFunction,
 		g.extractColorFunction,
+		g.extractTimeBuiltin,
 		g.extractUserDefinedFunction,
 		g.extractDefaultSeries,
 	}
@@ -86,11 +87,18 @@ func (g *generator) extractUserDefinedFunction(call *ast.CallExpression) string 
 		return ""
 	}
 
+	if g.chartOnlyUDFs[funcName] {
+		return "math.NaN()"
+	}
+
 	arrowCtxVar := g.arrowContextLifecycle.AllocateContextVariable(funcName)
 
 	argsCode := []string{arrowCtxVar}
 	for _, arg := range call.Arguments {
 		argsCode = append(argsCode, g.extractSeriesExpression(arg))
+	}
+	if g.arrowCaptureRegistry != nil {
+		argsCode = g.arrowCaptureRegistry.AppendCallArgs(argsCode, funcName, g.constants)
 	}
 
 	return fmt.Sprintf("%s(%s)", funcName, strings.Join(argsCode, ", "))
@@ -101,6 +109,12 @@ func (g *generator) extractDefaultSeries(call *ast.CallExpression) string {
 		return "Series.GetCurrent()"
 	}
 	funcName := g.extractFunctionName(call.Callee)
+	isKnownTA := sharedTASignatures.Contains(funcName)
+	isMath := g.mathHandler.CanHandle(funcName)
+	if !isKnownTA && !isMath {
+		g.featureGaps = append(g.featureGaps, funcName)
+		return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", funcName, "call_expr_series_extractor")
+	}
 	varName := strings.ReplaceAll(funcName, ".", "_")
 	return fmt.Sprintf("%sSeries.GetCurrent()", varName)
 }

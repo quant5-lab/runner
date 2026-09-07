@@ -73,12 +73,11 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 	}
 
 	entryID := g.extractStringLiteral(call.Arguments[0])
-	direction := g.extractDirectionConstant(call.Arguments[1])
-	qty := h.qtyResolver.ResolveQuantity(
-		call.Arguments,
-		g.strategyConfig.DefaultQtyValue,
-		g.extractFloatLiteral,
-	)
+	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("strategy.entry: %w", err)
+	}
+	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
@@ -131,18 +130,22 @@ func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExp
 }
 
 func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 2 {
+	if len(call.Arguments) == 0 {
 		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
 	}
 
-	exitID := g.extractStringLiteral(call.Arguments[0])
-	fromEntry := g.extractStringLiteral(call.Arguments[1])
+	parser := newStrategyExitArgParser(call.Arguments, g)
 
-	extractor := &ArgumentExtractor{generator: g}
-	limitExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "limit", 3, "math.NaN()")
-	stopExpr := extractor.ExtractNamedOrPositional(call.Arguments[2:], "stop", 5, "math.NaN()")
-	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 6, `""`)
-	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
+	exitID := parser.stringArg(0, "id", "")
+	if exitID == "" {
+		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
+	}
+
+	fromEntry := parser.stringArg(1, "from_entry", "")
+	stopExpr := parser.exprArg(noPositionalFallback, "stop", "math.NaN()")
+	limitExpr := parser.exprArg(noPositionalFallback, "limit", "math.NaN()")
+	comment := parser.commentArg()
+	whenCondition, hasWhen := parser.whenCondition()
 
 	exitCode := g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
 		exitID, fromEntry, stopExpr, limitExpr, comment)
@@ -161,8 +164,11 @@ func (h *StrategyActionHandler) generateOrder(g *generator, call *ast.CallExpres
 	}
 
 	orderID := g.extractStringLiteral(call.Arguments[0])
-	direction := g.extractDirectionConstant(call.Arguments[1])
-	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.extractFloatLiteral)
+	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	if err != nil {
+		return "", fmt.Errorf("strategy.order: %w", err)
+	}
+	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
 	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
@@ -183,14 +189,13 @@ func (h *StrategyActionHandler) generateQtyBlock(g *generator, method, qtyVar, i
 	fixedCall := g.ind() + fmt.Sprintf("strat.%s(%q, %s, %.0f, %s)\n", method, id, direction, qty, comment)
 
 	switch g.strategyConfig.DefaultQtyType {
-	case "strategy.cash", "cash":
+	case "strategy.cash", "cash",
+		"strategy.percent_of_equity", "percent_of_equity":
+		if method == "Entry" {
+			return g.ind() + fmt.Sprintf("strat.EntryWithDefaultQty(%q, %s, %s)\n", id, direction, comment)
+		}
 		return g.ind() + "{\n" +
-			g.ind() + "\t" + fmt.Sprintf("%s := %.0f / closeSeries.GetCurrent()\n", qtyVar, qty) +
-			dynamicCall +
-			g.ind() + "}\n"
-	case "strategy.percent_of_equity", "percent_of_equity":
-		return g.ind() + "{\n" +
-			g.ind() + "\t" + fmt.Sprintf("%s := (strat.Equity() * %.2f / 100) / closeSeries.GetCurrent()\n", qtyVar, qty) +
+			g.ind() + "\t" + fmt.Sprintf("%s := strat.DefaultEntryQty(closeSeries.GetCurrent())\n", qtyVar) +
 			dynamicCall +
 			g.ind() + "}\n"
 	case "strategy.fixed", "fixed", "":
@@ -253,6 +258,9 @@ func (h *StrategyActionHandler) generateAllowEntryIn(g *generator, call *ast.Cal
 		return g.ind() + "// strategy.risk.allow_entry_in() - invalid arguments\n", nil
 	}
 
-	direction := g.extractDirectionConstant(call.Arguments[0])
+	direction, err := g.extractDirectionConstant(call.Arguments[0])
+	if err != nil {
+		return "", fmt.Errorf("strategy.risk.allow_entry_in: %w", err)
+	}
 	return g.ind() + fmt.Sprintf("strat.SetAllowedDirection(%s)\n", direction), nil
 }

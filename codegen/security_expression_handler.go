@@ -47,6 +47,13 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 		return h.generateOHLCVAccess(varName, ident, secBarIdxVar), nil
 	}
 
+	if callExpr, ok := exprArg.(*ast.CallExpression); ok && h.gen != nil {
+		udfGen := NewSecurityUDFCallGenerator(h.gen)
+		if udfGen.IsUDFCall(callExpr) {
+			return udfGen.EmitBarLoopUDFEval(varName, callExpr)
+		}
+	}
+
 	code := ""
 	h.markSecurityExprEval()
 

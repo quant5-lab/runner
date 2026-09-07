@@ -98,6 +98,72 @@ func TestBuiltinNamespaceResolver_Resolve(t *testing.T) {
 		{"math.phi", "math", "phi", "1.618033988749895", GoFloat64, true},
 		{"math.rphi", "math", "rphi", "0.618033988749895", GoFloat64, true},
 
+		/* extend constants (drawing objects — numeric enum, GoFloat64) */
+		{"extend.none", "extend", "none", "0.0", GoFloat64, true},
+		{"extend.right", "extend", "right", "1.0", GoFloat64, true},
+		{"extend.left", "extend", "left", "2.0", GoFloat64, true},
+		{"extend.both", "extend", "both", "3.0", GoFloat64, true},
+		{"extend.unknown", "extend", "unknown_prop", "", GoFloat64, false},
+
+		/* line style constants */
+		{"line.style_solid", "line", "style_solid", "0.0", GoFloat64, true},
+		{"line.style_dashed", "line", "style_dashed", "1.0", GoFloat64, true},
+		{"line.style_dotted", "line", "style_dotted", "2.0", GoFloat64, true},
+		{"line.style_arrow_left", "line", "style_arrow_left", "3.0", GoFloat64, true},
+		{"line.style_arrow_right", "line", "style_arrow_right", "4.0", GoFloat64, true},
+		{"line.style_arrow_both", "line", "style_arrow_both", "5.0", GoFloat64, true},
+		{"line.style_cross", "line", "style_cross", "6.0", GoFloat64, true},
+		{"line.unknown", "line", "unknown_prop", "", GoFloat64, false},
+
+		/* label style constants */
+		{"label.style_none", "label", "style_none", "0.0", GoFloat64, true},
+		{"label.style_xcross", "label", "style_xcross", "1.0", GoFloat64, true},
+		{"label.style_cross", "label", "style_cross", "2.0", GoFloat64, true},
+		{"label.style_triangleup", "label", "style_triangleup", "3.0", GoFloat64, true},
+		{"label.style_triangledown", "label", "style_triangledown", "4.0", GoFloat64, true},
+		{"label.style_arrowup", "label", "style_arrowup", "7.0", GoFloat64, true},
+		{"label.style_arrowdown", "label", "style_arrowdown", "8.0", GoFloat64, true},
+		{"label.style_label_up", "label", "style_label_up", "9.0", GoFloat64, true},
+		{"label.style_diamond", "label", "style_diamond", "19.0", GoFloat64, true},
+		{"label.unknown", "label", "unknown_prop", "", GoFloat64, false},
+
+		/* xloc constants */
+		{"xloc.bar_time", "xloc", "bar_time", "0.0", GoFloat64, true},
+		{"xloc.bar_index", "xloc", "bar_index", "1.0", GoFloat64, true},
+		{"xloc.unknown", "xloc", "unknown_prop", "", GoFloat64, false},
+
+		/* size constants */
+		{"size.auto", "size", "auto", "0.0", GoFloat64, true},
+		{"size.tiny", "size", "tiny", "1.0", GoFloat64, true},
+		{"size.small", "size", "small", "2.0", GoFloat64, true},
+		{"size.normal", "size", "normal", "3.0", GoFloat64, true},
+		{"size.large", "size", "large", "4.0", GoFloat64, true},
+		{"size.huge", "size", "huge", "5.0", GoFloat64, true},
+		{"size.unknown", "size", "unknown_prop", "", GoFloat64, false},
+
+		/* shape constants */
+		{"shape.xcross", "shape", "xcross", "0.0", GoFloat64, true},
+		{"shape.cross", "shape", "cross", "1.0", GoFloat64, true},
+		{"shape.triangleup", "shape", "triangleup", "3.0", GoFloat64, true},
+		{"shape.arrowup", "shape", "arrowup", "8.0", GoFloat64, true},
+		{"shape.diamond", "shape", "diamond", "10.0", GoFloat64, true},
+		{"shape.square", "shape", "square", "11.0", GoFloat64, true},
+		{"shape.unknown", "shape", "unknown_prop", "", GoFloat64, false},
+
+		/* location constants */
+		{"location.abovebar", "location", "abovebar", "0.0", GoFloat64, true},
+		{"location.belowbar", "location", "belowbar", "1.0", GoFloat64, true},
+		{"location.top", "location", "top", "2.0", GoFloat64, true},
+		{"location.bottom", "location", "bottom", "3.0", GoFloat64, true},
+		{"location.absolute", "location", "absolute", "4.0", GoFloat64, true},
+		{"location.unknown", "location", "unknown_prop", "", GoFloat64, false},
+
+		/* hline style constants */
+		{"hline.style_solid", "hline", "style_solid", "0.0", GoFloat64, true},
+		{"hline.style_dashed", "hline", "style_dashed", "1.0", GoFloat64, true},
+		{"hline.style_dotted", "hline", "style_dotted", "2.0", GoFloat64, true},
+		{"hline.unknown", "hline", "unknown_prop", "", GoFloat64, false},
+
 		/* unknown namespace */
 		{"unknown.prop", "unknown", "prop", "", GoFloat64, false},
 		{"strategy.entry", "strategy", "entry", "", GoFloat64, false},
@@ -174,10 +240,20 @@ func TestBuiltinNamespaceResolver_IsNamespace(t *testing.T) {
 		{"earnings", true},
 		{"math", true},
 		{"strategy", true},
+		{"extend", true},
+		{"line", true},
+		{"label", true},
+		{"xloc", true},
+		{"size", true},
+		{"shape", true},
+		{"location", true},
+		{"hline", true},
 		{"unknown", false},
 		{"ta", false},
 		{"Barstate", false},
 		{"TIMEFRAME", false},
+		{"Extend", false},
+		{"LINE", false},
 		{"", false},
 	}
 
@@ -205,6 +281,14 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 		"earnings":  4,
 		"math":      4,
 		"strategy":  8,
+		"extend":    4,
+		"line":      7,
+		"label":     20,
+		"xloc":      2,
+		"size":      6,
+		"shape":     12,
+		"location":  5,
+		"hline":     3,
 	}
 
 	namespacePropSets := map[string][]string{
@@ -218,6 +302,20 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 		"earnings":  {"future_eps", "future_period_end_time", "future_revenue", "future_time"},
 		"math":      {"pi", "e", "phi", "rphi"},
 		"strategy":  {"cash", "fixed", "percent_of_equity", "long", "short", "both", "account_currency", "margin_liquidation_price"},
+		"extend":    {"none", "right", "left", "both"},
+		"line":      {"style_solid", "style_dashed", "style_dotted", "style_arrow_left", "style_arrow_right", "style_arrow_both", "style_cross"},
+		"label": {
+			"style_none", "style_xcross", "style_cross", "style_triangleup", "style_triangledown",
+			"style_flag", "style_circle", "style_arrowup", "style_arrowdown", "style_label_up",
+			"style_label_down", "style_label_left", "style_label_right", "style_label_lower_left",
+			"style_label_lower_right", "style_label_upper_left", "style_label_upper_right",
+			"style_label_center", "style_square", "style_diamond",
+		},
+		"xloc":     {"bar_time", "bar_index"},
+		"size":     {"auto", "tiny", "small", "normal", "large", "huge"},
+		"shape":    {"xcross", "cross", "circle", "triangleup", "triangledown", "flag", "labelup", "labeldown", "arrowup", "arrowdown", "diamond", "square"},
+		"location": {"abovebar", "belowbar", "top", "bottom", "absolute"},
+		"hline":    {"style_solid", "style_dashed", "style_dotted"},
 	}
 
 	for ns, props := range namespacePropSets {
@@ -230,6 +328,164 @@ func TestBuiltinNamespaceResolver_PropertyExhaustiveness(t *testing.T) {
 			}
 			if resolvedCount != expectedCounts[ns] {
 				t.Errorf("%s resolved %d properties, want %d", ns, resolvedCount, expectedCounts[ns])
+			}
+		})
+	}
+}
+
+// TestDrawingNamespaceConstants_AllAreFloat64 verifies that every drawing namespace
+// constant resolves to GoFloat64, not GoString or GoBool. Drawing enum values are
+// used in arithmetic expressions (plot, comparison), so the numeric contract is load-bearing.
+func TestDrawingNamespaceConstants_AllAreFloat64(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	drawingProps := map[string][]string{
+		"extend":   {"none", "right", "left", "both"},
+		"line":     {"style_solid", "style_dashed", "style_dotted", "style_arrow_left", "style_arrow_right", "style_arrow_both", "style_cross"},
+		"xloc":     {"bar_time", "bar_index"},
+		"size":     {"auto", "tiny", "small", "normal", "large", "huge"},
+		"shape":    {"xcross", "cross", "circle", "triangleup", "triangledown", "flag", "labelup", "labeldown", "arrowup", "arrowdown", "diamond", "square"},
+		"location": {"abovebar", "belowbar", "top", "bottom", "absolute"},
+		"hline":    {"style_solid", "style_dashed", "style_dotted"},
+	}
+
+	for ns, props := range drawingProps {
+		for _, prop := range props {
+			t.Run(ns+"."+prop, func(t *testing.T) {
+				res, found := resolver.Resolve(ns, prop)
+				if !found {
+					t.Fatalf("Resolve(%s, %s) not found", ns, prop)
+				}
+				if res.GoType != GoFloat64 {
+					t.Errorf("Resolve(%s, %s) GoType = %v, want GoFloat64", ns, prop, res.GoType)
+				}
+			})
+		}
+	}
+}
+
+// TestDrawingNamespaceConstants_Distinctness verifies that sibling constants within
+// each namespace resolve to distinct float64 values, preventing silent comparison bugs
+// (e.g. extend.right == extend.left would always be true).
+func TestDrawingNamespaceConstants_Distinctness(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	drawingProps := map[string][]string{
+		"extend":   {"none", "right", "left", "both"},
+		"line":     {"style_solid", "style_dashed", "style_dotted", "style_arrow_left", "style_arrow_right", "style_arrow_both", "style_cross"},
+		"xloc":     {"bar_time", "bar_index"},
+		"size":     {"auto", "tiny", "small", "normal", "large", "huge"},
+		"shape":    {"xcross", "cross", "circle", "triangleup", "triangledown", "flag", "labelup", "labeldown", "arrowup", "arrowdown", "diamond", "square"},
+		"location": {"abovebar", "belowbar", "top", "bottom", "absolute"},
+		"hline":    {"style_solid", "style_dashed", "style_dotted"},
+	}
+
+	for ns, props := range drawingProps {
+		t.Run(ns, func(t *testing.T) {
+			seen := make(map[string]string)
+			for _, prop := range props {
+				res, found := resolver.Resolve(ns, prop)
+				if !found {
+					t.Fatalf("Resolve(%s, %s) not found", ns, prop)
+				}
+				if prev, dup := seen[res.Code]; dup {
+					t.Errorf("%s.%s and %s share the same code %q — constants must be distinct", ns, prop, prev, res.Code)
+				}
+				seen[res.Code] = prop
+			}
+		})
+	}
+}
+
+// TestBuiltinNamespaceResolver_ResolveForArrow asserts the arrow-scope overrides
+// for every namespace that has them and that all other namespaces fall through to
+// the regular Resolve path unchanged.
+//
+// UDFs executing inside security() receive an *ArrowContext bound to the secondary
+// series, so identity-sensitive builtins must resolve to that context's fields.
+func TestBuiltinNamespaceResolver_ResolveForArrow(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	tests := []struct {
+		name         string
+		namespace    string
+		prop         string
+		expectedCode string
+		expectedType GoValueType
+		expectFound  bool
+	}{
+		{"syminfo.tickerid in arrow", "syminfo", "tickerid", "ctx.Symbol", GoString, true},
+		{"syminfo.ticker in arrow", "syminfo", "ticker", "ctx.Symbol", GoString, true},
+		{"syminfo.description in arrow", "syminfo", "description", "ctx.Symbol", GoString, true},
+
+		{"syminfo.timezone in arrow", "syminfo", "timezone", "ctx.Timezone", GoString, true},
+		{"syminfo.type in arrow", "syminfo", "type", `"stock"`, GoString, true},
+		{"syminfo.currency in arrow", "syminfo", "currency", `"USD"`, GoString, true},
+		{"syminfo.mintick in arrow", "syminfo", "mintick", "0.01", GoFloat64, true},
+		{"syminfo.unknown in arrow", "syminfo", "no_such_prop", "", GoFloat64, false},
+
+		{"session.ismarket in arrow", "session", "ismarket", "true", GoBool, true},
+		{"session.ispremarket in arrow", "session", "ispremarket", "false", GoBool, true},
+		{"session.ispostmarket in arrow", "session", "ispostmarket", "false", GoBool, true},
+
+		{"dayofweek.sunday in arrow", "dayofweek", "sunday", "1.0", GoFloat64, true},
+		{"barstate.isfirst in arrow", "barstate", "isfirst", "(ctx.BarIndex == 0)", GoBool, true},
+
+		{"unknown namespace in arrow", "nosuchns", "prop", "", GoFloat64, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, found := resolver.ResolveForArrow(tt.namespace, tt.prop)
+			if found != tt.expectFound {
+				t.Fatalf("ResolveForArrow(%s, %s) found = %v, want %v", tt.namespace, tt.prop, found, tt.expectFound)
+			}
+			if !found {
+				return
+			}
+			if res.Code != tt.expectedCode {
+				t.Errorf("ResolveForArrow(%s, %s) code = %q, want %q", tt.namespace, tt.prop, res.Code, tt.expectedCode)
+			}
+			if res.GoType != tt.expectedType {
+				t.Errorf("ResolveForArrow(%s, %s) GoType = %v, want %v", tt.namespace, tt.prop, res.GoType, tt.expectedType)
+			}
+		})
+	}
+}
+
+// TestBuiltinNamespaceResolver_SyminfoArrowVsBarLoop asserts the contractual
+// difference between the two resolution paths for identity-sensitive syminfo
+// properties: bar-loop scope emits the package-level variable name (resolved
+// once at startup from the -symbol flag), arrow scope emits ctx.Symbol
+// (resolved per-call from the ArrowContext, which may be a secondary series).
+func TestBuiltinNamespaceResolver_SyminfoArrowVsBarLoop(t *testing.T) {
+	resolver := NewBuiltinNamespaceResolver()
+
+	identityProps := []string{"tickerid", "ticker", "description"}
+	for _, prop := range identityProps {
+		prop := prop
+		t.Run(prop, func(t *testing.T) {
+			barLoop, found := resolver.Resolve("syminfo", prop)
+			if !found {
+				t.Fatalf("Resolve(syminfo, %s) not found", prop)
+			}
+			if barLoop.Code != "syminfo_tickerid" {
+				t.Errorf("Resolve(syminfo, %s) = %q, want \"syminfo_tickerid\"", prop, barLoop.Code)
+			}
+
+			arrow, found := resolver.ResolveForArrow("syminfo", prop)
+			if !found {
+				t.Fatalf("ResolveForArrow(syminfo, %s) not found", prop)
+			}
+			if arrow.Code != "ctx.Symbol" {
+				t.Errorf("ResolveForArrow(syminfo, %s) = %q, want \"ctx.Symbol\"", prop, arrow.Code)
+			}
+
+			if barLoop.Code == arrow.Code {
+				t.Errorf(
+					"bar-loop and arrow resolutions identical (%q) for syminfo.%s — arrow override not active",
+					barLoop.Code, prop,
+				)
 			}
 		})
 	}

@@ -21,7 +21,7 @@ func TestStrategyCommentBinaryExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -67,7 +67,7 @@ func TestStrategyCommentUnaryExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -112,7 +112,7 @@ func TestStrategyCommentNumericLiteral(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -154,7 +154,7 @@ func TestStrategyCommentCallExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -204,7 +204,7 @@ func TestStrategyCommentSpecialCharacters(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -246,7 +246,7 @@ func TestStrategyCommentNewlineCharacters(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{

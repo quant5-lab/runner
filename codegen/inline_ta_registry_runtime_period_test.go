@@ -253,13 +253,13 @@ func TestWMAIIFEGenerator_TypeSafeWeightCalculation(t *testing.T) {
 		{
 			name:            "Runtime period uses float64 subtraction",
 			period:          NewRuntimePeriod("period"),
-			expectedWeight:  "weight := float64(period) - float64(j)",
+			expectedWeight:  "weight := float64(int(period)) - float64(j)",
 			forbiddenWeight: "float64(period - j)",
 		},
 		{
 			name:            "Computed period uses float64 subtraction",
 			period:          NewComputedPeriod("(nSeries.GetCurrent() / 2)"),
-			expectedWeight:  "weight := float64((nSeries.GetCurrent() / 2)) - float64(j)",
+			expectedWeight:  "weight := float64(int((nSeries.GetCurrent() / 2))) - float64(j)",
 			forbiddenWeight: "float64((nSeries.GetCurrent() / 2) - j)",
 		},
 	}

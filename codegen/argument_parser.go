@@ -157,7 +157,7 @@ func (p *ArgumentParser) ParseInt(expr ast.Expression) ParsedArgument {
 
 /*
 ParseFloat extracts a float literal from an AST expression.
-Handles both float64 and int AST literal types.
+Handles float64, int, and UnaryExpression for negative numbers.
 
 Returns:
 
@@ -165,6 +165,19 @@ Returns:
 	ParsedArgument.Value = float64 value
 */
 func (p *ArgumentParser) ParseFloat(expr ast.Expression) ParsedArgument {
+	if unary, ok := expr.(*ast.UnaryExpression); ok && unary.Operator == "-" {
+		inner := p.ParseFloat(unary.Argument)
+		if inner.IsValid {
+			return ParsedArgument{
+				IsValid:    true,
+				IsLiteral:  true,
+				Value:      -inner.MustBeFloat(),
+				SourceExpr: expr,
+			}
+		}
+		return ParsedArgument{IsValid: false, SourceExpr: expr}
+	}
+
 	lit, ok := expr.(*ast.Literal)
 	if !ok {
 		return ParsedArgument{IsValid: false, SourceExpr: expr}

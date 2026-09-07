@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB9",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-01-21T07:51:49Z",
+  "generatedAt": "2026-05-29T21:12:34Z",
   "result": {
     "trades": [],
     "openTrades": [
@@ -36,34 +36,6 @@
       },
       {
         "entryId": "BB entry",
-        "entryBar": 3381,
-        "entryTime": 1760871600,
-        "entryPrice": 107882.71,
-        "entryComment": "",
-        "exitBar": 0,
-        "exitTime": 0,
-        "exitPrice": 0,
-        "exitComment": "",
-        "size": 2.7807977756583977,
-        "profit": 0,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 3861,
-        "entryTime": 1762599600,
-        "entryPrice": 102480.04,
-        "entryComment": "",
-        "exitBar": 0,
-        "exitTime": 0,
-        "exitPrice": 0,
-        "exitComment": "",
-        "size": 2.9273993257613875,
-        "profit": 0,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
         "entryBar": 4341,
         "entryTime": 1764327600,
         "entryPrice": 91850.49,
@@ -91,7 +63,7 @@
         "direction": "long"
       }
     ],
-    "equity": 1913944.8012265188,
+    "equity": 1962658.1419918016,
     "netProfit": 0,
     "totalTrades": 0,
     "plots": {}

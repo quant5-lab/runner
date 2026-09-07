@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/quant5-lab/runner/ast"
 )
 
@@ -283,7 +284,16 @@ func (c *Converter) convertCallExpr(call *CallExpr) (ast.Expression, error) {
 		NodeType:  ast.TypeCallExpression,
 		Callee:    callee,
 		Arguments: args,
+		Location:  sourceLocationFromLexer(call.Pos),
 	}, nil
+}
+
+func sourceLocationFromLexer(pos lexer.Position) ast.SourceLocation {
+	return ast.SourceLocation{
+		File:   pos.Filename,
+		Line:   pos.Line,
+		Column: pos.Column,
+	}
 }
 
 func (c *Converter) convertPostfixExpr(postfix *PostfixExpr) (ast.Expression, error) {

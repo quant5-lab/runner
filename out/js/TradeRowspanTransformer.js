@@ -1,72 +1,58 @@
-import { TradeRowData } from './TradeRowData.js';
+import { TradeRowData  } from './TradeRowData.js';
+import { SortDirection } from './SortDirection.js';
 
-/**
- * TradeRowspanTransformer - Transforms Trade objects into Entry/Exit row pairs
- * 
- * SRP: Single responsibility - convert domain Trade to presentation TradeRowData pairs
- * DRY: Reuses TradeDataFormatter for date/price formatting
- * KISS: Simple transformation logic, no business logic
- */
 export class TradeRowspanTransformer {
   constructor(formatter) {
     this.formatter = formatter;
   }
 
   /**
-   * Transform single trade into [entryRow, exitRow] pair
+   * `isPrimary` on the first row drives rowspan-cell placement in the renderer.
+   * `size` is populated on both rows so the renderer always finds it on the primary.
    */
-  transformTrade(trade, tradeNumber, currentPrice) {
-    const isOpen = trade.status === 'open';
+  transformTrade(trade, tradeNumber, currentPrice, sortDirection = SortDirection.DESC) {
+    const isOpen           = trade.status === 'open';
     const unrealizedProfit = this.formatter.calculateUnrealizedProfit(trade, currentPrice);
-    
-    const exitPrice = isOpen 
-      ? (currentPrice !== null && currentPrice !== undefined ? currentPrice : trade.entryPrice)
-      : (trade.exitPrice !== null && trade.exitPrice !== undefined ? trade.exitPrice : 0);
+    const exitPrice        = isOpen ? (currentPrice ?? trade.entryPrice) : (trade.exitPrice ?? 0);
+    const profitValue      = isOpen ? unrealizedProfit : trade.profit;
+    const sizeFormatted    = trade.size.toFixed(2);
 
-    const profitValue = isOpen ? unrealizedProfit : trade.profit;
-    const formattedProfit = this.formatter.formatProfit(profitValue);
-
-    // Entry row
     const entryRow = new TradeRowData({
-      tradeNumber: tradeNumber,
-      rowType: 'entry',
-      dateTime: this.formatter.getTradeDate(trade, true),
-      signal: trade.entryComment || trade.EntryComment || '',
-      price: this.formatter.formatPrice(trade.entryPrice),
-      size: trade.size.toFixed(2),
+      tradeNumber,
+      rowType:    'entry',
+      isPrimary:  sortDirection === SortDirection.ASC,
+      dateTime:   this.formatter.getTradeDate(trade, true),
+      signal:     trade.entryComment || trade.entryId || '',
+      price:      this.formatter.formatPrice(trade.entryPrice),
+      size:       sizeFormatted,
       profitLoss: '',
-      direction: trade.direction,
-      isOpen: false,
-      profitRaw: 0,
+      direction:  trade.direction,
+      isOpen:     false,
+      profitRaw:  0,
     });
 
-    // Exit row
     const exitRow = new TradeRowData({
-      tradeNumber: tradeNumber,
-      rowType: 'exit',
-      dateTime: isOpen ? 'Open' : this.formatter.getTradeDate(trade, false),
-      signal: isOpen ? '' : (trade.exitComment || trade.ExitComment || ''),
-      price: this.formatter.formatPrice(exitPrice),
-      size: '',
-      profitLoss: formattedProfit,
-      direction: trade.direction,
-      isOpen: isOpen,
-      profitRaw: profitValue,
+      tradeNumber,
+      rowType:    'exit',
+      isPrimary:  sortDirection === SortDirection.DESC,
+      dateTime:   isOpen ? 'Open' : this.formatter.getTradeDate(trade, false),
+      signal:     isOpen ? '' : (trade.exitComment || trade.exitId || ''),
+      price:      this.formatter.formatPrice(exitPrice),
+      size:       sizeFormatted,
+      profitLoss: this.formatter.formatProfit(profitValue),
+      direction:  trade.direction,
+      isOpen,
+      profitRaw:  profitValue,
     });
 
-    return [entryRow, exitRow];
+    return sortDirection === SortDirection.ASC
+      ? [entryRow, exitRow]
+      : [exitRow,  entryRow];
   }
 
-  /**
-   * Transform array of trades into flat array of TradeRowData
-   * [trade1, trade2] → [trade1_entry, trade1_exit, trade2_entry, trade2_exit]
-   */
-  transformTrades(trades, currentPrice) {
-    const rows = [];
-    trades.forEach((trade, index) => {
-      const [entryRow, exitRow] = this.transformTrade(trade, index + 1, currentPrice);
-      rows.push(entryRow, exitRow);
-    });
-    return rows;
+  transformTrades(trades, currentPrice, sortDirection = SortDirection.DESC) {
+    return trades.flatMap((trade, index) =>
+      this.transformTrade(trade, index + 1, currentPrice, sortDirection)
+    );
   }
 }

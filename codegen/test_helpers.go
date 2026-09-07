@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -33,6 +35,7 @@ func newTestGenerator() *generator {
 		callRouter:                 NewCallExpressionRouter(),
 		funcSigRegistry:            NewFunctionSignatureRegistry(),
 		arrowContextLifecycle:      NewArrowContextLifecycleManager(),
+		nestedChildContextAlloc:    NewNestedChildContextAllocator(),
 		mathHandler:                NewMathHandler(),
 		colorHandler:               NewColorHandler(),
 	}
@@ -53,7 +56,7 @@ func newTestGenerator() *generator {
 	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
 	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
-	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.directionExtractor = NewContextAwareDirectionExtractor(gen)
 	gen.builtinSeriesLifecycle = NewCompositeSeriesLifecycle()
 
 	return gen
@@ -170,5 +173,43 @@ func compilePineScript(source string) (string, error) {
 		return "", err
 	}
 
+	return result.UserDefinedFunctions + "\n" + result.FunctionBody, nil
+}
+
+var pineVersionHeaderPattern = regexp.MustCompile(`//@version\s*=\s*(\d+)`)
+
+func detectPineVersion(src string) int {
+	m := pineVersionHeaderPattern.FindStringSubmatch(src)
+	if len(m) >= 2 {
+		v := 0
+		fmt.Sscanf(m[1], "%d", &v)
+		return v
+	}
+	return 4
+}
+
+// compilePineScriptVersioned stamps program.PineVersion from the //@version
+// header so version-sensitive codegen paths (e.g. session DAYS-mask defaults)
+// are exercised at the script's declared version, not the zero-value default.
+func compilePineScriptVersioned(t *testing.T, source string) (string, error) {
+	t.Helper()
+	p, err := parser.NewParser()
+	if err != nil {
+		return "", err
+	}
+	script, err := p.ParseBytes("test.pine", []byte(source))
+	if err != nil {
+		return "", err
+	}
+	converter := parser.NewConverter()
+	program, err := converter.ToESTree(script)
+	if err != nil {
+		return "", err
+	}
+	program.PineVersion = detectPineVersion(source)
+	result, err := GenerateStrategyCodeFromAST(program)
+	if err != nil {
+		return "", err
+	}
 	return result.UserDefinedFunctions + "\n" + result.FunctionBody, nil
 }

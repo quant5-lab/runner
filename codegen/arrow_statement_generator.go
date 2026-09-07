@@ -13,6 +13,7 @@ type ArrowStatementGenerator struct {
 	exprGenerator *ArrowExpressionGeneratorImpl
 	symbolTable   SymbolTable
 	coercer       *NumericExpressionCoercer
+	tupleSecGen   *ArrowTupleSecurityGenerator
 }
 
 func NewArrowStatementGenerator(
@@ -30,6 +31,11 @@ func NewArrowStatementGenerator(
 	}
 }
 
+func (s *ArrowStatementGenerator) WithTupleSecurityGenerator(g *ArrowTupleSecurityGenerator) *ArrowStatementGenerator {
+	s.tupleSecGen = g
+	return s
+}
+
 /* GenerateStatement generates arrow-aware statement code with Series.Set() for variables */
 func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, error) {
 	switch st := stmt.(type) {
@@ -44,6 +50,9 @@ func (s *ArrowStatementGenerator) GenerateStatement(stmt ast.Node) (string, erro
 
 	case *ast.WhileStatement:
 		return s.generateWhileStatement(st)
+
+	case *ast.IfStatement:
+		return s.generateIfStatement(st)
 
 	default:
 		return s.gen.generateStatement(stmt)
@@ -94,6 +103,18 @@ func (s *ArrowStatementGenerator) generateTupleDeclaration(arrayPattern *ast.Arr
 		varNames[i] = elem.Name
 		if s.symbolTable != nil {
 			s.symbolTable.Register(varNames[i], VariableTypeSeries)
+		}
+	}
+
+	if call, ok := initExpr.(*ast.CallExpression); ok {
+		if isSecurityCallExpression(call) && s.tupleSecGen != nil {
+			return s.tupleSecGen.Generate(varNames, call)
+		}
+
+		funcName := extractCallFunctionName(call)
+		detector := NewUserDefinedFunctionDetector(s.gen.variables)
+		if detector.IsUserDefinedFunction(funcName) {
+			return s.gen.generateUserDefinedFunctionTupleCall(varNames, funcName, call)
 		}
 	}
 

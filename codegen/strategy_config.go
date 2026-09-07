@@ -8,13 +8,14 @@ const (
 )
 
 type StrategyConfig struct {
-	Name            string
-	InitialCapital  float64
-	DefaultQtyValue float64
-	DefaultQtyType  string
-	Pyramiding      int
-	CommissionType  string
-	CommissionValue float64
+	Name                 string
+	InitialCapital       float64
+	DefaultQtyValue      float64
+	DefaultQtyType       string
+	Pyramiding           int
+	CommissionType       string
+	CommissionValue      float64
+	ProcessOrdersOnClose bool
 }
 
 func NewStrategyConfig() *StrategyConfig {
@@ -51,5 +52,8 @@ func (c *StrategyConfig) MergeFrom(other *StrategyConfig) {
 	}
 	if other.CommissionValue > 0 {
 		c.CommissionValue = other.CommissionValue
+	}
+	if other.ProcessOrdersOnClose {
+		c.ProcessOrdersOnClose = true
 	}
 }

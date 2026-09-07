@@ -22,6 +22,10 @@ func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallEx
 		return "", nil
 	}
 
+	if g.chartOnlyUDFs[funcName] {
+		return "math.NaN()", nil
+	}
+
 	argumentList, err := h.buildArgumentList(g, funcName, call.Arguments)
 	if err != nil {
 		return "", err
@@ -50,7 +54,7 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 
 	if g.arrowCaptureRegistry != nil {
 		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
-			argStrings = append(argStrings, cap.GoParamName())
+			argStrings = append(argStrings, cap.GoCallSiteExpression(g.constants))
 		}
 	}
 

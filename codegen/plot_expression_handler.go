@@ -115,7 +115,8 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 		return h.generator.valueHandler.GenerateInlineCall(funcName, call.Arguments, h.generator)
 	}
 
-	return "", fmt.Errorf("unsupported inline function in plot: %s", funcName)
+	h.generator.featureGaps = append(h.generator.featureGaps, funcName)
+	return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", funcName, "plot_expression"), nil
 }
 
 func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcName string) (string, error) {

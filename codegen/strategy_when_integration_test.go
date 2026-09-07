@@ -118,7 +118,7 @@ func TestStrategyEntryWhenParameter_DirectHandlerIntegration(t *testing.T) {
 			qtyType:     "strategy.cash",
 			qtyValue:    1000.0,
 			expectIf:    true,
-			expectEntry: "entryQty :=",
+			expectEntry: "strat.EntryWithDefaultQty",
 			expectCond:  "if value.IsTrue(",
 		},
 	}
@@ -130,9 +130,9 @@ func TestStrategyEntryWhenParameter_DirectHandlerIntegration(t *testing.T) {
 					DefaultQtyType:  tt.qtyType,
 					DefaultQtyValue: tt.qtyValue,
 				},
-				indent:             2,
-				directionExtractor: NewDefaultDirectionExtractor(),
+				indent: 2,
 			}
+			g.directionExtractor = NewContextAwareDirectionExtractor(g)
 
 			handler := NewStrategyActionHandler()
 			generated, err := handler.generateEntry(g, tt.call)

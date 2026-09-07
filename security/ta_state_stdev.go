@@ -69,8 +69,21 @@ func (s *STDEVStateManager) windowVariance(secCtx *context.Context, sourceExpr a
 		if err != nil {
 			return 0, err
 		}
-		d := v - mean
+		d := tvStdevDiff(v, mean)
 		variance += d * d
 	}
 	return variance / float64(s.period), nil
+}
+
+/* tvStdevDiff mirrors runtime/ta.tvStdevDiff: applies Pine ta.stdev's
+ * per-deviation epsilon compensation to avoid float drift in marginal cases. */
+func tvStdevDiff(value, mean float64) float64 {
+	diff := value - mean
+	if math.Abs(diff) <= 1e-10 {
+		return 0
+	}
+	if math.Abs(diff) <= 1e-4 {
+		return 1e-5
+	}
+	return diff
 }

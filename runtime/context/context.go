@@ -16,16 +16,18 @@ type OHLCV struct {
 }
 
 type Context struct {
-	Symbol     string
-	Timeframe  string
-	Timezone   string // Exchange timezone: "UTC" (Binance), "America/New_York" (NYSE/Yahoo), "Europe/Moscow" (MOEX)
-	Bars       int
-	Data       []OHLCV
-	BarIndex   int
-	IsMonthly  bool
-	IsDaily    bool
-	IsWeekly   bool
-	IsIntraday bool
+	Symbol           string
+	Timeframe        string
+	Timezone         string // Exchange timezone: "UTC" (Binance), "America/New_York" (NYSE/Yahoo), "Europe/Moscow" (MOEX)
+	ReferenceSession string
+	PeriodAnchor     PeriodAnchor
+	Bars             int
+	Data             []OHLCV
+	BarIndex         int
+	IsMonthly        bool
+	IsDaily          bool
+	IsWeekly         bool
+	IsIntraday       bool
 
 	parent           *Context
 	variableResolver VariableResolver
@@ -34,16 +36,39 @@ type Context struct {
 
 func New(symbol, timeframe string, bars int) *Context {
 	return &Context{
-		Symbol:     symbol,
-		Timeframe:  timeframe,
-		Timezone:   "UTC", // Default to UTC, should be set by provider
-		Bars:       bars,
-		Data:       make([]OHLCV, 0, bars),
-		BarIndex:   0,
-		IsMonthly:  IsMonthlyTimeframe(timeframe),
-		IsDaily:    IsDailyTimeframe(timeframe),
-		IsWeekly:   IsWeeklyTimeframe(timeframe),
-		IsIntraday: IsIntradayTimeframe(timeframe),
+		Symbol:           symbol,
+		Timeframe:        timeframe,
+		Timezone:         "UTC", // Default to UTC, should be set by provider
+		ReferenceSession: "always-open",
+		Bars:             bars,
+		Data:             make([]OHLCV, 0, bars),
+		BarIndex:         0,
+		IsMonthly:        IsMonthlyTimeframe(timeframe),
+		IsDaily:          IsDailyTimeframe(timeframe),
+		IsWeekly:         IsWeeklyTimeframe(timeframe),
+		IsIntraday:       IsIntradayTimeframe(timeframe),
+	}
+}
+
+// NewReplayContext returns a Context with an independent BarIndex (starting at
+// zero) that shares source.Data without copying it — so advancing the cursor in a
+// replay loop leaves source and all other consumers unaffected.  Read-only metadata
+// (symbol, timeframe, timezone, flags) is copied so timezone-aware operations
+// inside the replay produce correct results.
+func NewReplayContext(source *Context) *Context {
+	return &Context{
+		Symbol:           source.Symbol,
+		Timeframe:        source.Timeframe,
+		Timezone:         source.Timezone,
+		ReferenceSession: source.ReferenceSession,
+		PeriodAnchor:     source.PeriodAnchor,
+		Bars:             source.Bars,
+		Data:             source.Data,
+		BarIndex:         0,
+		IsMonthly:        source.IsMonthly,
+		IsDaily:          source.IsDaily,
+		IsWeekly:         source.IsWeekly,
+		IsIntraday:       source.IsIntraday,
 	}
 }
 

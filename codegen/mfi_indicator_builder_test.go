@@ -75,3 +75,68 @@ func TestMFIIndicatorBuilder_Build_LookbackLoopStructure(t *testing.T) {
 		t.Errorf("expected 1 negSum accumulation, got %d", negSumCount)
 	}
 }
+
+func TestMFIIndicatorBuilder_RawMFAssignedInExactlyTwoBranches(t *testing.T) {
+	sources := []struct {
+		name     string
+		accessor AccessGenerator
+	}{
+		{"close", NewOHLCVFieldAccessGenerator("Close")},
+		{"hlc3", NewOHLCVFieldAccessGenerator("Close")},
+		{"true_range", NewTrueRangeAccessGenerator()},
+	}
+
+	for _, src := range sources {
+		t.Run(src.name, func(t *testing.T) {
+			ctx := NewTopLevelIndicatorContext()
+			builder := NewMFIIndicatorBuilder("mfi", NewConstantPeriod(14), src.accessor, ctx)
+			code := builder.Build()
+
+			if got := strings.Count(code, "= rawMF"); got != 2 {
+				t.Errorf("rawMF must be assigned exactly 2 times (positive + negative branch), got %d", got)
+			}
+		})
+	}
+}
+
+func TestMFIIndicatorBuilder_SplitBranchAssignsBothFlowVariables(t *testing.T) {
+	ctx := NewTopLevelIndicatorContext()
+	builder := NewMFIIndicatorBuilder("mfi", NewConstantPeriod(14), NewOHLCVFieldAccessGenerator("Close"), ctx)
+	code := builder.Build()
+
+	if got := strings.Count(code, "posMF = 0.0"); got < 3 {
+		t.Errorf("posMF must be explicitly zeroed in at least 3 branches (NaN + negative + zero-change), got %d", got)
+	}
+
+	if got := strings.Count(code, "negMF = 0.0"); got < 3 {
+		t.Errorf("negMF must be explicitly zeroed in at least 3 branches (NaN + positive + zero-change), got %d", got)
+	}
+}
+
+func TestMFIIndicatorBuilder_DirectionalSplitFourBranchChain(t *testing.T) {
+	ctx := NewTopLevelIndicatorContext()
+	builder := NewMFIIndicatorBuilder("mfi", NewConstantPeriod(14), NewOHLCVFieldAccessGenerator("Close"), ctx)
+	code := builder.Build()
+
+	hasNaN := strings.Contains(code, "math.IsNaN")
+	hasPositive := strings.Contains(code, "> 0")
+	hasNegative := strings.Contains(code, "< 0")
+	hasZero := strings.Contains(code, "} else {")
+	hasChain := strings.Contains(code, "} else if")
+
+	if !hasNaN {
+		t.Error("missing NaN branch in directional split")
+	}
+	if !hasPositive {
+		t.Error("missing positive-change branch in directional split")
+	}
+	if !hasNegative {
+		t.Error("missing negative-change branch in directional split")
+	}
+	if !hasZero {
+		t.Error("missing zero-change catch-all branch in directional split")
+	}
+	if !hasChain {
+		t.Error("branches must be chained with else-if so they are mutually exclusive")
+	}
+}

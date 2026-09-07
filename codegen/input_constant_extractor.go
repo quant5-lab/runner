@@ -2,8 +2,10 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/calendar"
 )
 
 /*
@@ -75,11 +77,43 @@ func (ice *InputConstantExtractor) extractInputIntValue(call *ast.CallExpression
 	}
 
 	if obj, ok := call.Arguments[0].(*ast.ObjectExpression); ok {
+		if ms, ok := extractTimestampFromDefval(obj); ok {
+			return strconv.FormatInt(ms, 10)
+		}
 		val := int(ice.extractFloatFromObject(obj, "defval", 0.0))
 		return fmt.Sprintf("%d", val)
 	}
 
 	return "0"
+}
+
+func extractTimestampFromDefval(obj *ast.ObjectExpression) (int64, bool) {
+	for _, prop := range obj.Properties {
+		keyID, ok := prop.Key.(*ast.Identifier)
+		if !ok || keyID.Name != "defval" {
+			continue
+		}
+		callExpr, ok := prop.Value.(*ast.CallExpression)
+		if !ok {
+			continue
+		}
+		callee, ok := callExpr.Callee.(*ast.Identifier)
+		if !ok || callee.Name != "timestamp" || len(callExpr.Arguments) != 1 {
+			continue
+		}
+		lit, ok := callExpr.Arguments[0].(*ast.Literal)
+		if !ok {
+			continue
+		}
+		str, ok := lit.Value.(string)
+		if !ok {
+			continue
+		}
+		if ms, ok := calendar.ParsePineTimestampMillisUTC(str); ok {
+			return ms, true
+		}
+	}
+	return 0, false
 }
 
 func (ice *InputConstantExtractor) extractInputBoolValue(call *ast.CallExpression) string {

@@ -4,18 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/market"
 )
 
-/* FileFetcher reads OHLCV data from local JSON files */
 type FileFetcher struct {
-	dataDir string        /* Directory containing JSON files */
-	latency time.Duration /* Simulated network latency */
+	dataDir string
+	latency time.Duration
 }
 
-/* NewFileFetcher creates fetcher with data directory and simulated latency */
+type MarketData struct {
+	market.SourceMetadata
+	Bars []context.OHLCV `json:"bars"`
+}
+
 func NewFileFetcher(dataDir string, latency time.Duration) *FileFetcher {
 	return &FileFetcher{
 		dataDir: dataDir,
@@ -23,43 +29,81 @@ func NewFileFetcher(dataDir string, latency time.Duration) *FileFetcher {
 	}
 }
 
-/* Fetch reads OHLCV data from {dataDir}/{symbol}_{timeframe}.json */
 func (f *FileFetcher) Fetch(symbol, timeframe string, limit int) ([]context.OHLCV, error) {
-	/* Simulate async network delay */
+	marketData, err := f.FetchWithMetadata(symbol, timeframe, limit)
+	if err != nil {
+		return nil, err
+	}
+	return marketData.Bars, nil
+}
+
+func (f *FileFetcher) FetchWithMetadata(symbol, timeframe string, limit int) (MarketData, error) {
 	if f.latency > 0 {
 		time.Sleep(f.latency)
 	}
 
-	/* Construct file path: BTCUSDT_1D.json */
-	filename := fmt.Sprintf("%s/%s_%s.json", f.dataDir, symbol, timeframe)
-
-	/* Read JSON file */
-	data, err := os.ReadFile(filename)
+	rawBytes, resolvedPath, err := readFixture(f.dataDir, symbol, timeframe)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", filename, err)
+		return MarketData{}, err
 	}
 
-	/* Parse OHLCV data - support both formats */
-	var bars []context.OHLCV
-
-	/* Try parsing as object with timezone metadata first */
-	var dataWithMetadata struct {
-		Timezone string          `json:"timezone"`
-		Bars     []context.OHLCV `json:"bars"`
+	marketData, err := ParseMarketDataJSON(rawBytes)
+	if err != nil {
+		return MarketData{}, fmt.Errorf("failed to parse %s: %w", resolvedPath, err)
 	}
-	if err := json.Unmarshal(data, &dataWithMetadata); err == nil && len(dataWithMetadata.Bars) > 0 {
-		bars = dataWithMetadata.Bars
-	} else {
-		/* Fallback: parse as plain array */
-		if err := json.Unmarshal(data, &bars); err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", filename, err)
+
+	if limit > 0 && limit < len(marketData.Bars) {
+		marketData.Bars = marketData.Bars[len(marketData.Bars)-limit:]
+	}
+
+	return marketData, nil
+}
+
+// Hyphen convention (operator default) is probed before underscore (legacy); canonical token before numeric alternate (e.g. "1h" before "60").
+func fixtureCandidatePaths(dir, symbol, timeframe string) []string {
+	base := filepath.Join(dir, symbol)
+	var paths []string
+	for _, token := range equivalentTimeframeTokens(timeframe) {
+		paths = append(paths, base+"-"+token+".json", base+"_"+token+".json")
+	}
+	return paths
+}
+
+func readFixture(dir, symbol, timeframe string) (data []byte, path string, err error) {
+	candidates := fixtureCandidatePaths(dir, symbol, timeframe)
+	for _, p := range candidates {
+		if d, e := os.ReadFile(p); e == nil {
+			return d, p, nil
+		}
+	}
+	return nil, "", fmt.Errorf("no fixture for %s:%s (tried: %s)",
+		symbol, timeframe, strings.Join(candidates, ", "))
+}
+
+func ParseMarketDataJSON(data []byte) (MarketData, error) {
+	var envelope struct {
+		market.SourceMetadata
+		Bars    []context.OHLCV  `json:"bars"`
+		RawBars *json.RawMessage `json:"-"`
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		if barsRaw, ok := raw["bars"]; ok {
+			envelope.RawBars = &barsRaw
+			if err := json.Unmarshal(data, &envelope); err != nil {
+				return MarketData{}, err
+			}
+			return MarketData{
+				SourceMetadata: envelope.SourceMetadata,
+				Bars:           envelope.Bars,
+			}, nil
 		}
 	}
 
-	/* Limit bars if requested */
-	if limit > 0 && limit < len(bars) {
-		bars = bars[len(bars)-limit:]
+	var bars []context.OHLCV
+	if err := json.Unmarshal(data, &bars); err != nil {
+		return MarketData{}, err
 	}
-
-	return bars, nil
+	return MarketData{Bars: bars}, nil
 }

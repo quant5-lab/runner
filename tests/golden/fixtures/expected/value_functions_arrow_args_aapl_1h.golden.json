@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Value Functions Arrow Args",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-02-08T11:16:19Z",
+  "generatedAt": "2026-06-11T18:39:42Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1759941000,
         "exitPrice": 258.19000244140625,
         "exitComment": "Position reversal",
-        "size": 39.00475501388104,
-        "profit": -70.20808289272252,
+        "size": 39,
+        "profit": -70.19952392578125,
         "direction": "short"
       },
       {
@@ -29,8 +29,8 @@
         "exitTime": 1760020200,
         "exitPrice": 254.5800018310547,
         "exitComment": "Position reversal",
-        "size": 38.47814667016275,
-        "profit": -138.90613296448447,
+        "size": 38,
+        "profit": -137.18002319335938,
         "direction": "long"
       },
       {
@@ -43,8 +43,8 @@
         "exitTime": 1760722200,
         "exitPrice": 250.8000030517578,
         "exitComment": "Position reversal",
-        "size": 38.813633485706916,
-        "profit": 146.71548719604846,
+        "size": 38,
+        "profit": 143.63995361328125,
         "direction": "short"
       },
       {
@@ -57,8 +57,8 @@
         "exitTime": 1761161400,
         "exitPrice": 257.5199890136719,
         "exitComment": "",
-        "size": 39.69965109140187,
-        "profit": 266.78109802710685,
+        "size": 39,
+        "profit": 262.07945251464844,
         "direction": "long"
       },
       {
@@ -71,8 +71,8 @@
         "exitTime": 1762187400,
         "exitPrice": 266.659912109375,
         "exitComment": "Position reversal",
-        "size": 39.32629388734147,
-        "profit": 284.7183832687753,
+        "size": 39,
+        "profit": 282.3560485839844,
         "direction": "long"
       },
       {
@@ -85,8 +85,8 @@
         "exitTime": 1762281000,
         "exitPrice": 270.6099853515625,
         "exitComment": "Position reversal",
-        "size": 39.48261316669304,
-        "profit": -155.95921380139407,
+        "size": 39,
+        "profit": -154.0528564453125,
         "direction": "short"
       },
       {
@@ -99,8 +99,8 @@
         "exitTime": 1762536600,
         "exitPrice": 269.114990234375,
         "exitComment": "Position reversal",
-        "size": 38.26887779104684,
-        "profit": -57.211785437860186,
+        "size": 38,
+        "profit": -56.809814453125,
         "direction": "long"
       },
       {
@@ -113,8 +113,8 @@
         "exitTime": 1762875000,
         "exitPrice": 274.1000061035156,
         "exitComment": "Position reversal",
-        "size": 38.24246279357226,
-        "profit": -190.63928390097763,
+        "size": 38,
+        "profit": -189.43060302734375,
         "direction": "short"
       },
       {
@@ -127,8 +127,8 @@
         "exitTime": 1763393400,
         "exitPrice": 269.2300109863281,
         "exitComment": "Position reversal",
-        "size": 37.392742551735076,
-        "profit": -182.10247364519907,
+        "size": 36,
+        "profit": -175.31982421875,
         "direction": "long"
       },
       {
@@ -141,8 +141,8 @@
         "exitTime": 1763652600,
         "exitPrice": 273.9100036621094,
         "exitComment": "Position reversal",
-        "size": 36.70572406710932,
-        "profit": -171.78251979331918,
+        "size": 36,
+        "profit": -168.479736328125,
         "direction": "short"
       },
       {
@@ -155,8 +155,8 @@
         "exitTime": 1763667000,
         "exitPrice": 267.7799987792969,
         "exitComment": "Position reversal",
-        "size": 35.943825372208295,
-        "profit": -220.33582503859668,
+        "size": 35,
+        "profit": -214.5501708984375,
         "direction": "long"
       },
       {
@@ -169,8 +169,8 @@
         "exitTime": 1763749800,
         "exitPrice": 270.9800109863281,
         "exitComment": "Position reversal",
-        "size": 35.65179628796048,
-        "profit": -114.08618332406493,
+        "size": 35,
+        "profit": -112.00042724609375,
         "direction": "short"
       },
       {
@@ -183,8 +183,8 @@
         "exitTime": 1764869400,
         "exitPrice": 280.1300048828125,
         "exitComment": "Position reversal",
-        "size": 34.72382254228388,
-        "profit": 317.722764324504,
+        "size": 34,
+        "profit": 311.09979248046875,
         "direction": "long"
       },
       {
@@ -197,8 +197,8 @@
         "exitTime": 1765564200,
         "exitPrice": 279.0400085449219,
         "exitComment": "Position reversal",
-        "size": 34.700350645252854,
-        "profit": 37.8232551268462,
+        "size": 34,
+        "profit": 37.05987548828125,
         "direction": "short"
       },
       {
@@ -211,8 +211,8 @@
         "exitTime": 1765812600,
         "exitPrice": 274.1700134277344,
         "exitComment": "Position reversal",
-        "size": 35.09888704944982,
-        "profit": -170.9314085495362,
+        "size": 34,
+        "profit": -165.579833984375,
         "direction": "long"
       },
       {
@@ -225,8 +225,8 @@
         "exitTime": 1766590200,
         "exitPrice": 274.0400085449219,
         "exitComment": "Position reversal",
-        "size": 35.69725696611889,
-        "profit": 4.640817708607986,
+        "size": 34,
+        "profit": 4.420166015625,
         "direction": "short"
       },
       {
@@ -239,8 +239,8 @@
         "exitTime": 1767112200,
         "exitPrice": 272.8299865722656,
         "exitComment": "",
-        "size": 35.084703391000005,
-        "profit": -42.45326200723725,
+        "size": 35,
+        "profit": -42.35076904296875,
         "direction": "long"
       },
       {
@@ -253,8 +253,8 @@
         "exitTime": 1768249800,
         "exitPrice": 260.9599914550781,
         "exitComment": "Position reversal",
-        "size": 35.01150358601729,
-        "profit": 407.18395765998844,
+        "size": 35,
+        "profit": 407.0501708984375,
         "direction": "short"
       },
       {
@@ -267,8 +267,8 @@
         "exitTime": 1768321800,
         "exitPrice": 259.8999938964844,
         "exitComment": "Position reversal",
-        "size": 38.17229193391505,
-        "profit": -40.46253625587784,
+        "size": 38,
+        "profit": -40.2799072265625,
         "direction": "long"
       },
       {
@@ -281,8 +281,8 @@
         "exitTime": 1768325400,
         "exitPrice": 260.8500061035156,
         "exitComment": "Position reversal",
-        "size": 38.16578453367351,
-        "profit": -36.25796119791432,
+        "size": 38,
+        "profit": -36.1004638671875,
         "direction": "short"
       },
       {
@@ -295,8 +295,8 @@
         "exitTime": 1768332600,
         "exitPrice": 259.7398986816406,
         "exitComment": "Position reversal",
-        "size": 37.994583633035305,
-        "profit": -42.178069282082895,
+        "size": 37,
+        "profit": -41.073974609375,
         "direction": "long"
       },
       {
@@ -309,14 +309,14 @@
         "exitTime": 1768497454,
         "exitPrice": 260.07000732421875,
         "exitComment": "",
-        "size": 37.88863618337027,
-        "profit": -12.507366259628789,
+        "size": 37,
+        "profit": -12.214019775390625,
         "direction": "short"
       }
     ],
     "openTrades": [],
-    "equity": 9819.56365896098,
-    "netProfit": -180.43634103901886,
+    "equity": 9832.083511352539,
+    "netProfit": -167.91648864746094,
     "totalTrades": 0,
     "plots": {}
   }

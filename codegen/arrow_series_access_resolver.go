@@ -69,3 +69,15 @@ func (r *ArrowSeriesAccessResolver) IsLocalVariable(identifierName string) bool 
 func (r *ArrowSeriesAccessResolver) IsParameter(identifierName string) bool {
 	return r.parameters[identifierName] || r.seriesParameters[identifierName]
 }
+
+/* BuildArrowScope returns a map of all registered parameter names for use with SecurityArgumentExtractor. */
+func (r *ArrowSeriesAccessResolver) BuildArrowScope() map[string]string {
+	scope := make(map[string]string)
+	for name := range r.parameters {
+		scope[name] = "scalar"
+	}
+	for name := range r.seriesParameters {
+		scope[name] = "series"
+	}
+	return scope
+}

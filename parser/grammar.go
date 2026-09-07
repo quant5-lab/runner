@@ -24,20 +24,21 @@ type Statement struct {
 }
 
 type StatementCore struct {
-	TupleAssignment *TupleAssignment `parser:"@@"`
-	If              *IfStatement     `parser:"| @@"`
-	ForIn           *ForInStatement  `parser:"| @@"`
-	For             *ForStatement    `parser:"| @@"`
-	While           *WhileStatement  `parser:"| @@"`
-	Switch          *SwitchExpr      `parser:"| @@"`
-	FunctionDecl    *FunctionDecl    `parser:"| @@"`
-	VarAssignment   *VarAssignment   `parser:"| @@"`
-	TypedAssignment *TypedAssignment `parser:"| @@"`
-	Assignment      *Assignment      `parser:"| @@"`
-	Reassignment    *Reassignment    `parser:"| @@"`
-	Break           *BreakStmt       `parser:"| @@"`
-	Continue        *ContinueStmt    `parser:"| @@"`
-	Expression      *ExpressionStmt  `parser:"| @@"`
+	TupleAssignment    *TupleAssignment    `parser:"@@"`
+	If                 *IfStatement        `parser:"| @@"`
+	ForIn              *ForInStatement     `parser:"| @@"`
+	For                *ForStatement       `parser:"| @@"`
+	While              *WhileStatement     `parser:"| @@"`
+	Switch             *SwitchExpr         `parser:"| @@"`
+	FunctionDecl       *FunctionDecl       `parser:"| @@"`
+	VarAssignment      *VarAssignment      `parser:"| @@"`
+	TypedAssignment    *TypedAssignment    `parser:"| @@"`
+	Assignment         *Assignment         `parser:"| @@"`
+	Reassignment       *Reassignment       `parser:"| @@"`
+	CompoundAssignment *CompoundAssignment `parser:"| @@"`
+	Break              *BreakStmt          `parser:"| @@"`
+	Continue           *ContinueStmt       `parser:"| @@"`
+	Expression         *ExpressionStmt     `parser:"| @@"`
 }
 
 type IfStatement struct {
@@ -109,6 +110,20 @@ type Assignment struct {
 type Reassignment struct {
 	Name  string      `parser:"@Ident ':='"`
 	Value *Expression `parser:"@@"`
+}
+
+// CompoundAssignment represents Pine Script compound mutation operators.
+// Each is syntactic sugar for x := x OP rhs:
+//
+//	x += e  =>  x := x + e
+//	x -= e  =>  x := x - e
+//	x *= e  =>  x := x * e
+//	x /= e  =>  x := x / e
+//	x %= e  =>  x := x % e
+type CompoundAssignment struct {
+	Name     string      `parser:"@Ident"`
+	Operator string      `parser:"@('+=' | '-=' | '*=' | '/=' | '%=')"`
+	Value    *Expression `parser:"@@"`
 }
 
 type ExpressionStmt struct {
@@ -282,6 +297,7 @@ type MemberAccess struct {
 }
 
 type CallExpr struct {
+	Pos    lexer.Position
 	Callee *CallCallee `parser:"@@"`
 	Args   []*Argument `parser:"'(' ( @@ ( ',' @@ )* )? ')'"`
 }
@@ -317,7 +333,7 @@ var pineLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Float", Pattern: `\d+[eE][+-]?\d+|\d*\.\d+([eE][+-]?\d+)?|\d+\.([eE][+-]?\d+)?`},
 	{Name: "Int", Pattern: `\d+`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "Punct", Pattern: `:=|=>|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
+	{Name: "Punct", Pattern: `\+=|-=|\*=|/=|%=|:=|=>|==|!=|>=|<=|&&|\|\||[(),=@/.><!?:+\-*%\[\]]`},
 })
 
 var indentAwareLexer = indentlexer.NewIndentationDefinition(pineLexer)

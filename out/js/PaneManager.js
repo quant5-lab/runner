@@ -1,4 +1,3 @@
-/* Multi-pane chart manager with time-scale synchronization (SRP) */
 export class PaneManager {
   constructor(chartOptions) {
     this.chartOptions = chartOptions;
@@ -7,6 +6,7 @@ export class PaneManager {
   }
 
   createMainPane(container, config) {
+    container.style.height = `${config.height}px`;
     this.mainPane = {
       container,
       chart: LightweightCharts.createChart(container, {
@@ -22,7 +22,8 @@ export class PaneManager {
     const containerDiv = document.createElement('div');
     containerDiv.id = `${paneName}-chart`;
     containerDiv.style.position = 'relative';
-    containerDiv.style.zIndex = '1';
+    containerDiv.style.zIndex   = '1';
+    containerDiv.style.height   = `${config.height}px`;
 
     const chartContainerDiv = document.querySelector('.chart-container');
     chartContainerDiv.appendChild(containerDiv);
@@ -51,6 +52,12 @@ export class PaneManager {
     const containers = [this.mainPane.container];
     this.dynamicPanes.forEach(({ container }) => containers.push(container));
     return containers;
+  }
+
+  getAllPanes() {
+    const panes = [this.mainPane];
+    this.dynamicPanes.forEach(pane => panes.push(pane));
+    return panes;
   }
 
   synchronizeTimeScales() {

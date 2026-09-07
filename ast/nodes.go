@@ -52,9 +52,10 @@ type Expression interface {
 }
 
 type CallExpression struct {
-	NodeType  NodeType     `json:"type"`
-	Callee    Expression   `json:"callee"`
-	Arguments []Expression `json:"arguments"`
+	NodeType  NodeType       `json:"type"`
+	Callee    Expression     `json:"callee"`
+	Arguments []Expression   `json:"arguments"`
+	Location  SourceLocation `json:"loc,omitempty"`
 }
 
 func (c *CallExpression) Type() NodeType  { return TypeCallExpression }
@@ -229,6 +230,16 @@ type ArrowFunctionExpression struct {
 
 func (a *ArrowFunctionExpression) Type() NodeType  { return TypeArrowFunctionExpression }
 func (a *ArrowFunctionExpression) expressionNode() {}
+
+type SourceLocation struct {
+	File   string `json:"file,omitempty"`
+	Line   int    `json:"line,omitempty"`
+	Column int    `json:"column,omitempty"`
+}
+
+func (l SourceLocation) IsZero() bool {
+	return l.File == "" && l.Line == 0 && l.Column == 0
+}
 
 type BreakStatement struct {
 	NodeType NodeType `json:"type"`

@@ -31,7 +31,18 @@ func (d *ExpressionPositionDispatcher) Dispatch(g *generator, call *ast.CallExpr
 		return strings.TrimSpace(code), nil
 	}
 
-	return "", fmt.Errorf("unsupported function in expression position: %s", funcName)
+	// Empty output means a known handler declined to produce an expression value.
+	if code == "" {
+		return "", fmt.Errorf("unsupported function in expression position: %s (no actionable code generated)", funcName)
+	}
+
+	// Namespaced unknown functions (ta.x, request.x) indicate an unsupported specific feature — error.
+	if strings.Contains(funcName, ".") {
+		return "", fmt.Errorf("unsupported function in expression position: %s", funcName)
+	}
+
+	// Bare unknown function: gap already recorded by UnknownFunctionHandler — degrade to NaN.
+	return "math.NaN()", nil
 }
 
 func (d *ExpressionPositionDispatcher) isActionableCode(code string) bool {

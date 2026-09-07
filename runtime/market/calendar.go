@@ -1,0 +1,209 @@
+package market
+
+import (
+	"strings"
+	"time"
+
+	"github.com/quant5-lab/runner/runtime/context"
+)
+
+type Calendar interface {
+	Accepts(bar context.OHLCV, timeframe string, timezone string) bool
+}
+
+type AlwaysOpenCalendar struct{}
+
+func (AlwaysOpenCalendar) Accepts(context.OHLCV, string, string) bool { return true }
+
+type DateSet map[string]struct{}
+
+func NewDateSet(dates ...string) DateSet {
+	set := make(DateSet, len(dates))
+	for _, date := range dates {
+		date = strings.TrimSpace(date)
+		if date != "" {
+			set[date] = struct{}{}
+		}
+	}
+	return set
+}
+
+func (s DateSet) Contains(date string) bool {
+	_, ok := s[date]
+	return ok
+}
+
+func (s DateSet) Empty() bool { return len(s) == 0 }
+
+type TimestampSet map[int64]struct{}
+
+func NewTimestampSet(values ...int64) TimestampSet {
+	set := make(TimestampSet, len(values))
+	for _, value := range values {
+		set[unixSecond(value)] = struct{}{}
+	}
+	return set
+}
+
+func (s TimestampSet) Contains(value int64) bool {
+	_, ok := s[unixSecond(value)]
+	return ok
+}
+
+func (s TimestampSet) Empty() bool { return len(s) == 0 }
+
+type WeekdaySet map[time.Weekday]struct{}
+
+func NewWeekdaySet(days ...time.Weekday) WeekdaySet {
+	set := make(WeekdaySet, len(days))
+	for _, day := range days {
+		set[day] = struct{}{}
+	}
+	return set
+}
+
+func WeekdaySetFromNames(names ...string) WeekdaySet {
+	set := WeekdaySet{}
+	for _, name := range names {
+		if day, ok := parseWeekday(name); ok {
+			set[day] = struct{}{}
+		}
+	}
+	return set
+}
+
+func (s WeekdaySet) Contains(day time.Weekday) bool {
+	_, ok := s[day]
+	return ok
+}
+
+func (s WeekdaySet) Empty() bool { return len(s) == 0 }
+
+type ExactTimestampCalendar struct {
+	Allowed TimestampSet
+}
+
+func (c ExactTimestampCalendar) Accepts(bar context.OHLCV, _ string, _ string) bool {
+	return c.Allowed.Contains(bar.Time)
+}
+
+type DateWhitelistCalendar struct {
+	Allowed DateSet
+}
+
+func (c DateWhitelistCalendar) Accepts(bar context.OHLCV, _ string, timezone string) bool {
+	return c.Allowed.Contains(localDate(bar, timezone))
+}
+
+type RegularSessionCalendar struct {
+	ClosedWeekdays WeekdaySet
+	SpecialOpen    DateSet
+	SpecialClosed  DateSet
+	Schedule       WeekSchedule
+	DateWindows    DateSessionWindows
+}
+
+func (c RegularSessionCalendar) Accepts(bar context.OHLCV, timeframe string, timezone string) bool {
+	instant := barInstant(bar).In(locationOrUTC(timezone))
+	date := instant.Format("2006-01-02")
+
+	if c.SpecialClosed.Contains(date) {
+		return false
+	}
+	if c.ClosedWeekdays.Contains(instant.Weekday()) && !c.SpecialOpen.Contains(date) {
+		return false
+	}
+	// Session schedule is an intraday concept; daily/weekly/monthly bars carry
+	// end-of-day timestamps that fall outside any intraday window and must not
+	// be filtered by it.
+	// Special-open weekend dates (holiday compensations) run with a full weekday
+	// session, so the weekday window applies instead of the narrower weekend one.
+	if context.IsIntradayTimeframe(timeframe) {
+		if window, ok := c.DateWindows.Window(date); ok {
+			return window.Contains(instant)
+		}
+		treatAsWeekend := isWeekendDay(instant) && !c.SpecialOpen.Contains(date)
+		if !c.Schedule.ContainsFor(instant, treatAsWeekend) {
+			return false
+		}
+	}
+	return true
+}
+
+func NewRegularSessionCalendarWithWindow(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, window SessionWindow) RegularSessionCalendar {
+	return NewRegularSessionCalendarWithSchedule(closed, specialOpen, specialClosed, UniformWeekSchedule(window))
+}
+
+func NewRegularSessionCalendarWithSchedule(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, schedule WeekSchedule) RegularSessionCalendar {
+	return NewRegularSessionCalendar(closed, specialOpen, specialClosed, schedule, nil)
+}
+
+func NewRegularSessionCalendar(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet, schedule WeekSchedule, dateWindows DateSessionWindows) RegularSessionCalendar {
+	if closed == nil {
+		closed = WeekdaySet{}
+	}
+	if specialOpen == nil {
+		specialOpen = DateSet{}
+	}
+	if specialClosed == nil {
+		specialClosed = DateSet{}
+	}
+	if dateWindows == nil {
+		dateWindows = DateSessionWindows{}
+	}
+	return RegularSessionCalendar{
+		ClosedWeekdays: closed,
+		SpecialOpen:    specialOpen,
+		SpecialClosed:  specialClosed,
+		Schedule:       schedule,
+		DateWindows:    dateWindows,
+	}
+}
+
+func NewRegularWeekdayCalendar(closed WeekdaySet, specialOpen DateSet, specialClosed DateSet) RegularSessionCalendar {
+	return NewRegularSessionCalendarWithWindow(closed, specialOpen, specialClosed, SessionWindow{})
+}
+
+func localDate(bar context.OHLCV, timezone string) string {
+	return barInstant(bar).In(locationOrUTC(timezone)).Format("2006-01-02")
+}
+
+func locationOrUTC(timezone string) *time.Location {
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.UTC
+	}
+	return location
+}
+
+func barInstant(bar context.OHLCV) time.Time {
+	return time.Unix(unixSecond(bar.Time), 0)
+}
+
+func unixSecond(value int64) int64 {
+	if value > 10_000_000_000 {
+		return value / 1000
+	}
+	return value
+}
+
+func parseWeekday(value string) (time.Weekday, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "0", "sun", "sunday":
+		return time.Sunday, true
+	case "1", "mon", "monday":
+		return time.Monday, true
+	case "2", "tue", "tuesday":
+		return time.Tuesday, true
+	case "3", "wed", "wednesday":
+		return time.Wednesday, true
+	case "4", "thu", "thursday":
+		return time.Thursday, true
+	case "5", "fri", "friday":
+		return time.Friday, true
+	case "6", "sat", "saturday":
+		return time.Saturday, true
+	default:
+		return time.Sunday, false
+	}
+}

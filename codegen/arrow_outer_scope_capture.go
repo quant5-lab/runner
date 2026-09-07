@@ -1,6 +1,10 @@
 package codegen
 
-import "github.com/quant5-lab/runner/ast"
+import (
+	"fmt"
+
+	"github.com/quant5-lab/runner/ast"
+)
 
 // OuterScopeCaptureKind classifies how an outer-scope identifier is stored in Go,
 // which drives its parameter type, call-site expression, and access resolver role.
@@ -51,6 +55,20 @@ func (c OuterScopeCapture) GoParamType() string {
 	}
 }
 
+// GoCallSiteExpression returns the Go expression used at a call site for this capture.
+// Bool scalar constants must be bridged to float64 via an IIFE; all other captures
+// use GoParamName() directly.
+func (c OuterScopeCapture) GoCallSiteExpression(constants map[string]interface{}) string {
+	if c.Kind == OuterScopeCaptureScalar {
+		if val, ok := constants[c.Name]; ok {
+			if _, isBool := val.(bool); isBool {
+				return fmt.Sprintf("func() float64 { if %s { return 1.0 } else { return 0.0 } }()", c.Name)
+			}
+		}
+	}
+	return c.GoParamName()
+}
+
 // NeedsSeriesAccessRegistration reports whether the access resolver must track
 // this capture as a series parameter so bare references emit GetCurrent() and
 // subscript references emit Get(n).
@@ -74,6 +92,17 @@ func (r *ArrowCaptureRegistry) Register(funcName string, captures []OuterScopeCa
 
 func (r *ArrowCaptureRegistry) Get(funcName string) []OuterScopeCapture {
 	return r.captures[funcName]
+}
+
+// AppendCallArgs appends the call-site expression for every captured outer-scope
+// variable of funcName to args and returns the extended slice.
+// Uses GoCallSiteExpression (not GoParamName) so bool-scalar constants are bridged
+// to float64 uniformly — a callee expects float64, not bool.
+func (r *ArrowCaptureRegistry) AppendCallArgs(args []string, funcName string, constants map[string]interface{}) []string {
+	for _, cap := range r.captures[funcName] {
+		args = append(args, cap.GoCallSiteExpression(constants))
+	}
+	return args
 }
 
 // OuterScopeCaptureAnalyzer walks an arrow function body to find every identifier
@@ -133,6 +162,9 @@ func (a *OuterScopeCaptureAnalyzer) Analyze(body []ast.Node) []OuterScopeCapture
 			}
 		case *ast.MemberExpression:
 			scanExpr(e.Object)
+			if e.Computed {
+				scanExpr(e.Property)
+			}
 		case *ast.ForStatement:
 			scanExpr(e.From)
 			scanExpr(e.To)

@@ -11,10 +11,11 @@ import (
 type CallVarLookup func(*ast.CallExpression) string
 
 type SeriesAccessConverter struct {
-	symbolTable   SymbolTable
-	offset        string
-	lookupCallVar CallVarLookup
-	mathExprGen   *MathExpressionGenerator
+	symbolTable       SymbolTable
+	offset            string
+	lookupCallVar     CallVarLookup
+	mathExprGen       *MathExpressionGenerator
+	ReportUnknownCall func(string)
 }
 
 func NewSeriesAccessConverter(symbolTable SymbolTable, offset string, lookupCallVar CallVarLookup) *SeriesAccessConverter {
@@ -116,6 +117,14 @@ func (c *SeriesAccessConverter) convertCallExpression(call *ast.CallExpression) 
 	funcName := c.extractFunctionName(call.Callee)
 	if c.mathExprGen.CanHandle(funcName) {
 		return c.mathExprGen.GenerateExpression(funcName, call.Arguments)
+	}
+
+	funcNameForReport := c.extractFunctionName(call.Callee)
+	if !sharedTASignatures.Contains(funcNameForReport) {
+		if c.ReportUnknownCall != nil {
+			c.ReportUnknownCall(funcNameForReport)
+		}
+		return "math.NaN()", nil
 	}
 
 	var funcCode string

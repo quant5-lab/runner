@@ -26,12 +26,13 @@ func baselineTrade() Trade {
 func baselineResult() *StrategyResult {
 	tr := baselineTrade()
 	return &StrategyResult{
-		Trades:      []Trade{tr},
-		OpenTrades:  []Trade{},
-		TotalTrades: 1,
-		Equity:      10000.00,
-		NetProfit:   10.00,
-		Plots:       map[string][]float64{},
+		Trades:         []Trade{tr},
+		OpenTrades:     []Trade{},
+		TotalTrades:    1,
+		Equity:         10010.00,
+		NetProfit:      10.00,
+		InitialCapital: 10000.00,
+		Plots:          map[string][]float64{},
 	}
 }
 
@@ -111,18 +112,18 @@ func TestCompareResults_TradeFieldMismatch(t *testing.T) {
 		{"entryId mismatch", func(tr *Trade) { tr.EntryID = "Short" }, "entryId"},
 		{"entryBar mismatch", func(tr *Trade) { tr.EntryBar = 99 }, "entryBar"},
 		{"entryTime mismatch", func(tr *Trade) { tr.EntryTime = 9_999_999 }, "entryTime"},
-		{"entryPrice within tolerance passes", func(tr *Trade) { tr.EntryPrice += priceTolerance * 0.5 }, ""},
-		{"entryPrice outside tolerance fails", func(tr *Trade) { tr.EntryPrice += priceTolerance + 0.001 }, "entryPrice"},
+		{"entryPrice within tolerance passes", func(tr *Trade) { tr.EntryPrice += 100.0 * priceRelEps * 0.5 }, ""},
+		{"entryPrice outside tolerance fails", func(tr *Trade) { tr.EntryPrice += 100.0 * priceRelEps * 2 }, "entryPrice"},
 		{"entryComment mismatch", func(tr *Trade) { tr.EntryComment = "other" }, "entryComment"},
 		{"exitBar mismatch", func(tr *Trade) { tr.ExitBar = 99 }, "exitBar"},
 		{"exitTime mismatch", func(tr *Trade) { tr.ExitTime = 9_999_999 }, "exitTime"},
-		{"exitPrice within tolerance passes", func(tr *Trade) { tr.ExitPrice += priceTolerance * 0.5 }, ""},
-		{"exitPrice outside tolerance fails", func(tr *Trade) { tr.ExitPrice += priceTolerance + 0.001 }, "exitPrice"},
+		{"exitPrice within tolerance passes", func(tr *Trade) { tr.ExitPrice += 110.0 * priceRelEps * 0.5 }, ""},
+		{"exitPrice outside tolerance fails", func(tr *Trade) { tr.ExitPrice += 110.0 * priceRelEps * 2 }, "exitPrice"},
 		{"exitComment mismatch", func(tr *Trade) { tr.ExitComment = "other" }, "exitComment"},
-		{"size within tolerance passes", func(tr *Trade) { tr.Size += priceTolerance * 0.5 }, ""},
-		{"size outside tolerance fails", func(tr *Trade) { tr.Size += priceTolerance + 0.001 }, "size"},
-		{"profit within tolerance passes", func(tr *Trade) { tr.Profit += priceTolerance * 0.5 }, ""},
-		{"profit outside tolerance fails", func(tr *Trade) { tr.Profit += priceTolerance + 0.001 }, "profit"},
+		{"size within tolerance passes", func(tr *Trade) { tr.Size += 1.0 * financialRelEps * 0.5 }, ""},
+		{"size outside tolerance fails", func(tr *Trade) { tr.Size += 1.0 * financialRelEps * 2 }, "size"},
+		{"profit within tolerance passes", func(tr *Trade) { tr.Profit += 10.0 * financialRelEps * 0.5 }, ""},
+		{"profit outside tolerance fails", func(tr *Trade) { tr.Profit += 10.0 * financialRelEps * 2 }, "profit"},
 		{"direction mismatch", func(tr *Trade) { tr.Direction = "short" }, "direction"},
 	}
 
@@ -186,10 +187,10 @@ func TestCompareResults_ScalarMismatch(t *testing.T) {
 		wantErr string
 	}{
 		{"totalTrades mismatch", func(r *StrategyResult) { r.TotalTrades = 99 }, "totalTrades"},
-		{"equity within tolerance passes", func(r *StrategyResult) { r.Equity += priceTolerance * 0.5 }, ""},
-		{"equity outside tolerance fails", func(r *StrategyResult) { r.Equity += priceTolerance + 0.001 }, "equity"},
-		{"netProfit within tolerance passes", func(r *StrategyResult) { r.NetProfit += priceTolerance * 0.5 }, ""},
-		{"netProfit outside tolerance fails", func(r *StrategyResult) { r.NetProfit += priceTolerance + 0.001 }, "netProfit"},
+		{"equity within tolerance passes", func(r *StrategyResult) { r.Equity += 10000.0 * financialRelEps * 0.5 }, ""},
+		{"equity outside tolerance fails", func(r *StrategyResult) { r.Equity += 10000.0 * financialRelEps * 2 }, "equity"},
+		{"netProfit within tolerance passes", func(r *StrategyResult) { r.NetProfit += 10.0 * financialRelEps * 0.5 }, ""},
+		{"netProfit outside tolerance fails", func(r *StrategyResult) { r.NetProfit += 10.0 * financialRelEps * 2 }, "netProfit"},
 	}
 
 	for _, tt := range tests {
@@ -249,13 +250,13 @@ func TestComparePlots(t *testing.T) {
 		{
 			"value within plot tolerance passes",
 			map[string][]float64{"rsi": {50.0}},
-			map[string][]float64{"rsi": {50.0 + plotTolerance*0.5}},
+			map[string][]float64{"rsi": {50.0 + plotAbsEps*0.5}},
 			"",
 		},
 		{
 			"value outside plot tolerance fails",
 			map[string][]float64{"rsi": {50.0}},
-			map[string][]float64{"rsi": {50.0 + plotTolerance + 1e-7}},
+			map[string][]float64{"rsi": {50.0 + plotAbsEps + 1e-7}},
 			`plots["rsi"][0]`,
 		},
 		{
@@ -325,6 +326,33 @@ func TestResultsEqual(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ResultsEqual(tt.a, tt.b); got != tt.want {
 				t.Errorf("ResultsEqual = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCompareResults_InitialCapitalNotCompared guards that InitialCapital stays
+// excluded from golden comparison — existing golden files must not be invalidated
+// when capital declarations change.
+func TestCompareResults_InitialCapitalNotCompared(t *testing.T) {
+	cases := []struct {
+		name    string
+		capital float64
+	}{
+		{"small_1000", 1000.0},
+		{"default_10000", 10000.0},
+		{"large_100000", 100000.0},
+		{"zero", 0.0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expected := baselineResult()
+			actual := baselineResult()
+			actual.InitialCapital = tc.capital
+
+			if err := CompareResults(expected, actual); err != nil {
+				t.Errorf("InitialCapital=%v should not affect CompareResults, but got: %v", tc.capital, err)
 			}
 		})
 	}

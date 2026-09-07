@@ -8,9 +8,9 @@ import (
 	"github.com/quant5-lab/runner/security"
 )
 
-/* SecurityInjection holds prefetch code to inject before bar loop */
+// SecurityInjection holds prefetch code to inject before the bar loop.
 type SecurityInjection struct {
-	PrefetchCode string // Code to execute before bar loop
+	PrefetchCode string
 	ImportPaths  []string
 }
 
@@ -20,7 +20,7 @@ type resolvedSecurityCall struct {
 	resolvedTf     string
 	isSymRuntime   bool
 	isTfRuntime    bool
-	modifierPrefix string // e.g., "HEIKINASHI" if symbol was "HEIKINASHI:syminfo.tickerid"
+	modifierPrefix string // e.g. "HEIKINASHI" when symbol was "HEIKINASHI:syminfo.tickerid"
 }
 
 func buildVariableMap(program *ast.Program) map[string]string {
@@ -83,6 +83,10 @@ func resolveSecurityArgument(expr ast.Expression, rawValue string, vars map[stri
 	return rawValue, false
 }
 
+// AnalyzeAndGeneratePrefetch inspects program for security() calls, eliminates
+// calls whose outputs are consumed exclusively by chart-drawing namespaces
+// (label/line/box/table — no effect on strategy output), and emits Go prefetch
+// code for each remaining call.
 func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error) {
 	calls := security.AnalyzeAST(program)
 
@@ -99,16 +103,13 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		return nil, err
 	}
 
-	/* Build variable map for user variable resolution */
 	vars := buildVariableMap(program)
 
-	/* Resolve symbol/timeframe for each call */
 	resolved := make([]resolvedSecurityCall, len(calls))
 	for i, call := range calls {
 		sym, symRuntime := resolveSecurityArgument(call.SymbolExpr, call.Symbol, vars)
 		tf, tfRuntime := resolveSecurityArgument(call.TimeframeExpr, call.Timeframe, vars)
 
-		/* Extract modifier prefix from symbol (e.g., HEIKINASHI:syminfo.tickerid → prefix=HEIKINASHI, sym=syminfo.tickerid) */
 		modPrefix, baseSym, hasModifier := extractModifierPrefix(sym)
 		if hasModifier {
 			sym = baseSym
@@ -117,18 +118,12 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		resolved[i] = resolvedSecurityCall{
 			call:           call,
 			resolvedSym:    sym,
-			resolvedTf:     normalizeTimeframe(tf),
+			resolvedTf:     canonicalizeTimeframe(tf),
 			isSymRuntime:   symRuntime,
 			isTfRuntime:    tfRuntime,
 			modifierPrefix: modPrefix,
 		}
 	}
-
-	var codeBuilder strings.Builder
-
-	codeBuilder.WriteString("\n\t// request.security() Prefetch\n")
-	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
-	codeBuilder.WriteString("\t// Fetch and cache multi-timeframe data\n")
 
 	dedupMap := make(map[string][]resolvedSecurityCall)
 	for _, r := range resolved {
@@ -146,6 +141,26 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 		dedupMap[key] = append(dedupMap[key], r)
 	}
 
+	// Remove feeds whose outputs only reach chart-drawing namespaces — they have
+	// no effect on strategy execution or golden output and must not cause a hard
+	// exit when their fixture is absent.
+	lhsIndex := buildSecurityLHSIndex(program)
+	chartOnlyUDFs := NewChartOnlyUDFDetector().Detect(program)
+	chartOnlyKeys := SecurityChartOnlyClassifier{}.ChartOnlySecurityKeys(resolved, lhsIndex, chartOnlyUDFs, program)
+	for key := range chartOnlyKeys {
+		delete(dedupMap, key)
+	}
+
+	if len(dedupMap) == 0 {
+		return &SecurityInjection{
+			PrefetchCode: "",
+			ImportPaths:  []string{},
+		}, nil
+	}
+
+	var codeBuilder strings.Builder
+
+	codeBuilder.WriteString("\tfetcher := datafetcher.NewFileFetcher(dataDir, 0)\n\n")
 	codeBuilder.WriteString("\tbaseTimeframeSeconds := context.TimeframeToSeconds(ctx.Timeframe)\n")
 	codeBuilder.WriteString("\tvar secTimeframeSeconds int64\n")
 	codeBuilder.WriteString("\tbaseDateRange := request.NewDateRangeFromBars(ctx.Data, ctx.Timezone)\n")
@@ -204,26 +219,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			warmupBars = 50
 		}
 
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_limit := len(ctx.Data)\n", varName))
-		codeBuilder.WriteString("\tif secTimeframeSeconds != baseTimeframeSeconds && len(ctx.Data) > 0 {\n")
-		codeBuilder.WriteString("\t\tfirstBarTime := ctx.Data[0].Time\n")
-		codeBuilder.WriteString("\t\tlastBarTime := ctx.Data[len(ctx.Data)-1].Time\n")
-		codeBuilder.WriteString("\t\ttimeSpanSeconds := lastBarTime - firstBarTime\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t\tbaseSecurityBars := int(timeSpanSeconds/secTimeframeSeconds) + 1\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tdetectedWarmup := %d\n", warmupBars))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfixedMinimumWarmup := 500\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\trequiredWarmup := fixedMinimumWarmup\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tif detectedWarmup > requiredWarmup {\n"))
-		codeBuilder.WriteString(fmt.Sprintf("\t\t\trequiredWarmup = detectedWarmup\n"))
-		codeBuilder.WriteString("\t\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_limit = baseSecurityBars + requiredWarmup\n", varName))
-		codeBuilder.WriteString("\t}\n")
-		codeBuilder.WriteString(fmt.Sprintf("\t%s_data, %s_err := fetcher.Fetch(%s, %s, %s_limit)\n",
-			varName, varName, symbolCode, timeframeCode, varName))
-		codeBuilder.WriteString(fmt.Sprintf("\tif %s_err != nil {\n", varName))
-		codeBuilder.WriteString(fmt.Sprintf("\t\tfmt.Fprintf(os.Stderr, \"Failed to fetch %%s:%%s: %%%%v\\n\", %s, %s, %s_err)\n", symbolCode, timeframeCode, varName))
-		codeBuilder.WriteString("\t\tos.Exit(1)\n")
-		codeBuilder.WriteString("\t}\n")
+		codeBuilder.WriteString(fetchDataBlock(varName, symbolCode, timeframeCode, warmupBars))
 
 		hasModifier := firstCall.modifierPrefix != ""
 
@@ -237,13 +233,16 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 
 		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx := context.New(%s, %s, len(%s_data))\n",
 			varName, symbolCode, timeframeCode, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.Timezone = %s_tz\n", varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.ReferenceSession = %s_refsession\n", varName, varName))
+		codeBuilder.WriteString(fmt.Sprintf("\t%s_ctx.PeriodAnchor = %s_anchor\n", varName, varName))
 		codeBuilder.WriteString(fmt.Sprintf("\tfor _, bar := range %s_data {\n", varName))
 		codeBuilder.WriteString(fmt.Sprintf("\t\t%s_ctx.AddBar(bar)\n", varName))
 		codeBuilder.WriteString("\t}\n")
 
 		resolvedKey := fmt.Sprintf("%s:%s", firstCall.resolvedSym, firstCall.resolvedTf)
 
-		mapperCode := buildMapperCode(varName, hasModifier && isVariableBarCountModifier(firstCall.modifierPrefix))
+		mapper := mapperInitBlock(varName, hasModifier && isVariableBarCountModifier(firstCall.modifierPrefix))
 
 		if isSymbolPlaceholder || isTimeframePlaceholder {
 			var runtimeKeyArgs []string
@@ -260,11 +259,11 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 			keyExpr := fmt.Sprintf("fmt.Sprintf(%q, %s)", runtimeKey, strings.Join(runtimeKeyArgs, ", "))
 
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%s] = %s_ctx\n", keyExpr, varName))
-			codeBuilder.WriteString(mapperCode)
+			codeBuilder.WriteString(mapper)
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%s] = %s_mapper\n\n", keyExpr, varName))
 		} else {
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityContexts[%q] = %s_ctx\n", resolvedKey, varName))
-			codeBuilder.WriteString(mapperCode)
+			codeBuilder.WriteString(mapper)
 			codeBuilder.WriteString(fmt.Sprintf("\tsecurityBarMappers[%q] = %s_mapper\n\n", resolvedKey, varName))
 		}
 	}
@@ -283,7 +282,7 @@ func AnalyzeAndGeneratePrefetch(program *ast.Program) (*SecurityInjection, error
 	}, nil
 }
 
-// GenerateSecurityLookup generates runtime cache lookup code for security() calls
+// GenerateSecurityLookup generates runtime cache lookup code for a security() call.
 func GenerateSecurityLookup(call *security.SecurityCall, varName string) string {
 	var code strings.Builder
 
@@ -302,7 +301,7 @@ func GenerateSecurityLookup(call *security.SecurityCall, varName string) string 
 	return code.String()
 }
 
-// InjectSecurityCode updates StrategyCode with security prefetch and lookups
+// InjectSecurityCode prepends security prefetch code into the strategy function body.
 func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode, error) {
 	injection, err := AnalyzeAndGeneratePrefetch(program)
 	if err != nil {
@@ -325,28 +324,7 @@ func InjectSecurityCode(code *StrategyCode, program *ast.Program) (*StrategyCode
 	}, nil
 }
 
-// buildMapperCode emits the mapper initialisation block for one security symbol.
-//
-// For variable-bar-count modifiers (Renko, Kagi, …) the same-TF branch uses
-// BuildMappingFromTransform; all other same-TF cases use BuildIdentityMapping.
-func buildMapperCode(varName string, variableBarCount bool) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\t%s_mapper := request.NewSecurityBarMapper()\n", varName))
-	b.WriteString("\tif secTimeframeSeconds < baseTimeframeSeconds {\n")
-	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingForUpscaling(%s_ctx.Data, ctx.Data, ctx.Timezone)\n", varName, varName))
-	b.WriteString("\t} else if secTimeframeSeconds == baseTimeframeSeconds {\n")
-	if variableBarCount {
-		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingFromTransform(%s_transformResult.MainToSynthetic)\n", varName, varName))
-	} else {
-		b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildIdentityMapping(len(ctx.Data))\n", varName))
-	}
-	b.WriteString("\t} else {\n")
-	b.WriteString(fmt.Sprintf("\t\t%s_mapper.BuildMappingWithDateFilter(%s_ctx.Data, ctx.Data, baseDateRange, ctx.Timezone)\n", varName, varName))
-	b.WriteString("\t}\n")
-	return b.String()
-}
-
-/* mergeImports combines two import lists without duplicates */
+// mergeImports combines two import lists without duplicates.
 func mergeImports(existing, additional []string) []string {
 	seen := make(map[string]bool)
 	result := make([]string, 0, len(existing)+len(additional))
@@ -368,21 +346,7 @@ func mergeImports(existing, additional []string) []string {
 	return result
 }
 
-/* normalizeTimeframe converts short forms to canonical format */
-func normalizeTimeframe(tf string) string {
-	switch tf {
-	case "D":
-		return "1D"
-	case "W":
-		return "1W"
-	case "M":
-		return "1M"
-	default:
-		return tf
-	}
-}
-
-// generateContextVarName creates unique variable name for each symbol:timeframe
+// generateContextVarName creates a unique Go variable name for a symbol:timeframe pair.
 func generateContextVarName(key string, isSymbolPlaceholder, isTimeframePlaceholder bool) string {
 	parts := strings.Split(key, ":")
 	if len(parts) < 2 {
@@ -401,7 +365,7 @@ func generateContextVarName(key string, isSymbolPlaceholder, isTimeframePlacehol
 	return sanitizeVarName(key)
 }
 
-// sanitizeVarName converts "SYMBOL:TIMEFRAME" to valid Go variable name
+// sanitizeVarName converts a "SYMBOL:TIMEFRAME" key to a valid Go identifier.
 func sanitizeVarName(s string) string {
 	s = strings.ReplaceAll(s, ":", "_")
 	s = strings.ReplaceAll(s, "-", "_")

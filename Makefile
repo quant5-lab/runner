@@ -1,7 +1,7 @@
 # Makefile for Runner - PineScript Go Port
 # Centralized build automation following Go project conventions
 
-.PHONY: help build test test-unit test-integration test-e2e test-golden test-golden-update test-parser test-codegen test-runtime test-series test-syminfo regression-syminfo bench bench-series coverage coverage-show check ci clean clean-all cross-compile fmt vet lint build-strategy
+.PHONY: help build test test-unit test-integration test-e2e test-golden test-golden-update test-parser test-codegen test-runtime test-series test-syminfo regression-syminfo test-ui bench bench-series coverage coverage-show check ci clean clean-all cross-compile fmt vet lint build-strategy
 
 # Project configuration
 PROJECT_NAME := runner
@@ -160,6 +160,11 @@ test-syminfo: ## Run syminfo.tickerid integration tests only
 
 test-syminfo-regression: ## Run syminfo.tickerid regression test suite
 	@./scripts/test-syminfo-regression.sh
+
+test-ui: ## Run chart viewer JS unit tests (node:test, no install required)
+	@echo "Running chart viewer JS tests..."
+	@node --test out/tests/*.test.js
+	@echo "✓ Chart UI tests passed"
 
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
@@ -356,21 +361,9 @@ all: ci ## Full validation (format, vet, lint, build, all tests)
 
 install-hooks: ## Install git pre-commit hook
 	@echo "Installing pre-commit hook..."
-	@echo '#!/bin/sh' > .git/hooks/pre-commit
-	@echo '# Git pre-commit hook - full validation' >> .git/hooks/pre-commit
-	@echo 'set -e' >> .git/hooks/pre-commit
-	@echo 'export PATH="$$HOME/.local/go/bin:/usr/local/go/bin:$$PATH"' >> .git/hooks/pre-commit
-	@echo 'export GOPATH="$$HOME/go"' >> .git/hooks/pre-commit
-	@echo 'export PATH="$$PATH:$$GOPATH/bin"' >> .git/hooks/pre-commit
-	@echo 'if ! command -v go >/dev/null 2>&1; then' >> .git/hooks/pre-commit
-	@echo '    echo "✗ Go not found. Run: make install"' >> .git/hooks/pre-commit
-	@echo '    exit 1' >> .git/hooks/pre-commit
-	@echo 'fi' >> .git/hooks/pre-commit
-	@echo 'echo "🔍 Running pre-commit validation..."' >> .git/hooks/pre-commit
-	@echo 'make all' >> .git/hooks/pre-commit
-	@echo 'exit 0' >> .git/hooks/pre-commit
+	@cp scripts/pre-commit-hook.sh .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
-	@echo "✓ Pre-commit hook installed (runs: make all)"
+	@echo "✓ Pre-commit hook installed"
 
 install: ## Install Go to ~/.local (no sudo required)
 	@./scripts/install-deps.sh
