@@ -273,10 +273,6 @@ func (c *ControlFlowExpressionGenerator) generateIIFEAlternateTyped(builder *str
 	return nil
 }
 
-func (c *ControlFlowExpressionGenerator) generateIIFEAlternate(builder *strings.Builder, alternate []ast.Node) error {
-	return c.generateIIFEAlternateTyped(builder, alternate, "float64")
-}
-
 func (c *ControlFlowExpressionGenerator) generateBodyWithReturn(builder *strings.Builder, body []ast.Node) error {
 	/* IIFE bodies need arrow-function-style expression handling (e.g. binary expressions as values) */
 	wasInArrow := c.baseGenerator.inArrowFunctionBody

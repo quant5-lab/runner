@@ -13,15 +13,7 @@ var chartOnlyNamespaces = []string{"label", "line", "box", "table", "linefill"}
 type VoidNamespaceCallHandler struct{}
 
 func (h *VoidNamespaceCallHandler) CanHandle(funcName string) bool {
-	if isCalculationBearingChartCall(funcName) {
-		return true
-	}
-	for _, ns := range chartOnlyNamespaces {
-		if funcName == ns || strings.HasPrefix(funcName, ns+".") {
-			return true
-		}
-	}
-	return false
+	return isChartNamespaceCall(funcName)
 }
 
 func (h *VoidNamespaceCallHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
@@ -31,7 +23,11 @@ func (h *VoidNamespaceCallHandler) GenerateCode(g *generator, call *ast.CallExpr
 	}
 	if isCalculationBearingChartCall(funcName) {
 		g.featureGaps = append(g.featureGaps, funcName)
-		return "featuregap.Record(" + quote(funcName) + `, "chart_namespace_getter", ctx.BarIndex)`, nil
+		return runtimeFeatureGap(funcName, "chart_namespace_getter", call.Location), nil
+	}
+	if g != nil && g.chartHandleReachability.IsCalculationBearing(call) {
+		g.featureGaps = append(g.featureGaps, funcName)
+		return runtimeFeatureGap(funcName, "chart_namespace_handle", call.Location), nil
 	}
 	return "math.NaN()", nil
 }
@@ -47,8 +43,4 @@ func isCalculationBearingChartCall(funcName string) bool {
 	default:
 		return false
 	}
-}
-
-func quote(value string) string {
-	return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
 }

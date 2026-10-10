@@ -64,10 +64,19 @@ func TestStrategyCommentTernarySimple(t *testing.T) {
 
 /* TestStrategyCommentTernaryWithVariables verifies ternary with variable string branches */
 func TestStrategyCommentTernaryWithVariables(t *testing.T) {
-	/* Simulate: strategy.entry("Trade", dir, comment=condition ? long_msg : short_msg) */
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				Declarations: []ast.VariableDeclarator{
+					{ID: &ast.Identifier{Name: "long_msg"}, Init: &ast.Literal{Value: "long"}},
+				},
+			},
+			&ast.VariableDeclaration{
+				Declarations: []ast.VariableDeclarator{
+					{ID: &ast.Identifier{Name: "short_msg"}, Init: &ast.Literal{Value: "short"}},
+				},
+			},
 			&ast.ExpressionStatement{
 				Expression: &ast.CallExpression{
 					Callee: &ast.MemberExpression{
@@ -102,12 +111,11 @@ func TestStrategyCommentTernaryWithVariables(t *testing.T) {
 		t.Fatalf("GenerateStrategyCodeFromAST failed: %v", err)
 	}
 
-	/* Verify ternary branches use Series.GetCurrent() for variable references */
-	if !strings.Contains(code.FunctionBody, "long_msgSeries.GetCurrent()") {
-		t.Errorf("Expected long_msg Series access in true branch, got:\n%s", code.FunctionBody)
+	if !strings.Contains(code.FunctionBody, "return long_msg") {
+		t.Errorf("Expected long_msg in true branch, got:\n%s", code.FunctionBody)
 	}
-	if !strings.Contains(code.FunctionBody, "short_msgSeries.GetCurrent()") {
-		t.Errorf("Expected short_msg Series access in false branch, got:\n%s", code.FunctionBody)
+	if !strings.Contains(code.FunctionBody, "return short_msg") {
+		t.Errorf("Expected short_msg in false branch, got:\n%s", code.FunctionBody)
 	}
 }
 
@@ -284,10 +292,14 @@ func TestStrategyCommentTernaryInCloseAll(t *testing.T) {
 
 /* TestStrategyCommentTernaryMixedTypes verifies ternary with literal and variable branches */
 func TestStrategyCommentTernaryMixedTypes(t *testing.T) {
-	/* Simulate: strategy.entry("Trade", strategy.long, comment=use_custom ? custom_msg : "Default signal") */
 	program := &ast.Program{
 		NodeType: ast.TypeProgram,
 		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				Declarations: []ast.VariableDeclarator{
+					{ID: &ast.Identifier{Name: "custom_msg"}, Init: &ast.Literal{Value: "custom"}},
+				},
+			},
 			&ast.ExpressionStatement{
 				Expression: &ast.CallExpression{
 					Callee: &ast.MemberExpression{
@@ -325,9 +337,8 @@ func TestStrategyCommentTernaryMixedTypes(t *testing.T) {
 		t.Fatalf("GenerateStrategyCodeFromAST failed: %v", err)
 	}
 
-	/* Verify mixed types: variable (Series access) and literal (quoted string) */
-	if !strings.Contains(code.FunctionBody, "custom_msgSeries.GetCurrent()") {
-		t.Errorf("Expected Series access for variable in true branch, got:\n%s", code.FunctionBody)
+	if !strings.Contains(code.FunctionBody, "return custom_msg") {
+		t.Errorf("Expected string variable in true branch, got:\n%s", code.FunctionBody)
 	}
 	if !strings.Contains(code.FunctionBody, `"Default signal"`) {
 		t.Errorf("Expected literal string in false branch, got:\n%s", code.FunctionBody)

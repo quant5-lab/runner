@@ -31,14 +31,27 @@ type key struct {
 	source string
 }
 
+// The substitution vocabulary is part of the diagnostic wire format. The
+// codegen-time diagnostic producer and this runtime collector must emit the same
+// values into one scriptCompatibility payload, so both read a single definition.
+const (
+	SubstitutionNaN         = "NaN"
+	SubstitutionEmptyString = "empty-string"
+)
+
 var (
 	mu     sync.Mutex
 	hits   = map[key]*Hit{}
 	warned = map[key]struct{}{}
 )
 
-func Record(name, source string, barIdx int) float64 {
-	return RecordDiagnostic(name, source, "runtime", "observable-non-backtest", "NaN", nil, barIdx)
+func Record(name, source, file string, line, column, barIdx int) float64 {
+	return RecordDiagnosticAt(name, source, file, line, column, "runtime", "observable-non-backtest", SubstitutionNaN, nil, barIdx)
+}
+
+func RecordString(name, source, file string, line, column, barIdx int) string {
+	RecordDiagnosticAt(name, source, file, line, column, "runtime", "observable-non-backtest", SubstitutionEmptyString, nil, barIdx)
+	return ""
 }
 
 func RecordDiagnostic(name, source, phase, impact, substitution string, sinks []string, barIdx int) float64 {

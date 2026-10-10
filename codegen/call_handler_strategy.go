@@ -68,19 +68,22 @@ func (h *StrategyActionHandler) GenerateCode(g *generator, call *ast.CallExpress
 }
 
 func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 2 {
+	args := newStrategyCallArguments(call.Arguments)
+	entryIDExpr, hasID := args.value("id", idArgument)
+	directionExpr, hasDirection := args.valueOrContainer(directionArgument)
+	if !hasID || !hasDirection {
 		return g.ind() + "// strategy.entry() - invalid arguments\n", nil
 	}
 
-	entryID := g.extractStringLiteral(call.Arguments[0])
-	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	entryID := g.extractStringLiteral(entryIDExpr)
+	direction, err := g.extractDirectionConstant(directionExpr)
 	if err != nil {
 		return "", fmt.Errorf("strategy.entry: %w", err)
 	}
 	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
-	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
+	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", strategyAnnotationIndex("strategy.entry", "comment"), `""`)
 	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
 	entryCode := h.generateQtyBlock(g, "Entry", "entryQty", entryID, direction, comment, qty)
@@ -94,14 +97,15 @@ func (h *StrategyActionHandler) generateEntry(g *generator, call *ast.CallExpres
 }
 
 func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 1 {
+	args := newStrategyCallArguments(call.Arguments)
+	entryIDExpr, hasID := args.value("id", idArgument)
+	if !hasID {
 		return g.ind() + "// strategy.close() - invalid arguments\n", nil
 	}
-
-	entryID := g.extractStringLiteral(call.Arguments[0])
+	entryID := g.extractStringLiteral(entryIDExpr)
 
 	extractor := &ArgumentExtractor{generator: g}
-	comment := extractor.ExtractCommentArgument(call.Arguments[1:], "comment", 0, `""`)
+	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", strategyAnnotationIndex("strategy.close", "comment"), `""`)
 	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
 	closeCode := g.ind() + fmt.Sprintf("strat.Close(%q, bar.Close, bar.Time, %s)\n", entryID, comment)
@@ -116,7 +120,7 @@ func (h *StrategyActionHandler) generateClose(g *generator, call *ast.CallExpres
 
 func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExpression) (string, error) {
 	extractor := &ArgumentExtractor{generator: g}
-	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", 0, `""`)
+	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", strategyAnnotationIndex("strategy.close_all", "comment"), `""`)
 	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
 	closeAllCode := g.ind() + fmt.Sprintf("strat.CloseAll(bar.Close, bar.Time, %s)\n", comment)
@@ -130,24 +134,23 @@ func (h *StrategyActionHandler) generateCloseAll(g *generator, call *ast.CallExp
 }
 
 func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) == 0 {
-		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
-	}
-
-	parser := newStrategyExitArgParser(call.Arguments, g)
-
-	exitID := parser.stringArg(0, "id", "")
+	args := newStrategyCallArguments(call.Arguments)
+	exitID := g.strategyStringArgument(args, "id", idArgument, "")
 	if exitID == "" {
 		return g.ind() + "// strategy.exit() - invalid arguments\n", nil
 	}
 
-	fromEntry := parser.stringArg(1, "from_entry", "")
-	stopExpr := parser.exprArg(noPositionalFallback, "stop", "math.NaN()")
-	limitExpr := parser.exprArg(noPositionalFallback, "limit", "math.NaN()")
-	comment := parser.commentArg()
-	whenCondition, hasWhen := parser.whenCondition()
+	fromEntry := g.strategyStringArgument(args, "from_entry", fromEntryArgument, "")
+	stopExpr := g.strategyExpressionArgument(args, "stop", "math.NaN()")
+	limitExpr := g.strategyExpressionArgument(args, "limit", "math.NaN()")
 
-	exitCode := g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
+	extractor := &ArgumentExtractor{generator: g}
+	annotations := extractor.commentAnnotations("strategy.exit", call.Arguments)
+	comment := primaryComment(annotations, `""`)
+	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
+
+	exitCode := unsupportedCommentDiagnostics(g, annotations) +
+		g.ind() + fmt.Sprintf("strat.ExitWithLevels(%q, %q, %s, %s, bar.High, bar.Low, bar.Close, bar.Time, %s)\n",
 		exitID, fromEntry, stopExpr, limitExpr, comment)
 
 	if hasWhen {
@@ -159,19 +162,22 @@ func (h *StrategyActionHandler) generateExit(g *generator, call *ast.CallExpress
 }
 
 func (h *StrategyActionHandler) generateOrder(g *generator, call *ast.CallExpression) (string, error) {
-	if len(call.Arguments) < 2 {
+	args := newStrategyCallArguments(call.Arguments)
+	orderIDExpr, hasID := args.value("id", idArgument)
+	directionExpr, hasDirection := args.valueOrContainer(directionArgument)
+	if !hasID || !hasDirection {
 		return g.ind() + "// strategy.order() - invalid arguments\n", nil
 	}
 
-	orderID := g.extractStringLiteral(call.Arguments[0])
-	direction, err := g.extractDirectionConstant(call.Arguments[1])
+	orderID := g.extractStringLiteral(orderIDExpr)
+	direction, err := g.extractDirectionConstant(directionExpr)
 	if err != nil {
 		return "", fmt.Errorf("strategy.order: %w", err)
 	}
 	qty := h.qtyResolver.ResolveQuantity(call.Arguments, g.strategyConfig.DefaultQtyValue, g.makeQtyEvaluator())
 
 	extractor := &ArgumentExtractor{generator: g}
-	comment := extractor.ExtractCommentArgument(call.Arguments[2:], "comment", 1, `""`)
+	comment := extractor.ExtractCommentArgument(call.Arguments, "comment", strategyAnnotationIndex("strategy.order", "comment"), `""`)
 	whenCondition, hasWhen := extractor.ExtractWhenCondition(call.Arguments)
 
 	orderCode := h.generateQtyBlock(g, "Order", "orderQty", orderID, direction, comment, qty)

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
+	"github.com/quant5-lab/runner/runtime/featuregap"
 )
 
 type compatibilityDiagnostic struct {
@@ -27,12 +28,13 @@ type compatibilityFeature struct {
 type compatibilityFeatureSet map[string]compatibilityFeature
 
 type compatibilityAnalyzer struct {
-	program       *ast.Program
-	gaps          map[string]bool
-	udfs          map[string]*ast.ArrowFunctionExpression
-	boolConstants map[string]bool
-	boolConflicts map[string]bool
-	tainted       map[string]compatibilityFeatureSet
+	program                 *ast.Program
+	gaps                    map[string]bool
+	udfs                    map[string]*ast.ArrowFunctionExpression
+	boolConstants           map[string]bool
+	boolConflicts           map[string]bool
+	tainted                 map[string]compatibilityFeatureSet
+	chartHandleReachability chartHandleReachability
 }
 
 func analyzeCompatibility(program *ast.Program, featureGaps []string) []compatibilityDiagnostic {
@@ -51,12 +53,13 @@ func newCompatibilityAnalyzer(program *ast.Program, featureGaps []string) *compa
 		}
 	}
 	return &compatibilityAnalyzer{
-		program:       program,
-		gaps:          gaps,
-		udfs:          collectCompatibilityUDFs(program),
-		boolConstants: map[string]bool{},
-		boolConflicts: map[string]bool{},
-		tainted:       map[string]compatibilityFeatureSet{},
+		program:                 program,
+		gaps:                    gaps,
+		udfs:                    collectCompatibilityUDFs(program),
+		boolConstants:           map[string]bool{},
+		boolConflicts:           map[string]bool{},
+		tainted:                 map[string]compatibilityFeatureSet{},
+		chartHandleReachability: newChartHandleReachability(program),
 	}
 }
 
@@ -214,7 +217,7 @@ func (a *compatibilityAnalyzer) recordUnsupportedStatementCall(call *ast.CallExp
 		ID:       name,
 		Source:   "generator.statement_unknown",
 		Location: call.Location,
-	}, "observable-non-backtest", "")
+	}, "observable-non-backtest", featuregap.SubstitutionNaN, "")
 }
 
 func (a *compatibilityAnalyzer) collectBacktestDiagnostics(nodes []ast.Node, out map[string]compatibilityDiagnostic) {
@@ -222,7 +225,7 @@ func (a *compatibilityAnalyzer) collectBacktestDiagnostics(nodes []ast.Node, out
 		switch s := node.(type) {
 		case *ast.ExpressionStatement:
 			if call, ok := s.Expression.(*ast.CallExpression); ok {
-				a.recordCallSinkDiagnostic(call, nil, out)
+				a.recordCallDiagnostics(call, out)
 			}
 		case *ast.VariableDeclaration:
 			for _, d := range s.Declarations {
@@ -264,24 +267,34 @@ func (a *compatibilityAnalyzer) recordNestedStrategySinks(nodes []ast.Node, feat
 			return
 		}
 		for _, feature := range sortedFeatures(features) {
-			addDiagnostic(out, feature, "backtest-critical", sink)
+			addDiagnostic(out, feature, "backtest-critical", featuregap.SubstitutionNaN, sink)
 		}
 	})
 }
 
-func (a *compatibilityAnalyzer) recordCallSinkDiagnostic(call *ast.CallExpression, controlFeatures compatibilityFeatureSet, out map[string]compatibilityDiagnostic) {
+// recordCallDiagnostics publishes the records one strategy call owns. Resolving
+// the critical feature set once lets the annotation de-duplication read the same
+// set the critical record used.
+func (a *compatibilityAnalyzer) recordCallDiagnostics(call *ast.CallExpression, out map[string]compatibilityDiagnostic) {
 	sink := extractCallFunctionName(call)
 	if !isBacktestCriticalSink(sink) {
 		return
 	}
-	for _, feature := range sortedFeatures(controlFeatures) {
-		addDiagnostic(out, feature, "backtest-critical", sink)
+	critical := a.backtestCriticalFeatures(sink, call.Arguments)
+	for _, feature := range sortedFeatures(critical) {
+		addDiagnostic(out, feature, "backtest-critical", featuregap.SubstitutionNaN, sink)
 	}
-	for _, arg := range backtestCriticalArguments(sink, call.Arguments) {
-		for _, feature := range sortedFeatures(a.featuresInExpression(arg, a.tainted, "generator.variable_init_unknown", nil)) {
-			addDiagnostic(out, feature, "backtest-critical", sink)
-		}
+	a.recordAnnotationDiagnostics(call, critical, out)
+}
+
+// backtestCriticalFeatures collects the features carried by the arguments that
+// decide the backtest; comment annotations are excluded because they cannot.
+func (a *compatibilityAnalyzer) backtestCriticalFeatures(sink string, args []ast.Expression) compatibilityFeatureSet {
+	features := compatibilityFeatureSet{}
+	for _, arg := range backtestCriticalArguments(sink, args) {
+		mergeFeatureSets(features, a.featuresInExpression(arg, a.tainted, "generator.variable_init_unknown", nil))
 	}
+	return features
 }
 
 func backtestCriticalArguments(sink string, args []ast.Expression) []ast.Expression {
@@ -290,7 +303,7 @@ func backtestCriticalArguments(sink string, args []ast.Expression) []ast.Express
 		if object, ok := arg.(*ast.ObjectExpression); ok {
 			for _, prop := range object.Properties {
 				name := propertyName(prop.Key)
-				if isPresentationOnlyStrategyArg(sink, name) {
+				if isStrategyAnnotationParameter(name) {
 					continue
 				}
 				critical = append(critical, prop.Value)
@@ -313,32 +326,6 @@ func propertyName(expr ast.Expression) string {
 	return id.Name
 }
 
-func isPresentationOnlyStrategyArg(_ string, name string) bool {
-	switch name {
-	case "comment", "comment_profit", "comment_loss", "comment_trailing",
-		"alert_message", "alert_profit", "alert_loss", "alert_trailing",
-		"disable_alert":
-		return true
-	default:
-		return false
-	}
-}
-
-func isPresentationOnlyStrategyPositionalArg(sink string, index int) bool {
-	switch sink {
-	case "strategy.entry", "strategy.order":
-		return index == 7 || index == 8 || index == 9
-	case "strategy.exit":
-		return index >= 12 && index <= 20
-	case "strategy.close":
-		return index == 1 || index == 4 || index == 6
-	case "strategy.close_all":
-		return index == 0 || index == 1 || index == 3
-	default:
-		return false
-	}
-}
-
 func (a *compatibilityAnalyzer) featuresInExpression(
 	expr ast.Expression,
 	tainted map[string]compatibilityFeatureSet,
@@ -357,6 +344,8 @@ func (a *compatibilityAnalyzer) featuresInExpression(
 		switch {
 		case isCalculationBearingChartCall(name):
 			addFeature(features, name, "chart_namespace_getter", e.Location)
+		case a.chartHandleReachability.IsCalculationBearing(e):
+			addFeature(features, name, "chart_namespace_handle", e.Location)
 		case a.gaps[name]:
 			addFeature(features, name, defaultSource, e.Location)
 		case a.udfs[name] != nil:
@@ -604,7 +593,7 @@ func sortedFeatures(features compatibilityFeatureSet) []compatibilityFeature {
 	return out
 }
 
-func addDiagnostic(out map[string]compatibilityDiagnostic, feature compatibilityFeature, impact, sink string) {
+func addDiagnostic(out map[string]compatibilityDiagnostic, feature compatibilityFeature, impact, substitution, sink string) {
 	key := feature.ID + "\x00" + feature.Source
 	if sink != "" {
 		key += "\x00" + sink
@@ -626,7 +615,7 @@ func addDiagnostic(out map[string]compatibilityDiagnostic, feature compatibility
 		Location:     feature.Location,
 		Phase:        "codegen",
 		Impact:       impact,
-		Substitution: "NaN",
+		Substitution: substitution,
 		Sinks:        appendUnique(nil, sink),
 	}
 }
@@ -646,11 +635,17 @@ func compatibilityImpactRank(impact string) int {
 	}
 }
 
-func diagnosticSource(featureID string) string {
-	if isCalculationBearingChartCall(featureID) {
-		return "chart_namespace_getter"
+func isChartHandleProducer(funcName string) bool {
+	return isChartNamespaceCall(funcName) && !isCalculationBearingChartCall(funcName)
+}
+
+func isChartNamespaceCall(funcName string) bool {
+	for _, ns := range chartOnlyNamespaces {
+		if funcName == ns || strings.HasPrefix(funcName, ns+".") {
+			return true
+		}
 	}
-	return "generator.variable_init_unknown"
+	return false
 }
 
 func isBacktestCriticalSink(name string) bool {

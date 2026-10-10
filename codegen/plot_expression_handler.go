@@ -116,7 +116,7 @@ func (h *PlotExpressionHandler) handleCallExpression(call *ast.CallExpression) (
 	}
 
 	h.generator.featureGaps = append(h.generator.featureGaps, funcName)
-	return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", funcName, "plot_expression"), nil
+	return runtimeFeatureGap(funcName, "plot_expression", call.Location), nil
 }
 
 func (h *PlotExpressionHandler) HandleTAFunction(call *ast.CallExpression, funcName string) (string, error) {
@@ -173,15 +173,4 @@ func (h *PlotExpressionHandler) HandleATRFunction(call *ast.CallExpression, func
 
 	tempVarName := h.generator.tempVarMgr.GetOrCreate(callInfo)
 	return fmt.Sprintf("%sSeries.Get(0)", tempVarName), nil
-}
-
-func (h *PlotExpressionHandler) extractPeriod(arg *ast.Literal) (int, error) {
-	switch v := arg.Value.(type) {
-	case float64:
-		return int(v), nil
-	case int:
-		return v, nil
-	default:
-		return 0, fmt.Errorf("period must be numeric")
-	}
 }

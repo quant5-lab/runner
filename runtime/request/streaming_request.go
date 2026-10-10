@@ -103,11 +103,6 @@ func (r *StreamingRequest) getOrBuildMapper(cacheKey string, secCtx *context.Con
 	return mapper
 }
 
-func (r *StreamingRequest) getCurrentTime() int64 {
-	currentTimeObj := r.ctx.GetTime(-r.currentBar)
-	return currentTimeObj.Unix()
-}
-
 func buildSecurityKey(symbol, timeframe string) string {
 	return fmt.Sprintf("%s:%s", symbol, timeframe)
 }
@@ -130,23 +125,4 @@ func (r *StreamingRequest) getOrBuildSeries(symbol, timeframe string, expr ast.E
 
 	r.seriesCache.Set(seriesCacheKey, builtSeries)
 	return builtSeries, nil
-}
-
-func extractOffsetExpression(expr ast.Expression) (float64, bool) {
-	memberExpr, ok := expr.(*ast.MemberExpression)
-	if !ok {
-		return 0, false
-	}
-
-	literalProp, ok := memberExpr.Property.(*ast.Literal)
-	if !ok {
-		return 0, false
-	}
-
-	offset, ok := literalProp.Value.(float64)
-	if !ok {
-		return 0, false
-	}
-
-	return offset, true
 }

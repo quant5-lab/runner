@@ -43,21 +43,6 @@ type tvAlignmentDiscrepancy struct {
 	TVOnlyCapEscalated                  bool // TVOnly exceeds maxTVOnly; set only with operator approval; counted by TestTVAlignmentCases_CapEscalationRatchet
 }
 
-func exactTVAlignment() tvAlignmentDiscrepancy {
-	return tvAlignmentDiscrepancy{}
-}
-
-func tvAlignmentCaseByName(t *testing.T, name string) tvAlignmentCase {
-	t.Helper()
-	for _, tc := range tvAlignmentCases() {
-		if tc.Name == name {
-			return tc
-		}
-	}
-	t.Fatalf("TV alignment case %q not found", name)
-	return tvAlignmentCase{}
-}
-
 func loadTVTradesInFixtureWindow(t *testing.T, root string, tc tvAlignmentCase) []tvref.TVTrade {
 	t.Helper()
 	fixturePath := filepath.Join(root, "tests", "golden", "fixtures", "data", tc.Data)

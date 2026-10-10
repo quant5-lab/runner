@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/quant5-lab/runner/ast"
@@ -89,40 +88,11 @@ Used for strategy.entry/close/exit comment parameters.
 Returns Go code string (quoted literal or identifier) or default value.
 */
 func (e *ArgumentExtractor) ExtractCommentArgument(args []ast.Expression, argName string, positionalIndex int, defaultValue string) string {
-	// Check if last argument is ObjectExpression (named args container)
-	if len(args) == 0 {
+	expr, ok := newStrategyCallArguments(args).value(argName, positionalIndex)
+	if !ok {
 		return defaultValue
 	}
-
-	lastArg := args[len(args)-1]
-	objExpr, isObject := lastArg.(*ast.ObjectExpression)
-
-	// Try named argument first
-	if isObject {
-		for _, prop := range objExpr.Properties {
-			if prop.Key == nil {
-				continue
-			}
-			keyIdent, isIdent := prop.Key.(*ast.Identifier)
-			if !isIdent || keyIdent.Name != argName {
-				continue
-			}
-
-			// Extract string literal or identifier
-			return e.extractCommentValue(prop.Value)
-		}
-	}
-
-	// Try positional argument
-	if positionalIndex >= 0 && positionalIndex < len(args) {
-		arg := args[positionalIndex]
-		// Skip ObjectExpression (named args)
-		if _, isObj := arg.(*ast.ObjectExpression); !isObj {
-			return e.extractCommentValue(arg)
-		}
-	}
-
-	return defaultValue
+	return e.extractCommentValue(expr)
 }
 
 /*
@@ -160,26 +130,8 @@ func (e *ArgumentExtractor) ExtractConditionArgument(args []ast.Expression, argN
 extractCommentValue converts AST expression to Go string literal or identifier.
 */
 func (e *ArgumentExtractor) extractCommentValue(expr ast.Expression) string {
-	switch v := expr.(type) {
-	case *ast.Literal:
-		// String literal: "Buy signal" → "Buy signal"
-		if str, ok := v.Value.(string); ok {
-			return fmt.Sprintf("%q", str)
-		}
-	case *ast.Identifier:
-		// Variable reference: signal_msg → signal_msgSeries.GetCurrent()
-		// In PineScript, string variables are stored as Series<string>
-		return fmt.Sprintf("%sSeries.GetCurrent()", v.Name)
-	case *ast.ConditionalExpression:
-		// Ternary: condition ? "true_str" : "false_str"
-		// Generate: func() string { if condition { return "true_str" } else { return "false_str" } }()
-		condition := e.generator.extractSeriesExpression(v.Test)
-		trueValue := e.extractCommentValue(v.Consequent)
-		falseValue := e.extractCommentValue(v.Alternate)
-		return fmt.Sprintf("func() string { if (%s != 0) { return %s } else { return %s } }()",
-			strings.TrimRight(condition, "\n"), trueValue, falseValue)
-	}
-	return `""`
+	code, _ := e.commentExpression(expr)
+	return code
 }
 
 /*

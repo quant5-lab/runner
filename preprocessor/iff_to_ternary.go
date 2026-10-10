@@ -222,27 +222,6 @@ func (t *IffToTernaryTransformer) findIffCallInPostfix(postfix *parser.PostfixEx
 	return nil
 }
 
-func (t *IffToTernaryTransformer) transformCallToTernary(expr *parser.Expression) error {
-	call := expr.Call
-	if call == nil || call.Callee == nil {
-		return nil
-	}
-
-	if !t.isIffCall(call) {
-		return t.visitCallExprArgs(call)
-	}
-
-	ternary, err := t.convertIffCallToTernary(call)
-	if err != nil {
-		return err
-	}
-
-	expr.Call = nil
-	expr.Ternary = ternary
-
-	return nil
-}
-
 func (t *IffToTernaryTransformer) isIffCall(call *parser.CallExpr) bool {
 	if call.Callee.Ident == nil {
 		return false

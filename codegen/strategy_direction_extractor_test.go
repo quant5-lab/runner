@@ -635,6 +635,31 @@ func TestNamedDirectionArgExtractor_DirectionPropertyMapping(t *testing.T) {
 			},
 			"strategy.Long",
 		},
+		{
+			"direction=strategy.short → Short (v5 key)",
+			[]ast.Property{{Key: &ast.Identifier{Name: "direction"}, Value: longShortMember("short")}},
+			"strategy.Short",
+		},
+		{
+			"direction=strategy.long → Long (v5 key)",
+			[]ast.Property{{Key: &ast.Identifier{Name: "direction"}, Value: longShortMember("long")}},
+			"strategy.Long",
+		},
+		{
+			"direction=true literal → Long (v5 key)",
+			[]ast.Property{{Key: &ast.Identifier{Name: "direction"}, Value: &ast.Literal{Value: true}}},
+			"strategy.Long",
+		},
+		{
+			"direction= surrounded by qty/comment/when properties",
+			[]ast.Property{
+				{Key: &ast.Identifier{Name: "qty"}, Value: &ast.Literal{Value: 1.0}},
+				{Key: &ast.Identifier{Name: "direction"}, Value: longShortMember("short")},
+				{Key: &ast.Identifier{Name: "comment"}, Value: &ast.Literal{Value: "buy"}},
+				{Key: &ast.Identifier{Name: "when"}, Value: &ast.Identifier{Name: "cond"}},
+			},
+			"strategy.Short",
+		},
 	}
 
 	for _, tt := range tests {

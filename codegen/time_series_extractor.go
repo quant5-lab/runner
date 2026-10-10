@@ -1,10 +1,6 @@
 package codegen
 
-import (
-	"fmt"
-
-	"github.com/quant5-lab/runner/ast"
-)
+import "github.com/quant5-lab/runner/ast"
 
 var timeBuiltinNames = map[string]bool{
 	"time":       true,
@@ -38,7 +34,7 @@ func (g *generator) extractTimeBuiltin(call *ast.CallExpression) string {
 func (g *generator) extractTimeClose(call *ast.CallExpression) string {
 	if len(call.Arguments) >= 2 {
 		g.featureGaps = append(g.featureGaps, "time_close_session")
-		return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", "time_close_session", "time_series_extractor")
+		return runtimeFeatureGap("time_close_session", "time_series_extractor", call.Location)
 	}
 	return "time_closeSeries.GetCurrent()"
 }

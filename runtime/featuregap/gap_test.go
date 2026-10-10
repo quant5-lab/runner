@@ -7,18 +7,81 @@ import (
 	"testing"
 )
 
+// recordAt and recordStringAt keep the tests readable while exercising the
+// location-carrying recorder entries with an anonymous position.
+func recordAt(name, source string, barIdx int) float64 {
+	return Record(name, source, "", 0, 0, barIdx)
+}
+
+func recordStringAt(name, source string, barIdx int) string {
+	return RecordString(name, source, "", 0, 0, barIdx)
+}
+
 func TestRecord_ReturnsNaN(t *testing.T) {
 	Reset()
-	got := Record("foo", "test", 0)
+	got := recordAt("foo", "test", 0)
 	if !math.IsNaN(got) {
 		t.Fatalf("Record returned %v, want NaN", got)
+	}
+}
+
+func TestRecord_CarriesSourceLocation(t *testing.T) {
+	Reset()
+	Record("gap_fn", "plot_expression", "strategy.pine", 7, 3, 2)
+
+	h := Snapshot()[0]
+	if h.File != "strategy.pine" || h.Line != 7 || h.Column != 3 {
+		t.Fatalf("location = %s:%d:%d, want strategy.pine:7:3", h.File, h.Line, h.Column)
+	}
+}
+
+func TestRecordString_CarriesSourceLocation(t *testing.T) {
+	Reset()
+	RecordString("gap_fn", "generator.comment_unknown", "strategy.pine", 11, 9, 4)
+
+	h := Snapshot()[0]
+	if h.File != "strategy.pine" || h.Line != 11 || h.Column != 9 {
+		t.Fatalf("location = %s:%d:%d, want strategy.pine:11:9", h.File, h.Line, h.Column)
+	}
+}
+
+func TestRecordString_ReturnsEmptyStringAndRecordsSubstitution(t *testing.T) {
+	Reset()
+	got := recordStringAt("foo", "string_context", 3)
+	if got != "" {
+		t.Fatalf("RecordString returned %q, want empty string", got)
+	}
+	snap := Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("len(Snapshot()) = %d, want 1", len(snap))
+	}
+	h := snap[0]
+	if h.Substitution != "empty-string" {
+		t.Fatalf("Substitution = %q, want empty-string", h.Substitution)
+	}
+	if h.FirstSeenBar != 3 || h.LastSeenBar != 3 || h.HitCount != 1 {
+		t.Fatalf("runtime counters = %d..%d hits=%d, want 3..3 hits=1", h.FirstSeenBar, h.LastSeenBar, h.HitCount)
+	}
+}
+
+func TestRecordString_AccumulatesHits(t *testing.T) {
+	Reset()
+	recordStringAt("foo", "string_context", 2)
+	recordStringAt("foo", "string_context", 5)
+	snap := Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("len(Snapshot()) = %d, want 1", len(snap))
+	}
+	h := snap[0]
+	if h.FirstSeenBar != 2 || h.LastSeenBar != 5 || h.HitCount != 2 {
+		t.Fatalf("runtime counters = %d..%d hits=%d, want 2..5 hits=2", h.FirstSeenBar, h.LastSeenBar, h.HitCount)
 	}
 }
 
 func TestRecord_AccumulatesHits(t *testing.T) {
 	Reset()
 	for i := 0; i < 5; i++ {
-		Record("foo", "test", i)
+		recordAt("foo", "test", i)
 	}
 	snap := Snapshot()
 	if len(snap) != 1 {
@@ -38,9 +101,9 @@ func TestRecord_AccumulatesHits(t *testing.T) {
 
 func TestRecord_DistinguishesByNameAndSource(t *testing.T) {
 	Reset()
-	Record("foo", "src_a", 1)
-	Record("foo", "src_b", 2)
-	Record("bar", "src_a", 3)
+	recordAt("foo", "src_a", 1)
+	recordAt("foo", "src_b", 2)
+	recordAt("bar", "src_a", 3)
 	snap := Snapshot()
 	if len(snap) != 3 {
 		t.Fatalf("len(Snapshot()) = %d, want 3 distinct (name,source) pairs", len(snap))
@@ -49,9 +112,9 @@ func TestRecord_DistinguishesByNameAndSource(t *testing.T) {
 
 func TestSnapshot_StableSorted(t *testing.T) {
 	Reset()
-	Record("zeta", "x", 0)
-	Record("alpha", "y", 0)
-	Record("alpha", "x", 0)
+	recordAt("zeta", "x", 0)
+	recordAt("alpha", "y", 0)
+	recordAt("alpha", "x", 0)
 	snap := Snapshot()
 	want := []struct{ name, source string }{{"alpha", "x"}, {"alpha", "y"}, {"zeta", "x"}}
 	for i, w := range want {
@@ -63,7 +126,7 @@ func TestSnapshot_StableSorted(t *testing.T) {
 
 func TestReset_ClearsAll(t *testing.T) {
 	Reset()
-	Record("foo", "test", 0)
+	recordAt("foo", "test", 0)
 	Reset()
 	if got := Snapshot(); len(got) != 0 {
 		t.Errorf("Snapshot after Reset = %v, want empty", got)
@@ -77,7 +140,7 @@ func TestRecord_ConcurrencySafe(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			Record("foo", "test", idx)
+			recordAt("foo", "test", idx)
 		}(i)
 	}
 	wg.Wait()
@@ -99,7 +162,7 @@ func TestSummary_EmptyWhenNoHits(t *testing.T) {
 
 func TestSummary_NonEmptyAfterHit(t *testing.T) {
 	Reset()
-	Record("foo", "src", 7)
+	recordAt("foo", "src", 7)
 	if s := Summary(); s == "" {
 		t.Error("Summary() empty after Record; want non-empty")
 	}
@@ -107,7 +170,7 @@ func TestSummary_NonEmptyAfterHit(t *testing.T) {
 
 func TestSnapshot_IndependentOfSubsequentState(t *testing.T) {
 	Reset()
-	Record("foo", "test", 0)
+	recordAt("foo", "test", 0)
 	snap := Snapshot()
 	Reset()
 	if len(snap) != 1 {
@@ -117,9 +180,9 @@ func TestSnapshot_IndependentOfSubsequentState(t *testing.T) {
 
 func TestRecord_FirstSeenBarPreserved(t *testing.T) {
 	Reset()
-	Record("foo", "test", 10)
-	Record("foo", "test", 20)
-	Record("foo", "test", 5)
+	recordAt("foo", "test", 10)
+	recordAt("foo", "test", 20)
+	recordAt("foo", "test", 5)
 	h := Snapshot()[0]
 	if h.FirstSeenBar != 10 {
 		t.Errorf("FirstSeenBar = %d, want 10 (first call wins)", h.FirstSeenBar)
@@ -128,8 +191,8 @@ func TestRecord_FirstSeenBarPreserved(t *testing.T) {
 
 func TestRecord_LastSeenBarMonotone(t *testing.T) {
 	Reset()
-	Record("foo", "test", 10)
-	Record("foo", "test", 3)
+	recordAt("foo", "test", 10)
+	recordAt("foo", "test", 3)
 	h := Snapshot()[0]
 	if h.LastSeenBar != 10 {
 		t.Errorf("LastSeenBar = %d, want 10 (never decreases below observed max)", h.LastSeenBar)
@@ -138,8 +201,8 @@ func TestRecord_LastSeenBarMonotone(t *testing.T) {
 
 func TestSummary_ContainsAllHitFields(t *testing.T) {
 	Reset()
-	Record("request.dividends", "plot_expression", 42)
-	Record("request.dividends", "plot_expression", 99)
+	recordAt("request.dividends", "plot_expression", 42)
+	recordAt("request.dividends", "plot_expression", 99)
 	s := Summary()
 	for _, want := range []string{"request.dividends", "plot_expression", "42", "99", "2"} {
 		if !strings.Contains(s, want) {
@@ -151,8 +214,8 @@ func TestSummary_ContainsAllHitFields(t *testing.T) {
 func TestRecordStatic_MergesWithRuntimeObservation(t *testing.T) {
 	Reset()
 	RecordStaticAt("line.get_price", "chart_namespace_getter", "lines.pine", 4, 5, "codegen", "backtest-critical", "NaN", []string{"strategy.entry"})
-	Record("line.get_price", "chart_namespace_getter", 3)
-	Record("line.get_price", "chart_namespace_getter", 5)
+	recordAt("line.get_price", "chart_namespace_getter", 3)
+	recordAt("line.get_price", "chart_namespace_getter", 5)
 
 	snap := Snapshot()
 	if len(snap) != 1 {
@@ -175,7 +238,7 @@ func TestRecordStatic_MergesWithRuntimeObservation(t *testing.T) {
 
 func TestRecordStaticAt_FillsLocationAfterRuntimeObservation(t *testing.T) {
 	Reset()
-	Record("line.get_price", "chart_namespace_getter", 3)
+	recordAt("line.get_price", "chart_namespace_getter", 3)
 	RecordStaticAt("line.get_price", "chart_namespace_getter", "lines.pine", 4, 5, "codegen", "backtest-critical", "NaN", []string{"strategy.entry"})
 
 	h := Snapshot()[0]

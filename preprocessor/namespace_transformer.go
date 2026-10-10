@@ -222,27 +222,3 @@ func (t *NamespaceTransformer) visitPostfixExpr(postfix *parser.PostfixExpr) {
 		t.visitArithExpr(postfix.Subscript)
 	}
 }
-
-func (t *NamespaceTransformer) visitComparison(comp *parser.Comparison) {
-	if comp == nil {
-		return
-	}
-
-	if comp.Left != nil {
-		t.visitComparisonTerm(comp.Left)
-	}
-
-	if comp.Right != nil {
-		t.visitComparisonTerm(comp.Right)
-	}
-}
-
-func (t *NamespaceTransformer) visitComparisonTerm(term *parser.ComparisonTerm) {
-	if term == nil {
-		return
-	}
-
-	if term.Postfix != nil {
-		t.visitPostfixExpr(term.Postfix)
-	}
-}

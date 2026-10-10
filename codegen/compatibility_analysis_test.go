@@ -11,7 +11,7 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 	tests := []struct {
 		name        string
 		call        *ast.CallExpression
-		wantDiag    bool
+		wantImpact  string
 		wantFeature string
 		wantSink    string
 		wantSource  string
@@ -19,7 +19,7 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 		{
 			name:        "unknown variable controls entry condition",
 			call:        strategyEntryCall(identifier("x")),
-			wantDiag:    true,
+			wantImpact:  "backtest-critical",
 			wantFeature: "unsupported_entry_source",
 			wantSink:    "strategy.entry",
 			wantSource:  "generator.variable_init_unknown",
@@ -27,7 +27,7 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 		{
 			name:        "drawing getter controls entry condition",
 			call:        strategyEntryCall(chartGetterCall("line", "get_price")),
-			wantDiag:    true,
+			wantImpact:  "backtest-critical",
 			wantFeature: "line.get_price",
 			wantSink:    "strategy.entry",
 			wantSource:  "chart_namespace_getter",
@@ -39,7 +39,7 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 				member("strategy", "long"),
 				objectArg("qty", identifier("x")),
 			),
-			wantDiag:    true,
+			wantImpact:  "backtest-critical",
 			wantFeature: "unsupported_entry_source",
 			wantSink:    "strategy.entry",
 		},
@@ -50,7 +50,9 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 				member("strategy", "long"),
 				objectArg("comment", identifier("x")),
 			),
-			wantDiag: false,
+			wantImpact:  "observable-non-backtest",
+			wantFeature: "unsupported_entry_source",
+			wantSource:  "generator.variable_init_unknown",
 		},
 	}
 
@@ -58,15 +60,15 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			program := compatibilityProgram(tt.call)
 			got := analyzeCompatibility(program, []string{"unsupported_entry_source"})
-			if tt.wantDiag {
-				assertCompatibilityDiagnostic(t, got, tt.wantFeature, tt.wantSink)
-				if tt.wantSource != "" && got[0].Source != tt.wantSource {
-					t.Fatalf("diagnostic source = %q, want %q", got[0].Source, tt.wantSource)
+			if tt.wantImpact == "" {
+				if len(got) != 0 {
+					t.Fatalf("diagnostics = %+v, want none", got)
 				}
 				return
 			}
-			if len(got) != 0 {
-				t.Fatalf("diagnostics = %+v, want none", got)
+			assertCompatibilityImpact(t, got, tt.wantFeature, tt.wantImpact, tt.wantSink)
+			if tt.wantSource != "" && got[0].Source != tt.wantSource {
+				t.Fatalf("diagnostic source = %q, want %q", got[0].Source, tt.wantSource)
 			}
 		})
 	}
@@ -74,78 +76,79 @@ func TestAnalyzeCompatibility_BacktestCriticalSinks(t *testing.T) {
 
 func TestAnalyzeCompatibility_StrategyArgumentImpactClassification(t *testing.T) {
 	tests := []struct {
-		name     string
-		call     *ast.CallExpression
-		wantDiag bool
-		wantSink string
+		name       string
+		call       *ast.CallExpression
+		wantImpact string
+		wantSink   string
 	}{
 		{
-			name:     "entry id selects the order",
-			call:     call(member("strategy", "entry"), objectArg("id", identifier("x"))),
-			wantDiag: true,
-			wantSink: "strategy.entry",
+			name:       "entry id selects the order",
+			call:       call(member("strategy", "entry"), objectArg("id", identifier("x"))),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.entry",
 		},
 		{
-			name:     "exit from_entry selects the position",
-			call:     call(member("strategy", "exit"), objectArg("from_entry", identifier("x"))),
-			wantDiag: true,
-			wantSink: "strategy.exit",
+			name:       "exit from_entry selects the position",
+			call:       call(member("strategy", "exit"), objectArg("from_entry", identifier("x"))),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.exit",
 		},
 		{
-			name:     "order oca name selects the cancellation group",
-			call:     call(member("strategy", "order"), objectArg("oca_name", identifier("x"))),
-			wantDiag: true,
-			wantSink: "strategy.order",
+			name:       "order oca name selects the cancellation group",
+			call:       call(member("strategy", "order"), objectArg("oca_name", identifier("x"))),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.order",
 		},
 		{
-			name:     "order oca type changes cancellation semantics",
-			call:     call(member("strategy", "order"), objectArg("oca_type", identifier("x"))),
-			wantDiag: true,
-			wantSink: "strategy.order",
+			name:       "order oca type changes cancellation semantics",
+			call:       call(member("strategy", "order"), objectArg("oca_type", identifier("x"))),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.order",
 		},
 		{
-			name:     "cancel positional id selects the order",
-			call:     call(member("strategy", "cancel"), identifier("x")),
-			wantDiag: true,
-			wantSink: "strategy.cancel",
+			name:       "cancel positional id selects the order",
+			call:       call(member("strategy", "cancel"), identifier("x")),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.cancel",
 		},
 		{
-			name:     "close positional id selects the position",
-			call:     call(member("strategy", "close"), identifier("x")),
-			wantDiag: true,
-			wantSink: "strategy.close",
+			name:       "close positional id selects the position",
+			call:       call(member("strategy", "close"), identifier("x")),
+			wantImpact: "backtest-critical",
+			wantSink:   "strategy.close",
 		},
 		{
-			name:     "entry comment is presentation only",
-			call:     call(member("strategy", "entry"), objectArg("comment", identifier("x"))),
-			wantDiag: false,
+			name:       "entry comment is observable only",
+			call:       call(member("strategy", "entry"), objectArg("comment", identifier("x"))),
+			wantImpact: "observable-non-backtest",
 		},
 		{
-			name:     "exit profit comment is presentation only",
-			call:     call(member("strategy", "exit"), objectArg("comment_profit", identifier("x"))),
-			wantDiag: false,
+			name:       "exit profit comment is observable only",
+			call:       call(member("strategy", "exit"), objectArg("comment_profit", identifier("x"))),
+			wantImpact: "observable-non-backtest",
 		},
 		{
-			name:     "close alert message is presentation only",
-			call:     call(member("strategy", "close"), objectArg("alert_message", identifier("x"))),
-			wantDiag: false,
+			name: "close alert message is not a comment parameter",
+			call: call(member("strategy", "close"), objectArg("alert_message", identifier("x"))),
 		},
 		{
-			name:     "close all disable alert is presentation only",
-			call:     call(member("strategy", "close_all"), objectArg("disable_alert", identifier("x"))),
-			wantDiag: false,
+			name: "close all disable alert is not a comment parameter",
+			call: call(member("strategy", "close_all"), objectArg("disable_alert", identifier("x"))),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := analyzeCompatibility(compatibilityProgram(tt.call), []string{"unsupported_entry_source"})
-			if tt.wantDiag {
-				assertCompatibilityDiagnostic(t, got, "unsupported_entry_source", tt.wantSink)
+			if tt.wantImpact == "" {
+				if len(got) != 0 {
+					t.Fatalf("diagnostics = %+v, want no record for a non-comment argument", got)
+				}
 				return
 			}
-			if len(got) != 0 {
-				t.Fatalf("diagnostics = %+v, want presentation-only argument to leave backtest complete", got)
+			assertCompatibilityImpact(t, got, "unsupported_entry_source", tt.wantImpact, tt.wantSink)
+			if len(got) != 1 {
+				t.Fatalf("diagnostics = %+v, want exactly one record", got)
 			}
 		})
 	}
@@ -159,6 +162,145 @@ func TestAnalyzeCompatibility_NonBacktestConsumersRemainObservableOnly(t *testin
 
 	if got := analyzeCompatibility(program, []string{"unsupported_entry_source"}); len(got) != 0 {
 		t.Fatalf("diagnostics = %+v, want no static backtest-critical diagnostics", got)
+	}
+}
+
+func TestAnalyzeCompatibility_ChartHandleProducersOnlyReportWhenGetterConsumesHandle(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         []ast.Node
+		wantFeatures []string
+	}{
+		{
+			name: "display-only constructor remains silent",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.ExpressionStatement{Expression: call(identifier("plot"), identifier("close"))},
+			},
+		},
+		{
+			name: "getter consuming constructor handle reaches entry",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				compatVarDecl("price", chartCall("line", "get_price", identifier("line_handle"), identifier("bar_index"))),
+				&ast.IfStatement{
+					Test:       identifier("price"),
+					Consequent: []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.get_price", "line.new"},
+		},
+		{
+			name: "alias consumed by getter preserves originating constructor",
+			body: []ast.Node{
+				compatVarDecl("source_handle", chartCall("box", "new", identifier("bar_index"), identifier("close"))),
+				compatVarDecl("alias_handle", identifier("source_handle")),
+				compatVarDecl("top", chartCall("box", "get_top", identifier("alias_handle"))),
+				&ast.IfStatement{
+					Test:       identifier("top"),
+					Consequent: []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"box.get_top", "box.new"},
+		},
+		{
+			name: "handle controlling strategy branch is calculation bearing",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.IfStatement{
+					Test:       identifier("line_handle"),
+					Consequent: []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+		{
+			name: "inline handle producer controlling strategy branch is calculation bearing",
+			body: []ast.Node{
+				&ast.IfStatement{
+					Test:       chartCall("line", "new", identifier("bar_index"), identifier("close")),
+					Consequent: []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+		{
+			name: "handle in critical strategy argument is calculation bearing",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.ExpressionStatement{Expression: call(member("strategy", "entry"),
+					literal("L"),
+					member("strategy", "long"),
+					objectArg("qty", identifier("line_handle")),
+				)},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+		{
+			name: "handle in strategy comment remains presentation only",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.ExpressionStatement{Expression: call(member("strategy", "entry"),
+					literal("L"),
+					member("strategy", "long"),
+					objectArg("comment", identifier("line_handle")),
+				)},
+			},
+		},
+		{
+			name: "handle in for boundary controlling strategy branch is calculation bearing",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.ForStatement{
+					Counter: "i",
+					From:    literal(0.0),
+					To:      identifier("line_handle"),
+					Body:    []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+		{
+			name: "handle in while condition controlling strategy branch is calculation bearing",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.WhileStatement{
+					Condition: identifier("line_handle"),
+					Body:      []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+		{
+			name: "handle in for-in collection controlling strategy branch is calculation bearing",
+			body: []ast.Node{
+				compatVarDecl("line_handle", chartCall("line", "new", identifier("bar_index"), identifier("close"))),
+				&ast.ForInStatement{
+					ElementVar: "item",
+					Collection: identifier("line_handle"),
+					Body:       []ast.Node{&ast.ExpressionStatement{Expression: strategyEntryCall(identifier("close"))}},
+				},
+			},
+			wantFeatures: []string{"line.new"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyzeCompatibility(&ast.Program{Body: tt.body}, nil)
+			if len(tt.wantFeatures) == 0 {
+				if len(got) != 0 {
+					t.Fatalf("diagnostics = %+v, want display-only chart handle to stay silent", got)
+				}
+				return
+			}
+			for _, feature := range tt.wantFeatures {
+				assertCompatibilityDiagnostic(t, got, feature, "strategy.entry")
+			}
+			if len(got) != len(tt.wantFeatures) {
+				t.Fatalf("diagnostics = %+v, want exactly %v", got, tt.wantFeatures)
+			}
+		})
 	}
 }
 
@@ -437,12 +579,20 @@ func TestAnalyzeCompatibility_ConflictingBoolAssignmentsAreNotConstants(t *testi
 
 func assertCompatibilityDiagnostic(t *testing.T, got []compatibilityDiagnostic, featureID, sink string) {
 	t.Helper()
+	assertCompatibilityImpact(t, got, featureID, "backtest-critical", sink)
+}
+
+func assertCompatibilityImpact(t *testing.T, got []compatibilityDiagnostic, featureID, impact, sink string) {
+	t.Helper()
 	for _, diag := range got {
-		if diag.FeatureID == featureID && containsString(diag.Sinks, sink) {
+		if diag.FeatureID != featureID || diag.Impact != impact {
+			continue
+		}
+		if sink == "" || containsString(diag.Sinks, sink) {
 			return
 		}
 	}
-	t.Fatalf("missing feature=%s sink=%s in %+v", featureID, sink, got)
+	t.Fatalf("missing feature=%s impact=%s sink=%s in %+v", featureID, impact, sink, got)
 }
 
 func compatibilityProgram(sinkCall *ast.CallExpression) *ast.Program {
@@ -462,6 +612,10 @@ func strategyEntryCall(condition ast.Expression) *ast.CallExpression {
 
 func chartGetterCall(namespace, getter string) *ast.CallExpression {
 	return call(member(namespace, getter), identifier("handle"), identifier("bar_index"))
+}
+
+func chartCall(namespace, method string, args ...ast.Expression) *ast.CallExpression {
+	return call(member(namespace, method), args...)
 }
 
 func compatVarDecl(name string, init ast.Expression) *ast.VariableDeclaration {

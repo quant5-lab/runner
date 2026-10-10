@@ -45,7 +45,7 @@ func (r *VariableDeclarationRegistrar) RegisterVariable(varName string, init ast
 		return
 	}
 
-	varType := r.gen.inferVariableType(init)
+	varType := r.gen.inferDeclaredVariableType(varName, init)
 	r.gen.variables[varName] = varType
 	r.gen.typeSystem.RegisterVariable(varName, varType)
 

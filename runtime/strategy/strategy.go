@@ -415,7 +415,6 @@ func (ec *EquityCalculator) GetNetProfit() float64 {
 }
 
 type Strategy struct {
-	context              interface{} // Context with OHLCV data
 	orderManager         *OrderManager
 	positionTracker      *PositionTracker
 	tradeHistory         *TradeHistory

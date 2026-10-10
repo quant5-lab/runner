@@ -43,7 +43,6 @@ func timedCtx(timeframe string, anchor context.PeriodAnchor, bars ...context.OHL
 
 var (
 	nyseAnchor = context.PeriodAnchor{Timezone: "America/New_York", SessionOpenMinute: 9*60 + 30}
-	moexAnchor = context.PeriodAnchor{Timezone: "Europe/Moscow", SessionOpenMinute: 7 * 60}
 	utcAnchor  = context.PeriodAnchor{}
 )
 

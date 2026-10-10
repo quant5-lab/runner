@@ -50,13 +50,6 @@ func newInsufficientArgumentsError(funcName string, expected, got int) error {
 	}
 }
 
-func newInvalidArgumentTypeError(funcName string, argIdx int, expected string) error {
-	return &SecurityError{
-		Type:    "InvalidArgumentType",
-		Message: fmt.Sprintf("%s argument %d must be %s", funcName, argIdx, expected),
-	}
-}
-
 func newMissingArgumentError(funcName string, argName string) error {
 	return &SecurityError{
 		Type:    "MissingArgument",

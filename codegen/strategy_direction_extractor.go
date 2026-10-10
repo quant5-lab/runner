@@ -134,14 +134,16 @@ func (e *VariableDirectionExtractor) Extract(expr ast.Expression) (string, bool)
 	return "", false
 }
 
-// namedDirectionArgExtractor handles the Pine named-argument form
+// namedDirectionArgExtractor handles the Pine named-argument forms
 //
+//	strategy.entry(id, direction=<direction>, ...)
 //	strategy.entry(id, long=<direction>, ...)
 //
-// The parser bundles all named arguments into a single *ast.ObjectExpression
-// appended to call.Arguments. The "long" property value is resolved through
-// chain.Resolve, so every direction form supported for positional arguments is
-// automatically available inside a named argument.
+// The converter bundles all named arguments into a single *ast.ObjectExpression
+// appended to call.Arguments. The value of "direction" (the v5 name) or "long"
+// (the legacy alias) is resolved through chain.Resolve, so every direction form
+// supported for positional arguments is automatically available inside a named
+// argument.
 type namedDirectionArgExtractor struct {
 	chain *ChainDirectionExtractor
 }
@@ -153,7 +155,7 @@ func (e *namedDirectionArgExtractor) Extract(expr ast.Expression) (string, bool)
 	}
 	for _, prop := range obj.Properties {
 		key, ok := prop.Key.(*ast.Identifier)
-		if !ok || key.Name != "long" {
+		if !ok || (key.Name != "direction" && key.Name != "long") {
 			continue
 		}
 		dir, err := e.chain.Resolve(prop.Value)

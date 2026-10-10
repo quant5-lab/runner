@@ -140,7 +140,6 @@ func TestStrategyCommentNumericLiteral(t *testing.T) {
 	}
 }
 
-/* TestStrategyCommentCallExpression verifies CallExpression handling (unsupported) */
 func TestStrategyCommentCallExpression(t *testing.T) {
 	/* Simulate: strategy.entry("Trade", dir, comment=str.tostring(close)) */
 	program := &ast.Program{
@@ -184,9 +183,8 @@ func TestStrategyCommentCallExpression(t *testing.T) {
 		t.Fatalf("GenerateStrategyCodeFromAST failed: %v", err)
 	}
 
-	/* Verify unsupported CallExpression defaults to empty string */
-	if !strings.Contains(code.FunctionBody, `strat.Entry("Trade", strategy.Long, 1, "")`) {
-		t.Errorf("Expected empty string for unsupported CallExpression, got:\n%s", code.FunctionBody)
+	if !strings.Contains(code.FunctionBody, `strat.Entry("Trade", strategy.Long, 1, fmt.Sprintf("%.10g", close))`) {
+		t.Errorf("Expected str.tostring comment expression, got:\n%s", code.FunctionBody)
 	}
 }
 

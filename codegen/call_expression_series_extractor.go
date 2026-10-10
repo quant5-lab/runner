@@ -113,7 +113,7 @@ func (g *generator) extractDefaultSeries(call *ast.CallExpression) string {
 	isMath := g.mathHandler.CanHandle(funcName)
 	if !isKnownTA && !isMath {
 		g.featureGaps = append(g.featureGaps, funcName)
-		return fmt.Sprintf("featuregap.Record(%q, %q, ctx.BarIndex)", funcName, "call_expr_series_extractor")
+		return runtimeFeatureGap(funcName, "call_expr_series_extractor", call.Location)
 	}
 	varName := strings.ReplaceAll(funcName, ".", "_")
 	return fmt.Sprintf("%sSeries.GetCurrent()", varName)

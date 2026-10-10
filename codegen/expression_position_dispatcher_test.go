@@ -87,3 +87,42 @@ func TestExpressionPositionDispatcher_DispatchOutcomes(t *testing.T) {
 		})
 	}
 }
+
+func TestExpressionPositionDispatcher_DispatchStringFallback(t *testing.T) {
+	gen := newTestGenerator()
+	dispatcher := NewExpressionPositionDispatcher(gen.callRouter)
+	call := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "unsupported_comment"},
+		Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+	}
+
+	code, err := dispatcher.DispatchString(gen, call, "generator.comment_unknown")
+	if err != nil {
+		t.Fatalf("DispatchString() error = %v", err)
+	}
+	want := `featuregap.RecordString("unsupported_comment", "generator.comment_unknown", "", 0, 0, ctx.BarIndex)`
+	if code != want {
+		t.Fatalf("DispatchString() = %q, want %q", code, want)
+	}
+}
+
+func TestExpressionPositionDispatcher_DispatchNumericFallbackRecordsRuntimeGap(t *testing.T) {
+	gen := newTestGenerator()
+	dispatcher := NewExpressionPositionDispatcher(gen.callRouter)
+	call := &ast.CallExpression{
+		Callee:    &ast.Identifier{Name: "unsupported_signal"},
+		Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+	}
+
+	code, err := dispatcher.Dispatch(gen, call)
+	if err != nil {
+		t.Fatalf("Dispatch() error = %v", err)
+	}
+	want := `featuregap.Record("unsupported_signal", "generator.variable_init_unknown", "", 0, 0, ctx.BarIndex)`
+	if code != want {
+		t.Fatalf("Dispatch() = %q, want %q", code, want)
+	}
+	if !containsGap(gen.featureGaps, "unsupported_signal") {
+		t.Fatalf("featureGaps = %#v, want unsupported_signal", gen.featureGaps)
+	}
+}

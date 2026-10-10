@@ -102,9 +102,12 @@ func TestVoidNamespaceCallHandler_CanHandle(t *testing.T) {
 	}
 }
 
-// TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls verifies the split
-// between silent presentation calls and calculation-bearing drawing getters.
-func TestVoidNamespaceCallHandler_GenerateCode_MatchingCalls(t *testing.T) {
+// TestVoidNamespaceCallHandler_GenerateCode_UnreachedConstructorsStaySilentAndGettersRecordGap
+// pins the split the handler owns: getters record a gap by name, and a
+// constructor or mutator whose handle no getter consumes stays silent. The
+// consumed case is covered by
+// TestVoidNamespaceCallHandler_GenerateCode_RecordsOnlyReachableChartHandles.
+func TestVoidNamespaceCallHandler_GenerateCode_UnreachedConstructorsStaySilentAndGettersRecordGap(t *testing.T) {
 	h := &VoidNamespaceCallHandler{}
 
 	tests := []struct {
@@ -368,10 +371,54 @@ func TestVoidNamespaceCallHandler_GenerateCode_NonMatchingCallsPassThrough(t *te
 	}
 }
 
-// TestVoidNamespaceCallHandler_GeneratorStateUnchanged verifies that handling a
-// chart-only call leaves the generator's featureGaps and other mutable state
-// unmodified. Chart drawing calls must not pollute the featuregap log.
-func TestVoidNamespaceCallHandler_GeneratorStateUnchanged(t *testing.T) {
+func TestVoidNamespaceCallHandler_GenerateCode_RecordsOnlyReachableChartHandles(t *testing.T) {
+	h := &VoidNamespaceCallHandler{}
+	plainCall := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "line"},
+			Property: &ast.Identifier{Name: "new"},
+		},
+	}
+	reachableCall := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "box"},
+			Property: &ast.Identifier{Name: "new"},
+		},
+	}
+
+	plainGen := newTestGenerator()
+	plainCode, err := h.GenerateCode(plainGen, plainCall)
+	if err != nil {
+		t.Fatalf("GenerateCode() plain call error: %v", err)
+	}
+	if plainCode != "math.NaN()" {
+		t.Fatalf("plain chart handle code = %q, want silent math.NaN()", plainCode)
+	}
+	if len(plainGen.featureGaps) != 0 {
+		t.Fatalf("plain featureGaps = %#v, want none", plainGen.featureGaps)
+	}
+
+	reachableGen := newTestGenerator()
+	reachableGen.chartHandleReachability = chartHandleReachability{reachableCall: true}
+	reachableCode, err := h.GenerateCode(reachableGen, reachableCall)
+	if err != nil {
+		t.Fatalf("GenerateCode() reachable call error: %v", err)
+	}
+	want := `featuregap.Record("box.new", "chart_namespace_handle", "", 0, 0, ctx.BarIndex)`
+	if reachableCode != want {
+		t.Fatalf("reachable chart handle code = %q, want %q", reachableCode, want)
+	}
+	if !containsGap(reachableGen.featureGaps, "box.new") {
+		t.Fatalf("reachable featureGaps = %#v, want box.new", reachableGen.featureGaps)
+	}
+}
+
+// TestVoidNamespaceCallHandler_UnreachableHandleLeavesGeneratorStateUnchanged
+// verifies that handling a chart-only call whose handle is never consumed leaves
+// the generator's featureGaps and other mutable state unmodified. A reachable
+// handle is recorded instead; see
+// TestVoidNamespaceCallHandler_GenerateCode_RecordsOnlyReachableChartHandles.
+func TestVoidNamespaceCallHandler_UnreachableHandleLeavesGeneratorStateUnchanged(t *testing.T) {
 	h := &VoidNamespaceCallHandler{}
 
 	calls := []*ast.CallExpression{

@@ -106,7 +106,6 @@ type PlotPoint struct {
 
 /* MarshalJSON implements custom JSON marshaling to convert NaN to null */
 func (p PlotPoint) MarshalJSON() ([]byte, error) {
-	type Alias PlotPoint
 	var value interface{}
 	if math.IsNaN(p.Value) || math.IsInf(p.Value, 0) {
 		value = nil
