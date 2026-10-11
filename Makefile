@@ -217,9 +217,10 @@ run-strategy: ## Run strategy with pre-generated data file (usage: make run-stra
 	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@echo "Running strategy: $(STRATEGY)"
 	@mkdir -p out
-	@TEMP_FILE=$$( $(GO) run cmd/pine-gen/main.go \
-		-input ../$(STRATEGY) \
+	@TEMP_FILE=$$( $(GO) run ./cmd/pine-gen \
+		-input $(STRATEGY) \
 		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
+	 if [ -z "$$TEMP_FILE" ]; then echo "Error: code generation failed for $(STRATEGY)"; exit 1; fi; \
 	 $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
 	@SYMBOL=$$(basename $(DATA) | sed 's/_[^_]*\.json//'); \
 	TIMEFRAME=$$(basename $(DATA) .json | sed 's/.*_//'); \
@@ -373,4 +374,3 @@ install-go-only: ## Alias for install (kept for compatibility)
 
 setup: ## Initialize project after dependency installation (download modules, build)
 	@./scripts/post-install.sh
-
