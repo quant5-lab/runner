@@ -217,14 +217,16 @@ run-strategy: ## Run strategy with pre-generated data file (usage: make run-stra
 	@if [ -z "$(DATA)" ]; then echo "Error: DATA not set. Usage: make run-strategy STRATEGY=path/to/strategy.pine DATA=path/to/data.json"; exit 1; fi
 	@echo "Running strategy: $(STRATEGY)"
 	@mkdir -p out
-	@TEMP_FILE=$$( $(GO) run ./cmd/pine-gen \
+	@GEN_OUT=$$( $(GO) run ./cmd/pine-gen \
 		-input $(STRATEGY) \
-		-output /tmp/pinescript-strategy 2>&1 | grep "Generated:" | awk '{print $$2}'); \
-	 if [ -z "$$TEMP_FILE" ]; then echo "Error: code generation failed for $(STRATEGY)"; exit 1; fi; \
+		-output /tmp/pinescript-strategy 2>&1 ); \
+	 TEMP_FILE=$$(echo "$$GEN_OUT" | grep "Generated:" | awk '{print $$2}'); \
+	 if [ -z "$$TEMP_FILE" ]; then echo "$$GEN_OUT"; echo "Error: code generation failed for $(STRATEGY)"; exit 1; fi; \
 	 $(GO) build -o /tmp/pinescript-strategy $$TEMP_FILE
-	@SYMBOL=$$(basename $(DATA) | sed 's/_[^_]*\.json//'); \
-	TIMEFRAME=$$(basename $(DATA) .json | sed 's/.*_//'); \
-	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir testdata/ohlcv -output out/chart-data.json
+	@BASE=$$(basename $(DATA) .json); \
+	SYMBOL=$${BASE%[-_]*}; \
+	TIMEFRAME=$${BASE##*[-_]}; \
+	/tmp/pinescript-strategy -symbol $$SYMBOL -timeframe $$TIMEFRAME -data $(DATA) -datadir $$(dirname $(DATA)) -output out/chart-data.json
 	@echo "✓ Strategy executed: out/chart-data.json"
 	@ls -lh out/chart-data.json
 
