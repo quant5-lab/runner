@@ -8,14 +8,12 @@ import (
 
 // StrategyActionHandler generates code for strategy.entry/close/cancel/order calls.
 type StrategyActionHandler struct {
-	qtyResolver        *EntryQuantityResolver
-	conditionalWrapper *ConditionalEntryGenerator
+	qtyResolver *EntryQuantityResolver
 }
 
 func NewStrategyActionHandler() *StrategyActionHandler {
 	return &StrategyActionHandler{
-		qtyResolver:        NewEntryQuantityResolver(),
-		conditionalWrapper: NewConditionalEntryGenerator(""),
+		qtyResolver: NewEntryQuantityResolver(),
 	}
 }
 

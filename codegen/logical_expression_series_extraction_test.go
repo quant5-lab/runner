@@ -13,6 +13,7 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 		varInits:       make(map[string]ast.Expression),
 		constants:      make(map[string]interface{}),
 		builtinHandler: NewBuiltinIdentifierHandler(),
+		boolConverter:  NewBooleanConverter(NewTypeInferenceEngine()),
 	}
 
 	gen.variables["newmoon"] = "float"
@@ -129,7 +130,7 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 			mustNot: []string{"and"},
 		},
 		{
-			name: "logical with binary expression",
+			name: "comparison operand stays bare while series operand is coerced",
 			expr: &ast.LogicalExpression{
 				Operator: "and",
 				Left: &ast.BinaryExpression{
@@ -140,13 +141,9 @@ func TestLogicalExpressionInSeriesExpressions(t *testing.T) {
 				Right: &ast.Identifier{Name: "condition"},
 			},
 			mustHave: []string{
-				"value.IsTrue(",
-				"newmoonSeries.GetCurrent()",
-				">",
-				"&&",
-				"value.IsTrue(conditionSeries.GetCurrent())",
+				"(newmoonSeries.GetCurrent() > 0) && value.IsTrue(conditionSeries.GetCurrent())",
 			},
-			mustNot: []string{"and"},
+			mustNot: []string{"and", "value.IsTrue((newmoonSeries.GetCurrent()"},
 		},
 		{
 			name: "three-level nested logical",
@@ -201,6 +198,7 @@ func TestLogicalExpressionOperatorNormalization(t *testing.T) {
 		varInits:       make(map[string]ast.Expression),
 		constants:      make(map[string]interface{}),
 		builtinHandler: NewBuiltinIdentifierHandler(),
+		boolConverter:  NewBooleanConverter(NewTypeInferenceEngine()),
 	}
 
 	gen.variables["a"] = "float"
@@ -241,6 +239,7 @@ func TestLogicalExpressionWithSeriesOffset(t *testing.T) {
 		varInits:       make(map[string]ast.Expression),
 		constants:      make(map[string]interface{}),
 		builtinHandler: NewBuiltinIdentifierHandler(),
+		boolConverter:  NewBooleanConverter(NewTypeInferenceEngine()),
 	}
 
 	gen.variables["condition"] = "float"

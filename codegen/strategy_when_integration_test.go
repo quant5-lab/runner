@@ -58,7 +58,7 @@ func TestStrategyEntryWhenParameter_DirectHandlerIntegration(t *testing.T) {
 			qtyValue:    1.0,
 			expectIf:    true,
 			expectEntry: `strat.Entry("Long"`,
-			expectCond:  "if value.IsTrue(",
+			expectCond:  "if (closeSeries.GetCurrent() > openSeries.GetCurrent()) {",
 		},
 		{
 			name: "entry without when has no wrapper",
@@ -333,7 +333,7 @@ func TestStrategyCloseWhenParameter(t *testing.T) {
 			},
 			expectIf:    true,
 			expectClose: `strat.Close("Position1"`,
-			expectCond:  "if value.IsTrue(",
+			expectCond:  "if (rsiSeries.GetCurrent() > 70) {",
 		},
 		{
 			name: "close with complex when condition",
@@ -480,7 +480,7 @@ func TestStrategyCloseAllWhenParameter(t *testing.T) {
 			},
 			expectIf:       true,
 			expectCloseAll: "strat.CloseAll(",
-			expectCond:     "if value.IsTrue(",
+			expectCond:     "if (volatilitySeries.GetCurrent() > 100) {",
 		},
 	}
 
@@ -619,7 +619,7 @@ func TestStrategyExitWhenParameter(t *testing.T) {
 			},
 			expectIf:   true,
 			expectExit: `strat.ExitWithLevels("DynamicExit"`,
-			expectCond: "if value.IsTrue(",
+			expectCond: "if (barIndexSeries.GetCurrent() > 10) {",
 		},
 	}
 

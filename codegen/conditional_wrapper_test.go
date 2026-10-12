@@ -23,7 +23,7 @@ func TestConditionalWrapperGenerator_SimpleCondition(t *testing.T) {
 	condition := "bar.Close > bar.Open"
 	result := wrapper.WrapIfNeeded(condition, bodyCode, "\t\t")
 
-	expected := "\t\tif value.IsTrue(bar.Close > bar.Open) {\n" +
+	expected := "\t\tif bar.Close > bar.Open {\n" +
 		"\t\t\tstrat.Entry(\"Long\", strategy.Long, 1.0, \"\")\n" +
 		"\t\t}\n"
 
@@ -45,7 +45,7 @@ func TestConditionalWrapperGenerator_MultiLineBody(t *testing.T) {
 		t.Fatalf("Expected at least 4 lines, got %d", len(lines))
 	}
 
-	if !strings.Contains(lines[0], "if value.IsTrue(smaFast > smaSlow) {") {
+	if !strings.Contains(lines[0], "if smaFast > smaSlow {") {
 		t.Errorf("Expected if-block opening, got: %s", lines[0])
 	}
 

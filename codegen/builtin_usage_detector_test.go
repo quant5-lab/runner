@@ -142,6 +142,78 @@ func TestBuiltinUsageDetector_MemberExpressionKeys(t *testing.T) {
 	}
 }
 
+/*
+TestBuiltinUsageDetector_DetectsInsideCallArguments covers the argument path of the walker: a
+builtin used only as a call argument is detected whether it sits in a positional argument or in the
+named-argument object Pine emits, while a member outside the target set stays undetected.
+*/
+func TestBuiltinUsageDetector_DetectsInsideCallArguments(t *testing.T) {
+	detector := NewBuiltinUsageDetectorWithMembers(
+		[]string{"bar_index"},
+		[]string{"session.isfirstbar", "strategy.position_size"},
+	)
+
+	strategyCall := func(args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{Callee: member("strategy", "entry"), Arguments: args}
+	}
+
+	tests := []struct {
+		name     string
+		call     *ast.CallExpression
+		want     []string
+		wantNone []string
+	}{
+		{
+			name: "positional argument",
+			call: strategyCall(identifier("bar_index")),
+			want: []string{"bar_index"},
+		},
+		{
+			name: "named argument member",
+			call: strategyCall(objectArg("when", member("session", "isfirstbar"))),
+			want: []string{"session.isfirstbar"},
+		},
+		{
+			name: "named argument comparison",
+			call: strategyCall(objectArg("when", &ast.BinaryExpression{
+				Operator: ">",
+				Left:     member("strategy", "position_size"),
+				Right:    literal(0.0),
+			})),
+			want: []string{"strategy.position_size"},
+		},
+		{
+			name:     "member outside the target set",
+			call:     strategyCall(objectArg("when", member("strategy", "long"))),
+			wantNone: []string{"strategy.long"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			program := &ast.Program{
+				Body: []ast.Node{&ast.ExpressionStatement{Expression: tt.call}},
+			}
+
+			found := detector.Detect(program)
+			for _, key := range tt.want {
+				if !found[key] {
+					t.Errorf("%s not detected; found=%v", key, found)
+				}
+			}
+			for _, key := range tt.wantNone {
+				if found[key] {
+					t.Errorf("%s should not be detected", key)
+				}
+			}
+		})
+	}
+
+	if found := detector.Detect(nil); len(found) != 0 {
+		t.Errorf("a nil program must detect nothing, got %v", found)
+	}
+}
+
 func TestBuiltinUsageDetector_IfStatementAsRvalue(t *testing.T) {
 	makeProgram := func(initExpr ast.Expression) *ast.Program {
 		return &ast.Program{

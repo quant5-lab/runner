@@ -96,8 +96,9 @@ func (e *ArgumentExtractor) ExtractCommentArgument(args []ast.Expression, argNam
 }
 
 /*
-ExtractConditionArgument extracts boolean condition parameter (when=buySignal).
-Returns generated code expression and success boolean.
+ExtractConditionArgument extracts a boolean condition parameter (when=buySignal) as a Go boolean
+expression, coercing a numeric operand and leaving an already-boolean operand bare through
+BooleanConverter.EnsureGoBool.
 */
 func (e *ArgumentExtractor) ExtractConditionArgument(args []ast.Expression, argName string) (string, bool) {
 	if len(args) == 0 {
@@ -119,9 +120,9 @@ func (e *ArgumentExtractor) ExtractConditionArgument(args []ast.Expression, argN
 			continue
 		}
 
-		// Extract condition expression
-		code := e.generator.extractSeriesExpression(prop.Value)
-		return strings.TrimRight(code, "\n"), true
+		operandCode := e.generator.extractSeriesExpression(prop.Value)
+		conditionCode := e.generator.boolConverter.EnsureGoBool(prop.Value, operandCode)
+		return strings.TrimRight(conditionCode, "\n"), true
 	}
 	return "", false
 }
@@ -135,27 +136,8 @@ func (e *ArgumentExtractor) extractCommentValue(expr ast.Expression) string {
 }
 
 /*
-ExtractWhenCondition extracts when= parameter for conditional strategy execution.
-Returns (conditionExpr, hasWhen) where conditionExpr is Go boolean expression.
+ExtractWhenCondition extracts the when= parameter of a strategy call as a Go boolean expression.
 */
 func (e *ArgumentExtractor) ExtractWhenCondition(args []ast.Expression) (string, bool) {
-	if len(args) == 0 {
-		return "", false
-	}
-
-	lastArg := args[len(args)-1]
-	objExpr, isObject := lastArg.(*ast.ObjectExpression)
-	if !isObject {
-		return "", false
-	}
-
-	for _, prop := range objExpr.Properties {
-		if keyIdent, ok := prop.Key.(*ast.Identifier); ok && keyIdent.Name == "when" {
-			conditionExpr := e.generator.extractSeriesExpression(prop.Value)
-			conditionExpr = strings.TrimRight(conditionExpr, "\n")
-			return conditionExpr, true
-		}
-	}
-
-	return "", false
+	return e.ExtractConditionArgument(args, "when")
 }

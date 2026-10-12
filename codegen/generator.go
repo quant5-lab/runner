@@ -59,6 +59,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
+	boolConverter.SetGoTypeResolver(gen.builtinHandler)
 	gen.taRegistry = NewTAFunctionRegistry()
 	gen.compositeIndicatorRegistry = NewCompositeIndicatorRegistry()
 	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
@@ -3281,15 +3282,29 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		formatter := NewBinaryExpressionFormatterWithExtractor(g.extractSeriesExpression)
 		return formatter.formatWithExtractor(e)
 	case *ast.LogicalExpression:
-		left := g.extractSeriesExpression(e.Left)
-		right := g.extractSeriesExpression(e.Right)
+		leftOperand := g.extractSeriesExpression(e.Left)
+		rightOperand := g.extractSeriesExpression(e.Right)
 		op := NormalizeLogicalOperator(e.Operator)
-		boolExpr := fmt.Sprintf("(value.IsTrue(%s) %s value.IsTrue(%s))", left, op, right)
+		boolExpr := fmt.Sprintf("(%s %s %s)",
+			g.boolConverter.EnsureGoBool(e.Left, leftOperand),
+			op,
+			g.boolConverter.EnsureGoBool(e.Right, rightOperand),
+		)
 		return fmt.Sprintf("func() float64 { if %s { return 1.0 }; return 0.0 }()", boolExpr)
 	case *ast.UnaryExpression:
 		operand := g.extractSeriesExpression(e.Argument)
+		/* The Go-bool decision treats every negation as a Go bool, so the operand is coerced here. */
+		if isLogicalNegation(e.Operator) {
+			operand = g.boolConverter.EnsureGoBool(e.Argument, operand)
+		}
 		op := NormalizeLogicalOperator(e.Operator)
 		return fmt.Sprintf("%s%s", op, operand)
+	case *ast.ConditionalExpression:
+		code, err := g.generateConditionalExpression(e)
+		if err != nil {
+			return "/* ERROR: unsupported conditional expression in series position */"
+		}
+		return code
 	case *ast.CallExpression:
 		return g.extractCallExpression(e)
 	case *ast.ObjectExpression:
@@ -4100,12 +4115,22 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 				return true
 			}
 		}
+	case *ast.ObjectExpression:
+		/* Named call arguments arrive as one object, so a runtime read used only in a named
+		   argument is otherwise never detected. */
+		for _, prop := range e.Properties {
+			if hasStrategyRuntimeInExpression(prop.Value) {
+				return true
+			}
+		}
 	case *ast.BinaryExpression:
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.LogicalExpression:
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
+	case *ast.UnaryExpression:
+		return hasStrategyRuntimeInExpression(e.Argument)
 	}
 	return false
 }

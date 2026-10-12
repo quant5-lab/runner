@@ -12,7 +12,10 @@ Pure function following SRP - single responsibility for if-block generation.
 type ConditionalWrapperGenerator struct{}
 
 /*
-WrapIfNeeded wraps body code in if-block when condition present.
+WrapIfNeeded wraps body code in an if-block when condition present.
+
+The condition must already be a Go boolean expression, which is what
+ArgumentExtractor.ExtractWhenCondition yields; this generator owns block structure only.
 Returns original body if condition empty (backward compatibility).
 */
 func (c *ConditionalWrapperGenerator) WrapIfNeeded(condition string, bodyCode string, indent string) string {
@@ -21,7 +24,7 @@ func (c *ConditionalWrapperGenerator) WrapIfNeeded(condition string, bodyCode st
 	}
 
 	lines := strings.Split(strings.TrimRight(bodyCode, "\n"), "\n")
-	wrapped := indent + fmt.Sprintf("if value.IsTrue(%s) {\n", condition)
+	wrapped := indent + fmt.Sprintf("if %s {\n", condition)
 
 	for _, line := range lines {
 		if line != "" {

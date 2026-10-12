@@ -116,6 +116,12 @@ func (d *BuiltinUsageDetector) scanExpression(expr ast.Expression, found map[str
 		for _, arg := range e.Arguments {
 			d.scanExpression(arg, found)
 		}
+	case *ast.ObjectExpression:
+		/* Named call arguments arrive as one object, so a member used only in a named argument
+		   is otherwise never detected. */
+		for _, prop := range e.Properties {
+			d.scanExpression(prop.Value, found)
+		}
 	case *ast.BinaryExpression:
 		d.scanExpression(e.Left, found)
 		d.scanExpression(e.Right, found)
