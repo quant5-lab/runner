@@ -113,6 +113,9 @@ var allStrategyGoldens = []sizeResidualCase{
 	{strategyRelPath: "strategies/top10/moon.pine", dataFile: "SBERP-M.json", goldenFile: "moon_phases_sberp_m.golden.json", symbol: "SBERP", timeframe: "1M"},
 	{strategyRelPath: "strategies/top10/ut.pine", dataFile: "SBERP-1h.json", goldenFile: "ut-sberp-1h.json", symbol: "SBERP", timeframe: "1h"},
 	{strategyRelPath: "strategies/top10/ut+.pine", dataFile: "SBERP-1h.json", goldenFile: "ut-plus-sberp-1h.json", symbol: "SBERP", timeframe: "1h"},
+	{strategyRelPath: "strategies/top10/supertrend.pine", dataFile: "AAPL-1h.json", goldenFile: "top10-supertrend-aapl-1h.json", symbol: "AAPL", timeframe: "1h"},
+	{strategyRelPath: "strategies/top10/supertrend.pine", dataFile: "BTCUSDT-1h.json", goldenFile: "top10-supertrend-btcusdt-1h.json", symbol: "BTCUSDT", timeframe: "1h"},
+	{strategyRelPath: "strategies/top10/supertrend.pine", dataFile: "SBERP-1h.json", goldenFile: "top10-supertrend-sberp-1h.json", symbol: "SBERP", timeframe: "1h"},
 	{strategyRelPath: "strategies/utbot-quantnomad.pine", dataFile: "AAPL_1D.json", goldenFile: "utbot-aapl-1d.json", symbol: "AAPL", timeframe: "1D"},
 	{strategyRelPath: "strategies/utbot-quantnomad.pine", dataFile: "BTCUSDT_1D.json", goldenFile: "utbot-btcusdt-1d.json", symbol: "BTCUSDT", timeframe: "1D"},
 }

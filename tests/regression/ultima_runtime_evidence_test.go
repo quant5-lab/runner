@@ -18,10 +18,13 @@ const ultimaFullSeriesBars = 21436
 // silent-failure modes: a codegen regression dropping an entry site, a gate-literal
 // mutation, or a broken engine producing a zero indistinguishable from the by-design
 // zero without a positive control.
+//
+// Ultima left the top-10 set on 2026-10-14, when SuperTrend took its place, and it now
+// sits in the general corpus. This evidence test follows it there.
 func TestUltima_SBERP_Hourly_RuntimeEvidence(t *testing.T) {
 	root := projectRootFromCwd()
 
-	source, err := os.ReadFile(filepath.Join(root, "strategies", "top10", "ultima.pine"))
+	source, err := os.ReadFile(filepath.Join(root, "strategies", "ultima.pine"))
 	if err != nil {
 		t.Fatalf("read ultima strategy: %v", err)
 	}

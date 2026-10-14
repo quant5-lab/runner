@@ -11,11 +11,14 @@ import (
 // source requires external ±1 wiring absent from the SBERP-1h fixture. A .pine.skip on
 // any of them is stale; the guard rejects it.
 //
+// Ultima holds the BEST Strategy Template content. It left the top-10 set on 2026-10-14,
+// when SuperTrend took its place, and it now sits in the general corpus.
+//
 // Strategies absent from both this list and tvAlignmentCases() are legitimately pending
 // and are never flagged.
 func inertByDesignStrategies() []string {
 	return []string{
-		"top10/ultima.pine",
+		"ultima.pine",
 	}
 }
 
