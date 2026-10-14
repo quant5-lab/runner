@@ -14,6 +14,16 @@ var (
 
 // Blocked wiring — CSV + golden on disk, but cases cannot be wired until data-layer prerequisites are met:
 //
+// SuperTrend SBERP (2026-10-14) — the capture belongs to the corpus strategy, not
+// to the top-10 member of the same name. Measured this pass. Against
+// strategies/supertrend.pine (Supertrend [Alorse]) the capture matches fully:
+// matched=111 of tv=111, tv-only=0, runner-only=24 within the window and 66 beyond
+// the export horizon. Wiring is blocked because runner-only=24 exceeds the cap of
+// 2. Against strategies/top10/supertrend.pine, the member that entered the set on
+// 2026-10-14, the same capture matches only 68 of 111 and leaves 43 TV trades
+// unmatched, so the capture cannot serve the member. The member needs its own
+// capture from the operator.
+//
 // Zigzag SBERP — TVOnly=5 open blocker (2026-07-29).
 // RunnerOnly=1 (within cap 2), TVOnly=5 (exceeds cap 4), matched=483.
 // The residual RunnerOnly=1 is a genuine boundary trade; the TVOnly=5 are not near-misses
