@@ -29,23 +29,14 @@ func (f *VariableInitCallFilter) FilterHoistable(
 	nestedCalls []CallInfo,
 	initExpr ast.Expression,
 ) []CallInfo {
-	// TA calls nested inside request.security() are evaluated at runtime by the bar
-	// evaluator. Hoisting them to the main context generates incorrect code for the
-	// wrong symbol and causes duplicate-declaration compile errors.
+	// The security() expression is evaluated at runtime by the bar evaluator, which interprets the
+	// AST against the foreign symbol. Hoisting a call out of that expression generates incorrect
+	// code for the wrong symbol and causes duplicate-declaration compile errors. A security()
+	// expression that is itself a user-defined call is the exception: it and the calls in its
+	// arguments are compiled to Go, so a TA call below it still needs a hoisted series.
 	initIsSecurityCall := false
 	if callExpr, ok := initExpr.(*ast.CallExpression); ok {
-		funcName := ""
-		switch c := callExpr.Callee.(type) {
-		case *ast.Identifier:
-			funcName = c.Name
-		case *ast.MemberExpression:
-			if obj, ok := c.Object.(*ast.Identifier); ok {
-				if prop, ok := c.Property.(*ast.Identifier); ok {
-					funcName = obj.Name + "." + prop.Name
-				}
-			}
-		}
-		initIsSecurityCall = IsSecurityFunction(funcName)
+		initIsSecurityCall = IsSecurityFunction(extractCallFunctionName(callExpr))
 	}
 
 	var result []CallInfo
@@ -61,9 +52,8 @@ func (f *VariableInitCallFilter) FilterHoistable(
 		if f.runtimeOnlyFilter.IsRuntimeOnly(callInfo.FuncName) {
 			continue
 		}
-		// Skip TA functions that are arguments of a security() call — they are
-		// computed inside the security bar evaluator, not the main bar loop.
-		if initIsSecurityCall && !IsSecurityFunction(callInfo.FuncName) {
+		if initIsSecurityCall && !IsSecurityFunction(callInfo.FuncName) &&
+			!f.exprAnalyzer.IsCompiledBySecurityExpression(callInfo.Call, initExpr) {
 			continue
 		}
 		if f.requiresTempVar(callInfo) {

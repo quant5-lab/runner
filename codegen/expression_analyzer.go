@@ -36,6 +36,39 @@ func (ea *ExpressionAnalyzer) IsInsideSecurityCall(targetCall *ast.CallExpressio
 	return ea.findSecurityCallContaining(targetCall, rootExpr)
 }
 
+// IsCompiledBySecurityExpression reports whether a security() initialiser compiles targetCall to Go
+// instead of handing it to the runtime evaluator. Only a security() expression that is itself a
+// user-defined call is compiled, together with the calls in its arguments; every other
+// security() expression is interpreted against the foreign symbol.
+func (ea *ExpressionAnalyzer) IsCompiledBySecurityExpression(targetCall *ast.CallExpression, initExpr ast.Expression) bool {
+	securityCall, ok := initExpr.(*ast.CallExpression)
+	if !ok || !ea.isSecurityCall(securityCall) || len(securityCall.Arguments) <= securityExpressionArgument {
+		return false
+	}
+
+	securityExpression := securityCall.Arguments[securityExpressionArgument]
+	if !ea.gen.isUserDefinedCall(securityExpression) {
+		return false
+	}
+
+	return ea.isCallArgument(securityExpression, targetCall)
+}
+
+// isCallArgument detects if targetCall is an argument of a user-defined call in rootExpr.
+func (ea *ExpressionAnalyzer) isCallArgument(rootExpr ast.Expression, targetCall *ast.CallExpression) bool {
+	for _, candidate := range ea.FindNestedCalls(rootExpr) {
+		if candidate.Call == targetCall || !ea.gen.isUserDefinedCall(candidate.Call) {
+			continue
+		}
+		if ea.anyChildMatches(candidate.Call.Arguments, func(arg ast.Expression) bool {
+			return ea.expressionContainsCall(targetCall, arg)
+		}) {
+			return true
+		}
+	}
+	return false
+}
+
 func (ea *ExpressionAnalyzer) findSecurityCallContaining(targetCall *ast.CallExpression, expr ast.Expression) bool {
 	if expr == nil {
 		return false

@@ -14,11 +14,14 @@ func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
 	return false
 }
 
+func (g *generator) isUserDefinedCall(expr ast.Expression) bool {
+	return NewUserDefinedFunctionDetector(g.variables).IsUserDefinedCall(expr)
+}
+
 func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	detector := NewUserDefinedFunctionDetector(g.variables)
-	if !detector.IsUserDefinedFunction(funcName) {
+	if !g.isUserDefinedCall(call) {
 		return "", nil
 	}
 

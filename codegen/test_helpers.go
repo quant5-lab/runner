@@ -44,6 +44,7 @@ func newTestGenerator() *generator {
 	gen.compositeIndicatorRegistry.Register("ta.mfi", &MFIHandler{})
 	gen.compositeIndicatorRegistry.Register("mfi", &MFIHandler{})
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
+	gen.inputConstExtractor = NewInputConstantExtractor()
 	gen.arrowCaptureRegistry = NewArrowCaptureRegistry()
 	gen.tempVarMgr = NewTempVariableManager(gen)
 	gen.exprAnalyzer = NewExpressionAnalyzer(gen)

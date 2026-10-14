@@ -647,3 +647,226 @@ func TestArgumentExpressionGenerator_ConstantIdentifiers(t *testing.T) {
 		})
 	}
 }
+
+/* A call used as a user-defined function argument must reach the callee as a Go expression, across
+ * every hoist state, callee kind and declared parameter kind. */
+func TestArgumentExpressionGenerator_CallArguments(t *testing.T) {
+	taCall := func() *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "sma"},
+			},
+			Arguments: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Literal{Value: 20.0},
+			},
+		}
+	}
+	crossoverCall := func() *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "crossover"},
+			},
+			Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Identifier{Name: "open"}},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		funcName     string
+		seriesParam  bool
+		inArrowBody  bool
+		userFunction bool
+		hoist        bool
+		build        func() *ast.CallExpression
+		call         *ast.CallExpression
+		want         string
+	}{
+		{
+			name:     "hoisted ta call for a scalar parameter takes the current value",
+			funcName: "f",
+			hoist:    true,
+			call:     taCall(),
+			want:     "ta_sma_20_deadbeefSeries.GetCurrent()",
+		},
+		{
+			name:        "hoisted call for a series parameter takes the series",
+			funcName:    "f",
+			seriesParam: true,
+			hoist:       true,
+			call:        taCall(),
+			want:        "ta_sma_20_deadbeefSeries",
+		},
+		{
+			name:        "hoisted boolean call for a series parameter is not coerced to a float64",
+			funcName:    "f",
+			seriesParam: true,
+			hoist:       true,
+			build:       crossoverCall,
+			want:        "ta_crossover_deadbeefSeries",
+		},
+		{
+			name:     "call that was not hoisted resolves through the expression extractor chain",
+			funcName: "f",
+			call:     taCall(),
+			want:     "ta_smaSeries.GetCurrent()",
+		},
+		{
+			name:     "input call delivers its value",
+			funcName: "f",
+			call: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "input"},
+					Property: &ast.Identifier{Name: "int"},
+				},
+				Arguments: []ast.Expression{&ast.Literal{Value: 50.0}, &ast.Literal{Value: "lvl"}},
+			},
+			want: "50",
+		},
+		{
+			name:         "user-defined call carries its own arrow context",
+			funcName:     "f",
+			userFunction: true,
+			call: &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: "g"},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+			},
+			want: "g(arrowCtx_g_1, closeSeries.Get(0))",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+			gen.inArrowFunctionBody = tt.inArrowBody
+
+			if tt.userFunction {
+				gen.variables["g"] = "function"
+			}
+			if tt.seriesParam {
+				gen.funcSigRegistry.Register(tt.funcName, []FunctionParameterType{ParamTypeSeries}, "float64")
+			}
+			if tt.hoist {
+				build := tt.build
+				if build == nil {
+					build = taCall
+				}
+				hoisted := build()
+				gen.tempVarMgr.GetOrCreate(CallInfo{Call: hoisted, FuncName: extractCallFunctionName(hoisted), ArgHash: "deadbeef"})
+				tt.call = hoisted
+			}
+
+			aeg := NewArgumentExpressionGenerator(gen, tt.funcName, 0)
+			result, err := aeg.Generate(tt.call)
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			if result != tt.want {
+				t.Errorf("Generate() = %q, want %q", result, tt.want)
+			}
+		})
+	}
+}
+
+/* An argument inside an arrow body keeps the router's TA lowering, which reads each bar through the
+ * ambient context instead of a hoisted top-level series. */
+func TestArgumentExpressionGenerator_ArrowBodyCallKeepsBarWiseLowering(t *testing.T) {
+	gen := newTestGenerator()
+	gen.inArrowFunctionBody = true
+	gen.variables["x"] = "float"
+
+	call := &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "ta"},
+			Property: &ast.Identifier{Name: "sma"},
+		},
+		Arguments: []ast.Expression{&ast.Identifier{Name: "x"}, &ast.Literal{Value: 5.0}},
+	}
+
+	aeg := NewArgumentExpressionGenerator(gen, "f", 0)
+	result, err := aeg.Generate(call)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if !strings.Contains(result, "ctx.BarIndex") {
+		t.Errorf("Generate() = %q, want bar-wise access instead of a hoisted series", result)
+	}
+	if strings.Contains(result, "Series.GetCurrent()") {
+		t.Errorf("Generate() = %q, want no top-level hoisted series reference", result)
+	}
+}
+
+/* Coercion follows the declared parameter kind: a numeric or unregistered parameter coerces a
+ * boolean-producing argument to 1.0/0.0, a string or series parameter takes the argument as it is. */
+func TestArgumentExpressionGenerator_ParameterKindDecidesCoercion(t *testing.T) {
+	crossoverCall := func() *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: "crossover"},
+			},
+			Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Identifier{Name: "open"}},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		paramType    FunctionParameterType
+		registered   bool
+		dropRegistry bool
+		wantCoerced  bool
+	}{
+		{
+			name:        "scalar parameter coerces a boolean-producing argument",
+			paramType:   ParamTypeScalar,
+			registered:  true,
+			wantCoerced: true,
+		},
+		{
+			name:        "unregistered parameter coerces a boolean-producing argument",
+			wantCoerced: true,
+		},
+		{
+			name:         "absent signature registry coerces a boolean-producing argument",
+			dropRegistry: true,
+			wantCoerced:  true,
+		},
+		{
+			name:        "string parameter passes the argument through",
+			paramType:   ParamTypeString,
+			registered:  true,
+			wantCoerced: false,
+		},
+		{
+			name:        "series parameter passes the argument through",
+			paramType:   ParamTypeSeries,
+			registered:  true,
+			wantCoerced: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGenerator()
+			if tt.dropRegistry {
+				gen.funcSigRegistry = nil
+			}
+			if tt.registered {
+				gen.funcSigRegistry.Register("f", []FunctionParameterType{tt.paramType}, "float64")
+			}
+
+			result, err := NewArgumentExpressionGenerator(gen, "f", 0).Generate(crossoverCall())
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			if got := strings.HasPrefix(result, "func() float64 {"); got != tt.wantCoerced {
+				t.Errorf("Generate() = %q, coerced = %v, want %v", result, got, tt.wantCoerced)
+			}
+		})
+	}
+}

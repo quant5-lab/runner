@@ -20,9 +20,9 @@ func (h *BarsSinceHandler) GenerateCode(g *generator, varName string, call *ast.
 		return "", fmt.Errorf("ta.barssince requires 1 argument (condition)")
 	}
 
-	conditionExpr := g.extractSeriesExpression(call.Arguments[0])
+	conditionExpr := g.boolConverter.EnsureGoBool(call.Arguments[0], g.extractSeriesExpression(call.Arguments[0]))
 
-	code := g.ind() + fmt.Sprintf("if value.IsTrue(%s) {\n", conditionExpr)
+	code := g.ind() + fmt.Sprintf("if %s {\n", conditionExpr)
 	g.indent++
 	code += g.ind() + fmt.Sprintf("%sSeries.Set(0.0)\n", varName)
 	g.indent--

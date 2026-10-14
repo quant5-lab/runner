@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/quant5-lab/runner/ast"
@@ -629,5 +631,119 @@ func TestVariableInitCallFilter_MultipleTACalls(t *testing.T) {
 		if !funcNames[fn] {
 			t.Errorf("Expected %s to be hoistable", fn)
 		}
+	}
+}
+
+/* A security() expression that is a user-defined call is compiled to Go at the call site, so a TA
+ * call in its arguments still needs a hoisted series; every other security() expression stays with
+ * the runtime evaluator and hoists nothing. */
+func TestVariableInitCallFilter_UserDefinedCallInsideSecurity(t *testing.T) {
+	gen := newTestGenerator()
+	gen.variables["f"] = "function"
+	gen.variables["g"] = "function"
+
+	filter := NewVariableInitCallFilter(
+		gen.taRegistry,
+		gen.inlineRegistry,
+		gen.runtimeOnlyFilter,
+		gen.exprAnalyzer,
+	)
+
+	taCall := func(name string, period float64) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: name},
+			},
+			Arguments: []ast.Expression{&ast.Identifier{Name: "close"}, &ast.Literal{Value: period}},
+		}
+	}
+	udfCall := func(name string, args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{Callee: &ast.Identifier{Name: name}, Arguments: args}
+	}
+	securityCall := func(args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee:    &ast.Identifier{Name: "security"},
+			Arguments: append([]ast.Expression{&ast.Literal{Value: "SBERP"}, &ast.Literal{Value: "1D"}}, args...),
+		}
+	}
+
+	tests := []struct {
+		name     string
+		initExpr ast.Expression
+		want     []string
+	}{
+		{
+			name:     "ta call in the arguments of a user-defined security expression",
+			initExpr: securityCall(udfCall("f", taCall("sma", 20))),
+			want:     []string{"ta.sma"},
+		},
+		{
+			name:     "every ta call in the arguments of a user-defined security expression",
+			initExpr: securityCall(udfCall("f", taCall("sma", 20), taCall("ema", 5))),
+			want:     []string{"ta.ema", "ta.sma"},
+		},
+		{
+			name:     "every call in a compiled argument subtree is hoisted",
+			initExpr: securityCall(udfCall("f", udfCall("g", taCall("sma", 20)))),
+			want:     []string{"g", "ta.sma"},
+		},
+		{
+			name:     "the same call without security",
+			initExpr: udfCall("f", taCall("sma", 20)),
+			want:     []string{"ta.sma"},
+		},
+		{
+			name:     "the same nested call without security",
+			initExpr: udfCall("f", udfCall("g", taCall("sma", 20))),
+			want:     []string{"g", "ta.sma"},
+		},
+		{
+			name:     "bare ta call as the security expression",
+			initExpr: securityCall(taCall("sma", 20)),
+			want:     nil,
+		},
+		{
+			name: "ta call below a builtin wrapper as the security expression",
+			initExpr: securityCall(&ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "math"},
+					Property: &ast.Identifier{Name: "abs"},
+				},
+				Arguments: []ast.Expression{udfCall("f", taCall("sma", 20))},
+			}),
+			want: nil,
+		},
+		{
+			name:     "user-defined security expression without a ta call",
+			initExpr: securityCall(udfCall("f", &ast.Identifier{Name: "close"})),
+			want:     nil,
+		},
+		{
+			name:     "security call without an expression argument",
+			initExpr: securityCall(),
+			want:     nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nestedCalls := gen.exprAnalyzer.FindNestedCalls(tt.initExpr)
+			hoistable := filter.FilterHoistable(nestedCalls, tt.initExpr)
+
+			got := make([]string, 0, len(hoistable))
+			for _, callInfo := range hoistable {
+				got = append(got, callInfo.FuncName)
+			}
+			sort.Strings(got)
+
+			want := tt.want
+			if want == nil {
+				want = []string{}
+			}
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Errorf("hoistable = %v, want %v", got, want)
+			}
+		})
 	}
 }

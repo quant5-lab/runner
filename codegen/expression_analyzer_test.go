@@ -680,3 +680,115 @@ func TestExpressionAnalyzer_ContextDetectionEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+/* IsCompiledBySecurityExpression separates security() expressions that are emitted as Go at the call
+ * site from those the runtime evaluator interprets against the foreign symbol. */
+func TestExpressionAnalyzer_SecurityExpressionCompilation(t *testing.T) {
+	analyzer := NewExpressionAnalyzer(&generator{
+		variables: map[string]string{"f": "function", "g": "function"},
+	})
+
+	taCall := func(name string) *ast.CallExpression {
+		return &ast.CallExpression{
+			Callee: &ast.MemberExpression{
+				Object:   &ast.Identifier{Name: "ta"},
+				Property: &ast.Identifier{Name: name},
+			},
+			Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+		}
+	}
+	udfCall := func(name string, args ...ast.Expression) *ast.CallExpression {
+		return &ast.CallExpression{Callee: &ast.Identifier{Name: name}, Arguments: args}
+	}
+	securityCall := func(callee string, args ...ast.Expression) *ast.CallExpression {
+		expression := ast.Expression(&ast.Identifier{Name: "close"})
+		if len(args) > 0 {
+			expression = args[len(args)-1]
+		}
+		return &ast.CallExpression{
+			Callee:    &ast.Identifier{Name: callee},
+			Arguments: append([]ast.Expression{&ast.Identifier{Name: "sym"}, &ast.Literal{Value: "1D"}}, expression),
+		}
+	}
+
+	directTarget := taCall("sma")
+	nestedTarget := taCall("sma")
+	wrappedTarget := taCall("sma")
+	udfTarget := udfCall("f", taCall("sma"))
+
+	tests := []struct {
+		name   string
+		init   ast.Expression
+		target *ast.CallExpression
+		want   bool
+	}{
+		{
+			name:   "ta call in the arguments of a user-defined security expression",
+			init:   securityCall("security", udfCall("f", directTarget)),
+			target: directTarget,
+			want:   true,
+		},
+		{
+			name:   "ta call below a second user-defined call",
+			init:   securityCall("request.security", udfCall("f", udfCall("g", nestedTarget))),
+			target: nestedTarget,
+			want:   true,
+		},
+		{
+			name: "ta call below a builtin wrapper inside a user-defined argument",
+			init: securityCall("security", udfCall("f", &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "math"},
+					Property: &ast.Identifier{Name: "abs"},
+				},
+				Arguments: []ast.Expression{wrappedTarget},
+			})),
+			target: wrappedTarget,
+			want:   true,
+		},
+		{
+			name:   "the user-defined call itself is not an argument of another one",
+			init:   securityCall("security", udfTarget),
+			target: udfTarget,
+			want:   false,
+		},
+		{
+			name:   "ta call when the security expression is not a user-defined call",
+			init:   securityCall("security", taCall("sma")),
+			target: taCall("sma"),
+			want:   false,
+		},
+		{
+			name:   "ta call in a non-expression argument",
+			init:   securityCall("security", udfCall("f", taCall("ema"))),
+			target: taCall("sma"),
+			want:   false,
+		},
+		{
+			name:   "initialiser that is not a call",
+			init:   &ast.Identifier{Name: "close"},
+			target: taCall("sma"),
+			want:   false,
+		},
+		{
+			name:   "initialiser that is not a security call",
+			init:   taCall("sma"),
+			target: taCall("sma"),
+			want:   false,
+		},
+		{
+			name:   "security call without an expression argument",
+			init:   &ast.CallExpression{Callee: &ast.Identifier{Name: "security"}, Arguments: []ast.Expression{&ast.Identifier{Name: "sym"}, &ast.Literal{Value: "1D"}}},
+			target: taCall("sma"),
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := analyzer.IsCompiledBySecurityExpression(tt.target, tt.init); got != tt.want {
+				t.Errorf("IsCompiledBySecurityExpression() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -89,7 +89,16 @@ type StrategyData struct {
 
 type CompatibilityData struct {
 	Status      string           `json:"status"`
-	Diagnostics []featuregap.Hit `json:"diagnostics,omitempty"`
+	Diagnostics []featuregap.Hit `json:"diagnostics"`
+}
+
+/* cleanCompatibility is the compatibility state of a run with nothing to report. Diagnostics is a
+ * non-nil empty slice so the field always decodes as an empty set rather than an absent key. */
+func cleanCompatibility() CompatibilityData {
+	return CompatibilityData{
+		Status:      "complete",
+		Diagnostics: []featuregap.Hit{},
+	}
 }
 
 type BacktestData struct {
@@ -157,7 +166,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 			Title:     title,
 			Timestamp: clock.Now().Format(time.RFC3339),
 		},
-		ScriptCompatibility: CompatibilityData{Status: "complete"},
+		ScriptCompatibility: cleanCompatibility(),
 		Backtest:            BacktestData{Status: "complete"},
 		Candlestick:         ctx.Data,
 		Indicators:          make(map[string]IndicatorSeries),
@@ -171,7 +180,7 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 
 func (cd *ChartData) AddCompatibility(diagnostics []featuregap.Hit) {
 	if len(diagnostics) == 0 {
-		cd.ScriptCompatibility = CompatibilityData{Status: "complete"}
+		cd.ScriptCompatibility = cleanCompatibility()
 		cd.Backtest = BacktestData{Status: "complete"}
 		return
 	}

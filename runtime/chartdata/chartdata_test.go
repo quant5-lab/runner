@@ -911,3 +911,72 @@ func TestAddStrategy_ClosedTradeIdentifierPropagation(t *testing.T) {
 		})
 	}
 }
+
+/* A machine consumer distinguishes "nothing to report" from "no such field", so every path that
+ * builds a compatibility report must serialise diagnostics as an array: empty when clean, one entry
+ * per hit otherwise. */
+func TestChartData_CompatibilityDiagnosticsIsAlwaysAnArray(t *testing.T) {
+	tests := []struct {
+		name        string
+		diagnostics []featuregap.Hit
+		report      bool
+		wantHits    int
+	}{
+		{
+			name: "constructor without a compatibility call",
+		},
+		{
+			name:   "clean run",
+			report: true,
+		},
+		{
+			name:        "run with an observable diagnostic",
+			diagnostics: []featuregap.Hit{{Name: "plot_only_gap", Impact: "observable-non-backtest"}},
+			report:      true,
+			wantHits:    1,
+		},
+		{
+			name:        "run with a backtest critical diagnostic",
+			diagnostics: []featuregap.Hit{{Name: "line.get_price", Impact: "backtest-critical"}},
+			report:      true,
+			wantHits:    1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cd := NewChartData(context.New("TEST", "1h", 10), "TEST", "1h", "")
+			if tt.report {
+				cd.AddCompatibility(tt.diagnostics)
+			}
+
+			payload, err := json.Marshal(cd)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+
+			var decoded struct {
+				ScriptCompatibility map[string]json.RawMessage `json:"scriptCompatibility"`
+			}
+			if err := json.Unmarshal(payload, &decoded); err != nil {
+				t.Fatalf("Unmarshal: %v", err)
+			}
+
+			raw, present := decoded.ScriptCompatibility["diagnostics"]
+			if !present {
+				t.Fatalf("scriptCompatibility has no diagnostics field: %s", payload)
+			}
+
+			var hits []featuregap.Hit
+			if err := json.Unmarshal(raw, &hits); err != nil {
+				t.Fatalf("diagnostics is not an array: %s", raw)
+			}
+			if len(hits) != tt.wantHits {
+				t.Errorf("diagnostics = %s, want %d entries", raw, tt.wantHits)
+			}
+			if tt.wantHits == 0 && string(raw) != "[]" {
+				t.Errorf("empty diagnostics = %s, want []", raw)
+			}
+		})
+	}
+}
