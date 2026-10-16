@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/quant5-lab/runner/codegen"
@@ -21,6 +22,56 @@ var (
 	templateFlag = flag.String("template", "template/main.go.tmpl", "Template file path")
 )
 
+const (
+	generatedSourcePattern = "pine_strategy_*.go"
+	/* Ten times the longest observed gap between generation and the following build. */
+	orphanedSourceMaxAge = 10 * time.Minute
+)
+
+/*
+	removeGeneratedSource deletes an emitted Go source. The source is a build
+
+input for the caller and not a product, so the producer removes it whenever the
+run fails to hand it over.
+*/
+func removeGeneratedSource(path string) {
+	if os.Getenv("KEEP_GENERATED_SOURCE") != "" {
+		fmt.Fprintf(os.Stderr, "Kept emitted source: %s\n", path)
+		return
+	}
+	os.Remove(path)
+}
+
+/*
+	sweepOrphanedGeneratedSources removes this generator's own emitted sources
+
+that outlived any plausible generate-to-build gap, so a consumer that forgets to
+clean up cannot grow the temp directory without bound.
+*/
+func sweepOrphanedGeneratedSources(maxAge time.Duration) {
+	if os.Getenv("PINE_GEN_KEEP_ORPHANS") != "" {
+		return
+	}
+	matches, err := filepath.Glob(filepath.Join(os.TempDir(), generatedSourcePattern))
+	if err != nil || len(matches) == 0 {
+		return
+	}
+	cutoff := time.Now().Add(-maxAge)
+	removed := 0
+	for _, match := range matches {
+		info, statErr := os.Stat(match)
+		if statErr != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		if os.Remove(match) == nil {
+			removed++
+		}
+	}
+	if removed > 0 {
+		fmt.Fprintf(os.Stderr, "Swept %d orphaned emitted source file(s) older than %s\n", removed, maxAge)
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -28,6 +79,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: %s -input STRATEGY.pine -output BINARY [-template TEMPLATE.tmpl]\n", os.Args[0])
 		os.Exit(1)
 	}
+
+	sweepOrphanedGeneratedSources(orphanedSourceMaxAge)
 
 	sourceContent, err := os.ReadFile(*inputFlag)
 	if err != nil {
@@ -125,7 +178,7 @@ func main() {
 	temporaryDirectory := os.TempDir()
 
 	/* Create unique temp file to avoid conflicts when running tests in parallel */
-	tempFile, err := os.CreateTemp(temporaryDirectory, "pine_strategy_*.go")
+	tempFile, err := os.CreateTemp(temporaryDirectory, generatedSourcePattern)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create temp file: %v\n", err)
 		os.Exit(1)
@@ -136,6 +189,7 @@ func main() {
 	err = codegen.InjectStrategy(*templateFlag, temporaryGoFile, strategyCode)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Injection error: %v\n", err)
+		removeGeneratedSource(temporaryGoFile)
 		os.Exit(1)
 	}
 
@@ -143,6 +197,7 @@ func main() {
 	fmt.Printf("Generated: %s\n", temporaryGoFile)
 	fmt.Printf("AST size: %d bytes\n", len(astJSON))
 	fmt.Printf("Next: Compile with: go build -o %s %s\n", *outputFlag, temporaryGoFile)
+	fmt.Fprintf(os.Stderr, "Caller duty: remove the emitted Go source after the build. Orphans older than %s are swept on the next run.\n", orphanedSourceMaxAge)
 }
 
 type blockedCompatibilityResult struct {
