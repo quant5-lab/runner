@@ -1,0 +1,164 @@
+// MEASURED RESULT, session 2026-10-16i, on the frozen slice of 21 shortlist symbols over 1h, 1D, 1W and 1M:
+//   census 2160 runs, 24 candidates; champion C10 coverage 0.481, median active net -0.594 percent, deflated Sharpe -0.3543.
+//   No candidate cleared the deflation guard. The long leg carried the edge; every short configuration lost on this slice.
+//   The guard therefore withholds a profitability claim. Switch `Short Trades` off to run the measured champion.
+//@version=4
+strategy(title="Aroon RSI Break C10", shorttitle="C10", overlay=true, default_qty_type=strategy.cash, default_qty_value=1000000, initial_capital=1000000, calc_on_every_tick=false, commission_type=strategy.commission.percent, commission_value=0.03, slippage=1, margin_long=40, margin_short=40)
+
+// ---- direction toggles: both directions, each switchable ----
+longTrades  = input(true,  title='Long Trades', type=input.bool)
+shortTrades = input(true, title='Short Trades', type=input.bool)
+
+// ---- the discovery oscillator: Aroon with RSI confirmation ----
+length        = input(14, minval=1, title='Aroon Length')
+rsiLength     = input(14,   minval=1, title='RSI Length')
+smoothLength  = input(14, minval=1, title='Smoothed RSI Length')
+diffThreshold = input(4.6,  title='Max RSI Difference (pts)')
+tolerance     = input(0.2, title='Aroon Break Tolerance')
+breakLevel    = input(92.86, title='Aroon Break Level')
+bandCeil      = input(95.0,  title='Screener: Aroon band ceiling')
+bandFloor     = input(50.0,  title='Screener: Aroon band floor')
+rsiFloor      = input(50, title='Screener: RSI floor on the confirmation timeframe')
+ensembleFloor = input(3, minval=1, title='Ensemble weight floor')
+// The time-closeness window is frozen at build time at 3 base bars.
+
+upper = 100 * (highestbars(high, length + 1) + length) / length
+lower = 100 * (lowestbars(low, length + 1) + length) / length
+rsi_v = rsi(close, rsiLength)
+smoothRsi = sma(rsi_v, smoothLength)
+rsiDiff = abs(rsi_v - smoothRsi)
+
+downHit = abs(lower - breakLevel) <= tolerance
+upHit   = abs(upper - breakLevel) <= tolerance
+breakUp   = downHit and rsiDiff <= diffThreshold and rsi_v > smoothRsi
+breakDown = upHit   and rsiDiff <= diffThreshold and rsi_v < smoothRsi
+
+// The trigger must have fired inside the time-closeness window on the base
+// timeframe. Bar history is written out one term per bar, because the runner
+// resolves a sum() period only from a compile-time constant.
+freshUp   = breakUp or breakUp[1] or breakUp[2]
+freshDown = breakDown or breakDown[1] or breakDown[2]
+
+// ---- layers 2 and 3: the screener trend band on the higher timeframes ----
+// The band is the screener's own condition: the trend is established on the
+// higher timeframe and the counter-extreme is weak.
+// Note: the periods inside security() are written as literals. A body that
+// references a runtime input resolves to a null series in this runner, which is
+// the silent-null class. The literals are the candidate's own parameters.
+htfUpper = security(syminfo.tickerid, "1D", 100 * (highestbars(high, 15) + 14) / 14)
+htfLower = security(syminfo.tickerid, "1D", 100 * (lowestbars(low, 15) + 14) / 14)
+htfRsi   = security(syminfo.tickerid, "1D", rsi(close, 14))
+htf3Upper = security(syminfo.tickerid, "1W", 100 * (highestbars(high, 15) + 14) / 14)
+htf3Lower = security(syminfo.tickerid, "1W", 100 * (lowestbars(low, 15) + 14) / 14)
+
+bandLong1  = htfUpper <= bandCeil and htfUpper > bandFloor and htfLower < 50 and htfRsi > rsiFloor
+bandShort1 = htfLower <= bandCeil and htfLower > bandFloor and htfUpper < 50 and htfRsi < 100 - rsiFloor
+bandLong2  = false and htf3Upper <= bandCeil and htf3Upper > bandFloor and htf3Lower < 50
+bandShort2 = false and htf3Lower <= bandCeil and htf3Lower > bandFloor and htf3Upper < 50
+
+upWeight   = (freshUp ? 1 : 0)   + (bandLong1 ? 2 : 0)  + (bandLong2 ? 1 : 0)
+downWeight = (freshDown ? 1 : 0) + (bandShort1 ? 2 : 0) + (bandShort2 ? 1 : 0)
+
+// ---- guards inducted from bb-strategy-7/8/9 ----
+useDirectionGate = input(true,  title='Direction Gate (SMA 50/200)', type=input.bool)
+useHtfGate       = input(true,  title='Direction Gate on 1D SMA 20/50', type=input.bool)
+useSessionGate   = input(false, title='Session Gate (intraday only)', type=input.bool)
+useVolGate       = input(true,  title='Volatility Gate', type=input.bool)
+minVolSlFactor   = input(0.8,  step=0.05, title='Minimum Volatility vs Stop Factor')
+
+// ---- LONG: mid and long term. Buy very low, hold until the sell ----
+longStopFactor   = input(2.5,  step=0.5,  title='Long: Stop Factor (x 1D ATR/close)')
+longTrailEnabled = input(true, title='Long: Trailing Stop', type=input.bool)
+longTrailFactor  = input(2.0,  step=0.1,  title='Long: Trailing Step Factor (wide, lets it run)')
+longRewardRisk   = input(0.0,  step=0.5,  title='Long: Reward / Risk (0 = no fixed target, exit on the opposite break)')
+
+// ---- SHORT: short term, per security, hunting the whole slice ----
+shortStopFactor  = input(0.2,  step=0.05, title='Short: Stop Factor (x 1D ATR/close)')
+shortTrailEnabled= input(true, title='Short: Trailing Stop', type=input.bool)
+shortTrailFactor = input(1.5,  step=0.1,  title='Short: Trailing Step Factor (fast)')
+shortRewardRisk  = input(3.0,  step=0.5,  title='Short: Reward / Risk (quick)')
+shortMaxBars     = input(20, minval=0, title='Short: Horizon (bars in trade, 0 = off)')
+
+entryTime        = input("0950-1345", title="Entry Time", type=input.session)
+tradingSession   = input("0950-1645", title="Trading Session", type=input.session)
+
+session_open  = na(time(timeframe.period, tradingSession)) ? false : true
+is_entry_time = na(time(timeframe.period, entryTime)) ? false : true
+inSession = not useSessionGate or (session_open and is_entry_time)
+
+sma50  = sma(close, 50)
+sma200 = sma(close, 200)
+sma20_1d = security(syminfo.tickerid, "D", sma(close, 20))
+sma50_1d = security(syminfo.tickerid, "D", sma(close, 50))
+atr_1d   = security(syminfo.tickerid, "1D", atr(14))
+
+filterLong = true
+filterShort = true
+
+dirLong  = not useDirectionGate or sma50 > sma200
+dirShort = not useDirectionGate or sma50 < sma200
+htfLong  = not useHtfGate or sma20_1d > sma50_1d
+htfShort = not useHtfGate or sma20_1d < sma50_1d
+
+volSl = longStopFactor * atr_1d / close
+volOk = not useVolGate or (atr(2) <= minVolSlFactor * abs(volSl * close - close))
+ready = not na(upper) and not na(sma200) and not na(atr_1d) and not na(sma50_1d)
+
+longOk  = longTrades  and ready and inSession and volOk and dirLong  and htfLong  and filterLong  and upWeight   >= ensembleFloor
+shortOk = shortTrades and ready and inSession and volOk and dirShort and htfShort and filterShort and downWeight >= ensembleFloor
+
+// ---- trade management. Per side: the long holds, the short has a horizon ----
+has_active_trade = not na(strategy.position_avg_price)
+entryRef = has_active_trade ? strategy.position_avg_price : close
+isLong = strategy.position_size > 0
+
+sideStopFactor  = isLong ? longStopFactor  : shortStopFactor
+sideTrailFactor = isLong ? longTrailFactor : shortTrailFactor
+sideRewardRisk  = isLong ? longRewardRisk  : shortRewardRisk
+longSide        = has_active_trade and isLong
+shortSide       = has_active_trade and not isLong
+
+// the stop distance is derived, then frozen at the first bar of a live trade
+sl_inp = 0.0
+sl_inp := has_active_trade and nz(sl_inp[1]) > 0 ? nz(sl_inp[1]) : nz(sideStopFactor * atr_1d / close)
+
+fixedStop = isLong ? entryRef * (1 - sl_inp) : entryRef * (1 + sl_inp)
+trailStep = entryRef * sl_inp * sideTrailFactor
+trailLevel = fixedStop
+trailLevel := has_active_trade ? (isLong ? (low > trailLevel[1] + 2 * trailStep ? trailLevel[1] + trailStep : trailLevel[1]) : (high < trailLevel[1] - 2 * trailStep ? trailLevel[1] - trailStep : trailLevel[1])) : fixedStop
+stopLevel = fixedStop
+stopLevel := longSide and longTrailEnabled and nz(trailLevel) > 0 ? trailLevel : stopLevel
+stopLevel := shortSide and shortTrailEnabled and nz(trailLevel) > 0 ? trailLevel : stopLevel
+
+tp_inp = sideRewardRisk * sl_inp
+takeLevel = isLong ? entryRef * (1 + tp_inp) : entryRef * (1 - tp_inp)
+longLimit = longRewardRisk > 0 ? takeLevel : na
+shortLimit = shortRewardRisk > 0 ? takeLevel : na
+
+barsInTrade = 0
+barsInTrade := has_active_trade ? nz(barsInTrade[1]) + 1 : 0
+
+exitOnBreak   = has_active_trade and (isLong ? upHit : downHit)
+exitOnHorizon = has_active_trade and not isLong and shortMaxBars > 0 and barsInTrade >= shortMaxBars
+exitOnTrail   = has_active_trade and (isLong ? low < stopLevel : high > stopLevel)
+
+if not has_active_trade and longOk
+    strategy.entry("L", strategy.long)
+if not has_active_trade and shortOk
+    strategy.entry("S", strategy.short)
+if has_active_trade and isLong
+    strategy.exit("L exit", "L", stop=stopLevel, limit=longLimit)
+if has_active_trade and not isLong
+    strategy.exit("S exit", "S", stop=stopLevel, limit=shortLimit)
+if exitOnBreak or exitOnHorizon or exitOnTrail
+    strategy.close_all()
+
+// ---- drawing: the bracket guards and the signals below ----
+plot(has_active_trade ? stopLevel : na, title='SL', style=plot.style_linebr, color=color.red, linewidth=2, pane='main')
+plot(has_active_trade ? takeLevel : na, title='TP', style=plot.style_linebr, color=color.green, linewidth=2, pane='main')
+plot(upper, title='Aroon Up', style=plot.style_line, color=color.orange, pane='aroon')
+plot(lower, title='Aroon Down', style=plot.style_line, color=color.blue, pane='aroon')
+plot(longOk ? low * 0.995 : na, title='Buy Signal', style=plot.style_circles, color=color.green, linewidth=2, pane='main')
+plot(shortOk ? high * 1.005 : na, title='Sell Signal', style=plot.style_circles, color=color.red, linewidth=2, pane='main')
+plot(upWeight, title='Ensemble Weight Up', style=plot.style_histogram, color=color.new(color.green, 60), pane='ensemble')
+plot(downWeight, title='Ensemble Weight Down', style=plot.style_histogram, color=color.new(color.red, 60), pane='ensemble')
