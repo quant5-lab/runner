@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "MTF Confirmation",
   "dataSource": "NVDA-1h.json",
-  "generatedAt": "2026-01-21T07:51:53Z",
+  "generatedAt": "2026-06-11T18:39:53Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1763667000,
         "exitPrice": 182.7100067138672,
         "exitComment": "Position reversal",
-        "size": 5.791109000554758,
-        "profit": 58.01597962932166,
+        "size": 5,
+        "profit": 50.09056091308594,
         "direction": "long"
       },
       {
@@ -29,8 +29,8 @@
         "exitTime": 1767367800,
         "exitPrice": 190.57000732421875,
         "exitComment": "Position reversal",
-        "size": 5.510279092926571,
-        "profit": -43.3107970336103,
+        "size": 5,
+        "profit": -39.30000305175781,
         "direction": "short"
       },
       {
@@ -43,8 +43,8 @@
         "exitTime": 1767886200,
         "exitPrice": 186.0800018310547,
         "exitComment": "Position reversal",
-        "size": 5.25625605078626,
-        "profit": -23.60061854150715,
+        "size": 5,
+        "profit": -22.450027465820312,
         "direction": "long"
       },
       {
@@ -57,8 +57,8 @@
         "exitTime": 1768498200,
         "exitPrice": 188.6199951171875,
         "exitComment": "Position reversal",
-        "size": 5.37692235030452,
-        "profit": -13.657346669830943,
+        "size": 5,
+        "profit": -12.699966430664062,
         "direction": "short"
       }
     ],
@@ -73,13 +73,13 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 5.293054779136945,
+        "size": 5,
         "profit": 0,
         "direction": "long"
       }
     ],
-    "equity": 9964.79681969286,
-    "netProfit": -22.55278261562673,
+    "equity": 9963.690567016602,
+    "netProfit": -24.35943603515625,
     "totalTrades": 0,
     "plots": {}
   }

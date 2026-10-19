@@ -7,6 +7,7 @@ import (
 
 	"github.com/quant5-lab/runner/runtime/clock"
 	"github.com/quant5-lab/runner/runtime/context"
+	"github.com/quant5-lab/runner/runtime/featuregap"
 	"github.com/quant5-lab/runner/runtime/output"
 	"github.com/quant5-lab/runner/runtime/strategy"
 )
@@ -51,6 +52,7 @@ type UIConfig struct {
 /* Trade represents a closed trade in chart data */
 type Trade struct {
 	EntryID      string  `json:"entryId"`
+	ExitID       string  `json:"exitId,omitempty"`
 	EntryPrice   float64 `json:"entryPrice"`
 	EntryBar     int     `json:"entryBar"`
 	EntryTime    int64   `json:"entryTime"`
@@ -78,10 +80,30 @@ type OpenTrade struct {
 
 /* StrategyData represents strategy execution results */
 type StrategyData struct {
-	Trades     []Trade     `json:"trades"`
-	OpenTrades []OpenTrade `json:"openTrades"`
-	Equity     float64     `json:"equity"`
-	NetProfit  float64     `json:"netProfit"`
+	Trades         []Trade     `json:"trades"`
+	OpenTrades     []OpenTrade `json:"openTrades"`
+	Equity         float64     `json:"equity"`
+	NetProfit      float64     `json:"netProfit"`
+	InitialCapital float64     `json:"initialCapital"`
+}
+
+type CompatibilityData struct {
+	Status      string           `json:"status"`
+	Diagnostics []featuregap.Hit `json:"diagnostics"`
+}
+
+/* cleanCompatibility is the compatibility state of a run with nothing to report. Diagnostics is a
+ * non-nil empty slice so the field always decodes as an empty set rather than an absent key. */
+func cleanCompatibility() CompatibilityData {
+	return CompatibilityData{
+		Status:      "complete",
+		Diagnostics: []featuregap.Hit{},
+	}
+}
+
+type BacktestData struct {
+	Status        string   `json:"status"`
+	AffectedSinks []string `json:"affectedSinks,omitempty"`
 }
 
 /* PlotPoint represents a single plot data point */
@@ -93,10 +115,9 @@ type PlotPoint struct {
 
 /* MarshalJSON implements custom JSON marshaling to convert NaN to null */
 func (p PlotPoint) MarshalJSON() ([]byte, error) {
-	type Alias PlotPoint
 	var value interface{}
 	if math.IsNaN(p.Value) || math.IsInf(p.Value, 0) {
-		value = nil // Encode as JSON null
+		value = nil
 	} else {
 		value = p.Value
 	}
@@ -121,11 +142,13 @@ type PlotSeries struct {
 
 /* ChartData represents complete unified chart output */
 type ChartData struct {
-	Metadata    Metadata                   `json:"metadata"`
-	Candlestick []context.OHLCV            `json:"candlestick"`
-	Indicators  map[string]IndicatorSeries `json:"indicators"`
-	Strategy    *StrategyData              `json:"strategy,omitempty"`
-	UI          UIConfig                   `json:"ui"`
+	Metadata            Metadata                   `json:"metadata"`
+	ScriptCompatibility CompatibilityData          `json:"scriptCompatibility"`
+	Backtest            BacktestData               `json:"backtest"`
+	Candlestick         []context.OHLCV            `json:"candlestick"`
+	Indicators          map[string]IndicatorSeries `json:"indicators"`
+	Strategy            *StrategyData              `json:"strategy,omitempty"`
+	UI                  UIConfig                   `json:"ui"`
 }
 
 /* NewChartData creates a new chart data structure */
@@ -143,15 +166,41 @@ func NewChartData(ctx *context.Context, symbol, timeframe, strategyName string) 
 			Title:     title,
 			Timestamp: clock.Now().Format(time.RFC3339),
 		},
-		Candlestick: ctx.Data,
-		Indicators:  make(map[string]IndicatorSeries),
+		ScriptCompatibility: cleanCompatibility(),
+		Backtest:            BacktestData{Status: "complete"},
+		Candlestick:         ctx.Data,
+		Indicators:          make(map[string]IndicatorSeries),
 		UI: UIConfig{
 			Panes: map[string]PaneConfig{
-				"main":      {Height: 400, Fixed: true},
-				"indicator": {Height: 200, Fixed: false},
+				"main": {Height: 400, Fixed: true},
 			},
 		},
 	}
+}
+
+func (cd *ChartData) AddCompatibility(diagnostics []featuregap.Hit) {
+	if len(diagnostics) == 0 {
+		cd.ScriptCompatibility = cleanCompatibility()
+		cd.Backtest = BacktestData{Status: "complete"}
+		return
+	}
+
+	cd.ScriptCompatibility = CompatibilityData{
+		Status:      "degraded",
+		Diagnostics: diagnostics,
+	}
+	if featuregap.HasBacktestCritical(diagnostics) {
+		cd.Backtest = BacktestData{
+			Status:        "unsupported_dependency",
+			AffectedSinks: featuregap.BacktestSinks(diagnostics),
+		}
+		return
+	}
+	cd.Backtest = BacktestData{Status: "complete"}
+}
+
+func (cd *ChartData) BacktestComplete() bool {
+	return cd.Backtest.Status == "complete"
 }
 
 /* AddPlots adds plot data to chart as indicators */
@@ -247,6 +296,7 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	for i, t := range closedTrades {
 		trades[i] = Trade{
 			EntryID:      t.EntryID,
+			ExitID:       t.ExitID,
 			EntryPrice:   t.EntryPrice,
 			EntryBar:     t.EntryBar,
 			EntryTime:    t.EntryTime,
@@ -276,15 +326,14 @@ func (cd *ChartData) AddStrategy(strat *strategy.Strategy, currentPrice float64)
 	}
 
 	cd.Strategy = &StrategyData{
-		Trades:     trades,
-		OpenTrades: openTradesData,
-		Equity:     strat.GetEquity(currentPrice),
-		NetProfit:  strat.GetNetProfit(),
+		Trades:         trades,
+		OpenTrades:     openTradesData,
+		Equity:         strat.GetEquity(currentPrice),
+		NetProfit:      strat.GetNetProfit(),
+		InitialCapital: strat.GetInitialCapital(),
 	}
 }
 
-/* ToJSON converts chart data to JSON bytes, with NaN as null */
 func (cd *ChartData) ToJSON() ([]byte, error) {
-	// PlotPoint.MarshalJSON automatically converts NaN to null
 	return json.MarshalIndent(cd, "", "  ")
 }

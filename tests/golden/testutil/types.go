@@ -32,22 +32,44 @@ type Trade struct {
 }
 
 type StrategyResult struct {
-	Trades      []Trade              `json:"trades"`
-	OpenTrades  []Trade              `json:"openTrades"`
-	Equity      float64              `json:"equity"`
-	NetProfit   float64              `json:"netProfit"`
-	TotalTrades int                  `json:"totalTrades"`
-	Plots       map[string][]float64 `json:"plots"`
+	Trades         []Trade              `json:"trades"`
+	OpenTrades     []Trade              `json:"openTrades"`
+	Equity         float64              `json:"equity"`
+	NetProfit      float64              `json:"netProfit"`
+	TotalTrades    int                  `json:"totalTrades"`
+	InitialCapital float64              `json:"initialCapital"`
+	Plots          map[string][]float64 `json:"plots"`
+	// MarkClose must equal the mark the strategy binary used for equity so the
+	// open-position assertion is exact rather than tautological.
+	MarkClose float64 `json:"-"`
+	// FromRunner forces the open-position equity assertion even when MarkClose is zero,
+	// preventing a zero mark from silently bypassing verification on real runner results.
+	FromRunner bool                 `json:"-"`
+	Indicators map[string][]float64 `json:"-"`
 }
 
 type ChartOutput struct {
-	Strategy *StrategyResult `json:"strategy"`
-	Plots    []PlotSeries    `json:"plots"`
+	Strategy    *StrategyResult            `json:"strategy"`
+	Plots       []PlotSeries               `json:"plots"`
+	Indicators  map[string]IndicatorSeries `json:"indicators"`
+	Candlestick []Bar                      `json:"candlestick"`
 }
 
 type PlotSeries struct {
 	Title  string    `json:"title"`
 	Values []float64 `json:"values"`
+}
+
+// Runner binary outputs these under the "indicators" JSON key, separate from "plots".
+type IndicatorSeries struct {
+	Title string         `json:"title"`
+	Data  []IndicatorBar `json:"data"`
+}
+
+// Value is a pointer so that JSON null (Pine na) unmarshals as nil rather than 0.
+type IndicatorBar struct {
+	Time  int64    `json:"time"`
+	Value *float64 `json:"value"`
 }
 
 type GoldenFile struct {

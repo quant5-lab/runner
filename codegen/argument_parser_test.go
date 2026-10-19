@@ -117,6 +117,52 @@ func TestArgumentParser_ParseInt(t *testing.T) {
 			},
 			expectValid: false,
 		},
+		{
+			name: "negative int via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: 5},
+			},
+			expectValid: true,
+			expectValue: -5,
+		},
+		{
+			name: "negative float64 truncated via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: float64(3.7)},
+			},
+			expectValid: true,
+			expectValue: -3,
+		},
+		{
+			name: "double negation via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.UnaryExpression{
+					Operator: "-",
+					Argument: &ast.Literal{Value: 8},
+				},
+			},
+			expectValid: true,
+			expectValue: 8,
+		},
+		{
+			name: "unary minus on identifier stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Identifier{Name: "x"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "unary operator other than minus stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "+",
+				Argument: &ast.Literal{Value: 5},
+			},
+			expectValid: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -163,6 +209,77 @@ func TestArgumentParser_ParseFloat(t *testing.T) {
 			name: "bool literal",
 			input: &ast.Literal{
 				Value: true,
+			},
+			expectValid: false,
+		},
+		{
+			name: "negative float64 via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: float64(0.236)},
+			},
+			expectValid: true,
+			expectValue: -0.236,
+		},
+		{
+			name: "negative int promoted to float64 via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: 5},
+			},
+			expectValid: true,
+			expectValue: -5.0,
+		},
+		{
+			name: "double negation via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.UnaryExpression{
+					Operator: "-",
+					Argument: &ast.Literal{Value: float64(1.5)},
+				},
+			},
+			expectValid: true,
+			expectValue: 1.5,
+		},
+		{
+			name: "negative zero via unary minus",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: float64(0)},
+			},
+			expectValid: true,
+			expectValue: 0.0,
+		},
+		{
+			name: "unary minus on identifier stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Identifier{Name: "src"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "unary minus on bool literal stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: true},
+			},
+			expectValid: false,
+		},
+		{
+			name: "unary minus on string literal stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.Literal{Value: "abc"},
+			},
+			expectValid: false,
+		},
+		{
+			name: "unary operator other than minus stays invalid",
+			input: &ast.UnaryExpression{
+				Operator: "+",
+				Argument: &ast.Literal{Value: float64(1.0)},
 			},
 			expectValid: false,
 		},

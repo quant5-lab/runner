@@ -73,17 +73,17 @@ func (a *Asserter) assertTrade(index int, expected, actual *Trade) {
 			index, expected.ExitBar, actual.ExitBar)
 	}
 
-	if !a.floatClose(expected.EntryPrice, actual.EntryPrice, 0.01) {
+	if !matchPrice(expected.EntryPrice, actual.EntryPrice) {
 		a.t.Errorf("Trade[%d]: entryPrice mismatch: expected %.2f, got %.2f",
 			index, expected.EntryPrice, actual.EntryPrice)
 	}
 
-	if !a.floatClose(expected.ExitPrice, actual.ExitPrice, 0.01) {
+	if !matchPrice(expected.ExitPrice, actual.ExitPrice) {
 		a.t.Errorf("Trade[%d]: exitPrice mismatch: expected %.2f, got %.2f",
 			index, expected.ExitPrice, actual.ExitPrice)
 	}
 
-	if !a.floatClose(expected.Profit, actual.Profit, 0.01) {
+	if !matchFinancial(expected.Profit, actual.Profit) {
 		a.t.Errorf("Trade[%d]: profit mismatch: expected %.2f, got %.2f",
 			index, expected.Profit, actual.Profit)
 	}
@@ -183,7 +183,7 @@ func AssertTradesMatch(t *testing.T, expected, actual []Trade) {
 			t.Errorf("Trade[%d].exitBar: expected %d, got %d", i, exp.ExitBar, act.ExitBar)
 		}
 
-		if !floatWithin(exp.Profit, act.Profit, 0.01) {
+		if !matchFinancial(exp.Profit, act.Profit) {
 			t.Errorf("Trade[%d].profit: expected %.2f, got %.2f", i, exp.Profit, act.Profit)
 		}
 	}
@@ -201,12 +201,8 @@ func AssertPlotSmokePoints(t *testing.T, plotName string, expectedValues, actual
 		exp := expectedValues[idx]
 		act := actualValues[idx]
 
-		if math.IsNaN(exp) && math.IsNaN(act) {
-			continue
-		}
-
-		if !floatWithin(exp, act, 0.01) {
-			t.Errorf("Plot %q[%d]: expected %.4f, got %.4f", plotName, idx, exp, act)
+		if !matchPlot(exp, act) {
+			t.Errorf("Plot %q[%d]: expected %.8f, got %.8f", plotName, idx, exp, act)
 		}
 	}
 }
@@ -240,4 +236,73 @@ func DescribeResult(result *StrategyResult) string {
 		len(result.OpenTrades),
 		result.NetProfit,
 		result.Equity)
+}
+
+// closedEquityMismatch must only be called with no open positions; it does not
+// account for unrealized P&L.
+func closedEquityMismatch(equity, initialCapital, netProfit float64) string {
+	expected := initialCapital + netProfit
+	if matchFinancial(equity, expected) {
+		return ""
+	}
+	return fmt.Sprintf("equity=%.2f diverges from expected=%.2f (initial=%.2f + netProfit=%.2f)",
+		equity, expected, initialCapital, netProfit)
+}
+
+func tradeUnrealizedPnL(trade Trade, markClose float64) float64 {
+	dirSign := 1.0
+	if trade.Direction == "short" {
+		dirSign = -1.0
+	}
+	return (markClose - trade.EntryPrice) * trade.Size * dirSign
+}
+
+// openEquityMismatch requires markClose to equal the last-bar close the strategy
+// binary used for equity; using any other mark produces a tautological assertion.
+func openEquityMismatch(equity, initialCapital, netProfit float64, openTrades []Trade, markClose float64) string {
+	totalUnrealized := 0.0
+	for _, trade := range openTrades {
+		totalUnrealized += tradeUnrealizedPnL(trade, markClose)
+	}
+	expected := initialCapital + netProfit + totalUnrealized
+	if matchFinancial(equity, expected) {
+		return ""
+	}
+	return fmt.Sprintf(
+		"equity=%.2f diverges from expected=%.2f "+
+			"(initial=%.2f + closedPL=%.2f + unrealized=%.2f across %d open positions at mark=%.4f)",
+		equity, expected, initialCapital, netProfit, totalUnrealized, len(openTrades), markClose,
+	)
+}
+
+func openEquityCheckRequired(fromRunner bool, markClose float64) bool {
+	return fromRunner || markClose != 0
+}
+
+// ValidateEquityConsistency uses MarkClose sourced from the runner output (identical
+// to the mark the strategy binary itself used), so the open-position assertion is
+// exact, not tautological.  Runner-produced results (FromRunner=true) always assert;
+// the degraded-log path exists only for synthetic results that carry no mark price.
+func ValidateEquityConsistency(t *testing.T, result *StrategyResult) {
+	t.Helper()
+
+	if len(result.OpenTrades) == 0 {
+		if msg := closedEquityMismatch(result.Equity, result.InitialCapital, result.NetProfit); msg != "" {
+			t.Errorf("equity mismatch with no open positions: %s", msg)
+		}
+		return
+	}
+
+	if !openEquityCheckRequired(result.FromRunner, result.MarkClose) {
+		t.Logf("open equity unverified (synthetic result, no mark price): equity=%.2f initial=%.2f closedPL=%.2f (%d open positions)",
+			result.Equity, result.InitialCapital, result.NetProfit, len(result.OpenTrades))
+		return
+	}
+
+	if msg := openEquityMismatch(
+		result.Equity, result.InitialCapital, result.NetProfit,
+		result.OpenTrades, result.MarkClose,
+	); msg != "" {
+		t.Errorf("equity mismatch with open positions: %s", msg)
+	}
 }

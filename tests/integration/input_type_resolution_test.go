@@ -240,7 +240,7 @@ study("V4 Float")
 mult = input(1.5, title="Mult", type=input.float)
 plot(close)
 `,
-			expectedConst: "const mult = 1.50",
+			expectedConst: "const mult = 1.5",
 		},
 		{
 			name: "v4_int",
@@ -303,7 +303,7 @@ study("V4 Price")
 targetPrice = input(99.5, title="Target", type=input.price)
 plot(close)
 `,
-			expectedConst: "const targetPrice = 99.50",
+			expectedConst: "const targetPrice = 99.5",
 		},
 		{
 			name: "v4_time",
@@ -315,6 +315,33 @@ plot(close)
 			expectedConst: "const startTime = 0",
 		},
 		/* v5 direct call → const */
+		{
+			name: "v5_float",
+			pineScript: `//@version=5
+indicator("V5 Float")
+mult = input.float(defval=1.5, title="Mult")
+plot(close)
+`,
+			expectedConst: "const mult = 1.5",
+		},
+		{
+			name: "v5_int",
+			pineScript: `//@version=5
+indicator("V5 Int")
+period = input.int(defval=14, title="Length")
+plot(close)
+`,
+			expectedConst: "const period = 14",
+		},
+		{
+			name: "v5_bool",
+			pineScript: `//@version=5
+indicator("V5 Bool")
+show = input.bool(defval=true, title="Show")
+plot(close)
+`,
+			expectedConst: "const show = true",
+		},
 		{
 			name: "v5_session",
 			pineScript: `//@version=5

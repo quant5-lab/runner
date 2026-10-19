@@ -80,6 +80,7 @@ func TestAnalyzeAndGeneratePrefetch_WithSecurityCall(t *testing.T) {
 
 	requiredStrings := []string{
 		"fetcher.Fetch",
+		"market.NormalizeBars",
 		"context.New",
 		"securityContexts",
 		"BTCUSDT",
@@ -112,6 +113,74 @@ func TestAnalyzeAndGeneratePrefetch_WithSecurityCall(t *testing.T) {
 		if !found {
 			t.Errorf("Missing import: %q", expected)
 		}
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_NormalizesSecurityBarsBeforeLimitAndContext(t *testing.T) {
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Kind:     "var",
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "dailyClose"},
+						Init: &ast.CallExpression{
+							NodeType: ast.TypeCallExpression,
+							Callee: &ast.MemberExpression{
+								NodeType: ast.TypeMemberExpression,
+								Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+								Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+							},
+							Arguments: []ast.Expression{
+								&ast.MemberExpression{
+									NodeType: ast.TypeMemberExpression,
+									Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "syminfo"},
+									Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "tickerid"},
+								},
+								&ast.Literal{NodeType: ast.TypeLiteral, Value: "1D"},
+								&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+
+	code := injection.PrefetchCode
+	requiredOrder := []string{
+		`fetcher.FetchWithMetadata(ctx.Symbol, "1D", 0)`,
+		`sec_runtime_1d_metadata := market.CompleteSecondaryMetadata(ctx.Symbol, sec_runtime_1d_marketData.SourceMetadata, market.SecondaryContextDefaults{Timezone: ctx.Timezone, ReferenceSession: ctx.ReferenceSession})`,
+		`market.NormalizeBarsWithMetadataE(ctx.Symbol, "1D", sec_runtime_1d_metadata`,
+		`if sec_runtime_1d_normErr != nil`,
+		`sec_runtime_1d_tz = sec_runtime_1d_profile.Timezone`,
+		`sec_runtime_1d_refsession = string(sec_runtime_1d_profile.ReferenceSession)`,
+		`sec_runtime_1d_anchor = market.DeriveSessionAnchor(sec_runtime_1d_profile, sec_runtime_1d_normalized)`,
+		`sec_runtime_1d_data = sec_runtime_1d_data[len(sec_runtime_1d_data)-sec_runtime_1d_limit:]`,
+		`sec_runtime_1d_ctx := context.New(ctx.Symbol, "1D", len(sec_runtime_1d_data))`,
+		`sec_runtime_1d_ctx.Timezone = sec_runtime_1d_tz`,
+		`sec_runtime_1d_ctx.ReferenceSession = sec_runtime_1d_refsession`,
+		`sec_runtime_1d_ctx.PeriodAnchor = sec_runtime_1d_anchor`,
+	}
+
+	last := -1
+	for _, token := range requiredOrder {
+		idx := strings.Index(code, token)
+		if idx < 0 {
+			t.Fatalf("missing generated fragment %q in:\n%s", token, code)
+		}
+		if idx <= last {
+			t.Fatalf("generated fragment %q is out of order in:\n%s", token, code)
+		}
+		last = idx
 	}
 }
 
@@ -256,8 +325,8 @@ func TestAnalyzeAndGeneratePrefetch_RuntimeSymbolResolution(t *testing.T) {
 		t.Error("Expected ctx.Symbol runtime reference for syminfo.tickerid")
 	}
 
-	if !contains(injection.PrefetchCode, "fetcher.Fetch(ctx.Symbol") {
-		t.Error("Expected fetcher.Fetch to use ctx.Symbol for runtime symbol")
+	if !contains(injection.PrefetchCode, "fetcher.FetchWithMetadata(ctx.Symbol") {
+		t.Error("Expected fetcher.FetchWithMetadata to use ctx.Symbol for runtime symbol")
 	}
 }
 
@@ -361,8 +430,8 @@ func TestAnalyzeAndGeneratePrefetch_CombinedRuntimeResolution(t *testing.T) {
 		t.Error("Expected ctx.Timeframe runtime reference")
 	}
 
-	if !contains(injection.PrefetchCode, "fetcher.Fetch(ctx.Symbol, ctx.Timeframe") {
-		t.Error("Expected fetcher.Fetch to use both ctx.Symbol and ctx.Timeframe")
+	if !contains(injection.PrefetchCode, "fetcher.FetchWithMetadata(ctx.Symbol, ctx.Timeframe") {
+		t.Error("Expected fetcher.FetchWithMetadata to use both ctx.Symbol and ctx.Timeframe")
 	}
 
 	if !contains(injection.PrefetchCode, "context.New(ctx.Symbol, ctx.Timeframe") {
@@ -603,6 +672,100 @@ func TestAnalyzeAndGeneratePrefetch_InputDefvalTimeframeResolution(t *testing.T)
 	}
 }
 
+func TestAnalyzeAndGeneratePrefetch_FetchErrorHandlerShape(t *testing.T) {
+	literalSecurityCall := func(symbol, tf string) ast.Expression {
+		return &ast.CallExpression{
+			NodeType: ast.TypeCallExpression,
+			Callee: &ast.MemberExpression{
+				NodeType: ast.TypeMemberExpression,
+				Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+				Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+			},
+			Arguments: []ast.Expression{
+				&ast.Literal{NodeType: ast.TypeLiteral, Value: symbol},
+				&ast.Literal{NodeType: ast.TypeLiteral, Value: tf},
+				&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			},
+		}
+	}
+
+	runtimeSymbolSecurityCall := func(tf string) ast.Expression {
+		return &ast.CallExpression{
+			NodeType: ast.TypeCallExpression,
+			Callee: &ast.MemberExpression{
+				NodeType: ast.TypeMemberExpression,
+				Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+				Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+			},
+			Arguments: []ast.Expression{
+				&ast.MemberExpression{
+					NodeType: ast.TypeMemberExpression,
+					Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "syminfo"},
+					Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "tickerid"},
+				},
+				&ast.Literal{NodeType: ast.TypeLiteral, Value: tf},
+				&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			},
+		}
+	}
+
+	cases := []struct {
+		name string
+		expr ast.Expression
+	}{
+		{"literal symbol and timeframe", literalSecurityCall("BTCUSDT", "1D")},
+		{"runtime syminfo.tickerid with literal timeframe", runtimeSymbolSecurityCall("1D")},
+		{"literal symbol with daily timeframe variant", literalSecurityCall("SBERP", "D")},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			program := &ast.Program{
+				NodeType: ast.TypeProgram,
+				Body: []ast.Node{
+					&ast.VariableDeclaration{
+						NodeType: ast.TypeVariableDeclaration,
+						Kind:     "var",
+						Declarations: []ast.VariableDeclarator{
+							{
+								NodeType: ast.TypeVariableDeclarator,
+								ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "v"},
+								Init:     tc.expr,
+							},
+						},
+					},
+				},
+			}
+
+			injection, err := AnalyzeAndGeneratePrefetch(program)
+			if err != nil {
+				t.Fatalf("AnalyzeAndGeneratePrefetch: %v", err)
+			}
+
+			code := injection.PrefetchCode
+
+			if !contains(code, "os.Stderr") {
+				t.Error("fetch error must write to os.Stderr")
+			}
+			if !contains(code, `Failed to fetch `) {
+				t.Error("fetch error message must carry the 'Failed to fetch ' prefix")
+			}
+			if countOccurrences(code, `%s`) < 2 {
+				t.Errorf("fetch error format must have at least two %%s verbs (symbol, timeframe); got:\n%s", code)
+			}
+			if contains(code, `%%v`) {
+				t.Error("fetch error format must not escape the error verb with double-percent")
+			}
+			if !contains(code, `%v`) {
+				t.Errorf("fetch error format must contain the error-value verb; got:\n%s", code)
+			}
+			if !contains(code, "os.Exit(1)") {
+				t.Error("fetch failure must call os.Exit(1), not os.Exit(2)")
+			}
+		})
+	}
+}
+
 func countOccurrences(haystack, needle string) int {
 	count := 0
 	offset := 0
@@ -615,4 +778,369 @@ func countOccurrences(haystack, needle string) int {
 		offset += idx + len(needle)
 	}
 	return count
+}
+
+func TestAnalyzeAndGeneratePrefetch_ChartOnlySecurityCallsProduceNoPrefetch(t *testing.T) {
+	symExpr := &ast.Literal{NodeType: ast.TypeLiteral, Value: "EURUSD"}
+	secCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+			Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+		},
+		Arguments: []ast.Expression{
+			symExpr,
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: "1h"},
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+		},
+	}
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			// x = request.security("EURUSD", "1h", close)
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "x"},
+						Init:     secCall,
+					},
+				},
+			},
+			// label.new(bar_index, x)  — chart-only sink
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee: &ast.MemberExpression{
+						NodeType: ast.TypeMemberExpression,
+						Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label"},
+						Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "new"},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "bar_index"},
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "x"},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+	if injection.PrefetchCode != "" {
+		t.Errorf("expected empty PrefetchCode for chart-only security() call, got:\n%s", injection.PrefetchCode)
+	}
+	if len(injection.ImportPaths) != 0 {
+		t.Errorf("expected 0 imports for chart-only call, got %d", len(injection.ImportPaths))
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_MixedChartOnlyAndStrategyPreservesStrategyFetch(t *testing.T) {
+	symEURUSD := &ast.Literal{NodeType: ast.TypeLiteral, Value: "EURUSD"}
+	chartCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+			Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+		},
+		Arguments: []ast.Expression{
+			symEURUSD,
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: "1h"},
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+		},
+	}
+	symBTC := &ast.Literal{NodeType: ast.TypeLiteral, Value: "BTCUSDT"}
+	goldenCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+			Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+		},
+		Arguments: []ast.Expression{
+			symBTC,
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: "1D"},
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+		},
+	}
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			// label_val = request.security("EURUSD", "1h", close)
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label_val"},
+						Init:     chartCall,
+					},
+				},
+			},
+			// price = request.security("BTCUSDT", "1D", close)
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "price"},
+						Init:     goldenCall,
+					},
+				},
+			},
+			// label.new(bar_index, label_val) — chart-only sink
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee: &ast.MemberExpression{
+						NodeType: ast.TypeMemberExpression,
+						Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label"},
+						Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "new"},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "bar_index"},
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label_val"},
+					},
+				},
+			},
+			// plot(price) — golden sink
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "plot"},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "price"},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+	if injection.PrefetchCode == "" {
+		t.Fatal("expected non-empty PrefetchCode for strategy-affecting security() call")
+	}
+	if strings.Contains(injection.PrefetchCode, "EURUSD") {
+		t.Error("chart-only EURUSD:1h fetch must be eliminated from PrefetchCode")
+	}
+	if !strings.Contains(injection.PrefetchCode, "BTCUSDT") {
+		t.Error("strategy-affecting BTCUSDT:1D fetch must be present in PrefetchCode")
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_MultipleChartOnlySymbolsProduceNoPrefetch(t *testing.T) {
+	mkSecurity := func(sym string) (*ast.CallExpression, *ast.Literal) {
+		symLit := &ast.Literal{NodeType: ast.TypeLiteral, Value: sym}
+		return &ast.CallExpression{
+			NodeType: ast.TypeCallExpression,
+			Callee: &ast.MemberExpression{
+				NodeType: ast.TypeMemberExpression,
+				Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+				Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+			},
+			Arguments: []ast.Expression{
+				symLit,
+				&ast.Literal{NodeType: ast.TypeLiteral, Value: "1h"},
+				&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+			},
+		}, symLit
+	}
+	call1, _ := mkSecurity("EURUSD")
+	call2, _ := mkSecurity("GBPUSD")
+
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				NodeType:     ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{{NodeType: ast.TypeVariableDeclarator, ID: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "eurusd"}, Init: call1}},
+			},
+			&ast.VariableDeclaration{
+				NodeType:     ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{{NodeType: ast.TypeVariableDeclarator, ID: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "gbpusd"}, Init: call2}},
+			},
+			// Both outputs reach only chart-only sinks.
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee: &ast.MemberExpression{
+						NodeType: ast.TypeMemberExpression,
+						Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label"},
+						Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "new"},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "bar_index"},
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "eurusd"},
+					},
+				},
+			},
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee: &ast.MemberExpression{
+						NodeType: ast.TypeMemberExpression,
+						Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "line"},
+						Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "new"},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "bar_index"},
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "gbpusd"},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+	if injection.PrefetchCode != "" {
+		t.Errorf("expected empty PrefetchCode when all security() outputs are chart-only, got:\n%s", injection.PrefetchCode)
+	}
+	if len(injection.ImportPaths) != 0 {
+		t.Errorf("expected 0 imports when all security() outputs are chart-only, got %d", len(injection.ImportPaths))
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_TransitiveChartOnlyAliasEliminated(t *testing.T) {
+	symLit := &ast.Literal{NodeType: ast.TypeLiteral, Value: "NVDA"}
+	secCall := &ast.CallExpression{
+		NodeType: ast.TypeCallExpression,
+		Callee: &ast.MemberExpression{
+			NodeType: ast.TypeMemberExpression,
+			Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+			Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+		},
+		Arguments: []ast.Expression{
+			symLit,
+			&ast.Literal{NodeType: ast.TypeLiteral, Value: "1D"},
+			&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+		},
+	}
+
+	program := &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			// raw = request.security("NVDA", "1D", close)
+			&ast.VariableDeclaration{
+				NodeType:     ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{{NodeType: ast.TypeVariableDeclarator, ID: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "raw"}, Init: secCall}},
+			},
+			// alias = raw
+			&ast.VariableDeclaration{
+				NodeType:     ast.TypeVariableDeclaration,
+				Declarations: []ast.VariableDeclarator{{NodeType: ast.TypeVariableDeclarator, ID: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "alias"}, Init: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "raw"}}},
+			},
+			// label.new(bar_index, alias)
+			&ast.ExpressionStatement{
+				NodeType: ast.TypeExpressionStatement,
+				Expression: &ast.CallExpression{
+					NodeType: ast.TypeCallExpression,
+					Callee: &ast.MemberExpression{
+						NodeType: ast.TypeMemberExpression,
+						Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "label"},
+						Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "new"},
+					},
+					Arguments: []ast.Expression{
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "bar_index"},
+						&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "alias"},
+					},
+				},
+			},
+		},
+	}
+
+	injection, err := AnalyzeAndGeneratePrefetch(program)
+	if err != nil {
+		t.Fatalf("AnalyzeAndGeneratePrefetch failed: %v", err)
+	}
+	if injection.PrefetchCode != "" {
+		t.Errorf("expected empty PrefetchCode for transitive chart-only alias, got:\n%s", injection.PrefetchCode)
+	}
+}
+
+func TestAnalyzeAndGeneratePrefetch_NumericTimeframeToken_Canonicalization(t *testing.T) {
+	cases := []struct {
+		numericToken  string
+		canonicalForm string
+	}{
+		{"1", "1m"},
+		{"5", "5m"},
+		{"15", "15m"},
+		{"30", "30m"},
+		{"60", "1h"},
+		{"240", "4h"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.numericToken, func(t *testing.T) {
+			program := numericTokenSecurityCallProgram("SBERP", tc.numericToken)
+
+			injection, err := AnalyzeAndGeneratePrefetch(program)
+			if err != nil {
+				t.Fatalf("AnalyzeAndGeneratePrefetch: %v", err)
+			}
+			if injection.PrefetchCode == "" {
+				t.Fatal("no prefetch code emitted for numeric token")
+			}
+
+			canonicalQuoted := `"` + tc.canonicalForm + `"`
+			if !strings.Contains(injection.PrefetchCode, canonicalQuoted) {
+				t.Errorf("PrefetchCode lacks canonical form %s for token %q\n%s",
+					canonicalQuoted, tc.numericToken, injection.PrefetchCode)
+			}
+
+			secTimeframeExpr := `TimeframeToSeconds(` + canonicalQuoted + `)`
+			if !strings.Contains(injection.PrefetchCode, secTimeframeExpr) {
+				t.Errorf("secTimeframeSeconds not computed from canonical form %s\n%s",
+					canonicalQuoted, injection.PrefetchCode)
+			}
+		})
+	}
+}
+
+func numericTokenSecurityCallProgram(symbol, numericToken string) *ast.Program {
+	return &ast.Program{
+		NodeType: ast.TypeProgram,
+		Body: []ast.Node{
+			&ast.VariableDeclaration{
+				NodeType: ast.TypeVariableDeclaration,
+				Kind:     "var",
+				Declarations: []ast.VariableDeclarator{
+					{
+						NodeType: ast.TypeVariableDeclarator,
+						ID:       &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "secVal"},
+						Init: &ast.CallExpression{
+							NodeType: ast.TypeCallExpression,
+							Callee: &ast.MemberExpression{
+								NodeType: ast.TypeMemberExpression,
+								Object:   &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "request"},
+								Property: &ast.Identifier{NodeType: ast.TypeIdentifier, Name: "security"},
+							},
+							Arguments: []ast.Expression{
+								&ast.Literal{NodeType: ast.TypeLiteral, Value: symbol},
+								&ast.Literal{NodeType: ast.TypeLiteral, Value: numericToken},
+								&ast.Identifier{NodeType: ast.TypeIdentifier, Name: "close"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

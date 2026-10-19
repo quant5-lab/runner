@@ -164,7 +164,7 @@ func TestArrowFunctionTACallGenerator_TrNotConfusedWithVariable(t *testing.T) {
 	gen.variables = map[string]string{"my_tr": "float"}
 	taGen := newTestArrowTAGenerator(gen)
 
-	t.Run("bare tr returns BuiltinTrueRangeAccessor", func(t *testing.T) {
+	t.Run("bare tr in arrow context returns TrueRangeAccessGenerator (handle_na=true for ATR internals)", func(t *testing.T) {
 		accessor, err := taGen.accessorFactory.CreateAccessorForExpression(&ast.Identifier{Name: "tr"})
 		if err != nil {
 			t.Fatalf("CreateAccessorForExpression(tr) error: %v", err)
@@ -262,6 +262,26 @@ func TestTrueRangeAccessGenerator_HandleNASemantics(t *testing.T) {
 	t.Run("GetBaseOffset is 0", func(t *testing.T) {
 		if got := g.GetBaseOffset(); got != 0 {
 			t.Errorf("GetBaseOffset() = %d, want 0", got)
+		}
+	})
+
+	// GenerateInitialValueAccess must embed a pre-computed integer offset (period-1),
+	// not a string arithmetic expression like "5-1". The string form causes Go to
+	// evaluate it as left-associative subtraction, producing ctx.BarIndex - period - 1
+	// instead of ctx.BarIndex - (period-1), which goes negative at the seed bar.
+	t.Run("GenerateInitialValueAccess uses computed integer offset, not string arithmetic", func(t *testing.T) {
+		for _, period := range []int{3, 5, 14, 20} {
+			code := g.GenerateInitialValueAccess(period)
+			want := fmt.Sprintf("%d", period-1)
+			forbidden := fmt.Sprintf("%d-1", period)
+
+			if !contains(code, "ctx.BarIndex - "+want) && !contains(code, "ctx.BarIndex -"+want) {
+				t.Errorf("period=%d: expected offset %s in generated code\nGot: %s", period, want, code)
+			}
+			if contains(code, forbidden) {
+				t.Errorf("period=%d: found string arithmetic %q — must use pre-computed integer %s\nGot: %s",
+					period, forbidden, want, code)
+			}
 		}
 	})
 }

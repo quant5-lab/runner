@@ -63,7 +63,7 @@ func (e *TAArgumentExtractor) ExtractWithDynamic(call *ast.CallExpression, funcN
 			SourceExpr:    sourceExpr,
 			PeriodResult:  periodResult,
 			SourceInfo:    SourceInfo{},
-			AccessGen:     NewTrueRangeAccessGenerator(),
+			AccessGen:     NewBuiltinTrueRangeAccessor(),
 			NeedsNaNCheck: true,
 			Preamble:      "",
 		}, nil
@@ -75,6 +75,7 @@ func (e *TAArgumentExtractor) ExtractWithDynamic(call *ast.CallExpression, funcN
 	preamble := ""
 
 	if e.requiresExpressionAccessor(sourceExpr, sourceInfo) {
+		e.recordUnknownSourceCall(sourceExpr)
 		preambleCode, err := e.registerNestedTempVars(sourceExpr)
 		if err != nil {
 			return nil, err
@@ -141,7 +142,7 @@ func (e *TAArgumentExtractor) ExtractSourceOnly(call *ast.CallExpression, funcNa
 			SourceExpr:    sourceExpr,
 			Period:        0,
 			SourceInfo:    SourceInfo{},
-			AccessGen:     NewTrueRangeAccessGenerator(),
+			AccessGen:     NewBuiltinTrueRangeAccessor(),
 			NeedsNaNCheck: true,
 			Preamble:      "",
 		}, nil
@@ -184,6 +185,19 @@ func (e *TAArgumentExtractor) isTrBuiltin(expr ast.Expression) bool {
 		}
 	}
 	return false
+}
+
+func (e *TAArgumentExtractor) recordUnknownSourceCall(sourceExpr ast.Expression) {
+	switch expr := sourceExpr.(type) {
+	case *ast.CallExpression:
+		funcName := e.generator.extractFunctionName(expr.Callee)
+		if !sharedTASignatures.Contains(funcName) && !e.generator.mathHandler.CanHandle(funcName) {
+			e.generator.featureGaps = append(e.generator.featureGaps, funcName)
+		}
+	case *ast.BinaryExpression:
+		e.recordUnknownSourceCall(expr.Left)
+		e.recordUnknownSourceCall(expr.Right)
+	}
 }
 
 // requiresExpressionAccessor returns true when the source expression is not a simple OHLCV field/series

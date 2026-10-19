@@ -33,25 +33,62 @@ func NewArgumentExpressionGenerator(
 	}
 }
 
-/* Generate produces a correctly-typed Go expression for use as a function argument.
- * String-typed parameters bypass float64 coercion. */
+/* Generate produces a correctly-typed Go expression for use as a function argument. Only a numeric
+ * parameter is coerced to float64; a string parameter carries the argument as a string and a series
+ * parameter carries it as a series, so wrapping either in the numeric truthiness helper would not
+ * compile. */
 func (g *ArgumentExpressionGenerator) Generate(expr ast.Expression) (string, error) {
 	code, err := g.generate(expr)
 	if err != nil {
 		return "", err
 	}
-	if g.isStringParam() {
+	if g.isStringParam() || g.expectsSeriesParam() {
 		return code, nil
 	}
 	return g.ensureFloat64(expr, code), nil
 }
 
 func (g *ArgumentExpressionGenerator) isStringParam() bool {
-	if g.signatureRegistry == nil {
-		return false
-	}
-	paramType, ok := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+	paramType, ok := g.parameterType()
 	return ok && paramType == ParamTypeString
+}
+
+func (g *ArgumentExpressionGenerator) expectsSeriesParam() bool {
+	paramType, ok := g.parameterType()
+	return ok && paramType == ParamTypeSeries
+}
+
+func (g *ArgumentExpressionGenerator) parameterType() (FunctionParameterType, bool) {
+	if g.signatureRegistry == nil {
+		return ParamTypeScalar, false
+	}
+	return g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
+}
+
+/* An argument is materialised as a Go expression, so only calls that carry statement-level
+ * bookkeeping of their own (arrow-body TA lowering, a user-defined call's context and captured
+ * arguments) use the statement router; the rest resolve through the expression extractor chain,
+ * which the router leaves empty outside an arrow body.
+ *
+ * A call already hoisted for this bar is referenced through its series, because re-emitting it
+ * would compute it twice and claim a second ArrowContext instance that no declaration covers. */
+func (g *ArgumentExpressionGenerator) generateCall(call *ast.CallExpression) (string, error) {
+	if g.generator.inArrowFunctionBody {
+		return g.generator.generateCallExpression(call)
+	}
+
+	if hoistedName := g.generator.tempVarMgr.GetVarNameForCall(call); hoistedName != "" {
+		if g.expectsSeriesParam() {
+			return hoistedName + "Series", nil
+		}
+		return g.generator.extractTempVariable(call), nil
+	}
+
+	if g.generator.isUserDefinedCall(call) {
+		return g.generator.generateCallExpression(call)
+	}
+
+	return g.generator.extractCallExpression(call), nil
 }
 
 /* generate produces a raw Go expression preserving its native Go type (bool stays bool) */
@@ -62,7 +99,7 @@ func (g *ArgumentExpressionGenerator) generate(expr ast.Expression) (string, err
 	case *ast.Literal:
 		return g.generateLiteral(e)
 	case *ast.CallExpression:
-		return g.generator.generateCallExpression(e)
+		return g.generateCall(e)
 	case *ast.BinaryExpression:
 		return g.generateBinaryExpression(e)
 	case *ast.MemberExpression:
@@ -95,17 +132,16 @@ func (g *ArgumentExpressionGenerator) ensureFloat64(expr ast.Expression, code st
 }
 
 func (g *ArgumentExpressionGenerator) generateIdentifier(id *ast.Identifier) (string, error) {
+	expectsSeries := g.expectsSeriesParam()
+
 	if constVal, isConstant := g.generator.constants[id.Name]; isConstant {
 		if constVal == "input.source" {
+			if expectsSeries {
+				return fmt.Sprintf("%sSeries", id.Name), nil
+			}
 			return fmt.Sprintf("%sSeries.GetCurrent()", id.Name), nil
 		}
 		return id.Name, nil
-	}
-
-	expectsSeries := false
-	if g.signatureRegistry != nil {
-		paramType, hasSignature := g.signatureRegistry.GetParameterType(g.functionName, g.parameterIndex)
-		expectsSeries = hasSignature && paramType == ParamTypeSeries
 	}
 
 	// Arrow resolver checked before builtins; bypassed when passing to a series-typed parameter

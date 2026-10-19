@@ -81,36 +81,3 @@ func (p *SessionArgumentParser) Parse(expr ast.Expression) SessionArgument {
 
 // Legacy methods kept for backward compatibility with existing tests
 // These now delegate to the unified ArgumentParser
-
-func (p *SessionArgumentParser) parseLiteral(expr ast.Expression) SessionArgument {
-	result := p.argParser.ParseString(expr)
-	if !result.IsValid {
-		return SessionArgument{Type: ArgumentTypeUnknown}
-	}
-	return SessionArgument{
-		Type:  ArgumentTypeLiteral,
-		Value: result.MustBeString(),
-	}
-}
-
-func (p *SessionArgumentParser) parseIdentifier(expr ast.Expression) SessionArgument {
-	result := p.argParser.ParseIdentifier(expr)
-	if !result.IsValid {
-		return SessionArgument{Type: ArgumentTypeUnknown}
-	}
-	return SessionArgument{
-		Type:  ArgumentTypeIdentifier,
-		Value: result.Identifier,
-	}
-}
-
-func (p *SessionArgumentParser) parseWrappedIdentifier(expr ast.Expression) SessionArgument {
-	result := p.argParser.ParseWrappedIdentifier(expr)
-	if !result.IsValid {
-		return SessionArgument{Type: ArgumentTypeUnknown}
-	}
-	return SessionArgument{
-		Type:  ArgumentTypeWrappedIdentifier,
-		Value: result.Identifier,
-	}
-}

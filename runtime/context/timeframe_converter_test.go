@@ -28,6 +28,19 @@ func TestTimeframeConverter_ToSeconds(t *testing.T) {
 		{"empty string", "", 0},
 		{"invalid unit", "5x", 0},
 		{"large multiplier", "240h", 864000},
+		{"0 minutes clamps to 1", "0", 60},
+		{"1 minute", "1", 60},
+		{"3 minutes", "3", 180},
+		{"5 minutes numeric", "5", 300},
+		{"10 minutes", "10", 600},
+		{"15 minutes numeric", "15", 900},
+		{"30 minutes numeric", "30", 1800},
+		{"45 minutes", "45", 2700},
+		{"60 minutes", "60", 3600},
+		{"120 minutes", "120", 7200},
+		{"240 minutes", "240", 14400},
+		{"1440 minutes equals one day", "1440", 86400},
+		{"10080 minutes equals one week", "10080", 604800},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +153,26 @@ func TestTimeframeConverter_RoundtripProperties(t *testing.T) {
 			if result != canonical {
 				t.Errorf("FromSeconds(ToSeconds(%q)) = %q, want canonical %q",
 					alias, result, canonical)
+			}
+		}
+	})
+
+	t.Run("numeric tokens round-trip to canonical suffixed form", func(t *testing.T) {
+		tokens := map[string]string{
+			"1":    "1m",
+			"5":    "5m",
+			"15":   "15m",
+			"30":   "30m",
+			"60":   "1h",
+			"120":  "2h",
+			"240":  "4h",
+			"1440": "1D",
+		}
+		for input, want := range tokens {
+			secs := converter.ToSeconds(input)
+			got := converter.FromSeconds(secs)
+			if got != want {
+				t.Errorf("FromSeconds(ToSeconds(%q)) = %q, want %q", input, got, want)
 			}
 		}
 	})

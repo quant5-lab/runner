@@ -6,372 +6,392 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestEntryQuantityResolver_LessThanThreeArgs verifies default qty for insufficient arguments */
-func TestEntryQuantityResolver_LessThanThreeArgs(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
+// qtyLiteralEval resolves only AST float/int literals to (value, true).
+// Zero and negative values yield (0, false) because they are not valid position sizes.
+func qtyLiteralEval(expr ast.Expression) (float64, bool) {
+	lit, ok := expr.(*ast.Literal)
+	if !ok {
+		return 0, false
+	}
+	switch v := lit.Value.(type) {
+	case float64:
+		if v > 0 {
+			return v, true
+		}
+	case int:
+		if v > 0 {
+			return float64(v), true
+		}
+	}
+	return 0, false
+}
+
+// qtyConstEval resolves literals and also looks up identifiers in a symbol table.
+// Models the behaviour of makeQtyEvaluator, where identifiers bound to
+// input constants resolve to their defval.
+func qtyConstEval(consts map[string]float64) QtyEvaluator {
+	return func(expr ast.Expression) (float64, bool) {
+		if v, ok := qtyLiteralEval(expr); ok {
+			return v, true
+		}
+		if id, ok := expr.(*ast.Identifier); ok {
+			if v, exists := consts[id.Name]; exists && v > 0 {
+				return v, true
 			}
 		}
-		return 0
+		return 0, false
 	}
+}
 
-	tests := []struct {
-		name        string
-		args        []ast.Expression
-		defaultQty  float64
-		expectedQty float64
+// -- builders --
+
+func qtyResolver() *EntryQuantityResolver { return NewEntryQuantityResolver() }
+
+func positionalQtyArgs(qty ast.Expression) []ast.Expression {
+	return []ast.Expression{
+		&ast.Literal{Value: "Long"},
+		&ast.Identifier{Name: "strategy.long"},
+		qty,
+	}
+}
+
+// allNamedArgs models strategy.entry(id="Long", long=strategy.long, qty=…, when=…)
+// where every parameter is named, producing a single ObjectExpression argument.
+func allNamedArgs(props ...ast.Property) []ast.Expression {
+	return []ast.Expression{&ast.ObjectExpression{Properties: props}}
+}
+
+// mixedNamedArgs models strategy.entry("Long", long=strategy.long, qty=…, when=…)
+// where the id is positional but direction/qty/when are named.
+func mixedNamedArgs(props ...ast.Property) []ast.Expression {
+	return []ast.Expression{
+		&ast.Literal{Value: "Long"},
+		&ast.ObjectExpression{Properties: props},
+	}
+}
+
+func eqProp(key string, value ast.Expression) ast.Property {
+	return ast.Property{Key: &ast.Identifier{Name: key}, Value: value}
+}
+
+func qtyProp(value ast.Expression) ast.Property { return eqProp("qty", value) }
+
+func intLit(v int) *ast.Literal { return &ast.Literal{Value: v} }
+
+// TestEntryQuantityResolver_ArgCount verifies the arg-count boundary:
+// fewer than 3 positional args without a named-arg object default to defaultQty.
+func TestEntryQuantityResolver_ArgCount(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    []ast.Expression
+		wantQty float64
 	}{
 		{
-			name:        "no arguments",
-			args:        []ast.Expression{},
-			defaultQty:  1.0,
-			expectedQty: 1.0,
+			name:    "nil args",
+			args:    nil,
+			wantQty: 5.0,
 		},
 		{
-			name: "one argument",
-			args: []ast.Expression{
-				&ast.Literal{Value: "Buy"},
-			},
-			defaultQty:  2.0,
-			expectedQty: 2.0,
+			name:    "zero args",
+			args:    []ast.Expression{},
+			wantQty: 5.0,
 		},
 		{
-			name: "two arguments",
-			args: []ast.Expression{
-				&ast.Literal{Value: "Buy"},
-				&ast.Identifier{Name: "strategy.long"},
-			},
-			defaultQty:  3.0,
-			expectedQty: 3.0,
+			name:    "one arg (id only)",
+			args:    []ast.Expression{fltLit(1)},
+			wantQty: 5.0,
+		},
+		{
+			name:    "two args (id + direction)",
+			args:    []ast.Expression{&ast.Literal{Value: "Long"}, ident("strategy.long")},
+			wantQty: 5.0,
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			qty := resolver.ResolveQuantity(tt.args, tt.defaultQty, extractLiteral)
-
-			if qty != tt.expectedQty {
-				t.Errorf("Expected qty %.2f, got %.2f", tt.expectedQty, qty)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qtyResolver().ResolveQuantity(tc.args, tc.wantQty, qtyLiteralEval)
+			if got != tc.wantQty {
+				t.Errorf("want default %v, got %v", tc.wantQty, got)
 			}
 		})
 	}
 }
 
-/* TestEntryQuantityResolver_ExplicitQuantity verifies explicit quantity extraction */
-func TestEntryQuantityResolver_ExplicitQuantity(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-			if val, ok := lit.Value.(int); ok {
-				return float64(val)
-			}
-		}
-		return 0
-	}
-
-	tests := []struct {
-		name        string
-		thirdArg    ast.Expression
-		defaultQty  float64
-		expectedQty float64
+// TestEntryQuantityResolver_PositionalLiteral verifies that a float or int literal
+// at the third positional slot (args[2]) is extracted as the qty.
+func TestEntryQuantityResolver_PositionalLiteral(t *testing.T) {
+	cases := []struct {
+		name    string
+		arg     ast.Expression
+		wantQty float64
 	}{
-		{
-			name:        "float quantity",
-			thirdArg:    &ast.Literal{Value: 5.5},
-			defaultQty:  1.0,
-			expectedQty: 5.5,
-		},
-		{
-			name:        "integer quantity",
-			thirdArg:    &ast.Literal{Value: 10},
-			defaultQty:  1.0,
-			expectedQty: 10.0,
-		},
-		{
-			name:        "fractional quantity",
-			thirdArg:    &ast.Literal{Value: 0.25},
-			defaultQty:  1.0,
-			expectedQty: 0.25,
-		},
-		{
-			name:        "large quantity",
-			thirdArg:    &ast.Literal{Value: 1000.0},
-			defaultQty:  1.0,
-			expectedQty: 1000.0,
-		},
+		{name: "float64", arg: fltLit(10000.0), wantQty: 10000.0},
+		{name: "fractional", arg: fltLit(0.5), wantQty: 0.5},
+		{name: "int", arg: intLit(50), wantQty: 50.0},
+		{name: "large", arg: fltLit(1e6), wantQty: 1e6},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := []ast.Expression{
-				&ast.Literal{Value: "Buy"},
-				&ast.Identifier{Name: "strategy.long"},
-				tt.thirdArg,
-			}
-
-			qty := resolver.ResolveQuantity(args, tt.defaultQty, extractLiteral)
-
-			if qty != tt.expectedQty {
-				t.Errorf("Expected qty %.2f, got %.2f", tt.expectedQty, qty)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qtyResolver().ResolveQuantity(positionalQtyArgs(tc.arg), 1.0, qtyLiteralEval)
+			if got != tc.wantQty {
+				t.Errorf("want %v, got %v", tc.wantQty, got)
 			}
 		})
 	}
 }
 
-/* TestEntryQuantityResolver_NamedParameter verifies named parameter detection */
-func TestEntryQuantityResolver_NamedParameter(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-		}
-		return 0
-	}
-
-	tests := []struct {
-		name        string
-		thirdArg    ast.Expression
-		defaultQty  float64
-		expectedQty float64
+// TestEntryQuantityResolver_PositionalLiteralFallback verifies that non-positive
+// positional literals fall back to defaultQty.
+func TestEntryQuantityResolver_PositionalLiteralFallback(t *testing.T) {
+	cases := []struct {
+		name string
+		arg  ast.Expression
 	}{
+		{name: "zero", arg: fltLit(0.0)},
+		{name: "negative", arg: fltLit(-1.0)},
+		{name: "negative int", arg: intLit(-10)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const want = 7.0
+			got := qtyResolver().ResolveQuantity(positionalQtyArgs(tc.arg), want, qtyLiteralEval)
+			if got != want {
+				t.Errorf("non-positive positional literal must use default: want %v, got %v", want, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_PositionalConstantIdentifier verifies that a variable
+// identifier at args[2] resolves through the evaluator when that identifier
+// is bound to a known constant (e.g., an input defval).
+func TestEntryQuantityResolver_PositionalConstantIdentifier(t *testing.T) {
+	cases := []struct {
+		name   string
+		consts map[string]float64
+		id     string
+		want   float64
+	}{
+		{
+			name:   "known constant resolves to its value",
+			consts: map[string]float64{"tradeQty": 250.0},
+			id:     "tradeQty",
+			want:   250.0,
+		},
+		{
+			name:   "unknown identifier falls back to default",
+			consts: map[string]float64{},
+			id:     "dynamicQty",
+			want:   1.0,
+		},
+		{
+			name:   "constant registered as zero falls back to default",
+			consts: map[string]float64{"zeroQty": 0.0},
+			id:     "zeroQty",
+			want:   1.0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qtyResolver().ResolveQuantity(
+				positionalQtyArgs(ident(tc.id)),
+				1.0,
+				qtyConstEval(tc.consts),
+			)
+			if got != tc.want {
+				t.Errorf("want %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_PositionalObjectExpressionSkipped verifies that an
+// ObjectExpression at args[2] (the named-arg blob in all-positional-then-named calls)
+// is not interpreted as the qty value.
+func TestEntryQuantityResolver_PositionalObjectExpressionSkipped(t *testing.T) {
+	cases := []struct {
+		name string
+		obj  *ast.ObjectExpression
+	}{
+		{
+			name: "empty object",
+			obj:  &ast.ObjectExpression{},
+		},
+		{
+			name: "object with when= only",
+			obj: &ast.ObjectExpression{Properties: []ast.Property{
+				eqProp("when", ident("signal")),
+			}},
+		},
+		{
+			name: "object with comment= only",
+			obj: &ast.ObjectExpression{Properties: []ast.Property{
+				eqProp("comment", &ast.Literal{Value: "buy"}),
+			}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []ast.Expression{&ast.Literal{Value: "Long"}, ident("strategy.long"), tc.obj}
+			const want = 9.0
+			got := qtyResolver().ResolveQuantity(args, want, qtyLiteralEval)
+			if got != want {
+				t.Errorf("ObjectExpression at positional slot must not be treated as qty: want %v, got %v", want, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_NamedQtyLiteral verifies qty= extraction from named
+// arguments packed as an ObjectExpression.  Both call shapes are covered:
+// mixed (positional id + named rest) and all-named (every parameter named).
+func TestEntryQuantityResolver_NamedQtyLiteral(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    []ast.Expression
+		wantQty float64
+	}{
+		{
+			name:    "mixed: id positional, rest named",
+			args:    mixedNamedArgs(eqProp("long", ident("strategy.long")), qtyProp(fltLit(500.0))),
+			wantQty: 500.0,
+		},
+		{
+			name: "mixed: qty among multiple named params",
+			args: mixedNamedArgs(
+				eqProp("long", ident("strategy.long")),
+				qtyProp(fltLit(100.0)),
+				eqProp("comment", &ast.Literal{Value: "entry"}),
+				eqProp("when", ident("signal")),
+			),
+			wantQty: 100.0,
+		},
+		{
+			name: "all-named: id also in ObjectExpression",
+			args: allNamedArgs(
+				eqProp("id", &ast.Literal{Value: "Long"}),
+				eqProp("long", ident("strategy.long")),
+				qtyProp(fltLit(200.0)),
+			),
+			wantQty: 200.0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qtyResolver().ResolveQuantity(tc.args, 1.0, qtyLiteralEval)
+			if got != tc.wantQty {
+				t.Errorf("want %v, got %v", tc.wantQty, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_NamedQtyLiteralFallback verifies that a qty= property
+// whose value is non-positive falls back to defaultQty, consistent with the
+// positional path behaviour.
+func TestEntryQuantityResolver_NamedQtyLiteralFallback(t *testing.T) {
+	cases := []struct {
+		name string
+		val  ast.Expression
+	}{
+		{name: "zero", val: fltLit(0.0)},
+		{name: "negative", val: fltLit(-5.0)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := mixedNamedArgs(qtyProp(tc.val))
+			const want = 3.0
+			got := qtyResolver().ResolveQuantity(args, want, qtyLiteralEval)
+			if got != want {
+				t.Errorf("non-positive named qty must use default: want %v, got %v", want, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_NamedQtyConstantIdentifier verifies that when qty=
+// is a named identifier bound to a known constant, the constant value is used.
+func TestEntryQuantityResolver_NamedQtyConstantIdentifier(t *testing.T) {
+	cases := []struct {
+		name    string
+		consts  map[string]float64
+		id      string
+		wantQty float64
+	}{
+		{
+			name:    "known constant resolves",
+			consts:  map[string]float64{"tradeSize": 10000.0},
+			id:      "tradeSize",
+			wantQty: 10000.0,
+		},
+		{
+			name:    "unknown identifier falls back to default",
+			consts:  map[string]float64{},
+			id:      "dynamicQty",
+			wantQty: 2.0,
+		},
+		{
+			name:    "constant registered as zero falls back to default",
+			consts:  map[string]float64{"empty": 0.0},
+			id:      "empty",
+			wantQty: 2.0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := mixedNamedArgs(eqProp("long", ident("strategy.long")), qtyProp(ident(tc.id)))
+			got := qtyResolver().ResolveQuantity(args, 2.0, qtyConstEval(tc.consts))
+			if got != tc.wantQty {
+				t.Errorf("want %v, got %v", tc.wantQty, got)
+			}
+		})
+	}
+}
+
+// TestEntryQuantityResolver_NamedBlobWithoutQtyProperty verifies that an
+// ObjectExpression containing only non-qty properties does not produce a qty —
+// defaultQty is returned.
+func TestEntryQuantityResolver_NamedBlobWithoutQtyProperty(t *testing.T) {
+	cases := []struct {
+		name string
+		args []ast.Expression
+	}{
+		{
+			name: "only direction in named blob",
+			args: mixedNamedArgs(eqProp("long", ident("strategy.long"))),
+		},
+		{
+			name: "direction + when in named blob",
+			args: mixedNamedArgs(eqProp("long", ident("strategy.long")), eqProp("when", ident("signal"))),
+		},
 		{
 			name: "empty object expression",
-			thirdArg: &ast.ObjectExpression{
-				Properties: []ast.Property{},
-			},
-			defaultQty:  2.0,
-			expectedQty: 2.0,
-		},
-		{
-			name: "object with properties",
-			thirdArg: &ast.ObjectExpression{
-				Properties: []ast.Property{
-					{
-						Key:   &ast.Identifier{Name: "stop"},
-						Value: &ast.Literal{Value: 100.0},
-					},
-				},
-			},
-			defaultQty:  3.0,
-			expectedQty: 3.0,
-		},
-		{
-			name: "object with qty property",
-			thirdArg: &ast.ObjectExpression{
-				Properties: []ast.Property{
-					{
-						Key:   &ast.Identifier{Name: "qty"},
-						Value: &ast.Literal{Value: 5.0},
-					},
-				},
-			},
-			defaultQty:  1.0,
-			expectedQty: 1.0,
+			args: []ast.Expression{&ast.ObjectExpression{}},
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := []ast.Expression{
-				&ast.Literal{Value: "Buy"},
-				&ast.Identifier{Name: "strategy.long"},
-				tt.thirdArg,
-			}
-
-			qty := resolver.ResolveQuantity(args, tt.defaultQty, extractLiteral)
-
-			if qty != tt.expectedQty {
-				t.Errorf("Expected qty %.2f (default for object expr), got %.2f", tt.expectedQty, qty)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const want = 4.0
+			got := qtyResolver().ResolveQuantity(tc.args, want, qtyLiteralEval)
+			if got != want {
+				t.Errorf("no qty property: want default %v, got %v", want, got)
 			}
 		})
 	}
 }
 
-/* TestEntryQuantityResolver_ZeroQuantity verifies zero quantity falls back to default */
-func TestEntryQuantityResolver_ZeroQuantity(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-		}
-		return 0
-	}
-
+// TestEntryQuantityResolver_ExtraPositionalArgs verifies that when more than three
+// positional args are present, only args[2] is consulted for qty.
+func TestEntryQuantityResolver_ExtraPositionalArgs(t *testing.T) {
 	args := []ast.Expression{
-		&ast.Literal{Value: "Buy"},
-		&ast.Identifier{Name: "strategy.long"},
-		&ast.Literal{Value: 0.0},
-	}
-
-	qty := resolver.ResolveQuantity(args, 5.0, extractLiteral)
-
-	if qty != 5.0 {
-		t.Errorf("Zero explicit qty should use default, expected 5.0, got %.2f", qty)
-	}
-}
-
-/* TestEntryQuantityResolver_NegativeQuantity verifies negative quantity falls back to default */
-func TestEntryQuantityResolver_NegativeQuantity(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-		}
-		return 0
-	}
-
-	args := []ast.Expression{
-		&ast.Literal{Value: "Buy"},
-		&ast.Identifier{Name: "strategy.long"},
-		&ast.Literal{Value: -2.0},
-	}
-
-	qty := resolver.ResolveQuantity(args, 3.0, extractLiteral)
-
-	if qty != 3.0 {
-		t.Errorf("Negative explicit qty should use default, expected 3.0, got %.2f", qty)
-	}
-}
-
-/* TestEntryQuantityResolver_NonLiteralThirdArg verifies non-literal argument handling */
-func TestEntryQuantityResolver_NonLiteralThirdArg(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-		}
-		return 0
-	}
-
-	tests := []struct {
-		name        string
-		thirdArg    ast.Expression
-		defaultQty  float64
-		expectedQty float64
-	}{
-		{
-			name:        "identifier",
-			thirdArg:    &ast.Identifier{Name: "qtyVariable"},
-			defaultQty:  2.0,
-			expectedQty: 2.0,
-		},
-		{
-			name: "binary expression",
-			thirdArg: &ast.BinaryExpression{
-				Left:     &ast.Literal{Value: 2.0},
-				Operator: "*",
-				Right:    &ast.Literal{Value: 3.0},
-			},
-			defaultQty:  1.0,
-			expectedQty: 1.0,
-		},
-		{
-			name: "call expression",
-			thirdArg: &ast.CallExpression{
-				Callee: &ast.Identifier{Name: "calculateQty"},
-			},
-			defaultQty:  4.0,
-			expectedQty: 4.0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := []ast.Expression{
-				&ast.Literal{Value: "Buy"},
-				&ast.Identifier{Name: "strategy.long"},
-				tt.thirdArg,
-			}
-
-			qty := resolver.ResolveQuantity(args, tt.defaultQty, extractLiteral)
-
-			if qty != tt.expectedQty {
-				t.Errorf("Non-literal should use default, expected %.2f, got %.2f", tt.expectedQty, qty)
-			}
-		})
-	}
-}
-
-/* TestEntryQuantityResolver_DifferentDefaults verifies resolver uses provided default */
-func TestEntryQuantityResolver_DifferentDefaults(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		return 0
-	}
-
-	defaults := []float64{0.5, 1.0, 2.5, 5.0, 10.0, 100.0}
-
-	for _, defaultQty := range defaults {
-		args := []ast.Expression{
-			&ast.Literal{Value: "Buy"},
-			&ast.Identifier{Name: "strategy.long"},
-		}
-
-		qty := resolver.ResolveQuantity(args, defaultQty, extractLiteral)
-
-		if qty != defaultQty {
-			t.Errorf("For default %.2f, expected qty %.2f, got %.2f", defaultQty, defaultQty, qty)
-		}
-	}
-}
-
-/* TestEntryQuantityResolver_ExtractLiteralFailure verifies fallback when extractor returns zero */
-func TestEntryQuantityResolver_ExtractLiteralFailure(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		return 0
-	}
-
-	args := []ast.Expression{
-		&ast.Literal{Value: "Buy"},
-		&ast.Identifier{Name: "strategy.long"},
-		&ast.Literal{Value: "not-a-number"},
-	}
-
-	qty := resolver.ResolveQuantity(args, 7.0, extractLiteral)
-
-	if qty != 7.0 {
-		t.Errorf("Failed extraction should use default, expected 7.0, got %.2f", qty)
-	}
-}
-
-/* TestEntryQuantityResolver_MoreThanThreeArgs verifies behavior with extra arguments */
-func TestEntryQuantityResolver_MoreThanThreeArgs(t *testing.T) {
-	resolver := NewEntryQuantityResolver()
-	extractLiteral := func(expr ast.Expression) float64 {
-		if lit, ok := expr.(*ast.Literal); ok {
-			if val, ok := lit.Value.(float64); ok {
-				return val
-			}
-		}
-		return 0
-	}
-
-	args := []ast.Expression{
-		&ast.Literal{Value: "Buy"},
-		&ast.Identifier{Name: "strategy.long"},
-		&ast.Literal{Value: 8.0},
+		&ast.Literal{Value: "Long"},
+		ident("strategy.long"),
+		fltLit(8.0),
 		&ast.ObjectExpression{},
-		&ast.Literal{Value: 10.0},
+		fltLit(99.0),
 	}
-
-	qty := resolver.ResolveQuantity(args, 1.0, extractLiteral)
-
-	if qty != 8.0 {
-		t.Errorf("Should extract from third arg, expected 8.0, got %.2f", qty)
+	got := qtyResolver().ResolveQuantity(args, 1.0, qtyLiteralEval)
+	if got != 8.0 {
+		t.Errorf("third arg must be used, want 8.0, got %v", got)
 	}
 }

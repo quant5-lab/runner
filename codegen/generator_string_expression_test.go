@@ -286,6 +286,19 @@ func TestGenerateStringExpression_EdgeCases(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "syminfo.tickerid — string-typed builtin member, not an error",
+			expr:        MemberExpr("syminfo", "tickerid"),
+			expectError: false,
+		},
+		{
+			name: "ticker.heikinashi call — ticker constructor, not an error",
+			expr: &ast.CallExpression{
+				Callee:    MemberExpr("ticker", "heikinashi"),
+				Arguments: []ast.Expression{MemberExpr("syminfo", "tickerid")},
+			},
+			expectError: false,
+		},
+		{
 			name: "unsupported ta member expression",
 			expr: &ast.MemberExpression{
 				Object:   &ast.Identifier{Name: "ta"},
@@ -477,6 +490,188 @@ func TestGenerateStringVariableInit_UnsupportedCallExpression(t *testing.T) {
 
 	if err == nil {
 		t.Error("expected error for non-color call expression in string variable init")
+	}
+}
+
+func TestGenerateStringExpression_BuiltinStringMembers(t *testing.T) {
+	tests := []struct {
+		name        string
+		expr        ast.Expression
+		wantResult  string
+		expectError bool
+	}{
+		// ── syminfo string properties ─────────────────────────────────────────
+		{"syminfo.tickerid", MemberExpr("syminfo", "tickerid"), "syminfo_tickerid", false},
+		{"syminfo.ticker", MemberExpr("syminfo", "ticker"), "syminfo_tickerid", false},
+		{"syminfo.timezone", MemberExpr("syminfo", "timezone"), "ctx.Timezone", false},
+		{"syminfo.type", MemberExpr("syminfo", "type"), `"stock"`, false},
+		{"syminfo.currency", MemberExpr("syminfo", "currency"), `"USD"`, false},
+		// ── timeframe string properties ───────────────────────────────────────
+		{"timeframe.period", MemberExpr("timeframe", "period"), "ctx.Timeframe", false},
+		// ── numeric namespace member is not a valid string expression ─────────
+		{"syminfo.mintick — numeric, must error", MemberExpr("syminfo", "mintick"), "", true},
+		{"ta.sma — not a string member, must error", MemberExpr("ta", "sma"), "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringExpression(tt.expr)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error, got result %q", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.wantResult {
+				t.Errorf("got %q, want %q", result, tt.wantResult)
+			}
+		})
+	}
+}
+
+func TestGenerateStringExpression_TickerConstructorCalls(t *testing.T) {
+	syminfo := func(prop string) ast.Expression { return MemberExpr("syminfo", prop) }
+	call := func(ns, fn string, args ...ast.Expression) ast.Expression {
+		return &ast.CallExpression{Callee: MemberExpr(ns, fn), Arguments: args}
+	}
+
+	tests := []struct {
+		name         string
+		expr         ast.Expression
+		wantContains string
+		expectError  bool
+	}{
+		{
+			name:         "ticker.heikinashi with syminfo.tickerid",
+			expr:         call("ticker", "heikinashi", syminfo("tickerid")),
+			wantContains: "ticker.Heikinashi(ctx.Symbol)",
+		},
+		{
+			name:         "bare v4 heikinashi form (preprocessor not yet applied)",
+			expr:         &ast.CallExpression{Callee: &ast.Identifier{Name: "heikinashi"}, Arguments: []ast.Expression{syminfo("tickerid")}},
+			wantContains: "ticker.Heikinashi(ctx.Symbol)",
+		},
+		{
+			name:         "ticker.standard with syminfo.tickerid strips modifier",
+			expr:         call("ticker", "standard", syminfo("tickerid")),
+			wantContains: "ticker.Standard(ctx.Symbol)",
+		},
+		{
+			name:         "ticker.standard with no args returns ctx.Symbol",
+			expr:         &ast.CallExpression{Callee: MemberExpr("ticker", "standard")},
+			wantContains: "ctx.Symbol",
+		},
+		{
+			name:        "ta.sma is not a ticker constructor — must error",
+			expr:        &ast.CallExpression{Callee: MemberExpr("ta", "sma")},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringExpression(tt.expr)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error, got result %q", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, tt.wantContains) {
+				t.Errorf("got %q, want substring %q", result, tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestGenerateStringVariableInit_BuiltinStringMembers(t *testing.T) {
+	tests := []struct {
+		name        string
+		varName     string
+		expr        ast.Expression
+		wantContain string
+	}{
+		{
+			name:        "syminfo.tickerid assignment",
+			varName:     "t",
+			expr:        MemberExpr("syminfo", "tickerid"),
+			wantContain: "t = syminfo_tickerid",
+		},
+		{
+			name:        "syminfo.timezone assignment",
+			varName:     "tz",
+			expr:        MemberExpr("syminfo", "timezone"),
+			wantContain: "tz = ctx.Timezone",
+		},
+		{
+			name:        "timeframe.period assignment",
+			varName:     "tf",
+			expr:        MemberExpr("timeframe", "period"),
+			wantContain: "tf = ctx.Timeframe",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringVariableInit(tt.varName, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, tt.wantContain) {
+				t.Errorf("got %q, want substring %q", result, tt.wantContain)
+			}
+		})
+	}
+}
+
+func TestGenerateStringVariableInit_TickerConstructorCalls(t *testing.T) {
+	syminfo := func(prop string) ast.Expression { return MemberExpr("syminfo", prop) }
+
+	tests := []struct {
+		name        string
+		varName     string
+		expr        ast.Expression
+		wantContain string
+	}{
+		{
+			name:    "ticker.heikinashi assignment",
+			varName: "_ha",
+			expr: &ast.CallExpression{
+				Callee:    MemberExpr("ticker", "heikinashi"),
+				Arguments: []ast.Expression{syminfo("tickerid")},
+			},
+			wantContain: "_ha = ticker.Heikinashi(ctx.Symbol)",
+		},
+		{
+			name:    "ticker.standard no-arg assignment returns ctx.Symbol",
+			varName: "_std",
+			expr: &ast.CallExpression{
+				Callee: MemberExpr("ticker", "standard"),
+			},
+			wantContain: "_std = ctx.Symbol",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := createStringExpressionTestGenerator()
+			result, err := gen.generateStringVariableInit(tt.varName, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, tt.wantContain) {
+				t.Errorf("got %q, want substring %q", result, tt.wantContain)
+			}
+		})
 	}
 }
 

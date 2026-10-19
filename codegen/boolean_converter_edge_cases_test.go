@@ -146,6 +146,12 @@ func TestBooleanConverter_EnsureBooleanOperand_EdgeCases(t *testing.T) {
 			generatedCode: "foo(x)",
 			want:          "(value.IsTrue(foo(x)))",
 		},
+		{
+			name:          "Namespace member without an oracle",
+			expr:          member("barstate", "islast"),
+			generatedCode: "(ctx.BarIndex == len(ctx.Data)-1)",
+			want:          "(value.IsTrue((ctx.BarIndex == len(ctx.Data)-1)))",
+		},
 	}
 
 	for _, tt := range tests {

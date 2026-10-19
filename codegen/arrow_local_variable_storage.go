@@ -56,10 +56,6 @@ func (s *ArrowLocalVariableStorage) GenerateDualReassignment(varName, exprCode s
 	return s.GenerateScalarAndSeriesStorage(varName, exprCode, VariableReassignment)
 }
 
-func isSimpleInteger(expr string) bool {
-	return isSimpleIntegerLiteral(expr)
-}
-
 /* GenerateTupleDualStorage generates dual storage for tuple destructuring */
 func (s *ArrowLocalVariableStorage) GenerateTupleDualStorage(varNames []string, exprCode string) string {
 	tempVars := make([]string, len(varNames))

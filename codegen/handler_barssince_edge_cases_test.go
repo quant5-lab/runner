@@ -124,22 +124,28 @@ func TestBarsSinceHandler_AlgorithmCorrectness(t *testing.T) {
 	})
 }
 
-/* TestBarsSinceHandler_ConditionTypes validates different condition expressions */
+/* TestBarsSinceHandler_ConditionTypes validates that every condition operand kind yields a usable
+ * truthiness test. Operands that already lower to a Go bool are tested directly, because the
+ * numeric-truthiness helper takes a float64 and the generated Go would not compile. */
 func TestBarsSinceHandler_ConditionTypes(t *testing.T) {
 	handler := &BarsSinceHandler{}
 	gen := newTestGenerator()
 
 	testCases := []struct {
-		name      string
-		condition ast.Expression
+		name                 string
+		condition            ast.Expression
+		lowersToGoBool       bool
+		wantConditionOperand string
 	}{
 		{
-			name:      "identifier_condition",
-			condition: &ast.Identifier{Name: "bullish"},
+			name:                 "identifier_condition",
+			condition:            &ast.Identifier{Name: "bullish"},
+			wantConditionOperand: "bullishSeries.GetCurrent()",
 		},
 		{
-			name:      "member_expression",
-			condition: &ast.MemberExpression{Object: &ast.Identifier{Name: "signal"}, Property: &ast.Identifier{Name: "cross"}},
+			name:                 "member_expression",
+			condition:            &ast.MemberExpression{Object: &ast.Identifier{Name: "signal"}, Property: &ast.Identifier{Name: "cross"}},
+			wantConditionOperand: "value.IsTrue(signalSeries.Get(0))",
 		},
 		{
 			name:      "call_expression",
@@ -152,6 +158,8 @@ func TestBarsSinceHandler_ConditionTypes(t *testing.T) {
 				Operator: ">",
 				Right:    &ast.Identifier{Name: "open"},
 			},
+			lowersToGoBool:       true,
+			wantConditionOperand: "if (bar.Close > bar.Open) {",
 		},
 	}
 
@@ -163,8 +171,16 @@ func TestBarsSinceHandler_ConditionTypes(t *testing.T) {
 				t.Fatalf("GenerateCode() error = %v", err)
 			}
 
-			if !strings.Contains(code, "value.IsTrue(") {
+			if tc.lowersToGoBool {
+				if strings.Contains(code, "value.IsTrue(") {
+					t.Error("Go-bool condition must not be wrapped in the float64 truthiness helper")
+				}
+			} else if !strings.Contains(code, "value.IsTrue(") {
 				t.Error("Missing value.IsTrue check")
+			}
+
+			if tc.wantConditionOperand != "" && !strings.Contains(code, tc.wantConditionOperand) {
+				t.Errorf("condition operand %q missing from:\n%s", tc.wantConditionOperand, code)
 			}
 
 			if !strings.Contains(code, "testSeries.Set(") {

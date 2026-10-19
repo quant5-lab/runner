@@ -8,22 +8,15 @@ import (
 // across bars by referencing their own previous values (RMA, EMA, etc.)
 // Unlike window-based indicators, these use recursive formulas with previous results
 type StatefulIndicatorBuilder struct {
-	indicatorName          string
-	varName                string
-	period                 PeriodExpression
-	accessor               AccessGenerator
-	needsNaN               bool
-	recoverFromNaNPrevious bool
-	indenter               CodeIndenter
-	context                StatefulIndicatorContext
+	indicatorName string
+	varName       string
+	period        PeriodExpression
+	accessor      AccessGenerator
+	needsNaN      bool
+	indenter      CodeIndenter
+	context       StatefulIndicatorContext
 }
 
-// NewStatefulIndicatorBuilder creates builder for stateful indicators.
-//
-// recoverFromNaNPrevious is derived from indicatorName: EMA restarts from the
-// current source when the previous indicator value is NaN (e.g. after a gap);
-// RMA propagates NaN because its recursive formula alpha*src+(1-alpha)*prev
-// has no defined recovery — if prev is NaN the result must also be NaN.
 func NewStatefulIndicatorBuilder(
 	indicatorName string,
 	varName string,
@@ -33,21 +26,14 @@ func NewStatefulIndicatorBuilder(
 	context StatefulIndicatorContext,
 ) *StatefulIndicatorBuilder {
 	return &StatefulIndicatorBuilder{
-		indicatorName:          indicatorName,
-		varName:                varName,
-		period:                 period,
-		accessor:               accessor,
-		needsNaN:               needsNaN,
-		recoverFromNaNPrevious: isEMAVariant(indicatorName),
-		indenter:               NewCodeIndenter(),
-		context:                context,
+		indicatorName: indicatorName,
+		varName:       varName,
+		period:        period,
+		accessor:      accessor,
+		needsNaN:      needsNaN,
+		indenter:      NewCodeIndenter(),
+		context:       context,
 	}
-}
-
-// isEMAVariant returns true for EMA-family indicators that restart from the current
-// source value when the previous indicator value is NaN.
-func isEMAVariant(indicatorName string) bool {
-	return indicatorName == "ta.ema" || indicatorName == "ema"
 }
 
 // RMA formula: rma[i] = alpha * source[i] + (1-alpha) * rma[i-1], alpha = 1/period
@@ -59,7 +45,7 @@ func (b *StatefulIndicatorBuilder) BuildRMA() string {
 
 	b.indenter.IncreaseIndent()
 	code += b.buildInitializationPhase()
-	code += b.buildRecursivePhase(b.rmaFormula)
+	code += b.buildRMARecursivePhase()
 	b.indenter.DecreaseIndent()
 
 	code += b.closeBlock()
@@ -113,14 +99,31 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 	b.indenter.IncreaseIndent()
 
 	code += b.indenter.Line("/* First valid value: calculate SMA as initial state */")
-	code += b.indenter.Line("_sma_accumulator := 0.0")
+	code += b.buildSMAAccumulationCode()
 
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("} else {")
+
+	return code
+}
+
+// buildSMAAccumulationCode emits the SMA seed loop shared by the init phase and RMA prev-NaN recovery.
+func (b *StatefulIndicatorBuilder) buildSMAAccumulationCode() string {
 	loopBound := ""
 	if b.period.IsConstant() {
 		loopBound = fmt.Sprintf("%d", b.period.AsInt())
 	} else {
 		loopBound = b.period.AsIntCast()
 	}
+
+	smaDiv := ""
+	if b.period.IsConstant() {
+		smaDiv = fmt.Sprintf("float64(%d)", b.period.AsInt())
+	} else {
+		smaDiv = b.period.AsFloat64Cast()
+	}
+
+	code := b.indenter.Line("_sma_accumulator := 0.0")
 	if b.needsNaN {
 		code += b.indenter.Line("_sma_has_nan := false")
 	}
@@ -144,12 +147,6 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 	b.indenter.DecreaseIndent()
 	code += b.indenter.Line("}")
 
-	smaDiv := ""
-	if b.period.IsConstant() {
-		smaDiv = fmt.Sprintf("float64(%d)", b.period.AsInt())
-	} else {
-		smaDiv = b.period.AsFloat64Cast()
-	}
 	if b.needsNaN {
 		code += b.indenter.Line("if _sma_has_nan {")
 		b.indenter.IncreaseIndent()
@@ -165,9 +162,6 @@ func (b *StatefulIndicatorBuilder) buildInitializationPhase() string {
 		code += b.indenter.Line(fmt.Sprintf("initialValue := _sma_accumulator / %s", smaDiv))
 		code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "initialValue"))
 	}
-
-	b.indenter.DecreaseIndent()
-	code += b.indenter.Line("} else {")
 
 	return code
 }
@@ -197,6 +191,46 @@ func (b *StatefulIndicatorBuilder) buildRecursivePhase(formula recursiveFormula)
 	}
 
 	code += formula()
+
+	if b.needsNaN {
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("}")
+	}
+
+	b.indenter.DecreaseIndent()
+	code += b.indenter.Line("}")
+
+	return code
+}
+
+// buildRMARecursivePhase emits the RMA recursive phase.
+// When previousValue is NaN, Pine Script re-seeds with ta.sma(src, length) rather than currentSource.
+// This matches: rma[i] = na(rma[i-1]) ? ta.sma(src, length) : alpha*src + (1-alpha)*rma[i-1]
+func (b *StatefulIndicatorBuilder) buildRMARecursivePhase() string {
+	b.indenter.IncreaseIndent()
+
+	code := b.indenter.Line("/* Recursive phase: use previous indicator value */")
+	code += b.indenter.Line(fmt.Sprintf("previousValue := %s", b.context.GenerateSeriesAccess(b.varName, 1)))
+
+	currentSourceAccess := b.accessor.GenerateLoopValueAccess("0")
+	code += b.indenter.Line(fmt.Sprintf("currentSource := %s", currentSourceAccess))
+
+	if b.needsNaN {
+		code += b.indenter.Line("if math.IsNaN(currentSource) {")
+		b.indenter.IncreaseIndent()
+		code += b.indenter.Line(b.context.GenerateSeriesUpdate(b.varName, "math.NaN()"))
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else if math.IsNaN(previousValue) {")
+		b.indenter.IncreaseIndent()
+		// Pine: na(sum[1]) ? ta.sma(src, length) — re-seed with full SMA, not currentSource
+		code += b.indenter.Line("/* RMA prev-NaN recovery: re-seed with SMA (matches Pine ta.rma) */")
+		code += b.buildSMAAccumulationCode()
+		b.indenter.DecreaseIndent()
+		code += b.indenter.Line("} else {")
+		b.indenter.IncreaseIndent()
+	}
+
+	code += b.rmaFormula()
 
 	if b.needsNaN {
 		b.indenter.DecreaseIndent()

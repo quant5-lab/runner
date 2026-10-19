@@ -281,6 +281,36 @@ func TestPlotStatementScope(t *testing.T) {
 				assertPlotCount(t, code, 2)
 				assertAllPlotsAtBarLoopScope(t, code)
 				assertPlotsAtEndOfBarLoop(t, code)
+				assertOnBarMetricsPrecedesPlots(t, code)
+			},
+		},
+		{
+			name: "strategy.exit without plots: OnBarMetrics is emitted",
+			program: &ast.Program{
+				Body: []ast.Node{
+					&ast.IfStatement{
+						Test: &ast.Identifier{Name: "condition"},
+						Consequent: []ast.Node{
+							&ast.ExpressionStatement{
+								Expression: &ast.CallExpression{
+									Callee: &ast.MemberExpression{
+										Object:   &ast.Identifier{Name: "strategy"},
+										Property: &ast.Identifier{Name: "exit"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPlotCount: 0,
+			scopeValidator: func(t *testing.T, code string) {
+				if !strings.Contains(code, "strat.OnBarMetrics(") {
+					t.Error("expected strat.OnBarMetrics() when strategy.exit is present")
+				}
+				if strings.Contains(code, "collector.Add") {
+					t.Error("no plot() calls in source, but collector.Add found in generated code")
+				}
 			},
 		},
 	}
@@ -431,6 +461,28 @@ func assertPlotsAtEndOfBarLoop(t *testing.T, code string) {
 			t.Errorf("Found %d non-empty lines between last plot and bar loop end - plots should be at end",
 				nonCommentLinesBetween)
 		}
+	}
+}
+
+func assertOnBarMetricsPrecedesPlots(t *testing.T, code string) {
+	t.Helper()
+	lines := strings.Split(code, "\n")
+	onBarMetricsLine := -1
+	firstCollectorLine := -1
+	for i, line := range lines {
+		if onBarMetricsLine == -1 && strings.Contains(line, "strat.OnBarMetrics(") {
+			onBarMetricsLine = i
+		}
+		if firstCollectorLine == -1 && strings.Contains(line, "collector.Add(") {
+			firstCollectorLine = i
+		}
+	}
+	if onBarMetricsLine == -1 || firstCollectorLine == -1 {
+		return
+	}
+	if onBarMetricsLine >= firstCollectorLine {
+		t.Errorf("strat.OnBarMetrics (line %d) must appear before first collector.Add (line %d)",
+			onBarMetricsLine, firstCollectorLine)
 	}
 }
 

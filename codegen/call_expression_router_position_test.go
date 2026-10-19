@@ -109,14 +109,14 @@ func TestCallExpressionRouter_VariableAssignmentRouting(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "unregistered function falls back to TODO",
+			name: "unregistered function falls back to featuregap.Record",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "unregistered_func"},
 				Arguments: []ast.Expression{
 					&ast.Identifier{Name: "close"},
 				},
 			},
-			wantContains: "TODO: implement unregistered_func",
+			wantContains: `featuregap.Record("unregistered_func"`,
 			wantErr:      false,
 		},
 	}
@@ -347,7 +347,7 @@ func TestCallExpressionRouter_EdgeCases(t *testing.T) {
 				},
 				Arguments: []ast.Expression{},
 			},
-			wantContains: "TODO", /* Handler validation error → falls back to TODO */
+			wantContains: `featuregap.Record("str.toupper"`,
 			wantErr:      false,
 		},
 		{
@@ -361,7 +361,7 @@ func TestCallExpressionRouter_EdgeCases(t *testing.T) {
 					&ast.Literal{Value: "test"},
 				},
 			},
-			wantContains: "TODO: implement unknown.func",
+			wantContains: `featuregap.Record("unknown.func"`,
 			wantErr:      false,
 		},
 		{
@@ -372,7 +372,7 @@ func TestCallExpressionRouter_EdgeCases(t *testing.T) {
 					&ast.Literal{Value: "test"},
 				},
 			},
-			wantContains: "TODO: implement unknown_bare",
+			wantContains: `featuregap.Record("unknown_bare"`,
 			wantErr:      false,
 		},
 	}
@@ -400,18 +400,17 @@ func TestCallExpressionRouter_EdgeCases(t *testing.T) {
 func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 	gen := newTestGenerator()
 
-	/* Sample call for each handler - one per registered handler */
 	handlerSamples := []struct {
-		handlerName string
-		call        *ast.CallExpression
-		wantNotTODO bool /* True if handler should generate real code, not TODO */
+		handlerName  string
+		call         *ast.CallExpression
+		wantRealCode bool
 	}{
 		{
 			handlerName: "MetaFunctionHandler",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "indicator"},
 			},
-			wantNotTODO: false, /* Meta functions are filtered out earlier */
+			wantRealCode: false, /* Meta functions are filtered out earlier */
 		},
 		{
 			handlerName: "StrategyActionHandler",
@@ -428,7 +427,7 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 					},
 				},
 			},
-			wantNotTODO: true,
+			wantRealCode: true,
 		},
 		{
 			handlerName: "InputHandler",
@@ -441,14 +440,14 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 					&ast.Literal{Value: 10},
 				},
 			},
-			wantNotTODO: false, /* input.* functions are filtered at strategy level */
+			wantRealCode: false, /* input.* functions are filtered at strategy level */
 		},
 		{
 			handlerName: "ValueHandler",
 			call: &ast.CallExpression{
 				Callee: &ast.Identifier{Name: "na"},
 			},
-			wantNotTODO: true,
+			wantRealCode: true,
 		},
 		{
 			handlerName: "MathFunctionHandler",
@@ -461,7 +460,7 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 					&ast.Identifier{Name: "close"},
 				},
 			},
-			wantNotTODO: true,
+			wantRealCode: true,
 		},
 		{
 			handlerName: "TickerHandler",
@@ -474,7 +473,7 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 					},
 				},
 			},
-			wantNotTODO: true,
+			wantRealCode: true,
 		},
 		{
 			handlerName: "StringNamespaceHandler",
@@ -487,7 +486,7 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 					&ast.Identifier{Name: "close"},
 				},
 			},
-			wantNotTODO: true,
+			wantRealCode: true,
 		},
 	}
 
@@ -498,10 +497,10 @@ func TestCallExpressionRouter_AllHandlersCovered(t *testing.T) {
 				t.Fatalf("generateVariableFromCall() error = %v", err)
 			}
 
-			hasTODO := strings.Contains(code, "TODO")
+			fellThrough := strings.Contains(code, "TODO") || strings.Contains(code, "featuregap.Record")
 
-			if tt.wantNotTODO && hasTODO {
-				t.Errorf("%s handler generated TODO comment, expected real code: %q", tt.handlerName, code)
+			if tt.wantRealCode && fellThrough {
+				t.Errorf("%s handler fell through to unknown-function path, expected real code: %q", tt.handlerName, code)
 			}
 		})
 	}

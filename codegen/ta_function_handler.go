@@ -86,6 +86,7 @@ func NewTAFunctionRegistry() *TAFunctionRegistry {
 			&SarHandler{},
 			&TrHandler{},
 			&PivotPointLevelsHandler{},
+			&StochSingleValueHandler{},
 		},
 	}
 }

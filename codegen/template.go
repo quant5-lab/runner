@@ -21,14 +21,14 @@ func InjectStrategy(templatePath, outputPath string, code *StrategyCode) error {
 	}
 
 	/* Generate function with strategy code (securityContexts map parameter for security() support) */
-	strategyFunc := userFuncs + fmt.Sprintf(`func executeStrategy(ctx *context.Context, dataDir string, securityContexts map[string]*context.Context, securityBarMappers map[string]*request.SecurityBarMapper) (*output.Collector, *strategy.Strategy) {
+	strategyFunc := userFuncs + fmt.Sprintf(`func executeStrategy(ctx *context.Context, dataDir string, securityContexts map[string]*context.Context, securityBarMappers map[string]*request.SecurityBarMapper, qtyStep float64) (*output.Collector, *strategy.Strategy) {
 	collector := output.NewCollector()
 	strat := strategy.NewStrategy()
 
 %s
 
 	return collector, strat
-}`, code.FunctionBody)
+}`, code.CompatibilitySetup+code.FunctionBody)
 
 	/* Replace placeholders */
 	output := strings.Replace(template, "{{STRATEGY_FUNC}}", strategyFunc, 1)

@@ -158,7 +158,15 @@ func isOHLCVBuiltin(name string) bool {
 
 func (f *ArrowAwareAccessorFactory) createBinaryAccessor(binExpr *ast.BinaryExpression) (AccessGenerator, error) {
 	if f.symbolTable != nil {
-		return NewSeriesExpressionAccessor(binExpr, f.symbolTable, nil), nil
+		pre := newNestedTACallPrecomputer(f.exprGenerator)
+		if err := pre.Process(binExpr); err != nil {
+			return nil, fmt.Errorf("nested TA precompute (binary): %w", err)
+		}
+		acc := NewSeriesExpressionAccessor(binExpr, f.symbolTable, pre.BuildLookup())
+		if pre.HasNestedCalls() {
+			acc.WithPreamble(pre.Preamble())
+		}
+		return acc, nil
 	}
 
 	tempVarName := "binary_source_temp"
@@ -200,7 +208,15 @@ func (f *ArrowAwareAccessorFactory) createCallAccessor(call *ast.CallExpression)
 
 func (f *ArrowAwareAccessorFactory) createConditionalAccessor(cond *ast.ConditionalExpression) (AccessGenerator, error) {
 	if f.symbolTable != nil {
-		return NewSeriesExpressionAccessor(cond, f.symbolTable, nil), nil
+		pre := newNestedTACallPrecomputer(f.exprGenerator)
+		if err := pre.Process(cond); err != nil {
+			return nil, fmt.Errorf("nested TA precompute (conditional): %w", err)
+		}
+		acc := NewSeriesExpressionAccessor(cond, f.symbolTable, pre.BuildLookup())
+		if pre.HasNestedCalls() {
+			acc.WithPreamble(pre.Preamble())
+		}
+		return acc, nil
 	}
 
 	tempVarName := "ternary_source_temp"

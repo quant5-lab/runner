@@ -7,7 +7,6 @@ import (
 	"github.com/quant5-lab/runner/ast"
 )
 
-/* TestConstantRegistry_InputConstantsIsolation validates input constants never generate Series artifacts */
 func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -42,7 +41,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 					},
 				},
 			},
-			wantConsts: []string{"const factor = 1.50"},
+			wantConsts: []string{"const factor = 1.5"},
 			wantVars:   []string{},
 			noSeries:   []string{"factorSeries"},
 		},
@@ -82,7 +81,7 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 					},
 				},
 			},
-			wantConsts: []string{"const mult = 2.50"},
+			wantConsts: []string{"const mult = 2.5"},
 			wantVars:   []string{},
 			noSeries:   []string{"multSeries"},
 		},
@@ -178,7 +177,6 @@ func TestConstantRegistry_InputConstantsIsolation(t *testing.T) {
 	}
 }
 
-/* TestInputConstants_VariableSeparation tests that constants never leak into variable lifecycle */
 func TestInputConstants_VariableSeparation(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -268,7 +266,7 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 					},
 				},
 			},
-			wantConst:     "const factor = 1.50",
+			wantConst:     "const factor = 1.5",
 			noConstSeries: "factorSeries",
 			wantVar:       "value1",
 			wantVarSeries: "value2Series",
@@ -351,7 +349,6 @@ func TestInputConstants_VariableSeparation(t *testing.T) {
 	}
 }
 
-/* TestInputConstants_SeriesLifecycleEdgeCases tests boundary conditions */
 func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -384,7 +381,7 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 				"xSeries.Next()",
 				"_ = xSeries",
 			},
-			mustContain: []string{"const x = 0.00"},
+			mustContain: []string{"const x = 0"},
 			description: "Default input.float(0.0) should not create Series",
 		},
 		{
@@ -526,7 +523,6 @@ func TestInputConstants_SeriesLifecycleEdgeCases(t *testing.T) {
 	}
 }
 
-/* TestInputConstants_ConstantRegistryConsistency tests registry state integrity */
 func TestInputConstants_ConstantRegistryConsistency(t *testing.T) {
 	program := &ast.Program{
 		Body: []ast.Node{

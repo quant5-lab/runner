@@ -1,0 +1,270 @@
+@import './tokens.css';
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+
+body {
+  font-family: var(--font-ui);
+  background: linear-gradient(135deg, var(--surface-base) 0%, var(--surface-raised) 100%);
+  color: var(--text-primary);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+#container {
+  width: 100%;
+  max-width: 90vw;
+  margin: 0 auto;
+  padding: 1.5rem;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-container);
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  text-shadow: var(--shadow-text);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent-alt));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Info card ───────────────────────────────────────────────────────────── */
+
+.info {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.refresh-btn {
+  background-color: var(--color-action);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: background-color var(--transition-duration);
+}
+
+.refresh-btn:hover       { background-color: var(--color-action-hover); }
+.refresh-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.refresh-btn:active      { transform: scale(0.97); }
+
+.sort-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color var(--transition-duration), color var(--transition-duration);
+}
+
+.sort-toggle-btn:hover        { border-color: var(--color-accent); color: var(--color-accent); }
+.sort-toggle-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.sort-toggle-btn:active       { transform: scale(0.97); }
+
+.fullscreen-toggle-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background: var(--surface-raised-alpha);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition-duration), color var(--transition-duration);
+}
+
+.fullscreen-toggle-btn:hover        { border-color: var(--color-accent); color: var(--color-accent); }
+.fullscreen-toggle-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.fullscreen-toggle-btn:active       { transform: scale(0.97); }
+
+/* ── Chart container ─────────────────────────────────────────────────────── */
+
+.chart-container {
+  position: relative;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.chart-container > div          { margin-bottom: 8px; }
+.chart-container > div:last-child { margin-bottom: 0; }
+
+/* ── Fullscreen states ───────────────────────────────────────────────────── */
+
+.chart-container:fullscreen,
+.chart-container:-webkit-full-screen,
+.chart-container.chart-fullscreen {
+  background: var(--surface-raised);
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chart-container:fullscreen > #main-chart,
+.chart-container:-webkit-full-screen > #main-chart,
+.chart-container.chart-fullscreen > #main-chart {
+  flex: 1 1 auto;
+  min-height: 200px;
+}
+
+.chart-container:fullscreen > div:not(#main-chart),
+.chart-container:-webkit-full-screen > div:not(#main-chart),
+.chart-container.chart-fullscreen > div:not(#main-chart) {
+  flex: 0 0 auto;
+}
+
+/* ── Pane resize handle ──────────────────────────────────────────────────── */
+
+.pane-resize-handle {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  user-select: none;
+  flex-shrink: 0;
+  transition: background var(--transition-duration);
+}
+
+.pane-resize-handle:hover           { background: var(--color-accent-subtle); }
+.chart-container > .pane-resize-handle { margin: 0; }
+
+/* ── Timestamp ───────────────────────────────────────────────────────────── */
+
+.timestamp {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+}
+
+/* ── Trades section ──────────────────────────────────────────────────────── */
+
+.trades-section {
+  margin-top: 2rem;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.trades-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.trades-header h2 {
+  color: var(--color-accent);
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.trades-summary {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* ── Trades table ────────────────────────────────────────────────────────── */
+
+.trades-table-container {
+  overflow-x: auto;
+}
+
+.trades-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.trades-table th {
+  background-color: var(--surface-base);
+  color: var(--text-secondary);
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-default);
+}
+
+.trades-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.trades-table tbody tr:hover {
+  background-color: var(--surface-hover);
+}
+
+.trades-table tbody tr:nth-child(4n+1):not(:only-child),
+.trades-table tbody tr:nth-child(4n+2):not(:only-child) {
+  background-color: var(--stripe-tint);
+}
+
+/* ── Trade row states ────────────────────────────────────────────────────── */
+
+.trade-long             { color: var(--color-long); }
+.trade-short            { color: var(--color-short); }
+
+.trade-profit-positive  { color: var(--color-long);  font-weight: 600; }
+.trade-profit-negative  { color: var(--color-short); font-weight: 600; }
+
+.trade-open {
+  color: var(--color-open);
+  font-weight: 600;
+  font-style: italic;
+}
+
+.no-trades {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

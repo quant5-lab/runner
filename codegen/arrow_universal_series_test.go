@@ -70,12 +70,13 @@ plot(count(10))
 			mustContainAll: []string{
 				"resultSeries := arrowCtx.GetOrCreateSeries(\"result\")",
 				"gainSeries := arrowCtx.GetOrCreateSeries(\"gain\")",
-				"resultSeries.Set((resultSeries.GetCurrent() + gain))", // Inline pattern in if-body
+				"result = (resultSeries.GetCurrent() + gain)",
+				"resultSeries.Set(result)",
 			},
 			forbiddenPattern: []string{
 				"resultSeries.Set((result + gain))", // Should use Series.GetCurrent()
 			},
-			description: "variables declared in if-statements inside loops get Series",
+			description: "variables declared in if-statements inside loops get dual-storage (scalar + Series)",
 		},
 		{
 			name: "multiple_loops_same_variable",

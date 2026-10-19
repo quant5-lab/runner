@@ -256,6 +256,12 @@ func TestExtractTimeframe_AllExpressionTypes(t *testing.T) {
 			wantRuntime: false,
 		},
 		{
+			name:        "literal - numeric token normalized",
+			expr:        &ast.Literal{Value: "60"},
+			wantCode:    `"1h"`,
+			wantRuntime: false,
+		},
+		{
 			name:        "literal - quoted string stripped",
 			expr:        &ast.Literal{Value: `"1D"`},
 			wantCode:    `"1D"`,
@@ -265,6 +271,16 @@ func TestExtractTimeframe_AllExpressionTypes(t *testing.T) {
 			name:      "literal - non-string type",
 			expr:      &ast.Literal{Value: 60},
 			wantError: true,
+		},
+		{
+			name: "identifier - constant with numeric value normalized",
+			expr: &ast.Identifier{Name: "tf"},
+			generator: &generator{
+				variables: map[string]string{"tf": "string"},
+				constants: map[string]interface{}{"tf": "60"},
+			},
+			wantCode:    `"1h"`,
+			wantRuntime: false,
 		},
 		{
 			name:      "call expression without generator",
@@ -310,35 +326,45 @@ func TestTimeframeNormalization_AllFormats(t *testing.T) {
 
 	tests := []struct {
 		input    string
-		expected string
+		wantCode string
 	}{
-		{"D", "1D"},
-		{"W", "1W"},
-		{"M", "1M"},
-		{"1D", "1D"},
-		{"1W", "1W"},
-		{"1M", "1M"},
-		{"5D", "5D"},
-		{"2W", "2W"},
-		{"3M", "3M"},
-		{"1h", "1h"},
-		{"4h", "4h"},
-		{"1m", "1m"},
-		{"5m", "5m"},
-		{"15", "15"},
-		{"60", "60"},
-		{"", ""},
-		{"d", "d"},
-		{"w", "w"},
-		{"m", "m"},
-		{"custom", "custom"},
+		{"D", `"1D"`},
+		{"W", `"1W"`},
+		{"M", `"1M"`},
+		{"1D", `"1D"`},
+		{"1W", `"1W"`},
+		{"1M", `"1M"`},
+		{"5D", `"5D"`},
+		{"2W", `"2W"`},
+		{"3M", `"3M"`},
+		{"1h", `"1h"`},
+		{"4h", `"4h"`},
+		{"1m", `"1m"`},
+		{"5m", `"5m"`},
+		{"0", `"1m"`},
+		{"1", `"1m"`},
+		{"5", `"5m"`},
+		{"15", `"15m"`},
+		{"30", `"30m"`},
+		{"60", `"1h"`},
+		{"120", `"2h"`},
+		{"240", `"4h"`},
+		{"1440", `"1D"`},
+		{"", `""`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := extractor.normalizeTimeframe(tt.input)
-			if result != tt.expected {
-				t.Errorf("normalizeTimeframe(%q) = %q, want %q", tt.input, result, tt.expected)
+			expr := &ast.Literal{Value: tt.input}
+			result, err := extractor.ExtractTimeframe(expr)
+			if err != nil {
+				t.Fatalf("ExtractTimeframe(%q): unexpected error: %v", tt.input, err)
+			}
+			if result.Code != tt.wantCode {
+				t.Errorf("ExtractTimeframe(%q).Code = %q, want %q", tt.input, result.Code, tt.wantCode)
+			}
+			if result.IsRuntime {
+				t.Errorf("ExtractTimeframe(%q).IsRuntime = true, want false for literal", tt.input)
 			}
 		})
 	}
@@ -635,6 +661,8 @@ func TestBoundaryConditions_ExtremeInputs(t *testing.T) {
 	})
 
 	t.Run("very long timeframe", func(t *testing.T) {
+		// A 1000-digit all-digit string overflows int64 during minute-count parsing,
+		// producing a negative second count; CanonicalTimeframe passes it through unchanged.
 		longTf := strings.Repeat("1", 1000)
 		result, err := extractor.ExtractTimeframe(&ast.Literal{Value: longTf})
 		if err != nil {

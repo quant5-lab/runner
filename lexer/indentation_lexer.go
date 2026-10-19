@@ -43,7 +43,6 @@ type IndentationLexer struct {
 	indentStack     []int
 	pending         []lexer.Token
 	previousLine    int
-	atLineStart     bool
 	whitespaceType  lexer.TokenType
 	lastTokenValue  string
 	expectingIndent bool

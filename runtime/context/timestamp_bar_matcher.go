@@ -44,16 +44,3 @@ func (m *TimestampBarMatcher) MatchBarWithLookahead(
 
 	return m.indexFinder.FindContainingBar(securityContext.Data, targetTimestamp)
 }
-
-func (m *TimestampBarMatcher) findFirstBarAfter(data []OHLCV, timestamp int64) int {
-	for i := 0; i < len(data); i++ {
-		if data[i].Time > timestamp {
-			return i
-		}
-	}
-	return -1
-}
-
-func (m *TimestampBarMatcher) handleBeyondLastBar(data []OHLCV) int {
-	return len(data) - 1
-}

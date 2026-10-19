@@ -15,9 +15,6 @@ func makeSimpleCallExpr(funcName string, args ...ast.Expression) *ast.CallExpres
 	}
 }
 
-// fptr is a convenience helper for providing an optional float64 replacement argument.
-func fptr(v float64) *float64 { return &v }
-
 func TestNz(t *testing.T) {
 	// nz(value [, replacement=0]) replaces NaN with replacement (default 0).
 	// Non-NaN values pass through unchanged regardless of any replacement argument.

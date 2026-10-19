@@ -14,7 +14,7 @@ func (g *TrueRangeAccessGenerator) GenerateLoopValueAccess(loopVar string) strin
 }
 
 func (g *TrueRangeAccessGenerator) GenerateInitialValueAccess(period int) string {
-	return g.GenerateLoopValueAccess(fmt.Sprintf("%d-1", period))
+	return g.GenerateLoopValueAccess(fmt.Sprintf("%d", period-1))
 }
 
 func (g *TrueRangeAccessGenerator) GenerateCurrentValueAccess() string {

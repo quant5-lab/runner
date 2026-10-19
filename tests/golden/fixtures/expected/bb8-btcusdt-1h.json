@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB8",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-01-21T07:51:47Z",
+  "generatedAt": "2026-06-10T12:31:08Z",
   "result": {
     "trades": [
       {
@@ -16,7 +16,7 @@
         "exitPrice": 114292.14,
         "exitComment": "",
         "size": 5.08544479588635,
-        "profit": -18773.63142628588,
+        "profit": -19127.999336857993,
         "direction": "long"
       }
     ],
@@ -36,8 +36,8 @@
         "direction": "long"
       }
     ],
-    "equity": 1990606.2359123633,
-    "netProfit": -18773.63142628588,
+    "equity": 1990251.8680017912,
+    "netProfit": -19127.999336857993,
     "totalTrades": 0,
     "plots": {}
   }

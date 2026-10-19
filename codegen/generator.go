@@ -18,6 +18,8 @@ type StrategyCode struct {
 	FunctionBody         string   // executeStrategy() function body
 	StrategyName         string   // Pine Script strategy name
 	AdditionalImports    []string // Additional imports needed for security() streaming evaluation
+	FeatureGaps          []string // Deduplicated list of unimplemented function names encountered
+	CompatibilitySetup   string   // Generated static compatibility records
 }
 
 /* GenerateStrategyCodeFromAST converts parsed Pine ESTree to Go runtime code */
@@ -57,6 +59,7 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.valueHandler = NewValueHandler()
 	gen.subscriptResolver = NewSubscriptResolver()
 	gen.builtinHandler = NewBuiltinIdentifierHandler()
+	boolConverter.SetGoTypeResolver(gen.builtinHandler)
 	gen.taRegistry = NewTAFunctionRegistry()
 	gen.compositeIndicatorRegistry = NewCompositeIndicatorRegistry()
 	gen.compositeIndicatorRegistry.Register("ta.rsi", &RSIHandler{})
@@ -87,20 +90,25 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 	gen.signatureRegistrar = NewSignatureRegistrar(gen.funcSigRegistry)
 	gen.arrowCaptureRegistry = NewArrowCaptureRegistry()
 	gen.arrowContextLifecycle = NewArrowContextLifecycleManager()
+	gen.nestedChildContextAlloc = NewNestedChildContextAllocator()
 	gen.returnValueStorage = NewReturnValueSeriesStorageHandler("\t")
 	gen.symbolTable = NewSymbolTable()
 	gen.literalFormatter = NewLiteralFormatter()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
-	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.directionExtractor = NewContextAwareDirectionExtractor(gen)
 
 	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 	gen.conditionalCodeGen = NewConditionalCodeGenerator(gen, gen.conditionalArgAnalyzer, gen.tempVarMgr)
 	gen.securityAnalyzer = NewSecurityCallAnalyzer(gen)
 	gen.udfAnalyzer = NewUDFTempVarAnalyzer(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
+	gen.commentStringVars = collectStrategyCommentIdentifiers(program)
+	gen.chartHandleReachability = newChartHandleReachability(program)
 
 	gen.hasSecurityCalls = detectSecurityCalls(program)
+	gen.hasSecurityUDFEvals = detectSecurityUDFEvals(program)
 	gen.hasStrategyRuntimeAccess = detectStrategyRuntimeAccess(program)
+	gen.needsIntrabarExitChecking = detectStrategyExitCalls(program)
 
 	sessionMemberKeys := gen.builtinHandler.registry.SessionSeriesBuiltinNames()
 	usageDetector := NewBuiltinUsageDetectorWithMembers(
@@ -158,11 +166,14 @@ func GenerateStrategyCodeFromAST(program *ast.Program) (*StrategyCode, error) {
 		additionalImports = append(additionalImports, "sort")
 	}
 
+	featureGaps := deduplicateFeatureGaps(gen.featureGaps)
 	code := &StrategyCode{
 		UserDefinedFunctions: gen.userDefinedFunctions,
 		FunctionBody:         body,
 		StrategyName:         gen.strategyConfig.Name,
 		AdditionalImports:    additionalImports,
+		FeatureGaps:          featureGaps,
+		CompatibilitySetup:   compatibilitySetupCode(analyzeCompatibility(program, featureGaps)),
 	}
 
 	return code, nil
@@ -174,7 +185,6 @@ type generator struct {
 	varInits                  map[string]ast.Expression
 	constants                 map[string]interface{}
 	reassignedVars            map[string]bool
-	plots                     []string
 	strategyConfig            *StrategyConfig
 	indent                    int
 	userDefinedFunctions      string
@@ -182,11 +192,15 @@ type generator struct {
 	tupleTAFunctions          []tupleTAFunctionCall
 	inSecurityContext         bool
 	inArrowFunctionBody       bool
+	nestedChildContextAlloc   *NestedChildContextAllocator
+	blockLocalVars            map[string]bool
 	loopContextStack          *LoopContextStack
 	hasSecurityCalls          bool
 	hasSecurityExprEvals      bool
 	hasArrowSecurityExprEvals bool
+	hasSecurityUDFEvals       bool
 	hasStrategyRuntimeAccess  bool
+	needsIntrabarExitChecking bool
 	hasBarIndexUsage          bool
 	hasLastBarIndex           bool
 	hasLastBarTime            bool
@@ -233,17 +247,22 @@ type generator struct {
 	arrowAccessResolver        *ArrowSeriesAccessResolver
 	arrowCaptureRegistry       *ArrowCaptureRegistry
 	symbolTable                SymbolTable
+	arrowSymbolTable           SymbolTable
 	literalFormatter           *LiteralFormatter
 	tupleIndicatorHandler      *TupleIndicatorHandler
 	directionExtractor         *ChainDirectionExtractor
 
-	conditionalArgAnalyzer *ConditionalArgumentAnalyzer
-	conditionalCodeGen     *ConditionalCodeGenerator
-	securityAnalyzer       *SecurityCallAnalyzer
-	udfAnalyzer            *UDFTempVarAnalyzer
-	statementAnalyzer      *StatementConditionalAnalyzer
-	builtinSeriesLifecycle *CompositeSeriesLifecycle
-	seriesInitCoercer      *SeriesInitCoercer
+	conditionalArgAnalyzer  *ConditionalArgumentAnalyzer
+	conditionalCodeGen      *ConditionalCodeGenerator
+	securityAnalyzer        *SecurityCallAnalyzer
+	udfAnalyzer             *UDFTempVarAnalyzer
+	statementAnalyzer       *StatementConditionalAnalyzer
+	builtinSeriesLifecycle  *CompositeSeriesLifecycle
+	seriesInitCoercer       *SeriesInitCoercer
+	chartOnlyUDFs           map[string]bool
+	commentStringVars       map[string]bool
+	chartHandleReachability chartHandleReachability
+	featureGaps             []string
 }
 
 func (g *generator) buildPlotOptions(opts PlotOptions) string {
@@ -526,6 +545,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		nestedScanner.ScanReassignments(stmt)
 	}
 
+	g.chartOnlyUDFs = NewChartOnlyUDFDetector().Detect(program)
 	// Generate user-defined functions at module level
 	for _, stmt := range program.Body {
 		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
@@ -549,6 +569,34 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 
 					g.userDefinedFunctions += funcCode
 					g.indent = savedIndent
+
+					if retType := arrowCodegen.LastReturnType(); retType == "string" {
+						g.typeSystem.RegisterUDFReturnType(id.Name, retType)
+					}
+				}
+			}
+		}
+	}
+
+	for _, stmt := range program.Body {
+		if varDecl, ok := stmt.(*ast.VariableDeclaration); ok {
+			for _, declarator := range varDecl.Declarations {
+				id, ok := declarator.ID.(*ast.Identifier)
+				if !ok || declarator.Init == nil {
+					continue
+				}
+				varName := id.Name
+				if g.variables[varName] != "float64" {
+					continue
+				}
+				callExpr, ok := declarator.Init.(*ast.CallExpression)
+				if !ok {
+					continue
+				}
+				funcName := g.extractFunctionName(callExpr.Callee)
+				if retType, ok2 := g.typeSystem.GetUDFReturnType(funcName); ok2 && retType == "string" {
+					g.variables[varName] = "string"
+					g.typeSystem.RegisterVariable(varName, "string")
 				}
 			}
 		}
@@ -605,6 +653,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	if g.strategyConfig.DefaultQtyType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
+	}
+	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.SetProcessOrdersOnClose(true)\n"
 	}
 	code += "\n"
 
@@ -693,6 +745,9 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		code += g.ind() + "var secBarEvaluator security.BarEvaluator\n"
 		if g.hasArrowSecurityExprEvals {
 			code += g.ind() + "var " + ArrowEvalMapVar + " map[string]security.BarEvaluator\n"
+		}
+		if g.hasSecurityUDFEvals {
+			code += g.ind() + "var secUDFBarEvaluators map[string]security.BarEvaluator\n"
 		}
 		code += "\n"
 	}
@@ -812,6 +867,7 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	for i := range callSites {
 		callSites[i].NeedsSecurity = secDetector.FunctionContainsSecurityCall(callSites[i].FunctionName, program)
 	}
+	callSites = filterChartOnlyCallSites(callSites, g.chartOnlyUDFs)
 
 	g.hoistedArrowContexts = callSites
 
@@ -874,6 +930,15 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	code += "\n"
 
+	/* B1 fix: OnBarMetrics fires BEFORE Pine statements so TV-style intrabar
+	   exit checking (stop/limit fills at bar open using OHLC) happens before
+	   any Pine code that could call strategy.close_all() and dispose of
+	   pending exits. This mirrors TV's execution order: broker emulator
+	   evaluates pending stop/limit orders BEFORE user Pine code each bar. */
+	if g.hasStrategyRuntimeAccess || g.needsIntrabarExitChecking || g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarMetrics(bar.Open, bar.High, bar.Low, bar.Time)\n"
+	}
+
 	/* Interleaved emission — period .Set() must precede .Get(0) within the same bar */
 	statementCounter.Reset()
 	for stmtIdx, stmt := range program.Body {
@@ -902,15 +967,14 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 		}
 	}
 
-	if g.hasStrategyRuntimeAccess {
-		code += g.ind() + "strat.OnBarMetrics(bar.High, bar.Low)\n"
-	}
-
 	code += "\n" + g.ind() + "// Suppress unused variable warnings\n"
 	if g.hasSecurityCalls {
 		code += g.ind() + "_ = secBarEvaluator\n"
 		if g.hasArrowSecurityExprEvals {
 			code += g.ind() + "_ = " + ArrowEvalMapVar + "\n"
+		}
+		if g.hasSecurityUDFEvals {
+			code += g.ind() + "_ = secUDFBarEvaluators\n"
 		}
 	}
 	if g.hasStrategyRuntimeAccess {
@@ -948,6 +1012,10 @@ func (g *generator) generateProgram(program *ast.Program) (string, error) {
 	}
 	if g.hasTimenow {
 		code += g.ind() + "_ = timenow\n"
+	}
+
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarClose(bar.Close, bar.Time)\n"
 	}
 
 	// Advance Series cursors at end of bar loop
@@ -1311,6 +1379,10 @@ func (g *generator) generateArrowFunctionExpression(expr ast.Expression) (string
 			}
 		}
 
+		if g.blockLocalVars != nil && g.blockLocalVars[e.Name] {
+			return e.Name, nil
+		}
+
 		// User variables and parameters shadow builtins (PineScript semantics)
 		if varType, exists := g.variables[e.Name]; exists {
 			if varType == "float" || varType == "float64" || varType == "bool" {
@@ -1622,6 +1694,10 @@ func (g *generator) generateConditionExpression(expr ast.Expression) (string, er
 			}
 		}
 
+		if g.blockLocalVars != nil && g.blockLocalVars[varName] {
+			return varName, nil
+		}
+
 		/* User-declared variables shadow builtins (PineScript semantics) */
 		if _, exists := g.variables[varName]; exists {
 			if constVal, isConstant := g.constants[varName]; isConstant {
@@ -1806,7 +1882,7 @@ func (g *generator) generateVariableDeclaration(decl *ast.VariableDeclaration) (
 			}
 		}
 
-		varType := g.inferVariableType(declarator.Init)
+		varType := g.inferDeclaredVariableType(varName, declarator.Init)
 
 		isInLoop := g.loopContextStack != nil && g.loopContextStack.IsInLoop()
 		if !isInLoop {
@@ -2097,6 +2173,19 @@ func (g *generator) inferVariableType(expr ast.Expression) string {
 	return g.typeSystem.InferType(expr)
 }
 
+func (g *generator) inferDeclaredVariableType(varName string, expr ast.Expression) string {
+	if g.commentStringVars[varName] {
+		if funcName, ok := bareCallName(expr); ok && !g.isUserDefinedFunction(funcName) {
+			return "string"
+		}
+	}
+	return g.inferVariableType(expr)
+}
+
+func (g *generator) isUserDefinedFunction(funcName string) bool {
+	return g.variables[funcName] == "function"
+}
+
 func (g *generator) registerArrayVariable(varName, varType string) {
 	if g.arrayVariableRegistry == nil {
 		return
@@ -2159,6 +2248,15 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				}
 			}
 		}
+
+		if dir, ok := resolveStrategyDirectionMember(expr); ok {
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, dir), nil
+		}
+
+		if code, ok := g.resolveStringMemberExpr(expr); ok {
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, code), nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", expr)
 
 	case *ast.CallExpression:
@@ -2170,6 +2268,13 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 			}
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, colorCode), nil
 		}
+		if IsTickerConstructorFunction(funcName) {
+			tickerCode, err := NewTickerFunctionHandler().GenerateCode(g, expr)
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, tickerCode), nil
+		}
 		if funcName == "array.join" {
 			readerCodegen := NewArrayReaderCodegen()
 			joinCode, err := readerCodegen.GenerateCode(g, expr)
@@ -2177,6 +2282,23 @@ func (g *generator) generateStringVariableInit(varName string, initExpr ast.Expr
 				return "", err
 			}
 			return g.ind() + fmt.Sprintf("%s = %s\n", varName, joinCode), nil
+		}
+		detector := NewUserDefinedFunctionDetector(g.variables)
+		if detector.IsUserDefinedFunction(funcName) {
+			ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
+			callCode, err := g.generateUserDefinedFunctionCallWithContext(expr, ctxVarName)
+			if err != nil {
+				return "", fmt.Errorf("UDF string call %s: %w", funcName, err)
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, callCode), nil
+		}
+		if _, ok := bareCallName(expr); ok {
+			dispatcher := NewExpressionPositionDispatcher(g.callRouter)
+			callCode, err := dispatcher.DispatchString(g, expr, "generator.variable_init_unknown")
+			if err != nil {
+				return "", err
+			}
+			return g.ind() + fmt.Sprintf("%s = %s\n", varName, callCode), nil
 		}
 		return "", fmt.Errorf("unsupported call expression for string variable: %s", funcName)
 
@@ -2236,6 +2358,15 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 				}
 			}
 		}
+
+		if dir, ok := resolveStrategyDirectionMember(e); ok {
+			return dir, nil
+		}
+
+		if code, ok := g.resolveStringMemberExpr(e); ok {
+			return code, nil
+		}
+
 		return "", fmt.Errorf("unsupported string member expression: %v", e)
 
 	case *ast.CallExpression:
@@ -2243,11 +2374,30 @@ func (g *generator) generateStringExpression(expr ast.Expression) (string, error
 		if g.colorHandler.CanHandle(funcName) {
 			return g.colorHandler.GenerateColorCall(funcName, e.Arguments, g)
 		}
+		if IsTickerConstructorFunction(funcName) {
+			return NewTickerFunctionHandler().GenerateCode(g, e)
+		}
 		return "", fmt.Errorf("unsupported call expression for string expression: %s", funcName)
 
 	default:
 		return "", fmt.Errorf("unsupported string expression: %T", expr)
 	}
+}
+
+// resolveStringMemberExpr returns Go code for any MemberExpression whose resolved
+// type is GoString (e.g. syminfo.tickerid, syminfo.timezone).
+// Returns ("", false) for non-string or unrecognised members so callers can fall
+// through to their own handlers.
+func (g *generator) resolveStringMemberExpr(expr *ast.MemberExpression) (string, bool) {
+	code, ok := g.builtinHandler.TryResolveMemberExpression(expr, BarLoopScope)
+	if !ok {
+		return "", false
+	}
+	goType, found := g.builtinHandler.ResolveMemberExpressionGoType(expr)
+	if !found || goType != GoString {
+		return "", false
+	}
+	return code, true
 }
 
 func (g *generator) generateVariableInit(varName string, initExpr ast.Expression) (string, error) {
@@ -2479,7 +2629,12 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		code := ""
 
 		if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
-			code = g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+			if g.inArrowFunctionBody {
+				childCtxExpr := g.nestedChildContextAlloc.AllocateChildContextExpr(funcName)
+				code = g.ind() + fmt.Sprintf("%s := %s\n", ctxVarName, childCtxExpr)
+			} else {
+				code = g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+			}
 		}
 
 		callCode, err := g.generateUserDefinedFunctionCallWithContext(call, ctxVarName)
@@ -2496,8 +2651,10 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 	}
 
 	if sharedTASignatures.Contains(funcName) {
-		log.Printf("WARNING: TA function %s has no handler — producing NaN stub", funcName)
-		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName), nil
+		log.Printf("WARNING: TA function %s has no handler — producing featuregap stub", funcName)
+		g.featureGaps = append(g.featureGaps, funcName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n",
+			varName, runtimeFeatureGap(funcName, "generator.ta_no_handler", call.Location)), nil
 	}
 
 	// Handle math functions that need Series storage (have TA dependencies)
@@ -2688,7 +2845,7 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 		 * Usage: entry_time = time(timeframe.period, "0950-1345")
 		 * Check: is_entry_time = na(entry_time) ? false : true
 		 */
-		handler := NewTimeHandler(g.ind())
+		handler := NewTimeHandlerWithVersion(g.ind(), g.pineVersion)
 		return handler.HandleVariableInit(varName, call), nil
 
 	case "nz":
@@ -2738,7 +2895,9 @@ func (g *generator) generateVariableFromCall(varName string, call *ast.CallExpre
 			return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n", varName, routedCode), nil
 		}
 
-		return g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN()) // TODO: implement %s()\n", varName, funcName), nil
+		g.featureGaps = append(g.featureGaps, funcName)
+		return g.ind() + fmt.Sprintf("%sSeries.Set(%s)\n",
+			varName, runtimeFeatureGap(funcName, "generator.variable_init_unknown", call.Location)), nil
 	}
 }
 
@@ -2798,96 +2957,6 @@ func (g *generator) extractFunctionName(callee ast.Expression) string {
 			prop = id.Name
 		}
 		return obj + "." + prop
-	default:
-		return "unknown"
-	}
-}
-
-func (g *generator) extractArgIdentifier(expr ast.Expression) string {
-	// Handle MemberExpression like close[0]
-	if mem, ok := expr.(*ast.MemberExpression); ok {
-		if id, ok := mem.Object.(*ast.Identifier); ok {
-			// Map Pine builtins to OHLCV fields
-			switch id.Name {
-			case "close":
-				return "Close"
-			case "open":
-				return "Open"
-			case "high":
-				return "High"
-			case "low":
-				return "Low"
-			case "volume":
-				return "Volume"
-			default:
-				return id.Name
-			}
-		}
-	}
-	// Handle direct Identifier (legacy support)
-	if id, ok := expr.(*ast.Identifier); ok {
-		// Map Pine builtins to OHLCV fields
-		switch id.Name {
-		case "close":
-			return "Close"
-		case "open":
-			return "Open"
-		case "high":
-			return "High"
-		case "low":
-			return "Low"
-		case "volume":
-			return "Volume"
-		default:
-			return id.Name
-		}
-	}
-	return "Close" // Default
-}
-
-func (g *generator) extractArgLiteral(expr ast.Expression) int {
-	if lit, ok := expr.(*ast.Literal); ok {
-		if val, ok := lit.Value.(float64); ok {
-			return int(val)
-		}
-	}
-	return 0
-}
-
-/* extractStrategyName extracts title from strategy/indicator/study arguments */
-func (g *generator) extractStrategyName(args []ast.Expression) string {
-	if len(args) == 0 {
-		return ""
-	}
-
-	if lit, ok := args[0].(*ast.Literal); ok {
-		if name, ok := lit.Value.(string); ok {
-			return name
-		}
-	}
-
-	for _, arg := range args {
-		if obj, ok := arg.(*ast.ObjectExpression); ok {
-			parser := NewPropertyParser()
-			if title, ok := parser.ParseString(obj, "title"); ok {
-				return title
-			}
-		}
-	}
-
-	return ""
-}
-
-func (g *generator) generatePattern(pattern ast.Pattern) string {
-	switch p := pattern.(type) {
-	case *ast.Identifier:
-		return p.Name
-	case *ast.ArrayPattern:
-		names := make([]string, len(p.Elements))
-		for i, elem := range p.Elements {
-			names[i] = elem.Name
-		}
-		return strings.Join(names, ", ")
 	default:
 		return "unknown"
 	}
@@ -2961,7 +3030,12 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 	ctxVarName := g.arrowContextLifecycle.AllocateContextVariable(funcName)
 
 	if !g.arrowContextLifecycle.IsHoisted(ctxVarName) {
-		code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+		if g.inArrowFunctionBody {
+			childCtxExpr := g.nestedChildContextAlloc.AllocateChildContextExpr(funcName)
+			code += g.ind() + fmt.Sprintf("%s := %s\n", ctxVarName, childCtxExpr)
+		} else {
+			code += g.ind() + fmt.Sprintf("%s := context.NewArrowContext(ctx)\n", ctxVarName)
+		}
 	}
 
 	args := []string{ctxVarName}
@@ -2972,6 +3046,9 @@ func (g *generator) generateUserDefinedFunctionTupleCall(varNames []string, func
 			return "", fmt.Errorf("failed to generate argument %d: %w", idx, err)
 		}
 		args = append(args, argCode)
+	}
+	if g.arrowCaptureRegistry != nil {
+		args = g.arrowCaptureRegistry.AppendCallArgs(args, funcName, g.constants)
 	}
 
 	callCode := fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
@@ -2996,9 +3073,7 @@ func (g *generator) generateUserDefinedFunctionCallWithContext(callExpr *ast.Cal
 	}
 
 	if g.arrowCaptureRegistry != nil {
-		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
-			args = append(args, cap.GoParamName())
-		}
+		args = g.arrowCaptureRegistry.AppendCallArgs(args, funcName, g.constants)
 	}
 
 	return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", ")), nil
@@ -3013,20 +3088,29 @@ func (g *generator) extractStringLiteral(expr ast.Expression) string {
 	return ""
 }
 
-func (g *generator) extractFloatLiteral(expr ast.Expression) float64 {
-	if lit, ok := expr.(*ast.Literal); ok {
-		if val, ok := lit.Value.(float64); ok {
-			return val
+func (g *generator) makeQtyEvaluator() QtyEvaluator {
+	return func(expr ast.Expression) (float64, bool) {
+		if lit, ok := expr.(*ast.Literal); ok {
+			if val, ok := lit.Value.(float64); ok && val > 0 {
+				return val, true
+			}
+			return 0, false
 		}
+		if ident, ok := expr.(*ast.Identifier); ok {
+			name := SanitizeGoIdentifier(ident.Name)
+			if val, ok := g.constantRegistry.GetFloat(name); ok && val > 0 {
+				return val, true
+			}
+		}
+		return 0, false
 	}
-	return 0.0
 }
 
-func (g *generator) extractDirectionConstant(expr ast.Expression) string {
+func (g *generator) extractDirectionConstant(expr ast.Expression) (string, error) {
 	if g.directionExtractor == nil {
-		g.directionExtractor = NewDefaultDirectionExtractor()
+		g.directionExtractor = NewContextAwareDirectionExtractor(g)
 	}
-	return g.directionExtractor.Extract(expr)
+	return g.directionExtractor.Resolve(expr)
 }
 
 func (g *generator) extractMemberName(expr *ast.MemberExpression) string {
@@ -3098,6 +3182,12 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 				}
 			}
 
+			// color.* namespace: color values can't be stored as float64 series;
+			// callers that produce colors (barcolor etc.) are no-op stubs.
+			if varName == "color" {
+				return "0.0"
+			}
+
 			// Check if it's an input constant with subscript
 			if funcName, isConstant := g.constants[varName]; isConstant {
 				if funcName == "input.source" {
@@ -3150,6 +3240,10 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 			return e.Name
 		}
 
+		if g.blockLocalVars != nil && g.blockLocalVars[e.Name] {
+			return e.Name
+		}
+
 		// Arrow resolver checked before builtins: parameters shadow builtins (PineScript semantics)
 		if g.arrowAccessResolver != nil {
 			if access, resolved := g.arrowAccessResolver.ResolveAccess(e.Name); resolved {
@@ -3188,14 +3282,29 @@ func (g *generator) extractSeriesExpression(expr ast.Expression) string {
 		formatter := NewBinaryExpressionFormatterWithExtractor(g.extractSeriesExpression)
 		return formatter.formatWithExtractor(e)
 	case *ast.LogicalExpression:
-		left := g.extractSeriesExpression(e.Left)
-		right := g.extractSeriesExpression(e.Right)
+		leftOperand := g.extractSeriesExpression(e.Left)
+		rightOperand := g.extractSeriesExpression(e.Right)
 		op := NormalizeLogicalOperator(e.Operator)
-		return fmt.Sprintf("(value.IsTrue(%s) %s value.IsTrue(%s))", left, op, right)
+		boolExpr := fmt.Sprintf("(%s %s %s)",
+			g.boolConverter.EnsureGoBool(e.Left, leftOperand),
+			op,
+			g.boolConverter.EnsureGoBool(e.Right, rightOperand),
+		)
+		return fmt.Sprintf("func() float64 { if %s { return 1.0 }; return 0.0 }()", boolExpr)
 	case *ast.UnaryExpression:
 		operand := g.extractSeriesExpression(e.Argument)
+		/* The Go-bool decision treats every negation as a Go bool, so the operand is coerced here. */
+		if isLogicalNegation(e.Operator) {
+			operand = g.boolConverter.EnsureGoBool(e.Argument, operand)
+		}
 		op := NormalizeLogicalOperator(e.Operator)
 		return fmt.Sprintf("%s%s", op, operand)
+	case *ast.ConditionalExpression:
+		code, err := g.generateConditionalExpression(e)
+		if err != nil {
+			return "/* ERROR: unsupported conditional expression in series position */"
+		}
+		return code
 	case *ast.CallExpression:
 		return g.extractCallExpression(e)
 	case *ast.ObjectExpression:
@@ -3326,50 +3435,6 @@ func (g *generator) generateMemberExpression(mem *ast.MemberExpression) (string,
 	return g.ind() + fmt.Sprintf("// %s.%s\n", obj, prop), nil
 }
 
-/* analyzeSeriesRequirements traverses AST to detect variables accessed with [offset > 0] */
-func (g *generator) analyzeSeriesRequirements(node ast.Node) {
-	if node == nil {
-		return
-	}
-
-	switch n := node.(type) {
-	case *ast.ExpressionStatement:
-		g.analyzeSeriesRequirements(n.Expression)
-
-	case *ast.VariableDeclaration:
-		for _, decl := range n.Declarations {
-			g.analyzeSeriesRequirements(decl.Init)
-		}
-
-	case *ast.CallExpression:
-		// Analyze callee
-		g.analyzeSeriesRequirements(n.Callee)
-		// Analyze arguments
-		for _, arg := range n.Arguments {
-			g.analyzeSeriesRequirements(arg)
-		}
-
-	case *ast.MemberExpression:
-		// No longer needed (ALL variables use Series storage)
-		// Kept for future optimizations
-		g.analyzeSeriesRequirements(n.Property)
-		g.analyzeSeriesRequirements(n.Object)
-
-	case *ast.BinaryExpression:
-		g.analyzeSeriesRequirements(n.Left)
-		g.analyzeSeriesRequirements(n.Right)
-
-	case *ast.ConditionalExpression:
-		g.analyzeSeriesRequirements(n.Test)
-		g.analyzeSeriesRequirements(n.Consequent)
-		g.analyzeSeriesRequirements(n.Alternate)
-
-	case *ast.LogicalExpression:
-		g.analyzeSeriesRequirements(n.Left)
-		g.analyzeSeriesRequirements(n.Right)
-	}
-}
-
 func (g *generator) generatePlaceholder() string {
 	code := g.ind() + "// Strategy code will be generated here\n"
 	code += g.ind() + fmt.Sprintf("strat.CallWithPyramiding(%q, %.0f, %d)\n", g.strategyConfig.Name, g.strategyConfig.InitialCapital, g.strategyConfig.Pyramiding)
@@ -3379,11 +3444,18 @@ func (g *generator) generatePlaceholder() string {
 	if g.strategyConfig.DefaultQtyType != "" {
 		code += g.ind() + fmt.Sprintf("strat.SetDefaultQty(%.10g, %q)\n", g.strategyConfig.DefaultQtyValue, g.strategyConfig.DefaultQtyType)
 	}
+	code += g.ind() + "strat.SetQtyStep(qtyStep)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.SetProcessOrdersOnClose(true)\n"
+	}
 	code += g.ind() + "for i := 0; i < len(ctx.Data); i++ {\n"
 	g.indent++
 	code += g.ind() + "ctx.BarIndex = i\n"
 	code += g.ind() + "strat.OnBarUpdate(i, ctx.Data[i].Open, ctx.Data[i].Time)\n"
-	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].High, ctx.Data[i].Low)\n"
+	code += g.ind() + "strat.OnBarMetrics(ctx.Data[i].Open, ctx.Data[i].High, ctx.Data[i].Low, ctx.Data[i].Time)\n"
+	if g.strategyConfig.ProcessOrdersOnClose {
+		code += g.ind() + "strat.OnBarClose(ctx.Data[i].Close, ctx.Data[i].Time)\n"
+	}
 	g.indent--
 	code += g.ind() + "}\n"
 	return code
@@ -3424,80 +3496,6 @@ func (g *generator) indentCode(code string) string {
 	}
 
 	return strings.Join(indented, "\n")
-}
-
-// generateSTDEV generates STDEV calculation using two-pass algorithm.
-// Pass 1: Calculate mean, Pass 2: Calculate variance from mean.
-func (g *generator) generateSTDEV(varName string, period int, accessor AccessGenerator, needsNaN bool) (string, error) {
-	var code strings.Builder
-
-	// Add header comment
-	code.WriteString(g.ind() + fmt.Sprintf("/* Inline ta.stdev(%d) */\n", period))
-
-	// Warmup check
-	code.WriteString(g.ind() + fmt.Sprintf("if ctx.BarIndex < %d-1 {\n", period))
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-	g.indent--
-	code.WriteString(g.ind() + "} else {\n")
-	g.indent++
-
-	// Pass 1: Calculate mean (inline SMA calculation)
-	code.WriteString(g.ind() + "sum := 0.0\n")
-	if needsNaN {
-		code.WriteString(g.ind() + "hasNaN := false\n")
-	}
-	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
-	g.indent++
-
-	if needsNaN {
-		code.WriteString(g.ind() + fmt.Sprintf("val := %s\n", accessor.GenerateLoopValueAccess("j")))
-		code.WriteString(g.ind() + "if math.IsNaN(val) {\n")
-		g.indent++
-		code.WriteString(g.ind() + "hasNaN = true\n")
-		code.WriteString(g.ind() + "break\n")
-		g.indent--
-		code.WriteString(g.ind() + "}\n")
-		code.WriteString(g.ind() + "sum += val\n")
-	} else {
-		code.WriteString(g.ind() + fmt.Sprintf("sum += %s\n", accessor.GenerateLoopValueAccess("j")))
-	}
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n")
-
-	// Check for NaN and calculate mean
-	if needsNaN {
-		code.WriteString(g.ind() + "if hasNaN {\n")
-		g.indent++
-		code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName))
-		g.indent--
-		code.WriteString(g.ind() + "} else {\n")
-		g.indent++
-	}
-
-	code.WriteString(g.ind() + fmt.Sprintf("mean := sum / %d.0\n", period))
-
-	// Pass 2: Calculate variance
-	code.WriteString(g.ind() + "variance := 0.0\n")
-	code.WriteString(g.ind() + fmt.Sprintf("for j := 0; j < %d; j++ {\n", period))
-	g.indent++
-	code.WriteString(g.ind() + fmt.Sprintf("diff := %s - mean\n", accessor.GenerateLoopValueAccess("j")))
-	code.WriteString(g.ind() + "variance += diff * diff\n")
-	g.indent--
-	code.WriteString(g.ind() + "}\n")
-	code.WriteString(g.ind() + fmt.Sprintf("variance /= %d.0\n", period))
-	code.WriteString(g.ind() + fmt.Sprintf("%sSeries.Set(math.Sqrt(variance))\n", varName))
-
-	if needsNaN {
-		g.indent--
-		code.WriteString(g.ind() + "}\n") // close else (hasNaN check)
-	}
-
-	g.indent--
-	code.WriteString(g.ind() + "}\n") // close else (warmup check)
-
-	return code.String(), nil
 }
 
 // generateRMA generates inline RMA (Relative Moving Average) calculation
@@ -3610,8 +3608,9 @@ func (g *generator) generateValuewhen(varName string, conditionExpr string, sour
 	conditionAccess := g.convertSeriesAccessToOffset(conditionExpr, "lookbackOffset")
 	isDirectSeriesAccess := strings.Contains(conditionAccess, ".Get(") &&
 		!strings.ContainsAny(conditionAccess, "><!=&|")
+	isFloat64Expression := isDirectSeriesAccess || strings.Contains(conditionAccess, "func() float64")
 
-	if isDirectSeriesAccess {
+	if isFloat64Expression {
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(%s) {\n", conditionAccess)
 	} else {
 		code += g.ind() + fmt.Sprintf("if value.IsTrue(func() float64 { if %s { return 1.0 } else { return 0.0 } }()) {\n", conditionAccess)
@@ -3918,29 +3917,111 @@ func (g *generator) serializeExpressionForRuntime(expr ast.Expression) (string, 
 	}
 }
 
-// extractConstValue parses "const varName = VALUE" to extract VALUE
-// Deprecated: Use ConstantRegistry.ExtractFromGeneratedCode
-func extractConstValue(code string) interface{} {
-	var varName string
-	var floatVal float64
-	var intVal int
-	var boolVal bool
-
-	if _, err := fmt.Sscanf(code, "const %s = %f", &varName, &floatVal); err == nil {
-		return floatVal
-	}
-	if _, err := fmt.Sscanf(code, "const %s = %d", &varName, &intVal); err == nil {
-		return intVal
-	}
-	if _, err := fmt.Sscanf(code, "const %s = %t", &varName, &boolVal); err == nil {
-		return boolVal
-	}
-	return nil
-}
-
 /* detectSecurityCalls delegates to security package for complete AST analysis */
 func detectSecurityCalls(program *ast.Program) bool {
 	return len(security.AnalyzeAST(program)) > 0
+}
+
+// detectSecurityUDFEvals runs before code generation so secUDFBarEvaluators can be declared
+// unconditionally when a UDF appears as a security() expression argument.
+func detectSecurityUDFEvals(program *ast.Program) bool {
+	udfs := collectArrowFunctionNames(program)
+	if len(udfs) == 0 {
+		return false
+	}
+	for _, call := range security.AnalyzeAST(program) {
+		if callExpr, ok := call.Expression.(*ast.CallExpression); ok {
+			if udfs[extractCallFunctionName(callExpr)] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func collectArrowFunctionNames(program *ast.Program) map[string]bool {
+	names := make(map[string]bool)
+	for _, stmt := range program.Body {
+		decl, ok := stmt.(*ast.VariableDeclaration)
+		if !ok {
+			continue
+		}
+		for _, d := range decl.Declarations {
+			id, ok := d.ID.(*ast.Identifier)
+			if !ok {
+				continue
+			}
+			if _, ok := d.Init.(*ast.ArrowFunctionExpression); ok {
+				names[id.Name] = true
+			}
+		}
+	}
+	return names
+}
+
+/*
+	strategy.exit with stop/limit registers pending exits checked only in OnBarMetrics;
+
+this detector ensures OnBarMetrics is emitted even when no strategy runtime values are read.
+*/
+func detectStrategyExitCalls(program *ast.Program) bool {
+	if program == nil {
+		return false
+	}
+	for _, node := range program.Body {
+		if strategyExitPresentInNode(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func strategyExitPresentInNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.ExpressionStatement:
+		return strategyExitPresentInExpr(n.Expression)
+	case *ast.IfStatement:
+		if strategyExitPresentInExpr(n.Test) {
+			return true
+		}
+		for _, c := range n.Consequent {
+			if strategyExitPresentInNode(c) {
+				return true
+			}
+		}
+		for _, a := range n.Alternate {
+			if strategyExitPresentInNode(a) {
+				return true
+			}
+		}
+	case *ast.VariableDeclaration:
+		for _, decl := range n.Declarations {
+			if strategyExitPresentInExpr(decl.Init) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func strategyExitPresentInExpr(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+	call, ok := expr.(*ast.CallExpression)
+	if !ok {
+		return false
+	}
+	member, ok := call.Callee.(*ast.MemberExpression)
+	if !ok {
+		return false
+	}
+	obj, ok := member.Object.(*ast.Identifier)
+	if !ok || obj.Name != "strategy" {
+		return false
+	}
+	prop, ok := member.Property.(*ast.Identifier)
+	return ok && prop.Name == "exit"
 }
 
 /* detectStrategyRuntimeAccess walks AST to detect strategy.* runtime value access */
@@ -4034,12 +4115,22 @@ func hasStrategyRuntimeInExpression(expr ast.Expression) bool {
 				return true
 			}
 		}
+	case *ast.ObjectExpression:
+		/* Named call arguments arrive as one object, so a runtime read used only in a named
+		   argument is otherwise never detected. */
+		for _, prop := range e.Properties {
+			if hasStrategyRuntimeInExpression(prop.Value) {
+				return true
+			}
+		}
 	case *ast.BinaryExpression:
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.LogicalExpression:
 		return hasStrategyRuntimeInExpression(e.Left) || hasStrategyRuntimeInExpression(e.Right)
 	case *ast.ConditionalExpression:
 		return hasStrategyRuntimeInExpression(e.Test) || hasStrategyRuntimeInExpression(e.Consequent) || hasStrategyRuntimeInExpression(e.Alternate)
+	case *ast.UnaryExpression:
+		return hasStrategyRuntimeInExpression(e.Argument)
 	}
 	return false
 }

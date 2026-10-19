@@ -23,7 +23,7 @@ func (h *TAIndicatorCallHandler) GenerateCode(g *generator, call *ast.CallExpres
 		return "", nil
 	}
 
-	if g.inArrowFunctionBody {
+	if g.inArrowFunctionBody && sharedTASignatures.Contains(funcName) {
 		return h.generateArrowFunctionTACall(g, call)
 	}
 

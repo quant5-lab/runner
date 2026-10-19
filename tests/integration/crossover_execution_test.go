@@ -59,22 +59,25 @@ if openCrossover
 		t.Fatalf("Parse result: %v", err)
 	}
 
-	if len(result.Strategy.OpenTrades) != 2 {
-		t.Fatalf("Expected 2 crossover trades, got %d", len(result.Strategy.OpenTrades))
+	// pyramiding=1 + no exit logic in this script → only the first crossover entry
+	// lands; the second crossover (bar 16) is blocked because the bar-6 trade is
+	// still open. This matches TV semantics: pyramiding=N caps simultaneous
+	// same-direction entries at N.
+	if len(result.Strategy.OpenTrades) != 1 {
+		t.Fatalf("Expected 1 crossover trade (pyramiding=1 blocks second entry), got %d",
+			len(result.Strategy.OpenTrades))
 	}
 
-	expectedBars := []int{6, 16}
-	for i, trade := range result.Strategy.OpenTrades {
-		if trade.EntryBar != expectedBars[i] {
-			t.Errorf("Trade %d: expected bar %d, got %d", i, expectedBars[i], trade.EntryBar)
-		}
-		if trade.EntryPrice <= 0 {
-			t.Errorf("Trade %d: invalid price %.2f", i, trade.EntryPrice)
-		}
-		if trade.Direction != "long" {
-			t.Errorf("Trade %d: expected 'long', got %q", i, trade.Direction)
-		}
+	trade := result.Strategy.OpenTrades[0]
+	if trade.EntryBar != 6 {
+		t.Errorf("Trade 0: expected bar 6, got %d", trade.EntryBar)
+	}
+	if trade.EntryPrice <= 0 {
+		t.Errorf("Trade 0: invalid price %.2f", trade.EntryPrice)
+	}
+	if trade.Direction != "long" {
+		t.Errorf("Trade 0: expected 'long', got %q", trade.Direction)
 	}
 
-	t.Logf("✓ Crossover test passed: 2 trades at bars %v", expectedBars)
+	t.Logf("Crossover test passed: 1 trade at bar 6 (pyramiding=1)")
 }

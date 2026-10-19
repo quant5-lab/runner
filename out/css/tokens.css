@@ -1,0 +1,48 @@
+:root {
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --surface-base:         #0f172a;
+  --surface-card:         #1a2035;
+  --surface-raised:       #1e293b;
+  --surface-raised-alpha: rgba(30, 41, 59, 0.85);
+  --surface-hover:        rgba(255, 255, 255, 0.06);
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --border-subtle:  #2d3748;
+  --border-default: #334155;
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --text-primary:   #cbd5e1;
+  --text-secondary: #94a3b8;
+  --text-muted:     #6b7280;
+
+  /* ── Accent ────────────────────────────────────────────────────────────── */
+  --color-accent:        #5eead4;
+  --color-accent-alt:    #2dd4bf;
+  --color-accent-subtle: rgba(94, 234, 212, 0.25);
+
+  /* ── Actions ───────────────────────────────────────────────────────────── */
+  --color-action:       #2563eb;
+  --color-action-hover: #1d4ed8;
+
+  /* ── Semantic ──────────────────────────────────────────────────────────── */
+  --color-long:  #10b981;
+  --color-short: #ef4444;
+  --color-open:  #3b82f6;
+
+  /* ── Trade table ───────────────────────────────────────────────────────── */
+  --stripe-tint: rgba(255, 255, 255, 0.03);
+
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+
+  /* ── Border radius ─────────────────────────────────────────────────────── */
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --shadow-container: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  --shadow-text:      0 2px 4px rgba(0, 0, 0, 0.3);
+
+  /* ── Transitions ───────────────────────────────────────────────────────── */
+  --transition-duration: 0.2s;
+}

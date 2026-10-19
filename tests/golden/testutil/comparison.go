@@ -2,27 +2,8 @@ package testutil
 
 import (
 	"fmt"
-	"math"
 	"sort"
 )
-
-const (
-	priceTolerance = 0.01
-	plotTolerance  = 1e-6
-)
-
-func floatWithin(a, b, tolerance float64) bool {
-	if math.IsNaN(a) && math.IsNaN(b) {
-		return true
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return false
-	}
-	if a == b {
-		return true
-	}
-	return math.Abs(a-b) <= tolerance
-}
 
 func CompareResults(expected, actual *StrategyResult) error {
 	if err := compareTradeSlice("trades", expected.Trades, actual.Trades); err != nil {
@@ -34,11 +15,11 @@ func CompareResults(expected, actual *StrategyResult) error {
 	if expected.TotalTrades != actual.TotalTrades {
 		return fmt.Errorf("totalTrades: expected %d, got %d", expected.TotalTrades, actual.TotalTrades)
 	}
-	if !floatWithin(expected.Equity, actual.Equity, priceTolerance) {
-		return fmt.Errorf("equity: expected %.2f, got %.2f", expected.Equity, actual.Equity)
+	if !matchFinancial(expected.Equity, actual.Equity) {
+		return fmt.Errorf("equity: expected %.10f, got %.10f", expected.Equity, actual.Equity)
 	}
-	if !floatWithin(expected.NetProfit, actual.NetProfit, priceTolerance) {
-		return fmt.Errorf("netProfit: expected %.2f, got %.2f", expected.NetProfit, actual.NetProfit)
+	if !matchFinancial(expected.NetProfit, actual.NetProfit) {
+		return fmt.Errorf("netProfit: expected %.10f, got %.10f", expected.NetProfit, actual.NetProfit)
 	}
 	return comparePlots(expected.Plots, actual.Plots)
 }
@@ -69,8 +50,8 @@ func compareTrade(field string, index int, expected, actual *Trade) error {
 	if expected.EntryTime != actual.EntryTime {
 		return fmt.Errorf("%s[%d].entryTime: expected %d, got %d", field, index, expected.EntryTime, actual.EntryTime)
 	}
-	if !floatWithin(expected.EntryPrice, actual.EntryPrice, priceTolerance) {
-		return fmt.Errorf("%s[%d].entryPrice: expected %.2f, got %.2f", field, index, expected.EntryPrice, actual.EntryPrice)
+	if !matchPrice(expected.EntryPrice, actual.EntryPrice) {
+		return fmt.Errorf("%s[%d].entryPrice: expected %.10f, got %.10f", field, index, expected.EntryPrice, actual.EntryPrice)
 	}
 	if expected.EntryComment != actual.EntryComment {
 		return fmt.Errorf("%s[%d].entryComment: expected %q, got %q", field, index, expected.EntryComment, actual.EntryComment)
@@ -81,17 +62,17 @@ func compareTrade(field string, index int, expected, actual *Trade) error {
 	if expected.ExitTime != actual.ExitTime {
 		return fmt.Errorf("%s[%d].exitTime: expected %d, got %d", field, index, expected.ExitTime, actual.ExitTime)
 	}
-	if !floatWithin(expected.ExitPrice, actual.ExitPrice, priceTolerance) {
-		return fmt.Errorf("%s[%d].exitPrice: expected %.2f, got %.2f", field, index, expected.ExitPrice, actual.ExitPrice)
+	if !matchPrice(expected.ExitPrice, actual.ExitPrice) {
+		return fmt.Errorf("%s[%d].exitPrice: expected %.10f, got %.10f", field, index, expected.ExitPrice, actual.ExitPrice)
 	}
 	if expected.ExitComment != actual.ExitComment {
 		return fmt.Errorf("%s[%d].exitComment: expected %q, got %q", field, index, expected.ExitComment, actual.ExitComment)
 	}
-	if !floatWithin(expected.Size, actual.Size, priceTolerance) {
-		return fmt.Errorf("%s[%d].size: expected %.4f, got %.4f", field, index, expected.Size, actual.Size)
+	if !matchFinancial(expected.Size, actual.Size) {
+		return fmt.Errorf("%s[%d].size: expected %.10f, got %.10f", field, index, expected.Size, actual.Size)
 	}
-	if !floatWithin(expected.Profit, actual.Profit, priceTolerance) {
-		return fmt.Errorf("%s[%d].profit: expected %.2f, got %.2f", field, index, expected.Profit, actual.Profit)
+	if !matchFinancial(expected.Profit, actual.Profit) {
+		return fmt.Errorf("%s[%d].profit: expected %.10f, got %.10f", field, index, expected.Profit, actual.Profit)
 	}
 	if expected.Direction != actual.Direction {
 		return fmt.Errorf("%s[%d].direction: expected %q, got %q", field, index, expected.Direction, actual.Direction)
@@ -118,7 +99,7 @@ func comparePlots(expected, actual map[string][]float64) error {
 			return fmt.Errorf("plots[%q]: expected %d values, got %d", name, len(expValues), len(actValues))
 		}
 		for i, ev := range expValues {
-			if !floatWithin(ev, actValues[i], plotTolerance) {
+			if !matchPlot(ev, actValues[i]) {
 				return fmt.Errorf("plots[%q][%d]: expected %.8f, got %.8f", name, i, ev, actValues[i])
 			}
 		}

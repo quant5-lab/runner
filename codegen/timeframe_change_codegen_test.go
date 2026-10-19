@@ -20,8 +20,8 @@ func TestBuildTimeframeChangeIIFE_StructuralProperties(t *testing.T) {
 			[]string{
 				"func() float64",
 				`tf := "1D"`,
-				"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex].Time, tf)",
-				"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex-1].Time, tf)",
+				"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex].Time, tf, ctx.PeriodAnchor)",
+				"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex-1].Time, tf, ctx.PeriodAnchor)",
 				"if ctx.BarIndex == 0 { return 1 }",
 				"if currAligned != prevAligned { return 1 }; return 0",
 			},
@@ -34,8 +34,8 @@ func TestBuildTimeframeChangeIIFE_StructuralProperties(t *testing.T) {
 			[]string{
 				"func() bool",
 				`tf := "1D"`,
-				"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex].Time, tf)",
-				"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex-1].Time, tf)",
+				"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex].Time, tf, ctx.PeriodAnchor)",
+				"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex-1].Time, tf, ctx.PeriodAnchor)",
 				"if ctx.BarIndex == 0 { return true }",
 				"return currAligned != prevAligned",
 			},
@@ -103,8 +103,8 @@ func TestBuildTimeframeChangeIIFE_StyleConsistency(t *testing.T) {
 	boolCode := buildTimeframeChangeIIFE(`"1D"`, timeframeChangeBool)
 
 	sharedFragments := []string{
-		"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex].Time, tf)",
-		"context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex-1].Time, tf)",
+		"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex].Time, tf, ctx.PeriodAnchor)",
+		"context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex-1].Time, tf, ctx.PeriodAnchor)",
 		"ctx.BarIndex == 0",
 		`tf := "1D"`,
 	}

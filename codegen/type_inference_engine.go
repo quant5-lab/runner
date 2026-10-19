@@ -11,6 +11,7 @@ type TypeInferenceEngine struct {
 	constants                map[string]interface{}
 	pineRegistry             *PineConstantRegistry
 	arrayConstructorResolver *ArrayConstructorTypeResolver
+	udfReturnTypes           map[string]string
 }
 
 func NewTypeInferenceEngine() *TypeInferenceEngine {
@@ -19,7 +20,17 @@ func NewTypeInferenceEngine() *TypeInferenceEngine {
 		constants:                make(map[string]interface{}),
 		pineRegistry:             NewPineConstantRegistry(),
 		arrayConstructorResolver: NewArrayConstructorTypeResolver(),
+		udfReturnTypes:           make(map[string]string),
 	}
+}
+
+func (te *TypeInferenceEngine) RegisterUDFReturnType(name, returnType string) {
+	te.udfReturnTypes[name] = returnType
+}
+
+func (te *TypeInferenceEngine) GetUDFReturnType(name string) (string, bool) {
+	retType, ok := te.udfReturnTypes[name]
+	return retType, ok
 }
 
 func (te *TypeInferenceEngine) RegisterVariable(name string, varType string) {
@@ -86,6 +97,17 @@ func (te *TypeInferenceEngine) inferMemberExpressionType(e *ast.MemberExpression
 			return "string"
 		}
 	}
+	// strategy.direction.* / strategy.commission.* / strategy.oca.* — nested constants
+	if innerMem, ok := e.Object.(*ast.MemberExpression); ok {
+		if innerObj, ok := innerMem.Object.(*ast.Identifier); ok && innerObj.Name == "strategy" {
+			if innerProp, ok := innerMem.Property.(*ast.Identifier); ok {
+				switch innerProp.Name {
+				case "direction", "commission", "oca":
+					return "string"
+				}
+			}
+		}
+	}
 	return "float64"
 }
 
@@ -109,6 +131,10 @@ func (te *TypeInferenceEngine) inferUnaryExpressionType(e *ast.UnaryExpression) 
 
 func (te *TypeInferenceEngine) inferCallExpressionType(e *ast.CallExpression) string {
 	funcName := extractFunctionName(e.Callee)
+
+	if retType, ok := te.udfReturnTypes[funcName]; ok {
+		return retType
+	}
 
 	if isBoolReturningTAFunction(funcName) {
 		return "bool"

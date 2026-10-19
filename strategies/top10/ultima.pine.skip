@@ -1,8 +1,0 @@
-BEST Strategy Template (v4) — full risk management framework
-
-Parse: ✅ (v4→v5 preprocessing, \r stripping, multiline continuation, expectingIndent reset)
-Generate: ❌ (time() IIFE not implemented — separate scope from Blocker #4)
-Compile: ❌ Not reached
-Execute: ❌ Not reached
-
-Blocker: #4 RESOLVED (parse/preprocess). Remaining: time() IIFE generator, #10 (alert)

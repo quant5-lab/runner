@@ -142,9 +142,7 @@ func TestExtractNamedOrPositional_UseDefault(t *testing.T) {
 }
 
 func TestExtractWhenCondition_Found(t *testing.T) {
-	g := &generator{
-		builtinHandler: NewBuiltinIdentifierHandler(),
-	}
+	g := newTestGenerator()
 	extractor := &ArgumentExtractor{generator: g}
 
 	args := []ast.Expression{

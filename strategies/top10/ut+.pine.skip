@@ -1,8 +1,0 @@
-UT Bot Strategy (v4) with backtesting date range
-
-Parse: ✅ (v4→v5 preprocessing)
-Generate: ✅
-Compile: ✅
-Execute: ✅ (0 trades — needs re-run with calendar.Timestamp() codegen)
-
-Blocker: none active. Resolved: UDF/arrow scope, timestamp() runtime. Needs e2e re-validation.

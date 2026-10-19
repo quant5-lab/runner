@@ -21,7 +21,7 @@ func TestStrategyCommentBinaryExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -67,7 +67,7 @@ func TestStrategyCommentUnaryExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -112,7 +112,7 @@ func TestStrategyCommentNumericLiteral(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -140,7 +140,6 @@ func TestStrategyCommentNumericLiteral(t *testing.T) {
 	}
 }
 
-/* TestStrategyCommentCallExpression verifies CallExpression handling (unsupported) */
 func TestStrategyCommentCallExpression(t *testing.T) {
 	/* Simulate: strategy.entry("Trade", dir, comment=str.tostring(close)) */
 	program := &ast.Program{
@@ -154,7 +153,7 @@ func TestStrategyCommentCallExpression(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -184,9 +183,8 @@ func TestStrategyCommentCallExpression(t *testing.T) {
 		t.Fatalf("GenerateStrategyCodeFromAST failed: %v", err)
 	}
 
-	/* Verify unsupported CallExpression defaults to empty string */
-	if !strings.Contains(code.FunctionBody, `strat.Entry("Trade", strategy.Long, 1, "")`) {
-		t.Errorf("Expected empty string for unsupported CallExpression, got:\n%s", code.FunctionBody)
+	if !strings.Contains(code.FunctionBody, `strat.Entry("Trade", strategy.Long, 1, fmt.Sprintf("%.10g", close))`) {
+		t.Errorf("Expected str.tostring comment expression, got:\n%s", code.FunctionBody)
 	}
 }
 
@@ -204,7 +202,7 @@ func TestStrategyCommentSpecialCharacters(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{
@@ -246,7 +244,7 @@ func TestStrategyCommentNewlineCharacters(t *testing.T) {
 					},
 					Arguments: []ast.Expression{
 						&ast.Literal{Value: "Trade"},
-						&ast.Identifier{Name: "dir"},
+						&ast.MemberExpression{Object: &ast.Identifier{Name: "strategy"}, Property: &ast.Identifier{Name: "long"}},
 						&ast.ObjectExpression{
 							NodeType: ast.TypeObjectExpression,
 							Properties: []ast.Property{

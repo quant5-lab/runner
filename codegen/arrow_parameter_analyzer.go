@@ -8,15 +8,26 @@ const (
 	ParameterUsageScalar ParameterUsageType = iota
 	ParameterUsageSeries
 	ParameterUsageString
+	// ParameterUsageTASource: param stays float64 in the signature but the
+	// codegen bridges it into a series for TA historical lookback.
+	ParameterUsageTASource
 )
 
 type ParameterUsageAnalyzer struct {
-	parameterTypes map[string]ParameterUsageType
+	parameterTypes  map[string]ParameterUsageType
+	funcSigRegistry *FunctionSignatureRegistry
 }
 
 func NewParameterUsageAnalyzer() *ParameterUsageAnalyzer {
 	return &ParameterUsageAnalyzer{
 		parameterTypes: make(map[string]ParameterUsageType),
+	}
+}
+
+func NewParameterUsageAnalyzerWithRegistry(registry *FunctionSignatureRegistry) *ParameterUsageAnalyzer {
+	return &ParameterUsageAnalyzer{
+		parameterTypes:  make(map[string]ParameterUsageType),
+		funcSigRegistry: registry,
 	}
 }
 
@@ -154,6 +165,15 @@ func (a *ParameterUsageAnalyzer) analyzeCallExpression(call *ast.CallExpression)
 	funcName := extractCallFunctionName(call)
 	argCount := len(call.Arguments)
 
+	// time(tf, session) — the session argument is always a string.
+	if funcName == "time" && argCount >= 2 {
+		if ident, ok := call.Arguments[1].(*ast.Identifier); ok {
+			if usage, isParam := a.parameterTypes[ident.Name]; isParam && usage == ParameterUsageScalar {
+				a.parameterTypes[ident.Name] = ParameterUsageString
+			}
+		}
+	}
+
 	if sharedTASignatures.Contains(funcName) && argCount >= 1 {
 		promoteFirstArg := false
 		if argCount >= 2 && sharedTASignatures.NeedsSourcePromotion(funcName, argCount) {
@@ -166,6 +186,18 @@ func (a *ParameterUsageAnalyzer) analyzeCallExpression(call *ast.CallExpression)
 			if ident, ok := sourceArg.(*ast.Identifier); ok {
 				if _, isParam := a.parameterTypes[ident.Name]; isParam {
 					a.parameterTypes[ident.Name] = ParameterUsageSeries
+				}
+			}
+		}
+	}
+
+	if a.funcSigRegistry != nil {
+		for i, arg := range call.Arguments {
+			if ident, ok := arg.(*ast.Identifier); ok {
+				if _, isParam := a.parameterTypes[ident.Name]; isParam {
+					if paramType, ok2 := a.funcSigRegistry.GetParameterType(funcName, i); ok2 && paramType == ParamTypeSeries {
+						a.parameterTypes[ident.Name] = ParameterUsageSeries
+					}
 				}
 			}
 		}

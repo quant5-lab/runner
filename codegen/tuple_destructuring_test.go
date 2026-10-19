@@ -419,7 +419,7 @@ func newTestGeneratorForTupleTests() *generator {
 	gen.plotCollector = NewPlotCollector()
 	gen.mathHandler = NewMathHandler()
 	gen.tupleIndicatorHandler = NewTupleIndicatorHandler()
-	gen.directionExtractor = NewDefaultDirectionExtractor()
+	gen.directionExtractor = NewContextAwareDirectionExtractor(gen)
 	gen.statementAnalyzer = NewStatementConditionalAnalyzer(gen)
 	gen.conditionalArgAnalyzer = NewConditionalArgumentAnalyzer(&ExpressionHasher{})
 	return gen

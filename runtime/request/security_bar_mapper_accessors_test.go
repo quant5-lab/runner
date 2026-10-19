@@ -45,6 +45,28 @@ func TestSecurityBarMapper_Mode_ReflectsActiveBuildMethod(t *testing.T) {
 			wantMode: ModeTransformed,
 		},
 		{
+			name: "BuildMappingByTimestamp",
+			build: func(m *SecurityBarMapper) {
+				coarser := []context.OHLCV{{Time: parseTime("2025-01-01 09:30:00"), Close: 100}}
+				primary := []context.OHLCV{
+					{Time: parseTime("2025-01-01 09:30:00"), Close: 100},
+					{Time: parseTime("2025-01-01 10:30:00"), Close: 101},
+				}
+				m.BuildMappingByTimestamp(coarser, primary)
+			},
+			wantMode: ModeDownscaling,
+		},
+		{
+			name: "BuildMappingByTimestamp overwrites prior mode",
+			build: func(m *SecurityBarMapper) {
+				m.BuildMappingForUpscaling(oneDailyBar, oneDailyBar, "UTC")
+				coarser := []context.OHLCV{{Time: parseTime("2025-01-01 09:30:00"), Close: 100}}
+				primary := []context.OHLCV{{Time: parseTime("2025-01-01 09:30:00"), Close: 100}}
+				m.BuildMappingByTimestamp(coarser, primary)
+			},
+			wantMode: ModeDownscaling,
+		},
+		{
 			name: "subsequent build overwrites mode",
 			build: func(m *SecurityBarMapper) {
 				m.BuildMappingFromTransform([]int{0, 1})

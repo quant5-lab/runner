@@ -223,3 +223,80 @@ func TestContextTimeframeFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestCanonicalTimeframe(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"0", "1m"},
+		{"1", "1m"},
+		{"3", "3m"},
+		{"5", "5m"},
+		{"10", "10m"},
+		{"15", "15m"},
+		{"30", "30m"},
+		{"45", "45m"},
+		{"60", "1h"},
+		{"120", "2h"},
+		{"240", "4h"},
+		{"1440", "1D"},
+		{"10080", "1W"},
+		{"D", "1D"},
+		{"W", "1W"},
+		{"M", "1M"},
+		{"1m", "1m"},
+		{"5m", "5m"},
+		{"15m", "15m"},
+		{"1h", "1h"},
+		{"4h", "4h"},
+		{"1D", "1D"},
+		{"2D", "2D"},
+		{"1W", "1W"},
+		{"1M", "1M"},
+		{"12M", "12M"},
+		{"5x", "5x"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := CanonicalTimeframe(tt.input)
+			if got != tt.want {
+				t.Errorf("CanonicalTimeframe(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanonicalTimeframe_Idempotent(t *testing.T) {
+	inputs := []string{
+		"1", "5", "15", "60", "240", "1440",
+		"D", "W", "M",
+		"1m", "5m", "1h", "4h", "1D", "1W", "1M",
+		"5x", "",
+	}
+	for _, tf := range inputs {
+		first := CanonicalTimeframe(tf)
+		second := CanonicalTimeframe(first)
+		if first != second {
+			t.Errorf("CanonicalTimeframe not idempotent for %q: first=%q second=%q", tf, first, second)
+		}
+	}
+}
+
+func TestCanonicalTimeframe_DurationPreserving(t *testing.T) {
+	inputs := []string{
+		"1", "5", "15", "60", "240", "1440",
+		"D", "W", "M",
+		"1m", "5m", "1h", "4h", "1D", "1W", "1M",
+	}
+	for _, tf := range inputs {
+		original := TimeframeToSeconds(tf)
+		canonical := TimeframeToSeconds(CanonicalTimeframe(tf))
+		if original != canonical {
+			t.Errorf("CanonicalTimeframe(%q) changes duration: ToSeconds(original)=%d ToSeconds(canonical)=%d",
+				tf, original, canonical)
+		}
+	}
+}

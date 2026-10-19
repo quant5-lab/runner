@@ -19,16 +19,41 @@ func (c *TimeframeConverter) ToSeconds(timeframe string) int64 {
 		return 0
 	}
 
+	// Must be tested before the single-char and suffixed paths so the last digit is
+	// never mistaken for a unit letter.
+	if c.isAllDigits(timeframe) {
+		return c.parseMinuteCount(timeframe) * 60
+	}
+
 	if len(timeframe) == 1 {
 		return c.unitToSeconds(timeframe[0])
 	}
 
-	numericPart := c.extractNumericPart(timeframe)
-	unit := timeframe[len(timeframe)-1]
-
-	return numericPart * c.unitToSeconds(unit)
+	return c.extractNumericPart(timeframe) * c.unitToSeconds(timeframe[len(timeframe)-1])
 }
 
+func (c *TimeframeConverter) isAllDigits(s string) bool {
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+// Returns 1 for a zero or overflowed value to uphold Pine's minimum resolution of 1 minute.
+func (c *TimeframeConverter) parseMinuteCount(s string) int64 {
+	var result int64
+	for _, ch := range s {
+		result = result*10 + int64(ch-'0')
+	}
+	if result <= 0 {
+		return 1
+	}
+	return result
+}
+
+// Only called for suffixed tokens; the all-digit path is handled in ToSeconds first.
 func (c *TimeframeConverter) extractNumericPart(timeframe string) int64 {
 	numStr := timeframe[:len(timeframe)-1]
 

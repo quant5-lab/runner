@@ -5,8 +5,11 @@ import (
 	"testing"
 )
 
+// All Pine `time` values are Unix milliseconds. Tests use *1000 to convert
+// second-anchored UTC epochs to the ms convention the public API expects.
+
 func TestCalendarExtraction_BasicBehavior(t *testing.T) {
-	ts := float64(1721046600) /* 2024-07-15 12:30:00 UTC (Monday) */
+	ts := float64(1721046600 * 1000)
 
 	tests := []struct {
 		name string
@@ -58,7 +61,7 @@ func TestCalendarExtraction_NaNHandling(t *testing.T) {
 }
 
 func TestCalendarExtraction_TimezoneEffects(t *testing.T) {
-	ts := float64(1721086200) /* 2024-07-15 23:30:00 UTC */
+	ts := float64(1721086200 * 1000)
 
 	tests := []struct {
 		tz        string
@@ -93,13 +96,13 @@ func TestDayOfWeek_PineConvention(t *testing.T) {
 		ts   float64
 		want float64
 	}{
-		{"2024-07-14 (Sun)", 1720915200, 1},
-		{"2024-07-15 (Mon)", 1721001600, 2},
-		{"2024-07-16 (Tue)", 1721088000, 3},
-		{"2024-07-17 (Wed)", 1721174400, 4},
-		{"2024-07-18 (Thu)", 1721260800, 5},
-		{"2024-07-19 (Fri)", 1721347200, 6},
-		{"2024-07-20 (Sat)", 1721433600, 7},
+		{"2024-07-14 (Sun)", 1720915200 * 1000, 1},
+		{"2024-07-15 (Mon)", 1721001600 * 1000, 2},
+		{"2024-07-16 (Tue)", 1721088000 * 1000, 3},
+		{"2024-07-17 (Wed)", 1721174400 * 1000, 4},
+		{"2024-07-18 (Thu)", 1721260800 * 1000, 5},
+		{"2024-07-19 (Fri)", 1721347200 * 1000, 6},
+		{"2024-07-20 (Sat)", 1721433600 * 1000, 7},
 	}
 
 	for _, tt := range tests {
@@ -117,18 +120,18 @@ func TestMonth_AllMonths(t *testing.T) {
 		ts    float64
 		want  float64
 	}{
-		{"Jan", 1704067200, 1},
-		{"Feb", 1706745600, 2},
-		{"Mar", 1709251200, 3},
-		{"Apr", 1711929600, 4},
-		{"May", 1714521600, 5},
-		{"Jun", 1717200000, 6},
-		{"Jul", 1719792000, 7},
-		{"Aug", 1722470400, 8},
-		{"Sep", 1725148800, 9},
-		{"Oct", 1727740800, 10},
-		{"Nov", 1730419200, 11},
-		{"Dec", 1733011200, 12},
+		{"Jan", 1704067200 * 1000, 1},
+		{"Feb", 1706745600 * 1000, 2},
+		{"Mar", 1709251200 * 1000, 3},
+		{"Apr", 1711929600 * 1000, 4},
+		{"May", 1714521600 * 1000, 5},
+		{"Jun", 1717200000 * 1000, 6},
+		{"Jul", 1719792000 * 1000, 7},
+		{"Aug", 1722470400 * 1000, 8},
+		{"Sep", 1725148800 * 1000, 9},
+		{"Oct", 1727740800 * 1000, 10},
+		{"Nov", 1730419200 * 1000, 11},
+		{"Dec", 1733011200 * 1000, 12},
 	}
 
 	for _, tt := range tests {
@@ -150,10 +153,10 @@ func TestCalendarExtraction_BoundaryValues(t *testing.T) {
 		sec  float64
 	}{
 		{"epoch", 0, 1970, 0, 0, 0},
-		{"negative", -86400, 1969, 0, 0, 0},
-		{"year_2038", 2147483647, 2038, 3, 14, 7},
-		{"midnight", 1721001600, 2024, 0, 0, 0},
-		{"end_of_day", 1721087999, 2024, 23, 59, 59},
+		{"negative", -86400 * 1000, 1969, 0, 0, 0},
+		{"year_2038", 2147483647 * 1000, 2038, 3, 14, 7},
+		{"midnight", 1721001600 * 1000, 2024, 0, 0, 0},
+		{"end_of_day", 1721087999 * 1000, 2024, 23, 59, 59},
 	}
 
 	for _, tt := range tests {
@@ -180,9 +183,9 @@ func TestWeekOfYear_EdgeCases(t *testing.T) {
 		ts   float64
 		want float64
 	}{
-		{"week_1", 1704067200, 1},
-		{"year_end_week_1", 1735603200, 1},
-		{"mid_year", 1721001600, 29},
+		{"week_1", 1704067200 * 1000, 1},
+		{"year_end_week_1", 1735603200 * 1000, 1},
+		{"mid_year", 1721001600 * 1000, 29},
 	}
 
 	for _, tt := range tests {
@@ -191,5 +194,25 @@ func TestWeekOfYear_EdgeCases(t *testing.T) {
 				t.Errorf("WeekOfYear = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestMsRoundtripWithTimestamp verifies the calendar.Timestamp → Year/Month/DayOfMonth/Hour/Minute round-trip.
+func TestMsRoundtripWithTimestamp(t *testing.T) {
+	ts := Timestamp(2024, 7, 15, 12, 30, 0, "UTC")
+	if got := Year(ts, "UTC"); got != 2024 {
+		t.Errorf("Year(Timestamp(2024,...)) = %v, want 2024", got)
+	}
+	if got := Month(ts, "UTC"); got != 7 {
+		t.Errorf("Month(Timestamp(...,7,...)) = %v, want 7", got)
+	}
+	if got := DayOfMonth(ts, "UTC"); got != 15 {
+		t.Errorf("DayOfMonth(Timestamp(...,15,...)) = %v, want 15", got)
+	}
+	if got := Hour(ts, "UTC"); got != 12 {
+		t.Errorf("Hour(Timestamp(...,12,...)) = %v, want 12", got)
+	}
+	if got := Minute(ts, "UTC"); got != 30 {
+		t.Errorf("Minute(Timestamp(...,30)) = %v, want 30", got)
 	}
 }

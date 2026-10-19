@@ -220,10 +220,10 @@ func BBands(source []float64, period int, stdDev float64) ([]float64, []float64,
 			continue
 		}
 
-		// Calculate standard deviation
+		// Calculate standard deviation with TV epsilon rounding (matches ta.stdev).
 		sum := 0.0
 		for j := 0; j < period; j++ {
-			diff := source[i-j] - middle[i]
+			diff := tvStdevDiff(source[i-j], middle[i])
 			sum += diff * diff
 		}
 		std := math.Sqrt(sum / float64(period))
@@ -306,7 +306,13 @@ func Stoch(high, low, close []float64, kPeriod, dPeriod int) ([]float64, []float
 	return k, d
 }
 
-/* Stdev calculates standard deviation (PineTS compatible) */
+/* Stdev calculates standard deviation matching Pine ta.stdev (biased, population N).
+ * Applies TV's epsilon-rounding compensation to each (source-mean) deviation:
+ *   |diff| <= 1e-10 → 0   (cancels float drift from cancellation)
+ *   |diff| <= 1e-4  → 1e-5 (clamps tiny non-zero diffs to a small constant)
+ * This rule comes from Pine's reference implementation of ta.stdev and is what
+ * lets marginal BB-band crossings agree with TradingView on the bar where a tiny
+ * diff would otherwise flip a > vs < comparison. */
 func Stdev(source []float64, period int) []float64 {
 	if period <= 0 || len(source) == 0 {
 		return source
@@ -326,10 +332,10 @@ func Stdev(source []float64, period int) []float64 {
 		}
 		mean := sum / float64(period)
 
-		// Calculate variance
+		// Calculate variance with TV epsilon rounding
 		variance := 0.0
 		for j := 0; j < period; j++ {
-			diff := source[i-j] - mean
+			diff := tvStdevDiff(source[i-j], mean)
 			variance += diff * diff
 		}
 		variance /= float64(period)
@@ -337,6 +343,24 @@ func Stdev(source []float64, period int) []float64 {
 		result[i] = math.Sqrt(variance)
 	}
 	return result
+}
+
+/* tvStdevDiff applies the TradingView ta.stdev per-deviation compensation rule:
+ *   |diff| <= 1e-10 → 0     (treats sub-ULP differences as exact cancellations)
+ *   |diff| <= 1e-4  → 1e-5  (clamps tiny non-zero magnitudes to a fixed floor)
+ *   otherwise               → diff unchanged
+ * This is published in the Pine reference implementation of ta.stdev. Applying
+ * it makes the runner's stdev bit-identical to TV's where it matters for band
+ * crossings. */
+func tvStdevDiff(value, mean float64) float64 {
+	diff := value - mean
+	if math.Abs(diff) <= 1e-10 {
+		return 0
+	}
+	if math.Abs(diff) <= 1e-4 {
+		return 1e-5
+	}
+	return diff
 }
 
 /* Change calculates bar-to-bar difference (source - source[1]) (PineTS compatible) */

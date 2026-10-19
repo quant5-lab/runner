@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "BB7",
   "dataSource": "BTCUSDT-1h.json",
-  "generatedAt": "2026-01-21T07:51:45Z",
+  "generatedAt": "2026-07-09T22:19:57Z",
   "result": {
     "trades": [
       {
@@ -11,26 +11,12 @@
         "entryTime": 1752231600,
         "entryPrice": 117983.78,
         "entryComment": "",
-        "exitBar": 1311,
-        "exitTime": 1753419600,
-        "exitPrice": 116102.71,
+        "exitBar": 1310,
+        "exitTime": 1753416000,
+        "exitPrice": 115200.80962968057,
         "exitComment": "",
-        "size": 8.47574132647725,
-        "profit": -15943.462736996496,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 2181,
-        "entryTime": 1756551600,
-        "entryPrice": 108425.98,
-        "entryComment": "",
-        "exitBar": 2186,
-        "exitTime": 1756569600,
-        "exitPrice": 108869.98,
-        "exitComment": "",
-        "size": 9.222880971619443,
-        "profit": 4094.9591513990326,
+        "size": 8.47574,
+        "profit": -24180.656872643518,
         "direction": "long"
       },
       {
@@ -43,8 +29,8 @@
         "exitTime": 1759507200,
         "exitPrice": 122258.04,
         "exitComment": "",
-        "size": 8.921388118031393,
-        "profit": 90711.33617592542,
+        "size": 8.921380000000001,
+        "profit": 90084.0407493527,
         "direction": "long"
       },
       {
@@ -57,37 +43,9 @@
         "exitTime": 1764594000,
         "exitPrice": 85430.64,
         "exitComment": "",
-        "size": 11.5409832433002,
-        "profit": -14046.4152955882,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 4557,
-        "entryTime": 1765105200,
-        "entryPrice": 89240.18,
-        "entryComment": "",
-        "exitBar": 4561,
-        "exitTime": 1765119600,
-        "exitPrice": 88220.53,
-        "exitComment": "",
-        "size": 11.205714735223529,
-        "profit": -11425.907029770606,
-        "direction": "long"
-      },
-      {
-        "entryId": "BB entry",
-        "entryBar": 4701,
-        "entryTime": 1765623600,
-        "entryPrice": 90595.14,
-        "entryComment": "",
-        "exitBar": 4731,
-        "exitTime": 1765731600,
-        "exitPrice": 88836.99,
-        "exitComment": "",
-        "size": 11.038120923277,
-        "profit": -19406.672301259394,
-        "direction": "long"
+        "size": 11.540980000000001,
+        "profit": 13450.62544021918,
+        "direction": "short"
       },
       {
         "entryId": "BB entry",
@@ -95,13 +53,13 @@
         "entryTime": 1766487600,
         "entryPrice": 87615.92,
         "entryComment": "",
-        "exitBar": 4947,
-        "exitTime": 1766509200,
-        "exitPrice": 88003.63,
+        "exitBar": 4946,
+        "exitTime": 1766505600,
+        "exitPrice": 88052.83374562845,
         "exitComment": "",
-        "size": 11.41344958616544,
-        "profit": 4425.108539052276,
-        "direction": "long"
+        "size": 11.413450000000001,
+        "profit": -5588.189151274464,
+        "direction": "short"
       }
     ],
     "openTrades": [
@@ -115,14 +73,15 @@
         "exitTime": 0,
         "exitPrice": 0,
         "exitComment": "",
-        "size": 10.516159393427927,
+        "size": 10.51618,
         "profit": 0,
         "direction": "long"
       }
     ],
-    "equity": 1054042.0587338442,
-    "netProfit": 38408.946502762024,
+    "equity": 1089398.963030054,
+    "netProfit": 73765.8201656539,
     "totalTrades": 0,
+    "initialCapital": 1000000,
     "plots": {}
   }
 }

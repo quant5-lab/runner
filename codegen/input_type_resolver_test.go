@@ -384,18 +384,37 @@ func TestResolveFromExplicitTypeParam(t *testing.T) {
 	}
 }
 
-func TestResolveFromExplicitTypeParam_NonMemberExpression(t *testing.T) {
-	/* type=bool (bare Identifier, not MemberExpression) returns "" */
-	call := &ast.CallExpression{
-		Arguments: []ast.Expression{
-			&ast.ObjectExpression{Properties: []ast.Property{
-				{Key: &ast.Identifier{Name: "type"}, Value: &ast.Identifier{Name: "bool"}},
-			}},
-		},
+func TestResolveFromExplicitTypeParam_BareV4IdentifierForm(t *testing.T) {
+	// Driven from v4InputTypeMapping so new entries are covered automatically.
+	for typeName, wantFunc := range v4InputTypeMapping {
+		typeName, wantFunc := typeName, wantFunc
+		t.Run(typeName, func(t *testing.T) {
+			call := &ast.CallExpression{
+				Arguments: []ast.Expression{
+					&ast.ObjectExpression{Properties: []ast.Property{
+						{Key: &ast.Identifier{Name: "type"}, Value: &ast.Identifier{Name: typeName}},
+						{Key: &ast.Identifier{Name: "defval"}, Value: &ast.Literal{Value: 0}},
+					}},
+				},
+			}
+			if got := resolveFromExplicitTypeParam(call); got != wantFunc {
+				t.Errorf("resolveFromExplicitTypeParam(bare %q) = %q, want %q", typeName, got, wantFunc)
+			}
+		})
 	}
-	if got := resolveFromExplicitTypeParam(call); got != "" {
-		t.Errorf("resolveFromExplicitTypeParam(bare Identifier) = %q, want empty", got)
-	}
+
+	t.Run("unknown_bare_type", func(t *testing.T) {
+		call := &ast.CallExpression{
+			Arguments: []ast.Expression{
+				&ast.ObjectExpression{Properties: []ast.Property{
+					{Key: &ast.Identifier{Name: "type"}, Value: &ast.Identifier{Name: "custom"}},
+				}},
+			},
+		}
+		if got := resolveFromExplicitTypeParam(call); got != "" {
+			t.Errorf("resolveFromExplicitTypeParam(unknown bare type) = %q, want empty", got)
+		}
+	})
 }
 
 func TestResolveFromExplicitTypeParam_WrongObjectPrefix(t *testing.T) {
@@ -488,6 +507,83 @@ func TestResolveFromDefvalType_ComplexExpression(t *testing.T) {
 	}
 	if got := resolveFromDefvalType(call); got != "" {
 		t.Errorf("resolveFromDefvalType(CallExpression) = %q, want empty", got)
+	}
+}
+
+func TestResolveFromDefvalType_NegativeNumericDefval(t *testing.T) {
+	tests := []struct {
+		name string
+		call *ast.CallExpression
+		want string
+	}{
+		{
+			name: "positional negative float",
+			call: &ast.CallExpression{Arguments: []ast.Expression{
+				&ast.UnaryExpression{Operator: "-", Argument: &ast.Literal{Value: float64(0.236)}},
+			}},
+			want: "input.float",
+		},
+		{
+			name: "positional negative int",
+			call: &ast.CallExpression{Arguments: []ast.Expression{
+				&ast.UnaryExpression{Operator: "-", Argument: &ast.Literal{Value: 5}},
+			}},
+			want: "input.int",
+		},
+		{
+			name: "named negative float",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "-", Argument: &ast.Literal{Value: float64(0.236)},
+			}),
+			want: "input.float",
+		},
+		{
+			name: "named negative int",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "-", Argument: &ast.Literal{Value: 5},
+			}),
+			want: "input.int",
+		},
+		{
+			name: "named negative whole float infers int kind",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "-", Argument: &ast.Literal{Value: float64(5)},
+			}),
+			want: "input.int",
+		},
+		{
+			name: "double negation stays unresolvable (one-level unwrap only)",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "-",
+				Argument: &ast.UnaryExpression{
+					Operator: "-", Argument: &ast.Literal{Value: float64(1.0)},
+				},
+			}),
+			want: "",
+		},
+		{
+			name: "unary minus on identifier stays unresolvable",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "-", Argument: &ast.Identifier{Name: "src"},
+			}),
+			want: "",
+		},
+		{
+			name: "unary operator other than minus stays unresolvable",
+			call: inputCallWithNamedDefval(&ast.UnaryExpression{
+				Operator: "+", Argument: &ast.Literal{Value: float64(1.0)},
+			}),
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveFromDefvalType(tt.call)
+			if got != tt.want {
+				t.Errorf("resolveFromDefvalType() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

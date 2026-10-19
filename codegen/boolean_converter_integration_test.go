@@ -11,6 +11,7 @@ func TestBooleanConverter_Integration_EndToEnd(t *testing.T) {
 	typeSystem.RegisterVariable("enabled", "bool")
 	typeSystem.RegisterVariable("condition", "bool")
 	converter := NewBooleanConverter(typeSystem)
+	converter.SetGoTypeResolver(NewBuiltinIdentifierHandler())
 
 	tests := []struct {
 		name        string
@@ -67,6 +68,30 @@ func TestBooleanConverter_Integration_EndToEnd(t *testing.T) {
 			code:        "enabledSeries.GetCurrent()",
 			expected:    "value.IsTrue(enabledSeries.GetCurrent())",
 			description: "Bool-typed variables converted even without pattern",
+		},
+		{
+			name:        "EnsureBooleanOperand: Go bool member unchanged",
+			method:      "EnsureBooleanOperand",
+			expr:        &ast.MemberExpression{Object: &ast.Identifier{Name: "barstate"}, Property: &ast.Identifier{Name: "islast"}},
+			code:        "(ctx.BarIndex == len(ctx.Data)-1)",
+			expected:    "(ctx.BarIndex == len(ctx.Data)-1)",
+			description: "The namespace Go type decides, not the Pine type",
+		},
+		{
+			name:        "EnsureBooleanOperand: numeric member coerced",
+			method:      "EnsureBooleanOperand",
+			expr:        &ast.MemberExpression{Object: &ast.Identifier{Name: "dayofweek"}, Property: &ast.Identifier{Name: "monday"}},
+			code:        "2.0",
+			expected:    "(value.IsTrue(2.0))",
+			description: "A float64 member keeps the coercion",
+		},
+		{
+			name:        "EnsureBooleanOperand: logical operand unchanged",
+			method:      "EnsureBooleanOperand",
+			expr:        &ast.LogicalExpression{Operator: "and"},
+			code:        "((bar.Close > 100) && (bar.Close < 200))",
+			expected:    "((bar.Close > 100) && (bar.Close < 200))",
+			description: "A condition lowering emits a logical expression over coerced operands",
 		},
 	}
 

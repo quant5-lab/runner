@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -62,6 +63,65 @@ func generateTestOHLCV(barCount int, intervalSeconds int64) string {
 
 	jsonData, _ := json.MarshalIndent(data, "", "  ")
 	return string(jsonData)
+}
+
+// runPineGen runs pine-gen on strategyPath and returns stdout and stderr separately.
+// Calls t.Fatal if pine-gen exits non-zero.
+func runPineGen(t *testing.T, strategyPath, testDir, projectRoot string) (stdout, stderr string) {
+	t.Helper()
+
+	builderPath := filepath.Join(projectRoot, "cmd", "pine-gen", "main.go")
+	templatePath := filepath.Join(projectRoot, "template", "main.go.tmpl")
+	outputPlaceholder := filepath.Join(testDir, "strategy.go")
+
+	var outBuf, errBuf bytes.Buffer
+	genCmd := exec.Command(
+		"go", "run", builderPath,
+		"-input", strategyPath,
+		"-output", outputPlaceholder,
+		"-template", templatePath,
+	)
+	genCmd.Stdout = &outBuf
+	genCmd.Stderr = &errBuf
+
+	if err := genCmd.Run(); err != nil {
+		t.Fatalf("pine-gen failed: %v\nstdout: %s\nstderr: %s", err, outBuf.String(), errBuf.String())
+	}
+
+	return outBuf.String(), errBuf.String()
+}
+
+// buildFromGeneratedFile compiles a generated .go file into an executable.
+// Handles go.mod creation, dependency resolution, and build.
+func buildFromGeneratedFile(t *testing.T, generatedFilePath, testDir, projectRoot string) string {
+	t.Helper()
+
+	localGenFile := filepath.Join(testDir, "strategy.go")
+	content, err := os.ReadFile(generatedFilePath)
+	if err != nil {
+		t.Fatalf("read generated file: %v", err)
+	}
+	if err := os.WriteFile(localGenFile, content, 0644); err != nil {
+		t.Fatalf("write strategy.go: %v", err)
+	}
+	if err := setupGoMod(localGenFile, projectRoot); err != nil {
+		t.Fatalf("setupGoMod: %v", err)
+	}
+
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = testDir
+	if out, err := tidyCmd.CombinedOutput(); err != nil {
+		t.Fatalf("go mod tidy: %v\n%s", err, out)
+	}
+
+	exePath := filepath.Join(testDir, "strategy")
+	buildCmd := exec.Command("go", "build", "-o", exePath, localGenFile)
+	buildCmd.Dir = testDir
+	if out, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+
+	return exePath
 }
 
 func TestSecurityDownsampling_1h_to_1D_WithWarmup(t *testing.T) {

@@ -1,51 +1,69 @@
 /**
- * TradeRowspanRenderer - Generates HTML for rowspan table structure
- * 
- * SRP: Single responsibility - HTML generation for rowspan cells
- * KISS: Simple row generation logic
- * 
- * Rowspan Structure:
- * Row 1 (Entry): Type[rowspan=2] | Entry Label | Entry Date | Entry Signal | Entry Price | Size[rowspan=2] | empty
- * Row 2 (Exit):                  | Exit Label  | Exit Date  | Exit Signal  | Exit Price  |                 | P/L[rowspan=2]
+ * TradeRowspanRenderer — stateless HTML generator for the rowspan trade table.
+ *
+ * Layout contract (7 columns: Type | Entry/Exit | DateTime | Signal | Price | Size | P/L):
+ *
+ *   Primary row   (isPrimary=true):
+ *     Type[rowspan=2] | label | DateTime | Signal | Price | Size[rowspan=2] | P/L (exit only)
+ *
+ *   Secondary row (isPrimary=false):
+ *     label | DateTime | Signal | Price | P/L (exit only)
+ *
+ * P/L is always and only on exit rows, regardless of pair position.
+ * `.trade-open` class is applied to the <tr> and the P/L <td> of open exit rows.
  */
 export class TradeRowspanRenderer {
-  constructor() {}
-
-  /**
-   * Render single TradeRowData as HTML row with rowspan cells
-   */
-  renderRow(row) {
-    const directionClass = row.direction === 'long' ? 'trade-long' : 'trade-short';
-    const profitClass = row.isOpen
-      ? (row.profitRaw >= 0 ? 'trade-profit-positive' : 'trade-profit-negative')
-      : (row.profitRaw >= 0 ? 'trade-profit-positive' : 'trade-profit-negative');
-
-    let html = '<tr>';
-
-    if (row.isEntryRow()) {
-      // Entry row: Type (rowspan=2), Entry label, date, signal, price, Size (rowspan=2)
-      html += `<td rowspan="2" class="${directionClass}">${row.direction.toUpperCase()}</td>`;
-      html += `<td>Entry</td>`;
-      html += `<td>${row.dateTime}</td>`;
-      html += `<td>${row.signal}</td>`;
-      html += `<td>${row.price}</td>`;
-      html += `<td rowspan="2">${row.size}</td>`;
-    } else {
-      // Exit row: Exit label, date, signal, price, P/L
-      html += `<td>Exit</td>`;
-      html += `<td>${row.dateTime}</td>`;
-      html += `<td>${row.signal}</td>`;
-      html += `<td>${row.price}</td>`;
-      html += `<td class="${profitClass}">${row.profitLoss}</td>`;
-    }
-
-    html += '</tr>';
-    return html;
+  #directionClass(row) {
+    return row.direction === 'long' ? 'trade-long' : 'trade-short';
   }
 
-  /**
-   * Render array of TradeRowData as complete HTML
-   */
+  #profitClass(row) {
+    if (row.isOpen) return 'trade-open';
+    return row.profitRaw >= 0 ? 'trade-profit-positive' : 'trade-profit-negative';
+  }
+
+  #label(row) {
+    return row.isEntryRow() ? 'Entry' : 'Exit';
+  }
+
+  #plCell(row) {
+    if (!row.isExitRow()) return '';
+    return `<td class="${this.#profitClass(row)}">${row.profitLoss}</td>`;
+  }
+
+  #primaryRowHtml(row) {
+    return [
+      `<td rowspan="2" class="${this.#directionClass(row)}">${row.direction.toUpperCase()}</td>`,
+      `<td>${this.#label(row)}</td>`,
+      `<td>${row.dateTime}</td>`,
+      `<td>${row.signal}</td>`,
+      `<td>${row.price}</td>`,
+      `<td rowspan="2">${row.size}</td>`,
+      this.#plCell(row),
+    ].join('');
+  }
+
+  #secondaryRowHtml(row) {
+    return [
+      `<td>${this.#label(row)}</td>`,
+      `<td>${row.dateTime}</td>`,
+      `<td>${row.signal}</td>`,
+      `<td>${row.price}</td>`,
+      this.#plCell(row),
+    ].join('');
+  }
+
+  #trClass(row) {
+    return row.isExitRow() && row.isOpen ? ' class="trade-open"' : '';
+  }
+
+  renderRow(row) {
+    const cells = row.isPrimary
+      ? this.#primaryRowHtml(row)
+      : this.#secondaryRowHtml(row);
+    return `<tr${this.#trClass(row)}>${cells}</tr>`;
+  }
+
   renderRows(rows) {
     return rows.map(row => this.renderRow(row)).join('\n');
   }

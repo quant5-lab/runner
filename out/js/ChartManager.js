@@ -1,4 +1,3 @@
-/* Chart creation and series management (SRP) */
 export class ChartManager {
   static createChart(container, config, chartOptions) {
     return LightweightCharts.createChart(container, {
@@ -25,7 +24,8 @@ export class ChartManager {
   }
 
   static handleResize(charts, containers) {
-    const width = containers[0].clientWidth;
-    charts.forEach((chart) => chart.applyOptions({ width }));
+    charts.forEach((chart, i) => {
+      chart.resize(containers[i].clientWidth, containers[i].clientHeight);
+    });
   }
 }

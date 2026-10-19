@@ -14,12 +14,19 @@ func (h *UserDefinedFunctionHandler) CanHandle(funcName string) bool {
 	return false
 }
 
+func (g *generator) isUserDefinedCall(expr ast.Expression) bool {
+	return NewUserDefinedFunctionDetector(g.variables).IsUserDefinedCall(expr)
+}
+
 func (h *UserDefinedFunctionHandler) GenerateCode(g *generator, call *ast.CallExpression) (string, error) {
 	funcName := extractCallFunctionName(call)
 
-	detector := NewUserDefinedFunctionDetector(g.variables)
-	if !detector.IsUserDefinedFunction(funcName) {
+	if !g.isUserDefinedCall(call) {
 		return "", nil
+	}
+
+	if g.chartOnlyUDFs[funcName] {
+		return "math.NaN()", nil
 	}
 
 	argumentList, err := h.buildArgumentList(g, funcName, call.Arguments)
@@ -50,7 +57,7 @@ func (h *UserDefinedFunctionHandler) buildArgumentList(g *generator, funcName st
 
 	if g.arrowCaptureRegistry != nil {
 		for _, cap := range g.arrowCaptureRegistry.Get(funcName) {
-			argStrings = append(argStrings, cap.GoParamName())
+			argStrings = append(argStrings, cap.GoCallSiteExpression(g.constants))
 		}
 	}
 

@@ -25,9 +25,9 @@ var (
 func buildTimeframeChangeIIFE(tfExpr string, style timeframeChangeStyle) string {
 	return fmt.Sprintf("(func() %s { "+
 		"tf := %s; "+
-		"currAligned := context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex].Time, tf); "+
+		"currAligned := context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex].Time, tf, ctx.PeriodAnchor); "+
 		"if ctx.BarIndex == 0 { return %s }; "+
-		"prevAligned := context.AlignTimestampToPeriod(ctx.Data[ctx.BarIndex-1].Time, tf); "+
+		"prevAligned := context.AlignTimestampToPeriodWithAnchor(ctx.Data[ctx.BarIndex-1].Time, tf, ctx.PeriodAnchor); "+
 		"%s "+
 		"}())", style.returnType, tfExpr, style.firstBar, style.comparison)
 }

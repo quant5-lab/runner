@@ -610,3 +610,249 @@ func TestParameterUsageAnalyzer_Idempotency(t *testing.T) {
 		}
 	}
 }
+
+func TestParameterUsageAnalyzer_StringParamDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		arrowFunc      *ast.ArrowFunctionExpression
+		expectedUsages map[string]ParameterUsageType
+	}{
+		{
+			name: "time(tf, sess) — second arg typed as string",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "tf"}, {Name: "sess"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "!=",
+							Left: &ast.CallExpression{
+								Callee: &ast.Identifier{Name: "time"},
+								Arguments: []ast.Expression{
+									&ast.Identifier{Name: "tf"},
+									&ast.Identifier{Name: "sess"},
+								},
+							},
+							Right: &ast.Literal{Value: 0.0},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"tf":   ParameterUsageScalar,
+				"sess": ParameterUsageString,
+			},
+		},
+		{
+			name: "time() with zero args — no promotion",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "sess"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee:    &ast.Identifier{Name: "time"},
+							Arguments: []ast.Expression{},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"sess": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "time(tf) with one arg — second slot absent, no string promotion",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "tf"}, {Name: "sess"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "time"},
+							Arguments: []ast.Expression{
+								&ast.Identifier{Name: "tf"},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"tf":   ParameterUsageScalar,
+				"sess": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "time(tf, literal) — non-param second arg, no change to params",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "tf"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "time"},
+							Arguments: []ast.Expression{
+								&ast.Identifier{Name: "tf"},
+								&ast.Literal{Value: "0000-2345"},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"tf": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "param already ParameterUsageSeries is not downgraded by time() session detection",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "src"}, {Name: "tf"}},
+				Body: []ast.Node{
+					// sma(src, 14) promotes src to Series first
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "sma"},
+							Arguments: []ast.Expression{
+								&ast.Identifier{Name: "src"},
+								&ast.Literal{Value: 14.0},
+							},
+						},
+					},
+					// time(tf, src) — src is also passed as session arg but it's already Series
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "time"},
+							Arguments: []ast.Expression{
+								&ast.Identifier{Name: "tf"},
+								&ast.Identifier{Name: "src"},
+							},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"src": ParameterUsageSeries,
+				"tf":  ParameterUsageScalar,
+			},
+		},
+		{
+			name: "binary == against string literal marks param as string",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "mode"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "==",
+							Left:     &ast.Identifier{Name: "mode"},
+							Right:    &ast.Literal{Value: "long"},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"mode": ParameterUsageString,
+			},
+		},
+		{
+			name: "binary == against numeric literal does not mark param as string",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "x"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "==",
+							Left:     &ast.Identifier{Name: "x"},
+							Right:    &ast.Literal{Value: 42.0},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"x": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "binary != against string literal marks param as string",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "dir"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "!=",
+							Left:     &ast.Identifier{Name: "dir"},
+							Right:    &ast.Literal{Value: "short"},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"dir": ParameterUsageString,
+			},
+		},
+		{
+			name: "binary < against string literal does not mark param as string (only == and !=)",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "x"}},
+				Body: []ast.Node{
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "<",
+							Left:     &ast.Identifier{Name: "x"},
+							Right:    &ast.Literal{Value: "abc"},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"x": ParameterUsageScalar,
+			},
+		},
+		{
+			name: "param already typed as string is not reset to scalar by subsequent binary expression",
+			arrowFunc: &ast.ArrowFunctionExpression{
+				Params: []ast.Identifier{{Name: "sess"}},
+				Body: []ast.Node{
+					// First usage: time(tf, sess) marks sess as String
+					&ast.ExpressionStatement{
+						Expression: &ast.CallExpression{
+							Callee: &ast.Identifier{Name: "time"},
+							Arguments: []ast.Expression{
+								&ast.Literal{Value: "D"},
+								&ast.Identifier{Name: "sess"},
+							},
+						},
+					},
+					// Second usage: arithmetic with sess — would only make sense if sess were scalar,
+					// but String classification must be sticky (not overwritten back to Scalar).
+					&ast.ExpressionStatement{
+						Expression: &ast.BinaryExpression{
+							Operator: "+",
+							Left:     &ast.Identifier{Name: "sess"},
+							Right:    &ast.Literal{Value: 0.0},
+						},
+					},
+				},
+			},
+			expectedUsages: map[string]ParameterUsageType{
+				"sess": ParameterUsageString,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewParameterUsageAnalyzer()
+			result := analyzer.AnalyzeArrowFunction(tt.arrowFunc)
+
+			if len(result) != len(tt.expectedUsages) {
+				t.Fatalf("usage count mismatch: got %d, want %d — result=%v", len(result), len(tt.expectedUsages), result)
+			}
+			for paramName, expectedType := range tt.expectedUsages {
+				actualType, exists := result[paramName]
+				if !exists {
+					t.Errorf("parameter %q not found in result", paramName)
+					continue
+				}
+				if actualType != expectedType {
+					t.Errorf("parameter %q: got %v, want %v", paramName, actualType, expectedType)
+				}
+			}
+		})
+	}
+}

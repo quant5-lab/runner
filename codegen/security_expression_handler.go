@@ -47,6 +47,13 @@ func (h *SecurityExpressionHandler) GenerateEvaluationCode(
 		return h.generateOHLCVAccess(varName, ident, secBarIdxVar), nil
 	}
 
+	if callExpr, ok := exprArg.(*ast.CallExpression); ok && h.gen != nil {
+		udfGen := NewSecurityUDFCallGenerator(h.gen)
+		if udfGen.IsUDFCall(callExpr) {
+			return udfGen.EmitBarLoopUDFEval(varName, callExpr)
+		}
+	}
+
 	code := ""
 	h.markSecurityExprEval()
 
@@ -84,38 +91,4 @@ func (h *SecurityExpressionHandler) generateOHLCVAccess(varName string, ident *a
 	}
 
 	return h.indentFunc() + fmt.Sprintf("%sSeries.Set(math.NaN())\n", varName)
-}
-
-func (h *SecurityExpressionHandler) extractHistoricalOffset(expr ast.Expression) (ast.Expression, int) {
-	// Direct subscript: close[1]
-	if memberExpr, ok := expr.(*ast.MemberExpression); ok {
-		if offsetLit, ok := memberExpr.Property.(*ast.Literal); ok {
-			if offsetVal, ok := offsetLit.Value.(float64); ok {
-				return memberExpr.Object, int(offsetVal)
-			}
-		}
-	}
-
-	// Nested subscript: fixnan(pivothigh()[1])
-	if callExpr, ok := expr.(*ast.CallExpression); ok {
-		for i, arg := range callExpr.Arguments {
-			if memberExpr, ok := arg.(*ast.MemberExpression); ok {
-				if offsetLit, ok := memberExpr.Property.(*ast.Literal); ok {
-					if offsetVal, ok := offsetLit.Value.(float64); ok {
-						newArgs := make([]ast.Expression, len(callExpr.Arguments))
-						copy(newArgs, callExpr.Arguments)
-						newArgs[i] = memberExpr.Object
-
-						newCall := &ast.CallExpression{
-							Callee:    callExpr.Callee,
-							Arguments: newArgs,
-						}
-						return newCall, int(offsetVal)
-					}
-				}
-			}
-		}
-	}
-
-	return expr, 0
 }

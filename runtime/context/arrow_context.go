@@ -6,11 +6,10 @@ import (
 	"github.com/quant5-lab/runner/runtime/series"
 )
 
-/*
-ArrowContext provides isolated Series storage for arrow function local variables requiring historical access.
-
-	Created once per call site, lazily initializes Series, advances cursors via AdvanceAll() after each bar.
-*/
+// ArrowContext provides isolated Series storage for a single arrow function invocation scope.
+// Created once per call site before the bar loop; persists across all bars.
+// Nested UDF calls use child contexts (GetOrCreateChildContext) so each level of nesting
+// has its own isolated Series namespace that also survives across bars.
 type ArrowContext struct {
 	Context            *Context
 	LocalSeries        map[string]*series.Series
@@ -18,10 +17,10 @@ type ArrowContext struct {
 	SecurityBarMappers map[string]BarIndexMapper
 	ConcreteBarMappers map[string]interface{}
 	SecurityEvaluators map[string]interface{}
+	children           map[string]*ArrowContext
 	capacity           int
 }
 
-/* NewArrowContext wraps Context with isolated Series map for arrow function local variables */
 func NewArrowContext(ctx *Context) *ArrowContext {
 	return &ArrowContext{
 		Context:     ctx,
@@ -30,25 +29,47 @@ func NewArrowContext(ctx *Context) *ArrowContext {
 	}
 }
 
-/* GetOrCreateSeries returns existing or creates new Series for variable name (lazy init) */
+// GetOrCreateSeries returns the existing series for name or lazily creates one.
 func (ac *ArrowContext) GetOrCreateSeries(name string) *series.Series {
 	if s, exists := ac.LocalSeries[name]; exists {
 		return s
 	}
-
 	s := series.NewSeries(ac.capacity)
 	ac.LocalSeries[name] = s
 	return s
 }
 
-/* AdvanceAll moves all local Series cursors forward by one bar */
+// GetOrCreateChildContext returns the persistent child context for the given key,
+// creating it on first access.  Each nested UDF call site must use a unique key
+// (conventionally "funcName_N" where N is the call-site index within the parent body)
+// so that sibling calls to the same function have independent Series namespaces.
+func (ac *ArrowContext) GetOrCreateChildContext(key string) *ArrowContext {
+	if ac.children == nil {
+		ac.children = make(map[string]*ArrowContext)
+	}
+	if child, exists := ac.children[key]; exists {
+		return child
+	}
+	child := &ArrowContext{
+		Context:     ac.Context,
+		LocalSeries: make(map[string]*series.Series),
+		capacity:    ac.capacity,
+	}
+	ac.children[key] = child
+	return child
+}
+
+// AdvanceAll advances cursors for all local series and recurses into child contexts.
+// Called once per bar after all UDF bodies have executed.
 func (ac *ArrowContext) AdvanceAll() {
 	for _, s := range ac.LocalSeries {
 		s.Next()
 	}
+	for _, child := range ac.children {
+		child.AdvanceAll()
+	}
 }
 
-/* GetSeries retrieves existing Series, returns error if not found */
 func (ac *ArrowContext) GetSeries(name string) (*series.Series, error) {
 	s, exists := ac.LocalSeries[name]
 	if !exists {
@@ -57,14 +78,15 @@ func (ac *ArrowContext) GetSeries(name string) (*series.Series, error) {
 	return s, nil
 }
 
-/* Reset moves all local Series cursors to specified position */
 func (ac *ArrowContext) Reset(position int) {
 	for _, s := range ac.LocalSeries {
 		s.Reset(position)
 	}
+	for _, child := range ac.children {
+		child.Reset(position)
+	}
 }
 
-/* SetSecurityContext registers a security context by cache key */
 func (ac *ArrowContext) SetSecurityContext(key string, ctx *Context) {
 	if ac.SecurityContexts == nil {
 		ac.SecurityContexts = make(map[string]*Context)
@@ -72,7 +94,6 @@ func (ac *ArrowContext) SetSecurityContext(key string, ctx *Context) {
 	ac.SecurityContexts[key] = ctx
 }
 
-/* SetBarMapper registers a bar index mapper by cache key */
 func (ac *ArrowContext) SetBarMapper(key string, mapper BarIndexMapper) {
 	if ac.SecurityBarMappers == nil {
 		ac.SecurityBarMappers = make(map[string]BarIndexMapper)
@@ -80,7 +101,6 @@ func (ac *ArrowContext) SetBarMapper(key string, mapper BarIndexMapper) {
 	ac.SecurityBarMappers[key] = mapper
 }
 
-/* SetConcreteBarMapper stores the concrete bar mapper (e.g. *request.SecurityBarMapper) for arrow security eval */
 func (ac *ArrowContext) SetConcreteBarMapper(key string, mapper interface{}) {
 	if ac.ConcreteBarMappers == nil {
 		ac.ConcreteBarMappers = make(map[string]interface{})
@@ -88,7 +108,6 @@ func (ac *ArrowContext) SetConcreteBarMapper(key string, mapper interface{}) {
 	ac.ConcreteBarMappers[key] = mapper
 }
 
-/* GetOrCreateSecurityEvaluator returns the cached evaluator or nil */
 func (ac *ArrowContext) GetOrCreateSecurityEvaluators() map[string]interface{} {
 	if ac.SecurityEvaluators == nil {
 		ac.SecurityEvaluators = make(map[string]interface{})

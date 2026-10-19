@@ -329,10 +329,13 @@ func (b *TAIndicatorBuilder) BuildSTDEV() string {
 
 	code += b.indenter.Line(fmt.Sprintf("mean := sum / float64(%d)", b.period))
 
-	// Step 2: Calculate variance
+	// Step 2: Calculate variance with TV epsilon-rounding compensation
+	// (Pine ta.stdev reference: |diff|<=1e-10 → 0; |diff|<=1e-4 → 1e-5).
 	code += b.indenter.Line("variance := 0.0")
 	code += b.BuildLoop(func(val string) string {
-		return b.indenter.Line(fmt.Sprintf("diff := %s - mean\nvariance += diff * diff", val))
+		return b.indenter.Line(fmt.Sprintf("diff := %s - mean", val)) +
+			b.indenter.Line("if d := math.Abs(diff); d <= 1e-10 { diff = 0 } else if d <= 1e-4 { diff = 1e-5 }") +
+			b.indenter.Line("variance += diff * diff")
 	})
 
 	code += b.indenter.Line(fmt.Sprintf("stdev := math.Sqrt(variance / float64(%d))", b.period))

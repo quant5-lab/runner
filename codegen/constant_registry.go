@@ -25,6 +25,20 @@ func (cr *ConstantRegistry) Get(name string) (interface{}, bool) {
 	return val, exists
 }
 
+func (cr *ConstantRegistry) GetFloat(name string) (float64, bool) {
+	val, exists := cr.constants[name]
+	if !exists {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	}
+	return 0, false
+}
+
 func (cr *ConstantRegistry) IsConstant(name string) bool {
 	_, exists := cr.constants[name]
 	return exists

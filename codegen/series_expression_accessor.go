@@ -27,6 +27,7 @@ type SeriesExpressionAccessor struct {
 	expr          ast.Expression
 	symbolTable   SymbolTable
 	lookupCallVar CallVarLookup
+	preamble      string
 }
 
 func NewSeriesExpressionAccessor(
@@ -85,6 +86,17 @@ func (a *SeriesExpressionAccessor) GenerateCurrentValueAccess() string {
 	}
 
 	return code
+}
+
+/* GetPreamble returns any precomputed code that must run before series loop access */
+func (a *SeriesExpressionAccessor) GetPreamble() string {
+	return a.preamble
+}
+
+/* WithPreamble sets the preamble code and returns the receiver for chaining */
+func (a *SeriesExpressionAccessor) WithPreamble(p string) *SeriesExpressionAccessor {
+	a.preamble = p
+	return a
 }
 
 /* GetBaseOffset returns 0 - series expression access is current bar relative */

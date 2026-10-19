@@ -1,94 +1,50 @@
-/* Pane assignment logic based on value range analysis (SRP) */
 export class PaneAssigner {
   constructor(candlestickData) {
-    this.candlestickRange = this.calculateCandlestickRange(candlestickData);
+    this.candlestickRange = this._candlestickRange(candlestickData);
   }
 
-  calculateCandlestickRange(candlestickData) {
-    if (!candlestickData || candlestickData.length === 0) {
-      return { min: 0, max: 0 };
+  _candlestickRange(candlestickData) {
+    if (!candlestickData?.length) return { min: 0, max: 0 };
+    let min = Infinity, max = -Infinity;
+    for (const { low, high } of candlestickData) {
+      if (low < min) min = low;
+      if (high > max) max = high;
     }
-
-    let min = Infinity;
-    let max = -Infinity;
-
-    candlestickData.forEach((candle) => {
-      if (candle.low < min) min = candle.low;
-      if (candle.high > max) max = candle.high;
-    });
-
     return { min, max };
   }
 
-  calculateIndicatorRange(indicatorData) {
-    if (!indicatorData || indicatorData.length === 0) {
-      return { min: 0, max: 0 };
-    }
-
-    let min = Infinity;
-    let max = -Infinity;
-    let validCount = 0;
-
-    indicatorData.forEach((point) => {
-      if (point.value !== null && point.value !== undefined && !isNaN(point.value) && point.value !== 0) {
-        if (point.value < min) min = point.value;
-        if (point.value > max) max = point.value;
-        validCount++;
+  _indicatorRange(indicatorData) {
+    if (!indicatorData?.length) return { min: 0, max: 0 };
+    let min = Infinity, max = -Infinity, count = 0;
+    for (const { value } of indicatorData) {
+      if (value != null && !isNaN(value) && value !== 0) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+        count++;
       }
-    });
-
-    if (validCount === 0) {
-      return { min: 0, max: 0 };
     }
-
-    return { min, max };
+    return count === 0 ? { min: 0, max: 0 } : { min, max };
   }
 
-  rangesOverlap(range1, range2, overlapThreshold = 0.3) {
-    const range1Span = range1.max - range1.min;
-    const range2Span = range2.max - range2.min;
-
-    if (range1Span === 0 || range2Span === 0) return false;
-
-    const overlapMin = Math.max(range1.min, range2.min);
-    const overlapMax = Math.min(range1.max, range2.max);
-    const overlapSpan = Math.max(0, overlapMax - overlapMin);
-
-    const overlapRatio = overlapSpan / Math.min(range1Span, range2Span);
-
-    return overlapRatio >= overlapThreshold;
+  _rangesOverlap(r1, r2, threshold = 0.3) {
+    const span1 = r1.max - r1.min;
+    const span2 = r2.max - r2.min;
+    if (span1 === 0 || span2 === 0) return false;
+    const overlapSpan = Math.max(0, Math.min(r1.max, r2.max) - Math.max(r1.min, r2.min));
+    return overlapSpan / Math.min(span1, span2) >= threshold;
   }
 
-  assignPane(indicatorKey, indicator, configOverride = null) {
-    if (configOverride && configOverride[indicatorKey]) {
-      const override = configOverride[indicatorKey];
-      // Handle both string ("indicator") and object ({pane: "indicator", ...})
-      return typeof override === 'string' ? override : (override.pane || 'indicator');
-    }
-
-    if (indicator.pane && indicator.pane !== '') {
-      return indicator.pane;
-    }
-
-    const indicatorRange = this.calculateIndicatorRange(indicator.data);
-
-    if (this.rangesOverlap(this.candlestickRange, indicatorRange)) {
-      return 'main';
-    }
-
-    return 'indicator';
+  _assignPane(indicator) {
+    if (indicator.pane) return indicator.pane;
+    const range = this._indicatorRange(indicator.data);
+    return this._rangesOverlap(this.candlestickRange, range) ? 'main' : 'indicator';
   }
 
-  assignAllPanes(indicators, configOverride = null) {
+  assignAllPanes(indicators) {
     const result = {};
-
-    Object.entries(indicators).forEach(([key, indicator]) => {
-      result[key] = {
-        ...indicator,
-        pane: this.assignPane(key, indicator, configOverride),
-      };
-    });
-
+    for (const [key, indicator] of Object.entries(indicators)) {
+      result[key] = { ...indicator, pane: this._assignPane(indicator) };
+    }
     return result;
   }
 }

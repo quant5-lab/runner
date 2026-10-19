@@ -23,8 +23,7 @@ type PercentileLinearInterpolationIIFEGenerator struct {
 
 // CorrelationIIFEGenerator generates inline IIFE code for ta.correlation.
 type CorrelationIIFEGenerator struct {
-	namingStrategy series_naming.Strategy
-	src2Accessor   AccessGenerator
+	src2Accessor AccessGenerator
 }
 
 func (g *PercentrankIIFEGenerator) Generate(accessor AccessGenerator, period PeriodExpression, _ string) string {

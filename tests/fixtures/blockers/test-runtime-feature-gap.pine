@@ -1,0 +1,17 @@
+//@version=5
+indicator("Test Runtime Feature Gap", overlay=false)
+
+// Invoke 3 unimplemented functions across distinct codegen positions:
+//   1) variable-init       -> generator.variable_init_unknown
+//   2) plot expression     -> plot_expression
+//   3) binary operand      -> call_expr_series_extractor
+//
+// Each call must degrade via featuregap.Record (returning NaN) rather than
+// emitting a bare math.NaN(). The binary must NOT crash; NaN must propagate
+// naturally through downstream math.
+a = mystery_alpha(close)
+plot(mystery_beta(close), "beta")
+c = close + mystery_gamma(close)
+
+plot(a, "a")
+plot(c, "c")

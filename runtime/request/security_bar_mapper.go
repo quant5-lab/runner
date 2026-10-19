@@ -297,6 +297,39 @@ func (m *SecurityBarMapper) FindTargetBarIndexByContainment(sourceBarIndex int, 
 	return m.findDownscalingIndex(sourceBarIndex, lookahead)
 }
 
+// BuildMappingByTimestamp is required for intraday coarser secondaries where
+// multiple coarser bars can share the same calendar date, making
+// BuildMappingWithDateFilter's date-string comparison ambiguous.
+func (m *SecurityBarMapper) BuildMappingByTimestamp(coarserBars, primaryBars []context.OHLCV) {
+	if len(coarserBars) == 0 || len(primaryBars) == 0 {
+		return
+	}
+
+	m.mode = ModeDownscaling
+	m.ranges = make([]BarRange, 0, len(coarserBars))
+
+	primaryIdx := 0
+	for primaryIdx < len(primaryBars) && primaryBars[primaryIdx].Time < coarserBars[0].Time {
+		primaryIdx++
+	}
+
+	for coarserIdx := range coarserBars {
+		startIdx := primaryIdx
+
+		for primaryIdx < len(primaryBars) {
+			if coarserIdx+1 < len(coarserBars) && primaryBars[primaryIdx].Time >= coarserBars[coarserIdx+1].Time {
+				break
+			}
+			primaryIdx++
+		}
+
+		endIdx := primaryIdx - 1
+		if endIdx >= startIdx {
+			m.ranges = append(m.ranges, NewBarRange(coarserIdx, startIdx, endIdx))
+		}
+	}
+}
+
 func (m *SecurityBarMapper) GetRanges() []BarRange {
 	return m.ranges
 }

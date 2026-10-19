@@ -1,8 +1,0 @@
-AlphaTrend Strategy (v5) — ATR-based trend follower with MFI/RSI filter
-
-Parse: ✅
-Generate: ✅
-Compile: ✅
-Execute: ✅ (10 trades, equity $10,012.41)
-
-Blocker: ~~#1~~ resolved | ~~#6~~ resolved (MFI internal series not advancing in temp var hoisting)

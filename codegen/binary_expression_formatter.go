@@ -62,7 +62,7 @@ func (f *BinaryExpressionFormatter) formatWithGenerator(binExpr *ast.BinaryExpre
 	}
 
 	if binExpr.Operator == "%" {
-		return fmt.Sprintf("float64(int(%s) %s int(%s))", left, binExpr.Operator, right), nil
+		return fmt.Sprintf("math.Mod(%s, %s)", left, right), nil
 	}
 
 	result := fmt.Sprintf("(%s %s %s)", left, binExpr.Operator, right)
@@ -74,7 +74,7 @@ func (f *BinaryExpressionFormatter) formatWithExtractor(binExpr *ast.BinaryExpre
 	right := f.formatOperandWithExtractor(binExpr.Right, binExpr.Operator, true)
 
 	if binExpr.Operator == "%" {
-		return fmt.Sprintf("float64(int(%s) %s int(%s))", left, binExpr.Operator, right)
+		return fmt.Sprintf("math.Mod(%s, %s)", left, right)
 	}
 
 	return fmt.Sprintf("(%s %s %s)", left, binExpr.Operator, right)

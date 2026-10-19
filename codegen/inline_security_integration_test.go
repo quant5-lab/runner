@@ -164,6 +164,36 @@ func TestSecurityInlineTimeframeNormalization(t *testing.T) {
 			timeframe: "5m",
 			expectKey: "%s:5m",
 		},
+		{
+			name:      "1 minute numeric token",
+			timeframe: "1",
+			expectKey: "%s:1m",
+		},
+		{
+			name:      "5 minute numeric token",
+			timeframe: "5",
+			expectKey: "%s:5m",
+		},
+		{
+			name:      "15 minute numeric token",
+			timeframe: "15",
+			expectKey: "%s:15m",
+		},
+		{
+			name:      "30 minute numeric token",
+			timeframe: "30",
+			expectKey: "%s:30m",
+		},
+		{
+			name:      "60 minute numeric token",
+			timeframe: "60",
+			expectKey: "%s:1h",
+		},
+		{
+			name:      "240 minute numeric token",
+			timeframe: "240",
+			expectKey: "%s:4h",
+		},
 	}
 
 	for _, tt := range tests {

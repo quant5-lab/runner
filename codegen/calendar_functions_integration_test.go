@@ -39,7 +39,7 @@ func TestCalendarFunctions_FixtureCompilation(t *testing.T) {
 			mustContain: []string{
 				"context.TimeframeToSeconds(",
 				"context.TimeframeFromSeconds(",
-				"context.AlignTimestampToPeriod(",
+				"context.AlignTimestampToPeriodWithAnchor(",
 			},
 		},
 	}

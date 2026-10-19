@@ -67,10 +67,16 @@ func (b *MFIIndicatorBuilder) generateMoneyFlowSplit(posMFName, negMFName string
 	code += b.base.indenter.Line(fmt.Sprintf("%s = 0.0", negMFVar))
 	b.base.indenter.DecreaseIndent()
 
-	code += b.base.indenter.Line("} else {")
+	code += b.base.indenter.Line(fmt.Sprintf("} else if %s < 0 {", changeVar))
 	b.base.indenter.IncreaseIndent()
 	code += b.base.indenter.Line(fmt.Sprintf("%s = 0.0", posMFVar))
 	code += b.base.indenter.Line(fmt.Sprintf("%s = rawMF", negMFVar))
+	b.base.indenter.DecreaseIndent()
+
+	code += b.base.indenter.Line("} else {")
+	b.base.indenter.IncreaseIndent()
+	code += b.base.indenter.Line(fmt.Sprintf("%s = 0.0", posMFVar))
+	code += b.base.indenter.Line(fmt.Sprintf("%s = 0.0", negMFVar))
 	b.base.indenter.DecreaseIndent()
 	code += b.base.indenter.Line("}")
 

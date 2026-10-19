@@ -2,7 +2,7 @@
   "version": "1.0",
   "strategy": "Momentum Cascade Strategy",
   "dataSource": "AAPL-1h.json",
-  "generatedAt": "2026-01-21T10:56:11Z",
+  "generatedAt": "2026-06-11T18:39:54Z",
   "result": {
     "trades": [
       {
@@ -15,8 +15,8 @@
         "exitTime": 1760625000,
         "exitPrice": 247.49000549316406,
         "exitComment": "",
-        "size": 40.76973275345621,
-        "profit": 77.05477002016215,
+        "size": 40,
+        "profit": 75.5999755859375,
         "direction": "short"
       },
       {
@@ -29,8 +29,8 @@
         "exitTime": 1761244200,
         "exitPrice": 259.9700012207031,
         "exitComment": "",
-        "size": 38.25470448844489,
-        "profit": -132.74387127254107,
+        "size": 38,
+        "profit": -131.86004638671875,
         "direction": "long"
       },
       {
@@ -43,8 +43,8 @@
         "exitTime": 1761579000,
         "exitPrice": 265.7099914550781,
         "exitComment": "",
-        "size": 38.10936348377106,
-        "profit": -181.7812451356161,
+        "size": 38,
+        "profit": -181.25958251953125,
         "direction": "short"
       },
       {
@@ -57,8 +57,8 @@
         "exitTime": 1762270200,
         "exitPrice": 268.42999267578125,
         "exitComment": "",
-        "size": 36.753745324424564,
-        "profit": 102.91003825427104,
+        "size": 36,
+        "profit": 100.799560546875,
         "direction": "long"
       },
       {
@@ -71,8 +71,8 @@
         "exitTime": 1763407800,
         "exitPrice": 267.2950134277344,
         "exitComment": "",
-        "size": 35.876933950507336,
-        "profit": -276.07217464253154,
+        "size": 35,
+        "profit": -269.3241882324219,
         "direction": "long"
       },
       {
@@ -85,8 +85,8 @@
         "exitTime": 1763667000,
         "exitPrice": 267.7799987792969,
         "exitComment": "",
-        "size": 35.80259725334817,
-        "profit": 2.1480684265161893,
+        "size": 35,
+        "profit": 2.09991455078125,
         "direction": "short"
       },
       {
@@ -99,8 +99,8 @@
         "exitTime": 1764952200,
         "exitPrice": 279.29998779296875,
         "exitComment": "",
-        "size": 34.38990203700228,
-        "profit": 14.098936278231465,
+        "size": 34,
+        "profit": 13.9390869140625,
         "direction": "long"
       },
       {
@@ -113,8 +113,8 @@
         "exitTime": 1765477800,
         "exitPrice": 277.5249938964844,
         "exitComment": "",
-        "size": 34.3745148797822,
-        "profit": 67.20276404506247,
+        "size": 34,
+        "profit": 66.4705810546875,
         "direction": "short"
       },
       {
@@ -127,8 +127,8 @@
         "exitTime": 1766763000,
         "exitPrice": 274.81500244140625,
         "exitComment": "",
-        "size": 35.35838721930571,
-        "profit": -44.19798402413214,
+        "size": 35,
+        "profit": -43.75,
         "direction": "short"
       },
       {
@@ -141,8 +141,8 @@
         "exitTime": 1767191400,
         "exitPrice": 273.3599853515625,
         "exitComment": "",
-        "size": 35.14680648643203,
-        "profit": -20.737559710958156,
+        "size": 35,
+        "profit": -20.65093994140625,
         "direction": "long"
       },
       {
@@ -155,14 +155,14 @@
         "exitTime": 1768321800,
         "exitPrice": 259.8999938964844,
         "exitComment": "",
-        "size": 36.389356461989415,
-        "profit": 150.28821987042087,
+        "size": 36,
+        "profit": 148.68017578125,
         "direction": "short"
       }
     ],
     "openTrades": [],
-    "equity": 9758.169962108885,
-    "netProfit": -241.83003789111487,
+    "equity": 9760.744537353516,
+    "netProfit": -239.25546264648438,
     "totalTrades": 0,
     "plots": {}
   }

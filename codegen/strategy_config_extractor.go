@@ -58,6 +58,10 @@ func (e *StrategyConfigExtractor) extractFromObject(obj *ast.ObjectExpression, c
 		config.Pyramiding = val
 	}
 
+	if val, ok := e.propertyParser.ParseBool(obj, "process_orders_on_close"); ok {
+		config.ProcessOrdersOnClose = val
+	}
+
 	if val, ok := e.propertyParser.ParseIdentifier(obj, "commission_type"); ok {
 		config.CommissionType = normalizeCommissionType(val)
 	}

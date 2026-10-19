@@ -793,3 +793,315 @@ func ohlcvGoField(field string) string {
 		return "Close"
 	}
 }
+
+// TestTupleSecurityUDFCallDispatch verifies that [vars...] = security(sym, tf, UDF(args...))
+// delegates to SecurityUDFCallGenerator.EmitTupleCall for any registered UDF regardless of
+// argument count, var count, or UDF name. It covers the full matrix of screener patterns
+// that embed Pine user-defined functions as the third security() argument.
+func TestTupleSecurityUDFCallDispatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		udfName  string
+		udfArgs  []ast.Expression
+		varNames []string
+		// assertions on emitted code
+		wantContains []string
+	}{
+		{
+			name:    "two-var two-arg UDF (Pmax-style screener)",
+			udfName: "Pmax",
+			udfArgs: []ast.Expression{
+				&ast.Identifier{Name: "Multiplier"},
+				&ast.Identifier{Name: "Periods"},
+			},
+			varNames: []string{"trend", "tsl"},
+			wantContains: []string{
+				"context.NewArrowContext(secCtx)",
+				"Pmax(",
+				"trendSeries.Set(trend)",
+				"tslSeries.Set(tsl)",
+				"secKey :=",
+				"secCtx, secFound := securityContexts[secKey]",
+				"securityBarMapper, mapperFound := securityBarMappers[secKey]",
+				"secBarIdx := securityBarMapper.FindDailyBarIndex(ctx.BarIndex, secLookahead)",
+			},
+		},
+		{
+			name:     "single-var no-arg UDF",
+			udfName:  "GetSignal",
+			udfArgs:  []ast.Expression{},
+			varNames: []string{"sig"},
+			wantContains: []string{
+				"context.NewArrowContext(secCtx)",
+				// arrow context is always injected as first arg, so no-arg UDF
+				// appears as GetSignal(arrowCtxVar) — match the prefix only.
+				"GetSignal(",
+				"sigSeries.Set(sig)",
+			},
+		},
+		{
+			name:    "single-var multi-arg UDF",
+			udfName: "Score",
+			udfArgs: []ast.Expression{
+				&ast.Literal{Value: 14.0},
+				&ast.Identifier{Name: "close"},
+				&ast.Identifier{Name: "volume"},
+			},
+			varNames: []string{"score"},
+			wantContains: []string{
+				"context.NewArrowContext(secCtx)",
+				"Score(",
+				"scoreSeries.Set(score)",
+			},
+		},
+		{
+			name:     "three-var UDF returning triple",
+			udfName:  "TripleOutput",
+			udfArgs:  []ast.Expression{&ast.Identifier{Name: "src"}},
+			varNames: []string{"a", "b", "c"},
+			wantContains: []string{
+				"context.NewArrowContext(secCtx)",
+				"TripleOutput(",
+				"aSeries.Set(a)",
+				"bSeries.Set(b)",
+				"cSeries.Set(c)",
+			},
+		},
+		{
+			name:     "UDF with underscore-prefixed name",
+			udfName:  "_internal_helper",
+			udfArgs:  []ast.Expression{&ast.Identifier{Name: "close"}},
+			varNames: []string{"out1", "out2"},
+			wantContains: []string{
+				"_internal_helper(",
+				"out1Series.Set(out1)",
+				"out2Series.Set(out2)",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGeneratorForSecurityTupleTests()
+			gen.variables[tt.udfName] = "function"
+
+			udfCall := &ast.CallExpression{
+				Callee:    &ast.Identifier{Name: tt.udfName},
+				Arguments: tt.udfArgs,
+			}
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "AAPL"},
+					&ast.Literal{Value: "60"},
+					udfCall,
+				},
+			}
+
+			declarator := buildTupleDeclarator(tt.varNames, call)
+			code, err := gen.generateTupleDestructuringDeclaration(declarator)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			for _, want := range tt.wantContains {
+				assertContains(t, code, want)
+			}
+		})
+	}
+}
+
+// TestTupleSecurityThirdArgRejectedKinds verifies that third-argument forms that are
+// neither an array literal nor a registered UDF call produce a consistent error.
+// Each case tests a structurally different argument type to ensure no form silently
+// slips through to undefined behavior.
+func TestTupleSecurityThirdArgRejectedKinds(t *testing.T) {
+	tests := []struct {
+		name    string
+		arg     ast.Expression
+		varsCnt int
+		wantErr string
+	}{
+		{
+			name:    "non-UDF builtin call (ta.sma)",
+			varsCnt: 1,
+			arg: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "ta"},
+					Property: &ast.Identifier{Name: "sma"},
+				},
+				Arguments: []ast.Expression{
+					&ast.Identifier{Name: "close"},
+					&ast.Literal{Value: 14.0},
+				},
+			},
+			wantErr: "expected array literal",
+		},
+		{
+			name:    "non-UDF flat call (math.round)",
+			varsCnt: 1,
+			arg: &ast.CallExpression{
+				Callee: &ast.MemberExpression{
+					Object:   &ast.Identifier{Name: "math"},
+					Property: &ast.Identifier{Name: "round"},
+				},
+				Arguments: []ast.Expression{&ast.Identifier{Name: "close"}},
+			},
+			wantErr: "expected array literal",
+		},
+		{
+			name:    "unregistered identifier-call",
+			varsCnt: 1,
+			arg: &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "notAUDF"},
+			},
+			wantErr: "expected array literal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := newTestGeneratorForSecurityTupleTests()
+			// deliberately do NOT register the callee as a UDF
+
+			varNames := make([]string, tt.varsCnt)
+			for i := range varNames {
+				varNames[i] = fmt.Sprintf("v%d", i)
+			}
+
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "security"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "AAPL"},
+					&ast.Literal{Value: "60"},
+					tt.arg,
+				},
+			}
+
+			declarator := buildTupleDeclarator(varNames, call)
+			_, err := gen.generateTupleDestructuringDeclaration(declarator)
+			if err == nil {
+				t.Fatal("expected error but got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected %q in error, got: %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestResolveTupleExpressionArg exercises every branch of the shared helper, including
+// invariants about when cardinality is and is not checked.
+func TestResolveTupleExpressionArg(t *testing.T) {
+	gen := newTestGeneratorForSecurityTupleTests()
+	gen.variables["MyUDF"] = "function"
+	detector := NewUserDefinedFunctionDetector(gen.variables)
+
+	t.Run("UDF call yields udfCall with nil elements", func(t *testing.T) {
+		call := &ast.CallExpression{Callee: &ast.Identifier{Name: "MyUDF"}}
+		elems, udfCall, err := resolveTupleExpressionArg(detector, call, 2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if udfCall == nil {
+			t.Fatal("expected udfCall to be non-nil")
+		}
+		if elems != nil {
+			t.Fatalf("expected elements to be nil for UDF path, got %v", elems)
+		}
+	})
+
+	t.Run("UDF path bypasses cardinality check", func(t *testing.T) {
+		// The UDF determines its output count at runtime; the caller's var count
+		// is irrelevant at the parse stage and must not cause a cardinality error.
+		call := &ast.CallExpression{Callee: &ast.Identifier{Name: "MyUDF"}}
+		_, udfCall, err := resolveTupleExpressionArg(detector, call, 999)
+		if err != nil {
+			t.Fatalf("UDF path should not check cardinality, got error: %v", err)
+		}
+		if udfCall == nil {
+			t.Fatal("expected udfCall to be non-nil")
+		}
+	})
+
+	t.Run("array literal with matching cardinality returns elements", func(t *testing.T) {
+		lit := &ast.Literal{
+			Value: []ast.Expression{
+				&ast.Identifier{Name: "close"},
+				&ast.Identifier{Name: "open"},
+			},
+		}
+		elems, udfCall, err := resolveTupleExpressionArg(detector, lit, 2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if udfCall != nil {
+			t.Fatalf("expected udfCall to be nil for literal path")
+		}
+		if len(elems) != 2 {
+			t.Fatalf("expected 2 elements, got %d", len(elems))
+		}
+	})
+
+	t.Run("array literal cardinality mismatch returns error", func(t *testing.T) {
+		lit := &ast.Literal{
+			Value: []ast.Expression{&ast.Identifier{Name: "close"}},
+		}
+		_, _, err := resolveTupleExpressionArg(detector, lit, 3)
+		if err == nil {
+			t.Fatal("expected cardinality error")
+		}
+		if !strings.Contains(err.Error(), "cardinality mismatch") {
+			t.Errorf("expected 'cardinality mismatch' in error, got: %v", err)
+		}
+	})
+
+	t.Run("empty array literal rejected", func(t *testing.T) {
+		// An empty literal [] has no expressions to bind to variables.
+		// extractTupleExpressionElements catches this before cardinality is reached.
+		lit := &ast.Literal{Value: []ast.Expression{}}
+		_, _, err := resolveTupleExpressionArg(detector, lit, 2)
+		if err == nil {
+			t.Fatal("expected error for empty literal")
+		}
+		if !strings.Contains(err.Error(), "empty expression array") {
+			t.Errorf("expected 'empty expression array' in error, got: %v", err)
+		}
+	})
+
+	t.Run("non-UDF CallExpression rejected", func(t *testing.T) {
+		call := &ast.CallExpression{Callee: &ast.Identifier{Name: "unknownFunc"}}
+		_, _, err := resolveTupleExpressionArg(detector, call, 1)
+		if err == nil {
+			t.Fatal("expected error for non-UDF call")
+		}
+		if !strings.Contains(err.Error(), "expected array literal") {
+			t.Errorf("expected 'expected array literal' in error, got: %v", err)
+		}
+	})
+
+	t.Run("bare identifier rejected", func(t *testing.T) {
+		_, _, err := resolveTupleExpressionArg(detector, &ast.Identifier{Name: "close"}, 1)
+		if err == nil {
+			t.Fatal("expected error for identifier")
+		}
+		if !strings.Contains(err.Error(), "expected array literal") {
+			t.Errorf("expected 'expected array literal' in error, got: %v", err)
+		}
+	})
+
+	t.Run("binary expression rejected", func(t *testing.T) {
+		expr := &ast.BinaryExpression{
+			Operator: "+",
+			Left:     &ast.Identifier{Name: "close"},
+			Right:    &ast.Literal{Value: 1.0},
+		}
+		_, _, err := resolveTupleExpressionArg(detector, expr, 1)
+		if err == nil {
+			t.Fatal("expected error for binary expression")
+		}
+		if !strings.Contains(err.Error(), "expected array literal") {
+			t.Errorf("expected 'expected array literal' in error, got: %v", err)
+		}
+	})
+}

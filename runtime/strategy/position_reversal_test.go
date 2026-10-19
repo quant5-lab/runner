@@ -547,3 +547,106 @@ func TestPositionReversal_EdgeCases(t *testing.T) {
 		}
 	})
 }
+
+func TestPositionReversal_Commission(t *testing.T) {
+	// Verifies that a position reversal via strategy.entry correctly charges:
+	//   - the exit commission on the trade being closed (same as explicit close)
+	//   - the entry commission on the new opposing trade
+	// This invariant holds for all three commission models.
+	tests := []struct {
+		name           string
+		commType       string
+		commRate       float64
+		initDir        string
+		reversalDir    string
+		openQty        float64
+		entryPrice     float64
+		reversalQty    float64
+		reversalPrice  float64
+		wantClosedComm float64 // entry_comm(open) + exit_comm(reversal)
+		wantOpenComm   float64 // entry_comm(reversal)
+	}{
+		{
+			name:           "percent_long_to_short",
+			commType:       CommissionPercent,
+			commRate:       1.0,
+			initDir:        Long,
+			reversalDir:    Short,
+			openQty:        10,
+			entryPrice:     100,
+			reversalQty:    10,
+			reversalPrice:  110,
+			wantClosedComm: 10*100*0.01 + 10*110*0.01,
+			wantOpenComm:   10 * 110 * 0.01,
+		},
+		{
+			name:           "cash_per_order_long_to_short",
+			commType:       CommissionCashPerOrder,
+			commRate:       5.0,
+			initDir:        Long,
+			reversalDir:    Short,
+			openQty:        10,
+			entryPrice:     100,
+			reversalQty:    10,
+			reversalPrice:  110,
+			wantClosedComm: 5.0 + 5.0,
+			wantOpenComm:   5.0,
+		},
+		{
+			name:           "cash_per_contract_long_to_short",
+			commType:       CommissionCashPerContract,
+			commRate:       2.0,
+			initDir:        Long,
+			reversalDir:    Short,
+			openQty:        5,
+			entryPrice:     100,
+			reversalQty:    5,
+			reversalPrice:  110,
+			wantClosedComm: 5*2.0 + 5*2.0,
+			wantOpenComm:   5 * 2.0,
+		},
+		{
+			name:           "percent_short_to_long",
+			commType:       CommissionPercent,
+			commRate:       0.5,
+			initDir:        Short,
+			reversalDir:    Long,
+			openQty:        20,
+			entryPrice:     200,
+			reversalQty:    20,
+			reversalPrice:  190,
+			wantClosedComm: 20*200*0.005 + 20*190*0.005,
+			wantOpenComm:   20 * 190 * 0.005,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewStrategy()
+			s.CallWithPyramiding("Test", 1000000, 10)
+			s.SetCommission(tt.commRate, tt.commType)
+
+			s.Entry("Init", tt.initDir, tt.openQty, "")
+			s.OnBarUpdate(1, tt.entryPrice, 1000)
+
+			s.Entry("Rev", tt.reversalDir, tt.reversalQty, "")
+			s.OnBarUpdate(2, tt.reversalPrice, 2000)
+
+			closed := s.GetTradeHistory().GetClosedTrades()
+			if len(closed) != 1 {
+				t.Fatalf("closed trades: want 1, got %d", len(closed))
+			}
+			if closed[0].Commission != tt.wantClosedComm {
+				t.Errorf("closed commission: got %.4f, want %.4f", closed[0].Commission, tt.wantClosedComm)
+			}
+
+			open := s.GetTradeHistory().GetOpenTrades()
+			if len(open) != 1 {
+				t.Fatalf("open trades: want 1, got %d", len(open))
+			}
+			if open[0].Commission != tt.wantOpenComm {
+				t.Errorf("new entry commission: got %.4f, want %.4f", open[0].Commission, tt.wantOpenComm)
+			}
+		})
+	}
+}

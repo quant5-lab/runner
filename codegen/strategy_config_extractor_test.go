@@ -313,6 +313,10 @@ func TestStrategyConfigExtractor_AllProperties(t *testing.T) {
 						Key:   &ast.Identifier{Name: "default_qty_type"},
 						Value: &ast.Identifier{Name: "fixed"},
 					},
+					{
+						Key:   &ast.Identifier{Name: "process_orders_on_close"},
+						Value: &ast.Literal{Value: true},
+					},
 				},
 			},
 		},
@@ -331,6 +335,9 @@ func TestStrategyConfigExtractor_AllProperties(t *testing.T) {
 	}
 	if config.DefaultQtyType != "fixed" {
 		t.Errorf("Expected default_qty_type 'fixed', got '%s'", config.DefaultQtyType)
+	}
+	if !config.ProcessOrdersOnClose {
+		t.Error("Expected process_orders_on_close to be extracted as true")
 	}
 }
 
@@ -699,6 +706,48 @@ func TestNormalizeCommissionType(t *testing.T) {
 			result := normalizeCommissionType(tt.input)
 			if result != tt.expected {
 				t.Errorf("normalizeCommissionType(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStrategyConfigExtractor_ProcessOrdersOnClose(t *testing.T) {
+	tests := []struct {
+		name  string
+		value ast.Expression
+		want  bool
+	}{
+		{name: "true bool literal sets flag", value: &ast.Literal{Value: true}, want: true},
+		{name: "false bool literal leaves flag unset", value: &ast.Literal{Value: false}, want: false},
+		{name: "absent property leaves flag unset", value: nil, want: false},
+		{name: "numeric literal not parsed as bool", value: &ast.Literal{Value: 1}, want: false},
+		{name: "string literal not parsed as bool", value: &ast.Literal{Value: "true"}, want: false},
+		{name: "identifier not parsed as bool", value: &ast.Identifier{Name: "true"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			extractor := NewStrategyConfigExtractor()
+
+			var props []ast.Property
+			if tt.value != nil {
+				props = append(props, ast.Property{
+					Key:   &ast.Identifier{Name: "process_orders_on_close"},
+					Value: tt.value,
+				})
+			}
+
+			call := &ast.CallExpression{
+				Callee: &ast.Identifier{Name: "strategy"},
+				Arguments: []ast.Expression{
+					&ast.Literal{Value: "S"},
+					&ast.ObjectExpression{Properties: props},
+				},
+			}
+
+			config := extractor.ExtractFromCall(call)
+			if config.ProcessOrdersOnClose != tt.want {
+				t.Errorf("ProcessOrdersOnClose = %v, want %v", config.ProcessOrdersOnClose, tt.want)
 			}
 		})
 	}
